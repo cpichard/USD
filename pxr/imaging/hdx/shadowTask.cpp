@@ -277,6 +277,19 @@ void
 HdxShadowTask::Prepare(HdTaskContext* ctx,
                        HdRenderIndex* renderIndex)
 {
+    GlfSimpleLightingContextRefPtr lightingContext;
+    if (!_GetTaskContextData(ctx,
+            HdxTokens->lightingContext, &lightingContext)) {
+        return;
+    }
+
+    GlfSimpleShadowArrayRefPtr const shadows = lightingContext->GetShadows();
+    if (shadows->GetNumShadowMapPasses() == 0) {
+        // Bail if we are not generating shadow maps. We don't want to call
+        // Prepare on outdated AOV bindings.
+        return;
+    }
+
     HdResourceRegistrySharedPtr resourceRegistry =
         renderIndex->GetResourceRegistry();
 

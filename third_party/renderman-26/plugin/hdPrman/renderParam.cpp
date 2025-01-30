@@ -20,6 +20,7 @@
 #include "hdPrman/renderViewContext.h"
 #include "hdPrman/rixStrings.h"
 #include "hdPrman/utils.h"
+#include "hdPrman/tokens.h"
 
 #include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/enums.h"
@@ -877,9 +878,9 @@ HdPrman_ConvertPrimvars(HdSceneDelegate *sceneDelegate, SdfPath const& id,
     }
 }
 
-// In 2302 and beyond, we can use
+// In 2311 and beyond, we can use
 // HdPrman_PreviewSurfacePrimvarsSceneIndexPlugin.
-#if PXR_VERSION < 2302
+#if PXR_VERSION < 2311
 
 void
 HdPrman_TransferMaterialPrimvarOpinions(HdSceneDelegate *sceneDelegate,
@@ -914,7 +915,7 @@ HdPrman_TransferMaterialPrimvarOpinions(HdSceneDelegate *sceneDelegate,
     }
 }
 
-#endif // PXR_VERSION >= 2302
+#endif // PXR_VERSION >= 2311
 
 RtParamList
 HdPrman_RenderParam::ConvertAttributes(HdSceneDelegate *sceneDelegate,
@@ -4806,6 +4807,43 @@ HdPrman_RenderParam::IsInteractive() const
 {
     return _renderDelegate->IsInteractive();
 }
+
+#if HD_API_VERSION >=76
+bool
+HdPrman_RenderParam::HasArbitraryValue(const TfToken& key) const
+{
+    // Currenly, we only support the sceneStateId as an arbitrary value.
+    return (key == HdPrmanRenderParamTokens->sceneStateId);
+}
+
+VtValue
+HdPrman_RenderParam::GetArbitraryValue(const TfToken& key) const
+{
+    // Currenly, we only support the sceneStateId as an arbitrary value.
+    if (key == HdPrmanRenderParamTokens->sceneStateId) {
+        return VtValue(_sceneStateId.load());
+    }
+
+    return VtValue();
+}
+
+bool
+HdPrman_RenderParam::SetArbitraryValue(const TfToken& key, const VtValue& value)
+{
+    // Currenly, we only support the sceneStateId as an arbitrary value.
+    if (key == HdPrmanRenderParamTokens->sceneStateId) {
+        if (value.IsHolding<int>()) {
+            _sceneStateId.store(value.Get<int>());
+            return true;
+        }
+
+        TF_WARN("Invalid type for 'sceneStateId' value (int expected) : %s",
+                value.GetTypeName().c_str());
+    }
+
+    return false;
+}
+#endif
 
 static const float*
 _GetShutterParam(const RtParamList &params)
