@@ -44,6 +44,7 @@
 #include "pxr/usd/sdr/shaderProperty.h"
 
 #include "pxr/base/arch/library.h"
+#include "pxr/base/arch/timing.h"
 #include "pxr/base/gf/vec2d.h"
 #include "pxr/base/gf/vec2f.h"
 #include "pxr/base/gf/vec2i.h"
@@ -120,6 +121,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
     (percentDone)
+    (totalClockTime)
+    (renderProgressAnnotation)
     (PrimvarPass)
     (name)
     (sourceName)
@@ -169,6 +172,8 @@ TF_DEFINE_ENV_SETTING(HD_PRMAN_DEFER_SET_OPTIONS, true,
                       "Defer first SetOptions call to render settings prim sync.");
 TF_DEFINE_ENV_SETTING(RMAN_XPU_GPUCONFIG, "0",
                       "A comma separated list of integers for which GPU devices to use.");
+TF_DEFINE_ENV_SETTING(HD_PRMAN_DISABLE_ADAPTIVE_SAMPLING, false,
+                      "Disable adaptive sampling.");
 
 // We now have two env setting related to driving hdPrman rendering using the
 // render settings prim. HD_PRMAN_RENDER_SETTINGS_DRIVE_RENDER_PASS ignores the
@@ -209,6 +214,8 @@ HdPrman_RenderParam::HdPrman_RenderParam(
     _statsSession(nullptr),
     _progressPercent(0),
     _progressMode(0),
+    _startTime(0),
+    _stopTime(0),
     _riley(nullptr),
 #if PXR_VERSION >= 2302
     _statsSceneIndex(nullptr),
@@ -221,6 +228,7 @@ HdPrman_RenderParam::HdPrman_RenderParam(
     _displayFiltersId(riley::DisplayFilterId::InvalidId()),
     _lastLegacySettingsVersion(0),
     _resolution(0),
+    _resolutionStr(""),
     _displayFiltersDirty(false),
     _sampleFiltersDirty(false),
     _sampleFilterId(riley::SampleFilterId::InvalidId()),
@@ -234,6 +242,7 @@ HdPrman_RenderParam::HdPrman_RenderParam(
     _qnMinSamples(2),
     _qnInterval(4)
 {
+    _startTime = ArchGetTickTime();
 #if _PRMANAPI_VERSION_MAJOR_ < 26
     // Create the stats session
     _CreateStatsSession();
@@ -2704,6 +2713,15 @@ HdPrman_RenderParam::UpdateRenderStats(VtDictionary &stats)
     // the dictionary the progress value that comes from
     // the rix progress callback.
     stats[_tokens->percentDone.GetString()] = _progressPercent;
+    // Stop time gets set at end of _RenderThreadCallback
+    // after riley->Render returns. Until that happens, log the time so far.
+    stats[_tokens->totalClockTime.GetString()] = (_stopTime == 0) ?
+        ArchTicksToSeconds(ArchGetTickTime() - _startTime) :
+        ArchTicksToSeconds(_stopTime - _startTime);
+    // renderProgressAnnotation is how Solaris allows us to print in viewport.
+    // Use it to display the current resolution.
+    stats[_tokens->renderProgressAnnotation.GetString()] =
+        VtValue(_resolutionStr);
 }
 
 void
@@ -2780,6 +2798,9 @@ void
 HdPrman_RenderParam::SetResolution(GfVec2i const & resolution)
 {
     _resolution = resolution;
+    _resolutionStr = std::to_string(_resolution[0]);
+    _resolutionStr += " x ";
+    _resolutionStr += std::to_string(_resolution[1]);
 }
 
 void
@@ -3037,6 +3058,8 @@ HdPrman_RenderParam::_RenderThreadCallback()
         { static_cast<uint32_t>(TfArraySize(renderViewIds)),
           renderViewIds },
         renderOptions);
+
+    _stopTime = ArchGetTickTime();
 }
 
 void
@@ -3336,6 +3359,14 @@ HdPrman_RenderParam::StartRender()
     if (_statsSession)
     {
         _statsSession->RemoveOldMetricData();
+    }
+
+    // If render restarts without recreating delegate, start timing here.
+    // Otherwise, _startTime is set in HdPrman_RenderParam constructor,
+    // so that it includes time for creation of hydra prims.
+    if(_stopTime != 0) {
+        _stopTime = 0;
+        _startTime = ArchGetTickTime();
     }
 
     _renderThread->StartRender();
@@ -3647,6 +3678,7 @@ HdPrman_RenderParam::_CreateRileyDisplay(
         displayParams.SetString(RixStr.k_Ri_name, productName);
         displayParams.SetString(RixStr.k_Ri_type, productType);
         if(_framebuffer) {
+            std::lock_guard<std::mutex> lock(_framebuffer->mutex);
             static const RtUString us_bufferID("bufferID");
             displayParams.SetInteger(us_bufferID, _framebuffer->id);
         }
@@ -3868,10 +3900,10 @@ HdPrman_RenderParam::CreateFramebufferAndRenderViewFromAovs(
     // Stop render and crease sceneVersion to trigger restart.
     riley::Riley * riley = AcquireRiley();
 
-    std::lock_guard<std::mutex> lock(_framebuffer->mutex);
-
-    _framebuffer->pendingClear = true;
-
+    {
+        std::lock_guard<std::mutex> lock(_framebuffer->mutex);
+        _framebuffer->pendingClear = true;
+    }
     _lastBindings = aovBindings;
 
     // Displays & Display Channels
@@ -3931,9 +3963,15 @@ HdPrman_RenderParam::CreateFramebufferAndRenderViewFromAovs(
                 aovDescs.push_back(std::move(aovDesc));
             }
         }
-
-        _framebuffer->CreateAovBuffers(aovDescs);
-
+        {
+            std::lock_guard<std::mutex> lock(_framebuffer->mutex);
+            _framebuffer->CreateAovBuffers(aovDescs);
+        }
+        // RMAN-23141: We do NOT want to lock the following call to CreateRileyDisplay since the
+        // renderer might want to schedule this display call either immediately or defer to a later
+        // time. In the case, it wants to call the display API immediately, holding on to the
+        // framebuffer lock will cause issues in case the display API within this thread also wants
+        // to do the same.
         RtParamList displayParams;
         static const RtUString us_hydra("hydra");
         _CreateRileyDisplay(RixStr.k_framebuffer,
