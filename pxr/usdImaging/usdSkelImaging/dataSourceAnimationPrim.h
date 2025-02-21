@@ -17,7 +17,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class UsdSkelImagingDataSourceAnimationPrim
 ///
-/// A prim data source representing UsdNurbsCurves.
+/// A prim data source for UsdSkel's SkelAnimation.
 ///
 class UsdSkelImagingDataSourceAnimationPrim
     : public UsdImagingDataSourcePrim

@@ -17,7 +17,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class UsdSkelImagingAnimationAdapter
 ///
-/// Support for consuming UsdSkelAnimation.
+/// Prim adapter for UsdSkel's SkelAnimation.
 ///
 class UsdSkelImagingAnimationAdapter
     : public UsdImagingSceneIndexPrimAdapter
