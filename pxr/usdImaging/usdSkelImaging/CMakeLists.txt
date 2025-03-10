@@ -22,15 +22,18 @@ pxr_library(usdSkelImaging
         extComputations
         inbetweenShapeSchema
         package
+        resolvingSceneIndexPlugin
+        skelData
         skeletonAdapter
         skeletonSchema
+        skelGuideData
         skelRootAdapter
         tokens
         utils
 
     PUBLIC_HEADERS
         api.h
-        schemaTypeDefs.h
+        dataSourceUtils.h
 
     RESOURCE_FILES
         plugInfo.json
