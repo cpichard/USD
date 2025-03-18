@@ -6,7 +6,9 @@
 //
 #include "pxr/usdImaging/usdSkelImaging/resolvingSceneIndexPlugin.h"
 
+#include "pxr/usdImaging/usdSkelImaging/pointsResolvingSceneIndex.h"
 #include "pxr/usdImaging/usdSkelImaging/bindingSchema.h"
+#include "pxr/usdImaging/usdSkelImaging/skeletonResolvingSceneIndex.h"
 
 #include "pxr/imaging/hd/flattenedDataSourceProviders.h"
 #include "pxr/imaging/hd/flattenedOverlayDataSourceProvider.h"
@@ -27,9 +29,11 @@ UsdSkelImagingResolvingSceneIndexPlugin::AppendSceneIndex(
 {
     HdSceneIndexBaseRefPtr sceneIndex = inputScene;
 
-    // TODO:
-    // Add scene indices resolving the Skeleton prim and
-    // points-based prims skinned by a Skeleton.
+    sceneIndex =
+        UsdSkelImagingSkeletonResolvingSceneIndex::New(sceneIndex);
+
+    sceneIndex =
+        UsdSkelImagingPointsResolvingSceneIndex::New(sceneIndex);
 
     return sceneIndex;
 }
