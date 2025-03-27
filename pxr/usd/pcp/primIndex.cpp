@@ -483,11 +483,12 @@ _GatherNodesRecursively(const PcpNodeRef& node,
                         std::vector<PcpNodeRef> *result);
 
 static bool
-_HasSpecializesChild(const PcpNodeRef & parent)
+_HasSpecializesChildInSubtree(const PcpNodeRef & parent)
 {
-    TF_FOR_ALL(child, Pcp_GetChildrenRange(parent)) {
-        if (PcpIsSpecializeArc((*child).GetArcType()))
+    for (PcpNodeRef child : Pcp_GetSubtreeRange(parent)) {
+        if (PcpIsSpecializeArc(child.GetArcType())) {
             return true;
+        }
     }
     return false;
 }
@@ -1366,13 +1367,11 @@ struct Pcp_PrimIndexer
                     // beneath this node to the appropriate location.
                     AddTask(Task(Task::Type::EvalImpliedSpecializes, base));
                 }
-                else if (_HasSpecializesChild(n)) {
+                else if (_HasSpecializesChildInSubtree(n)) {
                     // The new node is not a specializes node or beneath a
-                    // specializes node, but has specializes children.
-                    // Such children represent arcs found during the recursive 
-                    // computation of the node's subgraph.  We need to pick them 
-                    // up and continue propagating them now that we are
-                    // merging the subgraph into the parent graph.
+                    // specializes node, but has specializes children. We also
+                    // need to propagate those children to the appropriate
+                    // location.
                     AddTask(Task(Task::Type::EvalImpliedSpecializes, n));
                 }
             }
@@ -3537,10 +3536,6 @@ _EvalImpliedClassTree(
     }
 }
 
-static bool
-_IsPropagatedSpecializesNode(
-    const PcpNodeRef& node);
-
 static void
 _EvalImpliedClasses(
     PcpNodeRef node,
@@ -3560,7 +3555,7 @@ _EvalImpliedClasses(
     // the origin of these specializes arcs -- this ensures the origin
     // nodes of the propagated inherits have a consistent strength 
     // ordering.  This is handled with the implied specializes task.
-    if (_IsPropagatedSpecializesNode(node)) {
+    if (Pcp_IsPropagatedSpecializesNode(node)) {
         return;
     }
 
@@ -3631,18 +3626,6 @@ _EvalNodeSpecializes(
 
     // Add specializes arcs.
     _AddClassBasedArcs(node, specArcs, PcpArcTypeSpecialize, indexer);
-}
-
-// Returns true if the given node is a specializes node that
-// has been propagated to the root of the graph for strength
-// ordering purposes in _EvalImpliedSpecializes.
-static bool
-_IsPropagatedSpecializesNode(
-    const PcpNodeRef& node)
-{
-    return (PcpIsSpecializeArc(node.GetArcType()) && 
-            node.GetParentNode() == node.GetRootNode() && 
-            node.GetSite() == node.GetOriginNode().GetSite());
 }
 
 static bool
@@ -3728,6 +3711,7 @@ _PropagateNodeToParent(
             newNode.SetHasSymmetry(srcNode.HasSymmetry());
             newNode.SetPermission(srcNode.GetPermission());
             newNode.SetRestricted(srcNode.IsRestricted());
+            newNode.SetIsDueToAncestor(srcNode.IsDueToAncestor());
 
             // If we're propagating nodes to the origin, newNode may be a
             // previously-existing node that was created during an ancestral
@@ -3966,7 +3950,7 @@ _EvalImpliedSpecializes(
     if (!node.GetParentNode())
         return;
 
-    if (_IsPropagatedSpecializesNode(node)) {
+    if (Pcp_IsPropagatedSpecializesNode(node)) {
         _FindArcsToPropagateToOrigin(node, indexer);
     }
     else {
@@ -5015,7 +4999,7 @@ _CullSubtreesWithNoOpinions(
     // test_PrimIndexCulling_SpecializesHierarchy in testPcpPrimIndex for
     // an example.
     TF_REVERSE_FOR_ALL(child, Pcp_GetChildrenRange(primIndex->GetRootNode())) {
-        if (_IsPropagatedSpecializesNode(*child)) {
+        if (Pcp_IsPropagatedSpecializesNode(*child)) {
             std::unordered_set<PcpLayerStackSite, TfHash> culledSites;
             _CullSubtreesWithNoOpinionsHelper(
                 *child, rootSite, culledDeps, &culledSites);
@@ -5025,7 +5009,7 @@ _CullSubtreesWithNoOpinions(
     }
 
     TF_FOR_ALL(child, Pcp_GetChildrenRange(primIndex->GetRootNode())) {
-        if (!_IsPropagatedSpecializesNode(*child)) {
+        if (!Pcp_IsPropagatedSpecializesNode(*child)) {
             _CullSubtreesWithNoOpinionsHelper(*child, rootSite, culledDeps);
         }
     }
