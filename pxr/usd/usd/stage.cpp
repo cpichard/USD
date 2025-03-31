@@ -2061,6 +2061,13 @@ UsdStage::_SetValue(
 bool
 UsdStage::_ClearValue(UsdTimeCode time, const UsdAttribute &attr)
 {
+    if (time.IsPreTime()) {
+        TF_CODING_ERROR("Cannot clear value on <%s> at the pre-time %lf. "
+                        "Pre-time is meant only for retrieving values at the "
+                        "limit when approaching time from the left.",
+                        attr.GetPath().GetText(), time.GetValue());
+        return false;
+    }
     if (ARCH_UNLIKELY(!_ValidateEditPrim(attr.GetPrim(), "clear attribute value"))) {
         return false;
     }
@@ -6872,6 +6879,13 @@ bool
 UsdStage::_SetValueImpl(
     UsdTimeCode time, const UsdAttribute &attr, const T& newValue)
 {
+    if (time.IsPreTime()) {
+        TF_CODING_ERROR("Cannot set value on <%s> at the pre-time %lf. "
+                        "Pre-time is meant only for retrieving values at the "
+                        "limit when approaching time from the left.",
+                        attr.GetPath().GetText(), time.GetValue());
+        return false;
+    }
     // if we are setting a value block, we don't want type checking
     if (!Usd_ValueContainsBlock(&newValue)) {
         // Find the attribute's value type.
@@ -8212,12 +8226,14 @@ template <typename S>
 struct _EvalSplineFunctor
 {
     template <typename T>
-    void operator()(const TsSpline& spline, double localTime,
+    void operator()(const TsSpline& spline, UsdTimeCode localTime,
                     const SdfLayerOffset& layerToStageOffset, T* result,
                     bool* successOut)
     {
         S val;
-        if (!spline.Eval(localTime, &val)) {
+        auto evalFunc = !localTime.IsPreTime() ?
+                            &TsSpline::Eval<S> : &TsSpline::EvalPreValue<S>;
+        if (!(spline.*evalFunc)(localTime.GetValue(), &val)) {
             return;
         }
         *successOut = true;
@@ -8269,16 +8285,28 @@ public:
             }
         }
 
+        const char* preTimeDebug = time.IsPreTime() ? " (pretime)" : "";
         TF_DEBUG(USD_VALUE_RESOLUTION).Msg(
             "RESOLVE: reading field %s:%s from @%s@, "
-            "with requested time = %.3f (local time = %.3f) "
+            "with requested time = %.3f%s (local time = %.3f) "
             "reading from sample %.3f \n",
             specPath.GetText(),
             SdfFieldKeys->TimeSamples.GetText(),
             layer->GetIdentifier().c_str(),
             time.GetValue(),
+            preTimeDebug,
             localTime,
             lower);
+
+        if (time.IsPreTime() && lower == upper) {
+            // We should update our lower and upper to represent the previous
+            // time sample segment, upper is already set to lower.
+            if (!layer->GetPreviousTimeSampleForPath(
+                    specPath, localTime, &lower)) {
+                // Trying to access a previous sample before the first sample.
+                lower = upper;
+            }
+        }
 
         return Usd_GetOrInterpolateValue(
             layer, specPath, localTime, lower, upper, interpolator, result);
@@ -8308,10 +8336,12 @@ public:
 
         bool success = false;
 
+        const UsdTimeCode localTimeCode = time.IsPreTime() ?
+            UsdTimeCode::PreTime(localTime) : UsdTimeCode(localTime);
         // Use the Spline's value type to dispatch to the appropriate Evaluator.
         TsDispatchToValueTypeTemplate<_EvalSplineFunctor>(
-            spline.GetValueType(), spline, localTime, info._layerToStageOffset, 
-            result, &success);
+            spline.GetValueType(), spline, localTimeCode, 
+            info._layerToStageOffset, result, &success);
 
         return success;
     }
@@ -8354,6 +8384,16 @@ public:
             clipSet->name.c_str(),
             localTime,
             lower);
+
+        if (time.IsPreTime() && lower == upper) {
+            // We should update our lower and upper to represent the previous
+            // time sample segment, upper is already set to lower.
+            if (!clipSet->GetPreviousTimeSampleForPath(
+                    specPath, localTime, &lower)) {
+                // Trying to access a previous sample before the first sample.
+                lower = upper;
+            }
+        }
 
         return Usd_GetOrInterpolateValue(
             clipSet, specPath, localTime, lower, upper, interpolator, result);
@@ -8427,8 +8467,7 @@ UsdStage::_GetAssetPathContext(UsdTimeCode time, const UsdAttribute &attr) const
 template <class T>
 bool
 UsdStage::_GetValueImpl(UsdTimeCode time, const UsdAttribute &attr, 
-                        Usd_InterpolatorBase* interpolator,
-                        T *result) const
+                        Usd_InterpolatorBase* interpolator, T *result) const
 {
     UsdResolveInfo resolveInfo;
     _ExtraResolveInfo<T> extraResolveInfo;

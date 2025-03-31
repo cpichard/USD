@@ -153,6 +153,18 @@ def IsVisualStudio2017OrGreater():
     VISUAL_STUDIO_2017_VERSION = (14, 1)
     return IsVisualStudioVersionOrGreater(VISUAL_STUDIO_2017_VERSION)
 
+# Helper to get the current host arch on Windows
+def GetWindowsHostArch():
+    identifier = os.environ.get('PROCESSOR_IDENTIFIER')
+    # ARM64 identifiers currently start with "ARMv8 ...."
+    # Note: This could be modified in the future to distinguish between ARMv8 and ARMv9
+    if "ARMv" in identifier:
+        return "ARM64"
+    elif any(x64Arch in identifier for x64Arch in ["AMD64", "Intel64", "EM64T"]):
+        return "x64"
+    else:
+        raise RuntimeError("Unknown Windows host arch")
+
 def GetPythonInfo(context):
     """Returns a tuple containing the path to the Python executable, shared
     library, and include directory corresponding to the version of Python
@@ -383,7 +395,7 @@ def RunCMake(context, force, extraArgs = None):
 
     # Note - don't want to add -A (architecture flag) if generator is, ie, Ninja
     if IsVisualStudio2019OrGreater() and "Visual Studio" in generator:
-        generator = generator + " -A x64"
+        generator = generator + " -A " + GetWindowsHostArch()
 
     toolset = context.cmakeToolset
     if toolset is not None:
@@ -1547,7 +1559,7 @@ DRACO = Dependency("Draco", InstallDraco, "include/draco/compression/decode.h")
 ############################################################
 # MaterialX
 
-MATERIALX_URL = "https://github.com/materialx/MaterialX/archive/v1.38.10.zip"
+MATERIALX_URL = "https://github.com/AcademySoftwareFoundation/MaterialX/archive/v1.39.3.zip"
 
 def InstallMaterialX(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(MATERIALX_URL, context, force)):
@@ -2470,6 +2482,14 @@ if context.buildDraco and context.buildMonolithic and Windows():
 # The versions of Embree we currently support do not support oneTBB.
 if context.buildOneTBB and context.buildEmbree:
     PrintError("Embree support cannot be enabled when building against oneTBB")
+    sys.exit(1)
+
+# Windows ARM64 requires oneTBB. Since oneTBB is a non-standard option for the
+# currently aligned version of the VFX Reference Platform, we error out and 
+# require the user to explicitly specify --onetbb instead of silently switching
+# to oneTBB for them.
+if Windows() and GetWindowsHostArch() == "ARM64" and not context.buildOneTBB:
+    PrintError("Windows ARM64 builds require oneTBB. Enable via the --onetbb argument")
     sys.exit(1)
 
 # Error out if user enables Vulkan support but env var VULKAN_SDK is not set.
