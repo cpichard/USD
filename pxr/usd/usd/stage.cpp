@@ -378,7 +378,46 @@ public:
     using PathsToChangesMap = UsdNotice::ObjectsChanged::_PathsToChangesMap;
     PathsToChangesMap recomposeChanges, otherResyncChanges, otherInfoChanges;
     PathsToChangesMap primTypeInfoChanges, assetPathResyncChanges;
+
+    // When a _NamespaceEditsChangeBlock is opened by a UsdNamespaceEditor this
+    // will be populated with the edits we expect to be able to process as 
+    // namespace edits for notice handling.
+    _NamespaceEditsChangeBlock::ExpectedNamespaceEditChangeVector 
+        expectedNamespaceEditChanges;
 };
+
+UsdStage::_NamespaceEditsChangeBlock::_NamespaceEditsChangeBlock(
+    const UsdStagePtr &stage,
+    ExpectedNamespaceEditChangeVector &&expectedChanges) 
+    : _stage(stage)
+    , _localPendingChanges(std::make_unique<_PendingChanges>())
+{
+    if (_stage->_pendingChanges) {
+        TF_CODING_ERROR("Cannot open a namespace editing change block while "
+            "a stage still has pending changes to process.");
+        return;
+    }
+
+    // Opening the change block creates pending changes for the stage and pre-
+    // populates it with expected namespace edit changes.
+    _stage->_pendingChanges = _localPendingChanges.get();
+    _stage->_pendingChanges->expectedNamespaceEditChanges = 
+        std::move(expectedChanges);
+}
+
+UsdStage::_NamespaceEditsChangeBlock::_NamespaceEditsChangeBlock(
+    _NamespaceEditsChangeBlock &&other) = default;
+
+UsdStage::_NamespaceEditsChangeBlock::~_NamespaceEditsChangeBlock() 
+{
+    // It's possible that we end up closing this change block without the stage
+    // having received any change notifications. In that case, the stage will 
+    // not have cleared the pending changes we created for it when opening the
+    // block so we have to make sure to do it here.
+    if (_stage && _stage->_pendingChanges == _localPendingChanges.get()) {
+        _stage->_pendingChanges = nullptr;
+    }
+}
 
 // Object containing information used when resolving an asset path value.
 class Usd_AssetPathContext
@@ -4097,7 +4136,17 @@ UsdStage::MuteAndUnmuteLayers(const std::vector<std::string> &muteLayers,
     const auto& cacheChanges = _pendingChanges->pcpChanges.GetCacheChanges();
     const auto result = cacheChanges.find(_cache.get());
     if (result != cacheChanges.end()) {
-        _ProcessChangeLists(result->second.layerChangeListVec);
+        const bool noticesDispatched = 
+            _ProcessChangeLists(result->second.layerChangeListVec);
+        
+        // In order to preserve behavior that existed before finer grained 
+        // change notifications, if all layers that were muted and unmuted were
+        // empty, we still trigger Objects/StageContents changed notifications.
+        if (!noticesDispatched) {
+            UsdNotice::ObjectsChanged::_PathsToChangesMap resyncChanges;
+            UsdNotice::ObjectsChanged(self, &resyncChanges).Send(self);
+            UsdNotice::StageContentsChanged(self).Send(self);
+        }
     }
 }
 
@@ -4233,12 +4282,14 @@ _AddAffectedStagePaths(const SdfLayerHandle &layer, const SdfPath &path,
     const bool filterForExistingCachesOnly = false;
 
     // If this site is in the cache's layerStack, we always add it here.
+    // unless the path contains a variant selection as variant selections
+    // are never part of a valid namespace path.
     // We do this instead of including PcpDependencyTypeRoot in depTypes
     // because we do not want to include root deps on those sites, just
     // the other kinds of inbound deps.
-    if (cache.GetLayerStack()->HasLayer(layer)) {
-        const SdfPath depPath = path.StripAllVariantSelections();
-        _AddToChangedPaths(changedPaths, depPath, extraData...);
+    if (cache.GetLayerStack()->HasLayer(layer) && 
+            !path.ContainsPrimVariantSelection()) {
+        _AddToChangedPaths(changedPaths, path, extraData...);
     }
 
     for (const PcpDependency& dep:
@@ -4393,14 +4444,14 @@ UsdStage::_HandleLayersDidChange(
     _ProcessChangeLists(n.GetChangeListVec());
 }
 
-void UsdStage::_ProcessChangeLists(
+bool UsdStage::_ProcessChangeLists(
     const SdfLayerChangeListVec & changeListVec)
 {
     // Callers of this function are expected to have  set up _PendingChanges.
     // We will merge in all of the information from layer changes so it can 
     // be processed later.
     if (!TF_VERIFY(_pendingChanges)) {
-        return;
+        return false;
     }
 
     // Keep track of paths to USD objects that need to be recomposed or
@@ -4543,6 +4594,50 @@ void UsdStage::_ProcessChangeLists(
             if (!willRecompose) {
                 _AddAffectedStagePaths(layer, sdfPath, 
                         *_cache, &otherInfoChanges, &entry);
+
+                // In the special case where a variant spec was added or 
+                // deleted, but no prim index in the cache depends on the
+                // particular variant selection, we need to notify that the
+                // parent prim may have had its composed variant options
+                // changed. We do this by spoofing a "variantChildren" info
+                // changed entry for the parent prim which to reflect that
+                // that it has composed info change that doesn't affect its
+                // actual composition.
+                if (sdfPath.IsPrimVariantSelectionPath() && 
+                    (entry.flags.didAddInertPrim || 
+                     entry.flags.didAddNonInertPrim || 
+                     entry.flags.didRemoveInertPrim ||
+                     entry.flags.didRemoveNonInertPrim))  {
+
+                    // Create a spoofed entry that just indicates that
+                    // variantChildren has changed but has no info about the
+                    // old or new values. This is sufficient to provide the
+                    // ObjectsChanged notice with info needed to notify clients
+                    // that its composed variants may have changed.
+                    static SdfChangeList::Entry variantEntry = [](){
+                        SdfChangeList::Entry entry;
+                        entry.infoChanged.emplace_back(
+                            SdfChildrenKeys->VariantChildren,
+                            std::make_pair(VtValue(), VtValue()));
+                        return entry;
+                    }();
+                        
+                    // If the changed layer is in the caches root layer stack
+                    // log this as info change on the equivalent namespace path
+                    // of the variant selection path. This is similar to finding
+                    // the "root" dependency.
+                    if (_cache->GetLayerStack()->HasLayer(layer)) {
+                        _AddToChangedPaths(&otherInfoChanges, 
+                            sdfPath.GetPrimPath().StripAllVariantSelections(), 
+                            &variantEntry);
+                    }
+
+                    // Add any paths that depend on the prim path of the variant
+                    // selection as these will have their composed variants 
+                    // potentially changed.
+                    _AddAffectedStagePaths(layer, sdfPath.GetPrimPath(), 
+                        *_cache, &otherInfoChanges, &variantEntry);
+                }
             }
         }
     }
@@ -4588,14 +4683,14 @@ void UsdStage::_ProcessChangeLists(
     // However, the _PathsToChangesMap objects in _pendingChanges may hold
     // raw pointers to entries stored in the notice, so we must process these
     // changes immediately while the notice is still alive.
-    _ProcessPendingChanges();
+    return _ProcessPendingChanges();
 }
 
-void
+bool
 UsdStage::_ProcessPendingChanges()
 {
     if (!TF_VERIFY(_pendingChanges)) {
-        return;
+        return false;
     }
 
     TF_DEBUG(USD_CHANGES).Msg(
@@ -4609,6 +4704,8 @@ UsdStage::_ProcessPendingChanges()
     _PathsToChangesMap& otherInfoChanges = _pendingChanges->otherInfoChanges;
     _PathsToChangesMap& primTypeInfoChanges = _pendingChanges->primTypeInfoChanges;
     _PathsToChangesMap& assetPathResyncChanges = _pendingChanges->assetPathResyncChanges;
+
+    UsdNotice::ObjectsChanged::_PrimResyncInfoMap primResyncsInfo;
 
     _Recompose(changes, &recomposeChanges);
 
@@ -4736,6 +4833,63 @@ UsdStage::_ProcessPendingChanges()
         _editTargetIsLocalLayer = HasLocalLayer(_editTarget.GetLayer());
     }
 
+    // If the UsdNamespaceEditor triggered the changes, there will be expected
+    // namespace edit changes that we have to process before sending notices. We 
+    // process them to generate a map of resync classifications that we add
+    // to the ObjectsChanged notice that downstream clients can use to parse
+    // determine the nature of the resyncs they receive.
+    for (const auto &namespaceChange : 
+            _pendingChanges->expectedNamespaceEditChanges) {
+        // Skip deletes.
+        if (namespaceChange.newPath.IsEmpty()) {
+            continue;
+        }
+
+        // Get the recomposed prim at the new path and compare its prim 
+        // stack with the original prim stack at the old path (which we cached).
+        // The prim not existing or a differing prim stack indicates that we
+        // weren't able to completely perform the namespace edit as desired. 
+        // Skip this change as we can't classify the resyncs of the prims in 
+        // this case.
+        const UsdPrim newPrim = GetPrimAtPath(namespaceChange.newPath);
+        if (!newPrim ||
+            newPrim.GetPrimStack() != namespaceChange.oldPrimStack) {
+            continue;
+        }
+
+        using PrimResyncType = UsdNotice::ObjectsChanged::PrimResyncType;
+        using _PrimResyncInfo = UsdNotice::ObjectsChanged::_PrimResyncInfo;
+
+        if (namespaceChange.oldPath == namespaceChange.newPath) {
+            // If the old and new prim paths match we have an effective no-op
+            // resync.
+            primResyncsInfo.emplace(namespaceChange.oldPath, 
+                _PrimResyncInfo({PrimResyncType::UnchangedPrimStack, SdfPath()}));
+        } else {
+            // Otherwise figure out the actual type of namespace edit we have.
+            // We classify and store both the source and destination resync 
+            // types resulting from the edit, providing the complementary
+            // destination and source paths respectively.
+            PrimResyncType sourceType, destType;
+            if (namespaceChange.oldPath.GetNameToken() == 
+                    namespaceChange.newPath.GetNameToken()) {
+                sourceType = PrimResyncType::ReparentSource;
+                destType = PrimResyncType::ReparentDestination;
+            } else if (namespaceChange.oldPath.GetParentPath() == 
+                        namespaceChange.newPath.GetParentPath()) {
+                sourceType = PrimResyncType::RenameSource;
+                destType = PrimResyncType::RenameDestination;
+            } else {
+                sourceType = PrimResyncType::RenameAndReparentSource;
+                destType = PrimResyncType::RenameAndReparentDestination;
+            }
+            primResyncsInfo.emplace(namespaceChange.oldPath, 
+                _PrimResyncInfo({sourceType, namespaceChange.newPath}));
+            primResyncsInfo.emplace(namespaceChange.newPath, 
+                _PrimResyncInfo({destType, namespaceChange.oldPath}));
+        }
+    }
+
     // Reset _pendingChanges before sending notices so that any changes to
     // this stage that happen in response to the notices are handled
     // properly. The object that _pendingChanges referred to should remain
@@ -4749,12 +4903,15 @@ UsdStage::_ProcessPendingChanges()
 
         // Notify about changed objects.
         UsdNotice::ObjectsChanged(
-            self, &recomposeChanges, &otherInfoChanges, &assetPathResyncChanges)
+            self, &recomposeChanges, &otherInfoChanges, &assetPathResyncChanges,
+            &primResyncsInfo)
             .Send(self);
 
         // Receivers can now refresh their caches... or just dirty them
         UsdNotice::StageContentsChanged(self).Send(self);
+        return true;
     }
+    return false;
 }
 
 void

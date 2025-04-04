@@ -3598,9 +3598,11 @@ _GetOutputParamsAndUpdateRmanNames(
         // Gather all properties with the 'driver:parameters:aov' prefix
         // into the RtParamList, updating the hdAovName if needed.
         else if (TfStringStartsWith(
-                 settingName.GetText(), "driver:parameters:aov:") ||
+                     settingName.GetText(), "driver:parameters:aov:") ||
                  TfStringStartsWith(
-                 settingName.GetText(), "ri:driver:parameters:aov:")) {
+                     settingName.GetText(), "ri:driver:parameters:aov:") ||
+                 TfStringStartsWith(
+                     settingName.GetText(), "ri:displayChannel:")) {
             RtUString name(TfStringGetSuffix(settingName, ':').c_str());
             if (name == RixStr.k_name) {
                 hdAovName = settingVal.IsHolding<std::string>() ?
@@ -3656,7 +3658,7 @@ HdPrman_RenderParam::_CreateRileyDisplay(
     {
         HdPrman_RenderViewDesc::DisplayDesc displayDesc;
         displayDesc.name = productName;
-        if ((productName == RixStr.k_framebuffer) && !isXpu && _useQN)
+        if ((productName == RixStr.k_framebuffer) && _useQN)
         {
             // interactive denoiser is turned on
             std::string hdPrmanPath;

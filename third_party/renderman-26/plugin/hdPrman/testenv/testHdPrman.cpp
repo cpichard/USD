@@ -74,7 +74,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((pixelVariance, "ri:Ri:PixelVariance"))
 );
 
-TF_DEFINE_ENV_SETTING(TEST_HD_PRMAN_ENABLE_SCENE_INDEX, false,
+TF_DEFINE_ENV_SETTING(TEST_HD_PRMAN_ENABLE_SCENE_INDEX, true,
                       "Use Scene Index API for testHdPrman.");
 
 TF_DEFINE_ENV_SETTING(TEST_HD_PRMAN_USE_RENDER_SETTINGS_PRIM, true,
@@ -797,6 +797,9 @@ HydraSetupAndRender(
         fprintf(stdout, "Setting the active render settings prim path to <%s>.\n",
                 renderSettingsPrimPath.GetText());
         sgsi->SetActiveRenderSettingsPrimPath(renderSettingsPrimPath);
+        if (cameraInfo) {
+            sgsi->SetPrimaryCameraPrimPath(cameraInfo->cameraPath);
+        }
     } else {
         renderTags.push_back(HdRenderTagTokens->geometry);
     }
