@@ -27,6 +27,7 @@
 #include "pxr/imaging/hd/version.h"
 
 #include "pxr/imaging/hdsi/sceneGlobalsSceneIndex.h"
+#include "pxr/imaging/hdsi/legacyDisplayStyleOverrideSceneIndex.h"
 
 #include "pxr/usdImaging/usdImaging/delegate.h"
 #include "pxr/usdImaging/usdImaging/sceneIndices.h"
@@ -339,10 +340,9 @@ PopulateFallbackRenderSettings(
 
     // Set the Integrator
     {
-        UsdAttribute riIntegratorAttr = stage->GetAttributeAtPath(
-            settings->GetPath().AppendProperty(
-                TfToken("outputs:ri:integrator")));
-        if (!riIntegratorAttr.HasAuthoredConnections()) {
+        UsdRelationship riIntegratorRel =
+            settings->GetPrim().GetRelationship(TfToken("ri:integrator"));
+        if (!riIntegratorRel.HasAuthoredTargets()) {
             fprintf(stdout, "   Add an Integrator Prim.\n");
 
             UsdPrim pxrIntegrator;
@@ -363,13 +363,7 @@ PopulateFallbackRenderSettings(
                         TfToken("inputs:ri:style")));
                 styleAttr.Set(VtValue(TfToken(visualizerStyle)));
             }
-            UsdAttribute integratorOutputAttr = stage->GetAttributeAtPath(
-                pxrIntegrator.GetPath().AppendProperty(
-                    TfToken("outputs:result")));
-
-            const SdfPathVector integratorOutputPath = 
-                { integratorOutputAttr.GetPath() };
-            riIntegratorAttr.SetConnections(integratorOutputPath);
+            riIntegratorRel.SetTargets({pxrIntegrator.GetPath()});
         }
     }
 
@@ -480,7 +474,7 @@ AddVisualizerStyle(
 
         // Note that this can now be represented as an integrator prim that 
         // is connected to the RenderSettings prim through the 
-        // 'outputs:ri:integrator' terminal 
+        // 'ri:integrator' terminal 
         (*settingsMap)[HdPrmanRenderSettingsTokens->integratorName] =
             integratorName;
 
@@ -702,8 +696,21 @@ HydraSetupAndRender(
         UsdImagingSceneIndices sceneIndices =
             UsdImagingCreateSceneIndices(createInfo);
         sceneIndices.stageSceneIndex->SetTime(frameNum);
+
+        HdSceneIndexBaseRefPtr sceneIndex =
+            sceneIndices.finalSceneIndex;
+
+        // Add a displayStyle scene index.
+        if (!cullStyle.empty()) {
+            HdsiLegacyDisplayStyleOverrideSceneIndexRefPtr
+                displayStyleSceneIndex =
+                HdsiLegacyDisplayStyleOverrideSceneIndex::New(sceneIndex);
+            sceneIndex = displayStyleSceneIndex;
+            displayStyleSceneIndex->SetCullStyleFallback(TfToken(cullStyle));
+        }
+            
         hdRenderIndex->InsertSceneIndex(
-            sceneIndices.finalSceneIndex, SdfPath::AbsoluteRootPath());
+            sceneIndex, SdfPath::AbsoluteRootPath());
     } else {
         hdUsdFrontend = std::make_unique<UsdImagingDelegate>(
             hdRenderIndex.get(),
