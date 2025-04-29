@@ -1,8 +1,8 @@
 # Change Log
 
-## [25.05] - 2025-04-25
+## [25.05] - 2025-04-28
 
-We anticipate moving to the [VFX Reference Platform CY2023](https://vfxplatform.com/)  
+We anticipate moving to the [VFX Reference Platform CY2023](https://vfxplatform.com/)
 in an upcoming release.  
 
 ### Build
@@ -73,6 +73,8 @@ in an upcoming release.
 - Modified ArchGetFileName on Windows to return full paths that include the 
   prefix drive letters -- previously the prefix was not included.
   (PR: [#3361](https://github.com/PixarAnimationStudios/OpenUSD/pull/3361))
+  (PR: [#3545](https://github.com/PixarAnimationStudios/OpenUSD/pull/3545))
+  (PR: [#3611](https://github.com/PixarAnimationStudios/OpenUSD/pull/3611))
 
 - Made change to explicitly include size_t in gf, required by an upstream 
   change to Clang.
