@@ -25,6 +25,11 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class EsfAttributeInterface;
+class EsfJournal;
+class EsfObjectInterface;
+class EsfPrimInterface;
+
 /// Singleton that stores computation definitions registered for schemas that
 /// define computations.
 ///
@@ -38,24 +43,41 @@ public:
 
     /// Provides access to the singleton instance, first ensuring it is
     /// constructed.
+    ///
     EXEC_API
     static Exec_DefinitionRegistry& GetInstance();
 
     /// Returns the definition for the prim computation named
-    /// \p computationName registered for schema \p schemaType.
+    /// \p computationName registered for \p providerPrim.
+    ///
+    /// Any scene access needed to determine the input keys is recorded in
+    /// \p journal.
+    ///
     EXEC_API
-    const Exec_ComputationDefinition *GetPrimComputationDefinition(
-        TfType schemaType,
-        const TfToken &computationName) const;
+    const Exec_ComputationDefinition *GetComputationDefinition(
+        const EsfPrimInterface &providerPrim,
+        const TfToken &computationName,
+        EsfJournal *journal) const;
 
-    // Only computation builders can register prim computations.
-    class RegisterComputationAccess
+    /// Returns the definition for the attribute computation named
+    /// \p computationName registered for \p providerAttribute.
+    ///
+    /// Any scene access needed to determine the input keys is recorded in
+    /// \p journal.
+    ///
+    EXEC_API
+    const Exec_ComputationDefinition *GetComputationDefinition(
+        const EsfAttributeInterface &providerAttribute,
+        const TfToken &computationName,
+        EsfJournal *journal) const;
+
+    // Only computation builders can register plugin computations.
+    class RegisterPluginComputationAccess
     {
         friend class Exec_PrimComputationBuilder;
 
         // Registers a prim computation for \p schemaType.
         inline static void _RegisterPrimComputation(
-            Exec_DefinitionRegistry &registry,
             TfType schemaType,
             const TfToken &computationName,
             TfType resultType,
@@ -77,26 +99,68 @@ private:
         ExecCallbackFn &&callback,
         Exec_InputKeyVector &&inputKeys);
 
+    void _RegisterBuiltinStageComputation(
+        const TfToken &computationName,
+        std::unique_ptr<Exec_ComputationDefinition> &&definition);
+
+    void _RegisterBuiltinPrimComputation(
+        const TfToken &computationName,
+        std::unique_ptr<Exec_ComputationDefinition> &&definition);
+
+    void _RegisterBuiltinAttributeComputation(
+        const TfToken &computationName,
+        std::unique_ptr<Exec_ComputationDefinition> &&definition);
+
+    void _RegisterBuiltinComputations();
+
 private:
 
-    // Map from (schemaType, computationName) to prim computation definition.
+    // Map from (schemaType, computationName) to plugin prim computation
+    // definition.
+    //
+    // TODO: When we add support for loading plugins, we will need to think about
+    // how to provide thread-safe access to this map.
     std::unordered_map<
         std::tuple<TfType, TfToken>,
-        Exec_ComputationDefinition,
+        Exec_PluginComputationDefinition,
         TfHash>
-        _primComputationDefinitions;
+    _pluginPrimComputationDefinitions;
+
+    // Map from computationName to builtin stage computation
+    // definition.
+    std::unordered_map<
+        TfToken,
+        std::unique_ptr<Exec_ComputationDefinition>,
+        TfHash>
+    _builtinStageComputationDefinitions;
+
+    // Map from computationName to builtin prim computation
+    // definition.
+    std::unordered_map<
+        TfToken,
+        std::unique_ptr<Exec_ComputationDefinition>,
+        TfHash>
+    _builtinPrimComputationDefinitions;
+
+    // Map from computationName to builtin attribute computation
+    // definition.
+    std::unordered_map<
+        TfToken,
+        std::unique_ptr<Exec_ComputationDefinition>,
+        TfHash>
+    _builtinAttributeComputationDefinitions;
 };
 
 void
-Exec_DefinitionRegistry::RegisterComputationAccess::_RegisterPrimComputation(
-    Exec_DefinitionRegistry &registry,
+Exec_DefinitionRegistry::RegisterPluginComputationAccess::
+_RegisterPrimComputation(
     TfType schemaType,
     const TfToken &computationName,
     TfType resultType,
     ExecCallbackFn &&callback,
     Exec_InputKeyVector &&inputKeys)
 {
-    registry._RegisterPrimComputation(
+    GetInstance()._RegisterPrimComputation(
         schemaType,
         computationName,
         resultType,

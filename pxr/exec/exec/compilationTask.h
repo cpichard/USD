@@ -24,13 +24,12 @@ class Exec_CompilationState;
 class Exec_OutputKey;
 
 /// Base class for parallel compilation tasks.
-///
 class Exec_CompilationTask : public tbb::task
 {
 public:
-    explicit Exec_CompilationTask(Exec_CompilationState &compilationState) :
-        _compilationState(compilationState),
-        _taskStage(0)
+    explicit Exec_CompilationTask(Exec_CompilationState &compilationState)
+        : _compilationState(compilationState)
+        , _taskStage(0)
     {}
 
     tbb::task *execute() final;
@@ -50,12 +49,14 @@ protected:
     /// behind the convention is to bring clarity to what is an output parameter
     /// at the call site, which is often more important, but irrelevant in this
     /// particular case.
+    /// 
     virtual void _Compile(Exec_CompilationState &, TaskStages &) = 0;
 
     /// Called from the _Compile method in the derived class to indicate that
     /// the task identified by \c key has been completed. This must be called
     /// *after* the task published its results.
-    void _MarkDone(const Exec_OutputKey &key);
+    /// 
+    void _MarkDone(const Exec_OutputKey::Identity &key);
 
 private:
     // State persistent to one round of compilation
@@ -66,12 +67,13 @@ private:
 };
 
 /// Manages the task dependencies established during task stages.
-///
-class Exec_CompilationTask::TaskDependencies {
+class Exec_CompilationTask::TaskDependencies
+{
 public:
     /// Constructs and runs a new subtask and establishes the subtask as a
     /// dependency of the calling task. The calling task's _Compile method will
     /// automatically be re-executed once all dependencies have been fulfilled.
+    /// 
     template<class TaskType, class ... Args>
     void NewSubtask(Args&&... args);
 
@@ -80,7 +82,9 @@ public:
     /// calling task will establish a dependency on the subtask and the _Compile
     /// method will automatically be re-executed once all dependencies have been
     /// fulfilled.
-    Exec_CompilerTaskSync::ClaimResult ClaimSubtask(const Exec_OutputKey &key);
+    /// 
+    Exec_CompilerTaskSync::ClaimResult ClaimSubtask(
+        const Exec_OutputKey::Identity &key);
 
 private:
     friend class Exec_CompilationTask::TaskStages;
@@ -97,13 +101,15 @@ private:
         return _hasDependencies;
     }
 
+private:
     tbb::task *const _successor;
     Exec_CompilationState &_compilationState;
     bool _hasDependencies;
 };
 
 template<class TaskType, class ... Args>
-void Exec_CompilationTask::TaskDependencies::NewSubtask(Args&&... args)
+void
+Exec_CompilationTask::TaskDependencies::NewSubtask(Args&&... args)
 {
     _hasDependencies = true;
     tbb::task *task =
@@ -119,7 +125,8 @@ void Exec_CompilationTask::TaskDependencies::NewSubtask(Args&&... args)
 /// re-executing the _Compile method with the next stage once all dependencies
 /// have been fulfilled.
 /// 
-class Exec_CompilationTask::TaskStages {
+class Exec_CompilationTask::TaskStages
+{
 public:
     /// Invokes the callables in order, each denoting a task stage.
     template<typename... Callables>
@@ -147,13 +154,15 @@ private:
         Callable&& callable,
         Tail&&... tail);
 
+private:
     tbb::task *const _successor;
     Exec_CompilationState &_compilationState;
     uint32_t *const _taskStage;
 };
 
 template<typename Callable, typename... Tail>
-void Exec_CompilationTask::TaskStages::_InvokeOne(
+void
+Exec_CompilationTask::TaskStages::_InvokeOne(
     uint32_t i,
     Callable&& callable,
     Tail&&... tail)

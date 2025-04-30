@@ -27,12 +27,9 @@ class Exec_Program;
 class Exec_CompilationState
 {
 public:
-    Exec_CompilationState(
-        const EsfStage &stage,
-        Exec_Program *program) :
-        _stage(stage),
-        _program(program)
-    {
+    Exec_CompilationState(const EsfStage &stage, Exec_Program *program)
+        : _stage(stage)
+        , _program(program) {
         TF_VERIFY(_program);
     }
 
@@ -55,7 +52,6 @@ public:
     };
 
 private:
-
     const EsfStage &_stage;
     Exec_CompilerTaskSync _outputTasks;
     Exec_Program *_program;

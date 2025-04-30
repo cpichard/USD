@@ -10,6 +10,7 @@
 #include "pxr/pxr.h"
 
 #include "pxr/exec/exec/api.h"
+#include "pxr/exec/exec/types.h"
 
 #include "pxr/exec/esf/stage.h"
 
@@ -20,57 +21,97 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class Exec_RequestImpl;
 class Exec_Program;
-class ExecRequest;
+class Exec_RequestImpl;
 class ExecValueKey;
-
-class EfLeafNodeCache;
-class EfTimeInputNode;
 template <typename> class TfSpan;
+class VdfExecutorErrorLogger;
 class VdfExecutorInterface;
 class VdfMaskedOutput;
+class VdfRequest;
+class VdfSchedule;
 
-/// A system to procedurally compute values based on scene description and
-/// computation definitions.
+/// Base implementation of a system to procedurally compute values based on
+/// scene description and computation definitions.
 ///
 /// ExecSystem owns all the structures necessary to compile, schedule and
-/// evaluate requested computation values.
+/// evaluate requested computation values.  Derived classes are responsible
+/// for interfacing with the underlying scene description.
 ///
-class ExecSystem
+class EXEC_API_TYPE ExecSystem
 {
 public:
+    /// Diagnostic utility class.
+    class Diagnostics;
+
+protected:
+    /// Construct an exec system for computing values on \p stage.
     EXEC_API
     explicit ExecSystem(EsfStage &&stage);
 
-    EXEC_API
-    ~ExecSystem();
+    ExecSystem(const ExecSystem &) = delete;
+    ExecSystem& operator=(const ExecSystem &) = delete;
 
     EXEC_API
-    ExecRequest BuildRequest(std::vector<ExecValueKey> &&valueKeys);
+    virtual ~ExecSystem();
 
+    /// Transfer ownership of a newly-created request impl to the system.
+    ///
+    /// The system is responsible for managing the lifetime of the impl in
+    /// response to scene changes that would affect it.
+    ///
     EXEC_API
-    void PrepareRequest(const ExecRequest &request);
+    void _InsertRequest(std::shared_ptr<Exec_RequestImpl> &&impl);
 
+    /// Computes the values in the \p computeRequest using the provided
+    /// \p schedule.
+    /// 
     EXEC_API
-    void GraphNetwork(const char *filename) const;
+    void _CacheValues(
+        const VdfSchedule &schedule,
+        const VdfRequest &computeRequest);
+
+    /// Derived systems instantiate this class to deliver scene changes to exec.
+    class _ChangeProcessor;
 
 private:
     // Requires access to _Compile
     friend class Exec_RequestImpl;
     std::vector<VdfMaskedOutput> _Compile(TfSpan<const ExecValueKey> valueKeys);
 
+    // Constructs a new instance of the main executor along with its state, and
+    // discards the previous instance if any.
+    // 
+    EXEC_API
+    void _CreateExecutorState();
+
+    // Returns a pointer to the main executor.
+    EXEC_API
+    VdfExecutorInterface *_GetMainExecutor();
+
+    // Discards all internal state, and constructs new internal data structures
+    // leaving the system in the same state as if it was newly constructed.
+    // 
+    EXEC_API
+    void _InvalidateAll();
+
+    // Notifies the system of authored value invalidation.
+    EXEC_API
+    void _InvalidateAuthoredValues(
+        TfSpan<ExecInvalidAuthoredValue> invalidProperties);
+
+    // Reports any executor errors raised during a round of evaluation.
+    EXEC_API
+    void _ReportExecutorErrors(const VdfExecutorErrorLogger &errorLogger) const;
+
 private:
     EsfStage _stage;
 
     std::unique_ptr<Exec_Program> _program;
-    
-    std::unique_ptr<EfLeafNodeCache> _leafNodeCache;
 
-    class _EditMonitor;
-    std::unique_ptr<_EditMonitor> _editMonitor;
+    class _ExecutorState;
+    std::unique_ptr<_ExecutorState> _executorState;
 
-    std::unique_ptr<VdfExecutorInterface> _executor;
     tbb::concurrent_vector<std::shared_ptr<Exec_RequestImpl>> _requests;
 };
 

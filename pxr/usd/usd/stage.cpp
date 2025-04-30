@@ -29,7 +29,6 @@
 #include "pxr/usd/usd/stageCache.h"
 #include "pxr/usd/usd/stageCacheContext.h"
 #include "pxr/usd/usd/tokens.h"
-#include "pxr/usd/usd/usdFileFormat.h"
 #include "pxr/usd/usd/valueUtils.h"
 
 #include "pxr/usd/pcp/changes.h"
@@ -47,6 +46,7 @@
 #include "pxr/usd/sdf/fileFormat.h"
 #include "pxr/usd/sdf/schema.h"
 #include "pxr/usd/sdf/types.h" 
+#include "pxr/usd/sdf/usdFileFormat.h"
 #include "pxr/usd/sdf/variableExpression.h"
 
 #include "pxr/base/trace/trace.h"
@@ -696,7 +696,7 @@ UsdStage::UsdStage(const SdfLayerRefPtr& rootLayer,
     , _editTargetIsLocalLayer(true)
     , _cache(new PcpCache(PcpLayerStackIdentifier(
                               _rootLayer, _sessionLayer, pathResolverContext),
-                          UsdUsdFileFormatTokens->Target,
+                          SdfUsdFileFormatTokens->Target,
                           /*usdMode=*/true))
     , _clipCache(new Usd_ClipCache)
     , _instanceCache(new Usd_InstanceCache)
@@ -1077,7 +1077,7 @@ _OpenLayer(
 
     SdfLayer::FileFormatArguments args;
     args[SdfFileFormatTokens->TargetArg] =
-        UsdUsdFileFormatTokens->Target.GetString();
+        SdfUsdFileFormatTokens->Target.GetString();
 
     return SdfLayer::FindOrOpen(filePath, args);
 }
@@ -2305,17 +2305,12 @@ UsdStage::GetObjectAtPath(const SdfPath &path) const
         return UsdObject();
     }
 
-    const bool isPrimPath = path.IsPrimPath();
-    const bool isPropPath = !isPrimPath && path.IsPropertyPath();
-    if (!isPrimPath && !isPropPath) {
-        return UsdObject();
+    if (path.IsAbsoluteRootOrPrimPath()) {
+        return GetPrimAtPath(path);
     }
 
-    // A valid prim must be found to return either a prim or prop
-    if (isPrimPath) {
-        return GetPrimAtPath(path);
-    } else if (isPropPath) {
-        if (auto prim = GetPrimAtPath(path.GetPrimPath())) {
+    if (path.IsPrimPropertyPath()) {
+        if (const auto prim = GetPrimAtPath(path.GetPrimPath())) {
             return prim.GetProperty(path.GetNameToken());
         }
     }
@@ -3671,7 +3666,7 @@ UsdStage::IsSupportedFile(const std::string& filePath)
 
     // if the extension is valid we'll get a non null FileFormatPtr
     return SdfFileFormat::FindByExtension(fileExtension, 
-                                          UsdUsdFileFormatTokens->Target);
+                                          SdfUsdFileFormatTokens->Target);
 }
 
 namespace {
@@ -4689,6 +4684,8 @@ bool UsdStage::_ProcessChangeLists(
 bool
 UsdStage::_ProcessPendingChanges()
 {
+    TRACE_FUNCTION();
+
     if (!TF_VERIFY(_pendingChanges)) {
         return false;
     }
@@ -4840,6 +4837,8 @@ UsdStage::_ProcessPendingChanges()
     // determine the nature of the resyncs they receive.
     for (const auto &namespaceChange : 
             _pendingChanges->expectedNamespaceEditChanges) {
+        TRACE_SCOPE("Process expected namespace edit changes");
+
         const SdfPath &oldPath = namespaceChange.oldPath;
         const SdfPath &newPath = namespaceChange.newPath;
 

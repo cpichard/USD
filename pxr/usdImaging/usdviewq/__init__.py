@@ -27,6 +27,16 @@ class InvalidUsdviewOption(Exception):
     pass
 
 
+def _AbsoluteFilePath(argStr):
+    """This should be used for args that are meant to absolute file paths (as
+    opposed to ones that may get resolved.  This is especially useful if you
+    have an app that uses this launcher but also changes the dir.
+    """
+    if argStr is None:
+        return None
+    return os.path.abspath(argStr)
+
+
 class Launcher(object):
     '''
     Base class for argument parsing, validation, and initialization for UsdView
@@ -67,6 +77,10 @@ class Launcher(object):
                 traceCollector.enabled = True
 
             app, appController = self.LaunchPreamble(arg_parse_result)
+
+            if arg_parse_result.dumpFirstImage:
+                appController.SaveViewerImageToFile(arg_parse_result.dumpFirstImage)
+
             self.LaunchProcess(arg_parse_result, app, appController)
 
         if traceCollector:
@@ -178,7 +192,7 @@ class Launcher(object):
                             help='Enable asynchronous hydra scene processing')
 
         parser.add_argument('--traceToFile', action='store',
-                            type=str,
+                            type=_AbsoluteFilePath,
                             dest='traceToFile',
                             default=None,
                             help='Start tracing at application startup and '
@@ -204,6 +218,12 @@ class Launcher(object):
                             dest='mallocTagStats', type=str,
                             choices=['none', 'stage', 'stageAndImaging'],
                             help='Use the Pxr MallocTags memory accounting system to profile USD, saving results to a tmp file, with a summary to the console.  Will have no effect if MallocTags are not supported in the USD installation.')
+
+        parser.add_argument('--dumpFirstImage', action='store',
+                            type=_AbsoluteFilePath,
+                            dest='dumpFirstImage',
+                            default=None,
+                            help='Dumps the first image to file (as png)')
 
         parser.add_argument('--numThreads', action='store',
                             type=int, default=0,

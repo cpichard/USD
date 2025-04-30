@@ -45,7 +45,6 @@ public:
     Exec_CompilerTaskSync() = default;
 
     /// The different results claiming an output key can return.
-    ///
     enum class ClaimResult {
         Done,       /// The task is already done.
 
@@ -65,7 +64,9 @@ public:
     /// notified by decrementing its reference count, and if it reaches zero the
     /// \p successor will automatically be spawned.
     ///
-    ClaimResult Claim(const Exec_OutputKey &key, tbb::task *successor);
+    ClaimResult Claim(
+        const Exec_OutputKey::Identity &key,
+        tbb::task *successor);
 
     /// Marks the task associated with the output \p key done.
     /// 
@@ -73,7 +74,7 @@ public:
     /// their reference counts, and spawning them if their reference count
     /// reaches 0.
     ///
-    void MarkDone(const Exec_OutputKey &key);
+    void MarkDone(const Exec_OutputKey::Identity &key);
 
 private:
     // The various states a task can be in.
@@ -85,6 +86,7 @@ private:
 
     // Entries in the map always begin life as unclaimed tasks with no
     // nodes on their waitlist.
+    // 
     struct _Entry {
         _Entry() : state(_TaskStateUnclaimed), waiting(nullptr) {}
         std::atomic<uint8_t> state;
@@ -94,7 +96,7 @@ private:
     // The map of tasks that have been claimed during this round of
     // compilation.
     using _ClaimedTasks =
-        tbb::concurrent_unordered_map<Exec_OutputKey, _Entry, TfHash>;
+        tbb::concurrent_unordered_map<Exec_OutputKey::Identity, _Entry, TfHash>;
     _ClaimedTasks _claimedTasks;
 
     // Manages the waitlists in the _claimedTasks entries.

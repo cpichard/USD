@@ -7,16 +7,20 @@
 #include "pxr/exec/exec/leafCompilationTask.h"
 
 #include "pxr/exec/exec/compilationState.h"
-#include "pxr/exec/exec/compiledOutputCache.h"
-#include "pxr/exec/exec/compilerTaskSync.h"
-#include "pxr/exec/exec/outputProvidingCompilationTask.h"
+#include "pxr/exec/exec/inputKey.h"
+#include "pxr/exec/exec/inputResolvingCompilationTask.h"
 #include "pxr/exec/exec/program.h"
 
 #include "pxr/base/trace/trace.h"
 #include "pxr/exec/ef/leafNode.h"
+#include "pxr/exec/esf/editReason.h"
+#include "pxr/exec/esf/journal.h"
+#include "pxr/exec/esf/object.h"
 #include "pxr/exec/vdf/maskedOutput.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+static Exec_InputKey _MakeInputKey(const ExecValueKey &valueKey);
 
 void
 Exec_LeafCompilationTask::_Compile(
@@ -25,64 +29,84 @@ Exec_LeafCompilationTask::_Compile(
 {
     TRACE_FUNCTION();
 
-    // Look up the cached output.
-    const auto &[output, hasOutput] =
-        compilationState.GetProgram()->GetCompiledOutputCache()->Find(
-            _outputKey);
-
     taskStages.Invoke(
-    // Determine if the output dependency has been compiled, and if not
-    // run the tasks to produce the output.
-    [this, &compilationState, hasOutput=hasOutput]
+    // Turn the value key into an input key and create an input resolving
+    // subtask to compile the source output to later connect to the leaf node.
+    [this, &compilationState]
     (TaskDependencies &deps) {
-        // Nothing to do here, if we already have a cached output.
-        if (hasOutput) {
-            return;
-        }
+        TRACE_FUNCTION_SCOPE("input compilation");
 
-        TRACE_FUNCTION_SCOPE("leaf output");
+        // Get the provider object from the value key
+        _originObject = _valueKey.GetProvider();
 
-        // Claim the task for producing the missing output.
-        const Exec_CompilerTaskSync::ClaimResult claimResult =
-            deps.ClaimSubtask(_outputKey);
-        if (claimResult == Exec_CompilerTaskSync::ClaimResult::Claimed) {
-            // Run the task that produces the output.
-            deps.NewSubtask<Exec_OutputProvidingCompilationTask>(
-                compilationState,
-                _outputKey,
-                _resultOutput);
-        }
+        // Make an input key from the value key
+        const Exec_InputKey inputKey = _MakeInputKey(_valueKey);
+
+        // Run a new subtask to compile the input
+        deps.NewSubtask<Exec_InputResolvingCompilationTask>(
+            compilationState,
+            inputKey,
+            *_originObject,
+            &_resultOutputs,
+            &_journal);
     },
 
-    // Compile and register the leaf node.
-    [this, &compilationState, output=output, hasOutput=hasOutput]
+    // Compile and connect the leaf node.
+    [this, &compilationState]
     (TaskDependencies &deps) {
-        if (!TF_VERIFY(hasOutput)) {
+        TRACE_FUNCTION_SCOPE("leaf node creation");
+
+        if (!TF_VERIFY(_resultOutputs.size() == 1,
+                "Expected exactly one output for value key '%s'; got '%zu'",
+                _valueKey.GetDebugName().c_str(),
+                _resultOutputs.size())) {
             return;
         }
 
-        TRACE_FUNCTION_SCOPE("leaf node creation");
+        const VdfMaskedOutput &sourceOutput = _resultOutputs.front();
+        if (!TF_VERIFY(sourceOutput)) {
+            return;
+        }
 
-        // TODO: Journaling
+        // Return the compiled source output as the requested leaf output
+        *_leafOutput = sourceOutput;
+
+        // Leaf nodes should be uncompiled when a resync occurs on the value
+        // key's provider.
         EsfJournal nodeJournal;
-        EsfJournal inputJournal;
+        nodeJournal.Add(
+            _valueKey.GetProvider()->GetPath(nullptr),
+            EsfEditReason::ResyncedObject);
 
         EfLeafNode *const leafNode =
             compilationState.GetProgram()->CreateNode<EfLeafNode>(
                 nodeJournal,
-                output.GetOutput()->GetSpec().GetType());
+                sourceOutput.GetOutput()->GetSpec().GetType());
 
-        leafNode->SetDebugNameCallback([outputKey = _outputKey]{
-            return outputKey.GetDebugName();
-        });
+        // Value keys are not durable across scene changes so their debug name
+        // must be collected eagerly.
+        leafNode->SetDebugName(_valueKey.GetDebugName());
 
         compilationState.GetProgram()->Connect(
-            inputJournal,
-            Exec_Program::SourceOutputs{output},
+            _journal,
+            TfSpan<const VdfMaskedOutput>(&sourceOutput, 1),
             leafNode,
             EfLeafTokens->in);
     }
     );
+}
+
+Exec_InputKey
+_MakeInputKey(const ExecValueKey &valueKey)
+{
+    return {
+        EfLeafTokens->in,
+        valueKey.GetComputationName(),
+        TfType(),
+        {SdfPath::ReflexiveRelativePath(),
+            ExecProviderResolution::DynamicTraversal::Local},
+        false /* optional */
+    };
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

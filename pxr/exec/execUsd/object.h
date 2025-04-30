@@ -9,6 +9,7 @@
 
 #include "pxr/pxr.h"
 
+#include "pxr/exec/esf/attribute.h"
 #include "pxr/exec/esf/object.h"
 #include "pxr/usd/usd/object.h"
 
@@ -83,17 +84,23 @@ public:
 protected:
     /// Accessors to the wrapped object are made available to all derived
     /// classes.
+    /// 
     UsdObjectType &_GetWrapped() { return _object; }
     const UsdObjectType &_GetWrapped() const { return _object; }
 
 private:
-    /// The wrapped native usd object.
+    // The wrapped native usd object.
     UsdObjectType _object;
 
     // EsfObjectInterface implementation.
     bool _IsValid() const final;
     TfToken _GetName() const final;
     EsfPrim _GetPrim() const final;
+    bool IsPrim() const final;
+    bool IsAttribute() const final;
+    EsfObject AsObject() const final;
+    EsfPrim AsPrim() const final;
+    EsfAttribute AsAttribute() const final;
 };
 
 /// Implementation of EsfObjectInterface that wraps a UsdObject.

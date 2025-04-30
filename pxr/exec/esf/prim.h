@@ -49,9 +49,11 @@ public:
     /// \see UsdPrim::GetParent
     ESF_API EsfPrim GetParent(EsfJournal *journal) const;
 
-    /// \see UsdPrim::GetPrimTypeInfo
-    /// \see UsdPrimTypeInfo::GetSchemaType
+    /// \see UsdPrim::GetPrimTypeInfo and \see UsdPrimTypeInfo::GetSchemaType
     ESF_API TfType GetType(EsfJournal *journal) const;
+
+    /// \see UsdPrim::IsPseudoRoot
+    virtual bool IsPseudoRoot() const = 0;
 
 protected:
     /// This constructor may only be called by the scene adapter implementation.
@@ -72,8 +74,7 @@ private:
 /// The size is specified as an integer literal to prevent introducing Usd as
 /// a dependency.
 ///
-class EsfPrim
-    : public EsfFixedSizePolymorphicHolder<EsfPrimInterface, 48>
+class EsfPrim : public EsfFixedSizePolymorphicHolder<EsfPrimInterface, 48>
 {
 public:
     using EsfFixedSizePolymorphicHolder::EsfFixedSizePolymorphicHolder;

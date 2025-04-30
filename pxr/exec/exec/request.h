@@ -9,40 +9,26 @@
 
 #include "pxr/pxr.h"
 
-#include "pxr/exec/exec/api.h"
+#include "pxr/base/tf/pxrTslRobinMap/robin_set.h"
 
-#include <memory>
+#include <functional>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class Exec_RequestImpl;
+/// Index into the array of exec value keys used to construct an exec request.
+using ExecRequestIndexSet = pxr_tsl::robin_set<int>;
 
-/// A batch of computations to evaluate concurrently.
-class ExecRequest
-{
-    ExecRequest(const ExecRequest&) = delete;
-    ExecRequest& operator=(const ExecRequest&) = delete;
-
-public:
-    EXEC_API
-    ~ExecRequest();
-
-    /// Returns false if the request can no longer be used due to scene
-    /// changes.
-    EXEC_API
-    bool IsValid() const;
-
-private:
-    // Requests are issued by an ExecSystem and may only be used with that
-    // system.
-    friend class ExecSystem;
-
-    EXEC_API
-    ExecRequest(const std::shared_ptr<Exec_RequestImpl>&);
-
-private:
-    std::weak_ptr<Exec_RequestImpl> _impl;
-};
+/// Invalidation callback used by exec requests to notify clients of invalid
+/// computed values.
+/// 
+/// The index set contains the indices of value keys with invalid computed
+/// values, along with a time interval that specifies the time range over which
+/// these computed values are invalid.
+/// 
+using ExecRequestIndexedInvalidationCallback =
+    std::function<void (
+        const ExecRequestIndexSet &,
+        const class EfTimeInterval &)>;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

@@ -20,13 +20,17 @@ pxr_library(exec
         api.h
         providerResolution.h
         registerSchema.h
+        request.h
         types.h
 
     PUBLIC_CLASSES
+        builtinComputations
+        cacheView
         computationBuilders
-        request
+        requestImpl
         system
-        tokens
+        systemChangeProcessor
+        systemDiagnostics
         typeRegistry
         valueKey
 
@@ -35,6 +39,9 @@ pxr_library(exec
         inputKey.h
 
     PRIVATE_CLASSES
+        attributeInputNode
+        builtinAttributeComputations
+        builtinStageComputations
         callbackNode
         compilationTask
         compiledOutputCache
@@ -42,12 +49,12 @@ pxr_library(exec
         compilerTaskSync
         computationDefinition
         definitionRegistry
+        inputResolver
         inputResolvingCompilationTask
         leafCompilationTask
         outputKey
         outputProvidingCompilationTask
         program
-        requestImpl
         uncompilationRuleSet
         uncompilationTable
 
@@ -57,13 +64,49 @@ pxr_library(exec
 
 pxr_build_test(testExecComputationRegistration
     LIBRARIES
+        ef
+        esf
         exec
+        execUsd
+        plug
+        sdf
+        tf
+        usd
     CPPFILES
         testenv/testExecComputationRegistration.cpp
 )
 
+pxr_install_test_dir(
+    SRC testenv/testExecComputationRegistration
+    DEST testExecComputationRegistration
+)
+
 pxr_register_test(testExecComputationRegistration
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecComputationRegistration"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_build_test(testExecInputResolver
+    LIBRARIES
+        ef
+        esf
+        exec
+        execUsd
+        plug
+        sdf
+        tf
+        usd
+    CPPFILES
+        testenv/testExecInputResolver.cpp
+)
+
+pxr_install_test_dir(
+    SRC testenv/testExecInputResolver
+    DEST testExecInputResolver
+)
+
+pxr_register_test(testExecInputResolver
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecInputResolver"
     EXPECTED_RETURN_CODE 0
 )
 

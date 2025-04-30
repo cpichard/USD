@@ -8,7 +8,6 @@
 
 #include "pxr/exec/exec/compilationState.h"
 #include "pxr/exec/exec/leafCompilationTask.h"
-#include "pxr/exec/exec/outputKey.h"
 #include "pxr/exec/exec/valueKey.h"
 
 #include "pxr/base/tf/span.h"
@@ -21,11 +20,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 Exec_Compiler::Exec_Compiler(
     const EsfStage &stage,
-    Exec_Program *program) :
-    _stage(stage),
-    _program(program),
-    _rootTask(nullptr),
-    _taskGroupContext(
+    Exec_Program *program)
+    : _stage(stage)
+    , _program(program)
+    , _rootTask(nullptr)
+    , _taskGroupContext(
         tbb::task_group_context::isolated,
         tbb::task_group_context::concurrent_wait |
         tbb::task_group_context::default_traits)
@@ -63,9 +62,7 @@ Exec_Compiler::Compile(TfSpan<const ExecValueKey> valueKeys)
                 tbb::task *requestedOutputTask =
                     new (tbb::task::allocate_additional_child_of(*rootTask))
                         Exec_LeafCompilationTask(
-                            state,
-                            Exec_OutputKey(valueKeys[i]),
-                            &leafOutputs[i]);
+                            state, valueKeys[i], &leafOutputs[i]);
                 tbb::task::spawn(*requestedOutputTask);
             }
         });

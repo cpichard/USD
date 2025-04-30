@@ -25,11 +25,13 @@ public:
 
     /// Copies the provided \p attribute into this instance.
     ExecUsd_Attribute(const UsdAttribute &attribute)
-        : ExecUsd_PropertyImpl<EsfAttributeInterface, UsdAttribute>(attribute) {}
+        : ExecUsd_PropertyImpl<EsfAttributeInterface, UsdAttribute>(
+            attribute) {}
 
     /// Moves the provided \p attribute into this instance.
     ExecUsd_Attribute(UsdAttribute &&attribute)
-        : ExecUsd_PropertyImpl<EsfAttributeInterface, UsdAttribute>(std::move(attribute)) {}
+        : ExecUsd_PropertyImpl<EsfAttributeInterface, UsdAttribute>(
+            std::move(attribute)) {}
 
 private:
     // EsfAttributeInterface implementation.

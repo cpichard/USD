@@ -17,10 +17,11 @@
 
 #include "pxr/base/tf/smallVector.h"
 #include "pxr/exec/vdf/maskedOutput.h"
-#include "pxr/usd/sdf/path.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class EsfJournal;
+class EsfObject;
 class Exec_CompilationState;
 
 /// Compilation task that resolves an input key to the source VdfMaskedOutput
@@ -32,18 +33,21 @@ class Exec_CompilationState;
 /// in the input key. The provider object and computation name are used to
 /// construct output keys for Exec_OutputProvidingCompilationTasks, which are
 /// then kicked off to populate the source masked outputs.
+/// 
 class Exec_InputResolvingCompilationTask : public Exec_CompilationTask
 {
 public:
     Exec_InputResolvingCompilationTask(
         Exec_CompilationState &compilationState,
         const Exec_InputKey &inputKey,
-        const SdfPath &originObject,
-        TfSmallVector<VdfMaskedOutput, 1> *resultOutputs) :
-        Exec_CompilationTask(compilationState),
-        _inputKey(inputKey),
-        _originObject(originObject),
-        _resultOutputs(resultOutputs)
+        const EsfObject &originObject,
+        TfSmallVector<VdfMaskedOutput, 1> *resultOutputs,
+        EsfJournal *journal)
+        : Exec_CompilationTask(compilationState)
+        , _inputKey(inputKey)
+        , _originObject(originObject)
+        , _journal(journal)
+        , _resultOutputs(resultOutputs)
     {}
 
 private:
@@ -54,9 +58,12 @@ private:
     // The input key to resolve to output keys providing said input value.
     const Exec_InputKey _inputKey;
 
-    // Path to the scene object at which the scene traversal is started for the
+    // The scene object at which the scene traversal is started for the
     // specified provider resolution mode.
-    const SdfPath &_originObject;
+    const EsfObject &_originObject;
+
+    // The journal that records the traversal performed by the resolution.
+    EsfJournal *_journal;
 
     // The output keys populated as a result of the scene traversal.
     Exec_OutputKeyVector _outputKeys;
