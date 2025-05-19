@@ -35,8 +35,11 @@ pxr_library(exec
         valueKey
 
     PRIVATE_HEADERS
+        authoredValueInvalidationResult.h
         compilationState.h
         inputKey.h
+        parallelForRange.h
+        timeChangeInvalidationResult.h
 
     PRIVATE_CLASSES
         attributeInputNode
@@ -55,6 +58,7 @@ pxr_library(exec
         outputKey
         outputProvidingCompilationTask
         program
+        registrationBarrier
         uncompilationRuleSet
         uncompilationTable
         uncompiler
@@ -108,6 +112,20 @@ pxr_install_test_dir(
 
 pxr_register_test(testExecInputResolver
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecInputResolver"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_build_test(testExecTypeRegistration
+    LIBRARIES
+        gf
+        tf
+        exec
+    CPPFILES
+        testenv/testExecTypeRegistration.cpp
+)
+
+pxr_register_test(testExecTypeRegistration
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecTypeRegistration"
     EXPECTED_RETURN_CODE 0
 )
 

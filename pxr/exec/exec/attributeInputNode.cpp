@@ -6,16 +6,15 @@
 //
 #include "pxr/exec/exec/attributeInputNode.h"
 
+#include "pxr/exec/exec/typeRegistry.h"
+
+#include "pxr/exec/ef/time.h"
 #include "pxr/exec/vdf/connectorSpecs.h"
 #include "pxr/exec/vdf/context.h"
+#include "pxr/exec/vdf/rawValueAccessor.h"
 #include "pxr/exec/vdf/tokens.h"
 
-#include "pxr/base/gf/matrix4d.h"
-#include "pxr/base/gf/vec3f.h"
-#include "pxr/base/gf/vec3d.h"
-#include "pxr/base/vt/types.h"
 #include "pxr/base/vt/value.h"
-#include "pxr/exec/ef/time.h"
 #include "pxr/usd/sdf/valueTypeName.h"
 #include "pxr/usd/usd/timeCode.h"
 
@@ -45,6 +44,27 @@ Exec_AttributeInputNode::Exec_AttributeInputNode(
 
 Exec_AttributeInputNode::~Exec_AttributeInputNode() = default;
 
+bool
+Exec_AttributeInputNode::IsTimeVarying(
+    const EfTime &from,
+    const EfTime &to) const
+{
+    if (!_attribute->ValueMightBeTimeVarying()) {
+        return false;
+    }
+
+    VtValue fromValue, toValue;
+    _attribute->Get(&fromValue, from.GetTimeCode());
+    _attribute->Get(&toValue, to.GetTimeCode());
+    return fromValue != toValue;
+}
+
+bool
+Exec_AttributeInputNode::MaybeTimeVarying() const
+{
+    return _attribute->ValueMightBeTimeVarying();
+}
+
 void
 Exec_AttributeInputNode::Compute(VdfContext const &context) const
 {
@@ -52,30 +72,47 @@ Exec_AttributeInputNode::Compute(VdfContext const &context) const
         Exec_AttributeInputNodeTokens->time).GetTimeCode();
 
     if (VtValue resolvedValue; _attribute->Get(&resolvedValue, time)) {
-        // TODO: This will be replaced with more general, registration-based
-        // type dispatch
-        switch (resolvedValue.GetKnownValueTypeIndex()) {
-        case VtGetKnownValueTypeIndex<double>():
-            context.SetOutput(resolvedValue.UncheckedGet<double>());
-            break;
-        case VtGetKnownValueTypeIndex<int>():
-            context.SetOutput(resolvedValue.UncheckedGet<int>());
-            break;
-        case VtGetKnownValueTypeIndex<GfMatrix4d>():
-            context.SetOutput(resolvedValue.UncheckedGet<GfMatrix4d>());
-            break;
-        case VtGetKnownValueTypeIndex<GfVec3f>():
-            context.SetOutput(resolvedValue.UncheckedGet<GfVec3f>());
-            break;
-        case VtGetKnownValueTypeIndex<GfVec3d>():
-            context.SetOutput(resolvedValue.UncheckedGet<GfVec3d>());
-            break;
-        default:
-            TF_CODING_ERROR(
-                "Support for computing attributes of type '%s' is not yet "
-                "implemented.", resolvedValue.GetType().GetTypeName().c_str());
-        }
+        VdfRawValueAccessor(context).SetOutputVector(
+            *GetOutput(VdfTokens->out),
+            VdfMask::AllOnes(1),
+            ExecTypeRegistry::GetInstance().CreateVector(resolvedValue));
     }
+}
+
+VdfMask::Bits
+Exec_AttributeInputNode::_ComputeInputDependencyMask(
+    const VdfMaskedOutput &maskedOutput,
+    const VdfConnection &inputConnection) const
+{
+    // This node has one output, and it depends on the time input, which is the
+    // only input on the node, so the logic here is a straight forward
+    // one-to-one dependency.
+    // 
+    // Note, that we do not check whether the node is time-dependent when
+    // traversing in the input direction, and always report the time dependency
+    // as encoded in the network. This is to ensure that cached traversals in
+    // the input direction - primarily the schedules - do not go invalid when
+    // time dependencies on input nodes change. The trade-off then is that the
+    // time node is typically included in schedules, but this comes at very
+    // little cost.
+    
+    return inputConnection.GetMask().GetBits();
+}
+
+VdfMask 
+Exec_AttributeInputNode::_ComputeOutputDependencyMask(
+    const VdfConnection &inputConnection,
+    const VdfMask &inputDependencyMask,
+    const VdfOutput &output) const
+{
+    // There is only one input, and one output on this node, so we do not need
+    // to look at output names for dependency computation: We can assume that
+    // the dependency being computed is always from the 'value' output to the
+    // 'time' input.
+    
+    // If the node is potentially time-varying, there is a dependency.
+    // Otherwise, there is not.
+    return MaybeTimeVarying() ? VdfMask::AllOnes(1) : VdfMask();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

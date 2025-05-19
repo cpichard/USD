@@ -7,6 +7,7 @@
 #include "pxr/imaging/hd/renderIndex.h"
 
 #include "pxr/imaging/hd/basisCurves.h"
+#include "pxr/imaging/hd/cachingSceneIndex.h"
 #include "pxr/imaging/hd/dataSourceLegacyPrim.h"
 #include "pxr/imaging/hd/debugCodes.h"
 #include "pxr/imaging/hd/dirtyList.h"
@@ -176,16 +177,19 @@ HdRenderIndex::HdRenderIndex(
     if (_IsEnabledSceneIndexEmulation()) {
         _emulationSceneIndex = HdLegacyPrimSceneIndex::New();
 
+        // The legacy prim scene index holds prims contributed from
+        // upstream scene delegates.  Convert any legacy subsets
+        // to HdGeomSubsetSchema.
+        HdLegacyGeomSubsetSceneIndexRefPtr legacyGeomSubsetSceneIndex =
+            HdLegacyGeomSubsetSceneIndex::New(_emulationSceneIndex);
+
         _mergingSceneIndex = HdMergingSceneIndex::New();
         _mergingSceneIndex->AddInputScene(
-            _emulationBatchingCtx->Append(_emulationSceneIndex),
+            _emulationBatchingCtx->Append(legacyGeomSubsetSceneIndex),
             SdfPath::AbsoluteRootPath());
 
         _terminalSceneIndex =
             _mergingBatchingCtx->Append(_mergingSceneIndex);
-        
-        _terminalSceneIndex = HdLegacyGeomSubsetSceneIndex::New(
-            _terminalSceneIndex);
 
         _terminalSceneIndex =
             HdSceneIndexAdapterSceneDelegate::AppendDefaultSceneFilters(
@@ -201,6 +205,10 @@ HdRenderIndex::HdRenderIndex(
                         rendererDisplayName, _terminalSceneIndex,
                         instanceName, appName);
         }
+
+// XXX(blevin) Temporarily disabled
+//        _terminalSceneIndex =
+//            HdCachingSceneIndex::New(_terminalSceneIndex);
 
         _siSd = std::make_unique<HdSceneIndexAdapterSceneDelegate>(
             _terminalSceneIndex,
@@ -989,11 +997,15 @@ HdRenderIndex::_ConfigureReprs()
                                  HdBasisCurvesGeomStyleWire);
     HdBasisCurves::ConfigureRepr(HdReprTokens->wireOnSurf,
                                  HdBasisCurvesGeomStylePatch);
+    HdBasisCurves::ConfigureRepr(HdReprTokens->solidWireOnSurf,
+                                 HdBasisCurvesGeomStylePatch);
     HdBasisCurves::ConfigureRepr(HdReprTokens->refined,
                                  HdBasisCurvesGeomStylePatch);
     HdBasisCurves::ConfigureRepr(HdReprTokens->refinedWire,
                                  HdBasisCurvesGeomStyleWire);
     HdBasisCurves::ConfigureRepr(HdReprTokens->refinedWireOnSurf,
+                                 HdBasisCurvesGeomStylePatch);
+    HdBasisCurves::ConfigureRepr(HdReprTokens->refinedSolidWireOnSurf,
                                  HdBasisCurvesGeomStylePatch);
     HdBasisCurves::ConfigureRepr(HdReprTokens->points,
                                  HdBasisCurvesGeomStylePoints);
@@ -1006,11 +1018,15 @@ HdRenderIndex::_ConfigureReprs()
                             HdPointsGeomStylePoints);
     HdPoints::ConfigureRepr(HdReprTokens->wireOnSurf,
                             HdPointsGeomStylePoints);
+    HdPoints::ConfigureRepr(HdReprTokens->solidWireOnSurf,
+                            HdPointsGeomStylePoints);
     HdPoints::ConfigureRepr(HdReprTokens->refined,
                             HdPointsGeomStylePoints);
     HdPoints::ConfigureRepr(HdReprTokens->refinedWire,
                             HdPointsGeomStylePoints);
     HdPoints::ConfigureRepr(HdReprTokens->refinedWireOnSurf,
+                            HdPointsGeomStylePoints);
+    HdPoints::ConfigureRepr(HdReprTokens->refinedSolidWireOnSurf,
                             HdPointsGeomStylePoints);
     HdPoints::ConfigureRepr(HdReprTokens->points,
                             HdPointsGeomStylePoints);

@@ -20,15 +20,17 @@
 #include "pxr/base/tf/type.h"
 #include "pxr/base/tf/weakBase.h"
 
-#include <condition_variable>
+#include "tbb/concurrent_unordered_map.h"
+
 #include <memory>
-#include <mutex>
+#include <set>
 #include <tuple>
 #include <unordered_map>
 #include <utility>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class Exec_RegistrationBarrier;
 class EsfAttributeInterface;
 class EsfJournal;
 class EsfObjectInterface;
@@ -98,9 +100,31 @@ private:
     Exec_DefinitionRegistry();
 
     // Returns a reference to the singleton that is suitable for registering
-    // new computations. This instance cannot be used to look up computations.
+    // new computations.
+    //
+    // The returned instance cannot be used to look up computations.
+    //
     EXEC_API
     static Exec_DefinitionRegistry& _GetInstanceForRegistration();
+
+    // a structure that contains the definitions for all computations that can
+    // be found on a prim of a given type.
+    //
+    struct _ComposedPrimDefinition {
+        // Map from computation name to plugin prim computation definition.
+        std::unordered_map<
+            TfToken,
+            const Exec_PluginComputationDefinition *,
+            TfHash>
+        primComputationDefinitions;
+
+        // TODO: Add plugin attribute computation definitions.
+    };
+
+    // Creates and returns the composed prim definition for a prim with type
+    // \p schemaType.
+    //
+    _ComposedPrimDefinition _ComposePrimDefinition(TfType schemaType) const;
 
     void _RegisterPrimComputation(
         TfType schemaType,
@@ -123,30 +147,41 @@ private:
 
     void _RegisterBuiltinComputations();
 
-    void _SetInstanceFullyConstructed();
-
-    void _WaitForFullConstruction();
-
 private:
 
-    // These members ensure singleton access returns a fully-constructed
+    // This barrier ensures singleton access returns a fully-constructed
     // instance. This is the case for GetInstance(), but not required for
     // _GetInstanceForRegistration() which is called by exec definition registry
     // functions.
-    std::atomic<bool> _isFullyConstructed;
-    std::mutex _isFullyConstructedMutex;
-    std::condition_variable _isFullyConstructedConditionVariable;
+    std::unique_ptr<Exec_RegistrationBarrier> _registrationBarrier;
 
-    // Map from (schemaType, computationName) to plugin prim computation
-    // definition.
-    //
-    // TODO: When we add support for loading plugins, we will need to think about
-    // how to provide thread-safe access to this map.
+    // Comparator for ordering plugin computation definitions in a set.
+    struct _PluginComputationDefinitionComparator {
+        bool operator()(
+            const Exec_PluginComputationDefinition &a,
+            const Exec_PluginComputationDefinition &b) const {
+            return a.GetComputationName() < b.GetComputationName();
+        }
+    };
+
+    // Map from schemaType to plugin prim computation definitions.
     std::unordered_map<
-        std::tuple<TfType, TfToken>,
-        Exec_PluginComputationDefinition,
+        TfType,
+        std::set<
+            Exec_PluginComputationDefinition,
+            _PluginComputationDefinitionComparator>,
         TfHash>
     _pluginPrimComputationDefinitions;
+
+    // Map from schemaType to composed prim exec definition.
+    //
+    // This is a concurrent map to allow computation lookup to happen in
+    // parallel with lazy caching of composed prim definitions.
+    mutable tbb::concurrent_unordered_map<
+        TfType,
+        _ComposedPrimDefinition,
+        TfHash>
+    _composedPrimDefinitions;
 
     // Map from computationName to builtin stage computation
     // definition.

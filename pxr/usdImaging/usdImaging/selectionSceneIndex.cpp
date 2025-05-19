@@ -284,6 +284,8 @@ _ComputeAllInstanceIndicesForPrototype(
     const SdfPath &prototypePath,
     HdSceneIndexBaseRefPtr const &sceneIndex)
 {
+    TRACE_FUNCTION();
+
     HdContainerDataSourceHandle const primSource =
         sceneIndex->GetPrim(prototypePath).dataSource;
     HdInstancedBySchema instancedBySchema =
@@ -328,6 +330,8 @@ _ComputeAllNestedInstanceIndicesForPrototype(
     const SdfPath &prototypePath,
     HdSceneIndexBaseRefPtr const &sceneIndex)
 {
+    TRACE_FUNCTION();
+
     std::vector<_InstanceIndices> result;
 
     SdfPath path = prototypePath;
@@ -367,6 +371,8 @@ _ComputePiPropagatedPathsAndNestedInstanceIndices(
     HdContainerDataSourceHandle const &primSource,
     HdSceneIndexBaseRefPtr const &sceneIndex)
 {
+    TRACE_FUNCTION();
+
     std::vector<_PrimAndNestedInstanceIndices> result;
 
     UsdImagingUsdPrimInfoSchema schema =
@@ -409,6 +415,8 @@ _ComputeNiPrototypePathAndInstanceIndices(
     HdInstanceSchema &instance,
     HdInstancerTopologySchema &instancerTopology)
 {
+    TRACE_FUNCTION();
+
     SdfPath prototypePath;
 
     // Set instancer path.
@@ -448,6 +456,8 @@ _ComputeNiPrototypePathAndInstanceIndices(
     HdContainerDataSourceHandle const &primSource,
     HdSceneIndexBaseRefPtr const &sceneIndex)
 {
+    TRACE_FUNCTION();
+
     // Extract instance information.
     HdInstanceSchema instanceSchema =
       HdInstanceSchema::GetFromParent(primSource);
@@ -473,6 +483,8 @@ _TranslatePathToNiPrototype(
     HdSceneIndexBaseRefPtr const &sceneIndex,
     _PrimAndNestedInstanceIndices * const primAndInstanceIndices)
 {
+    TRACE_FUNCTION();
+
     SdfPath prototypePath;
     _InstanceIndices instanceIndices;
     std::tie(prototypePath, instanceIndices) =
@@ -536,6 +548,8 @@ _AddPiPropagatedPrototypes(
     const _PrimAndNestedInstanceIndices &primAndInstanceIndices,
     std::vector<_PrimAndNestedInstanceIndices> * const newPrimAndInstanceIndices)
 {
+    TRACE_FUNCTION();
+
     const _InstanceIndicesVector oldIndices =
         primAndInstanceIndices.nestedInstanceIndices;
 
@@ -566,6 +580,8 @@ _AppendNameToSceneIndexPrimsAndInstanceIndices(
     HdSceneIndexBaseRefPtr const &sceneIndex,
     std::vector<_PrimAndNestedInstanceIndices> * const result)
 {
+    TRACE_FUNCTION();
+
     SdfPath &prim = primAndInstanceIndices.prim;
     prim = prim.AppendChild(primName);
 
@@ -745,6 +761,8 @@ std::vector<_PrimAndNestedInstanceIndices>
 _ComputeSceneIndexPrimsAndInstanceIndices(
     const SdfPath &usdPath, HdSceneIndexBaseRefPtr const &sceneIndex)
 {
+    TRACE_FUNCTION();
+    
     static const _PrimAndNestedInstanceIndices root{
         SdfPath::AbsoluteRootPath(), {}};
 
@@ -873,7 +891,12 @@ UsdImagingSelectionSceneIndex::AddSelection(
             HdSelectionsSchema::GetDefaultLocator()};
         entries.push_back({dirtiedPrim, locators});
     }
-    _SendPrimsDirtied(entries);
+
+    {
+        TRACE_FUNCTION_SCOPE("_SendPrimsDirtied");
+
+        _SendPrimsDirtied(entries);
+    }
 }
 
 void
@@ -901,6 +924,8 @@ UsdImagingSelectionSceneIndex::ClearSelection()
     _selectionInfo->primToSelections.clear();
 
     if (!entries.empty()) {
+        TRACE_FUNCTION_SCOPE("_SendPrimsDirtied");
+
         _SendPrimsDirtied(entries);
     }
 }

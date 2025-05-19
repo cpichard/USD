@@ -204,6 +204,7 @@ pxr_test_scripts(
     testenv/testSdfFileFormat.py
     testenv/testSdfLayer.py
     testenv/testSdfLayerMuting.py
+    testenv/testSdfLegacyFileFormat.py
     testenv/testSdfListOp.py
     testenv/testSdfParsing.py
     testenv/testSdfPath.py
@@ -366,12 +367,12 @@ pxr_build_test(testSdfPredicateExpression_Cpp
         testenv/testSdfPredicateExpression.cpp
 )
 
-pxr_build_test(testSdfTextFileFormatParsing
+pxr_build_test(testSdfUsdaFileFormatParsing
     LIBRARIES
         sdf
         tf
     CPPFILES
-        testenv/testSdfTextFileFormatParsing.cpp
+        testenv/testSdfUsdaFileFormatParsing.cpp
 )
 
 pxr_build_test(testSdfZipFile_CPP
@@ -536,6 +537,20 @@ pxr_register_test(testSdfLayerMuting
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfLayerMuting"
 )
 
+pxr_register_test(testSdfLegacyFileFormat
+    PYTHON
+    ENV
+        SDF_FILE_FORMAT_LEGACY_IMPORT=allow
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfLegacyFileFormat"
+)
+
+pxr_register_test(testSdfLegacyFileFormat_Error
+    PYTHON
+    ENV
+        SDF_FILE_FORMAT_LEGACY_IMPORT=error
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfLegacyFileFormat"
+)
+
 pxr_register_test(testSdfListOp
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfListOp"
@@ -594,8 +609,8 @@ pxr_register_test(testSdfPredicateExpression_Cpp
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfPredicateExpression_Cpp"
 )
 
-pxr_register_test(testSdfTextFileFormatParsing
-   COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfTextFileFormatParsing"
+pxr_register_test(testSdfUsdaFileFormatParsing
+   COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfUsdaFileFormatParsing"
 )
 
 pxr_register_test(testSdfPayload
