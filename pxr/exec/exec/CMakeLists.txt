@@ -7,6 +7,7 @@ pxr_library(exec
         esf
         tf
         trace
+        ts
         sdf
         usd
         vdf
@@ -22,6 +23,7 @@ pxr_library(exec
         registerSchema.h
         request.h
         types.h
+        valueExtractorFunction.h
 
     PUBLIC_CLASSES
         builtinComputations
@@ -37,6 +39,7 @@ pxr_library(exec
     PRIVATE_HEADERS
         authoredValueInvalidationResult.h
         compilationState.h
+        disconnectedInputsInvalidationResult.h
         inputKey.h
         parallelForRange.h
         timeChangeInvalidationResult.h
@@ -52,20 +55,44 @@ pxr_library(exec
         compilerTaskSync
         computationDefinition
         definitionRegistry
+        inputRecompilationTask
         inputResolver
         inputResolvingCompilationTask
         leafCompilationTask
+        nodeRecompilationInfo
+        nodeRecompilationInfoTable
         outputKey
         outputProvidingCompilationTask
         program
         registrationBarrier
+        runtime
         uncompilationRuleSet
         uncompilationTable
         uncompiler
+        valueExtractor
 
     RESOURCE_FILES
         plugInfo.json
 )
+
+#
+# Tests
+#
+
+# Build test plugins
+
+pxr_build_test_shared_lib(TestExecPluginComputation
+    INSTALL_PREFIX ExecPlugins
+    LIBRARIES
+        gf
+        tf
+        exec
+        
+    CPPFILES
+        testenv/TestExecPluginComputation.cpp
+)
+
+# Build tests
 
 pxr_build_test(testExecComputationRegistration
     LIBRARIES
@@ -81,15 +108,18 @@ pxr_build_test(testExecComputationRegistration
         testenv/testExecComputationRegistration.cpp
 )
 
-pxr_install_test_dir(
-    SRC testenv/testExecComputationRegistration
-    DEST testExecComputationRegistration
-)
+# Tests that rely on plugins aren't currently supported in static builds.
+if (BUILD_SHARED_LIBS)
+    pxr_install_test_dir(
+        SRC testenv/testExecComputationRegistration
+        DEST testExecComputationRegistration
+    )
 
-pxr_register_test(testExecComputationRegistration
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecComputationRegistration"
-    EXPECTED_RETURN_CODE 0
-)
+    pxr_register_test(testExecComputationRegistration
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecComputationRegistration"
+        EXPECTED_RETURN_CODE 0
+    )
+endif()
 
 pxr_build_test(testExecInputResolver
     LIBRARIES

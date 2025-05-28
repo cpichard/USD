@@ -8,6 +8,7 @@
 
 #include "pxr/exec/exec/builtinComputations.h"
 #include "pxr/exec/exec/definitionRegistry.h"
+#include "pxr/exec/exec/inputKey.h"
 #include "pxr/exec/exec/program.h"
 
 #include "pxr/base/tf/diagnosticLite.h"
@@ -29,13 +30,12 @@ Exec_TimeComputationDefinition::Exec_TimeComputationDefinition()
 
 Exec_TimeComputationDefinition::~Exec_TimeComputationDefinition() = default;
 
-Exec_InputKeyVector
+Exec_InputKeyVectorConstRefPtr
 Exec_TimeComputationDefinition::GetInputKeys(
     const EsfObjectInterface &,
     EsfJournal *) const
 {
-    static Exec_InputKeyVector empty;
-    return empty;
+    return Exec_InputKeyVector::GetEmptyVector();
 }
 
 VdfNode *
@@ -51,7 +51,7 @@ Exec_TimeComputationDefinition::CompileNode(
         return nullptr;
     }
 
-    return program->CreateNode<EfTimeInputNode>(*nodeJournal);
+    return program->GetTimeInputNode();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

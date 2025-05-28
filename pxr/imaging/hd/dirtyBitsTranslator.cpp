@@ -434,17 +434,17 @@ HdDirtyBitsTranslator::BprimDirtyBitsToLocatorSet(TfToken const& primType,
         if (bits & HdRenderSettings::DirtyFrameNumber) {
             set->append(HdRenderSettingsSchema::GetFrameLocator());
         }
-        if (bits & HdRenderSettings::DirtyNamespacedSettings) {
-            set->append(HdRenderSettingsSchema::GetNamespacedSettingsLocator());
-        }
-        if (bits & HdRenderSettings::DirtyRenderProducts) {
-            set->append(HdRenderSettingsSchema::GetRenderProductsLocator());
-        }
         if (bits & HdRenderSettings::DirtyIncludedPurposes) {
             set->append(HdRenderSettingsSchema::GetIncludedPurposesLocator());
         }
         if (bits & HdRenderSettings::DirtyMaterialBindingPurposes) {
             set->append(HdRenderSettingsSchema::GetMaterialBindingPurposesLocator());
+        }
+        if (bits & HdRenderSettings::DirtyNamespacedSettings) {
+            set->append(HdRenderSettingsSchema::GetNamespacedSettingsLocator());
+        }
+        if (bits & HdRenderSettings::DirtyRenderProducts) {
+            set->append(HdRenderSettingsSchema::GetRenderProductsLocator());
         }
         if (bits & HdRenderSettings::DirtyRenderingColorSpace) {
             set->append(HdRenderSettingsSchema::GetRenderingColorSpaceLocator());
@@ -1128,14 +1128,6 @@ HdDirtyBitsTranslator::BprimLocatorSetToDirtyBits(
                 end, &it)) {
             bits |= HdRenderSettings::DirtyFrameNumber;
         }
-        if (_FindLocator(HdRenderSettingsSchema::GetNamespacedSettingsLocator(),
-                end, &it)) {
-            bits |= HdRenderSettings::DirtyNamespacedSettings;
-        }
-        if (_FindLocator(HdRenderSettingsSchema::GetRenderProductsLocator(),
-                end, &it)) {
-            bits |= HdRenderSettings::DirtyRenderProducts;
-        }
         if (_FindLocator(HdRenderSettingsSchema::GetIncludedPurposesLocator(),
                 end, &it)) {
             bits |= HdRenderSettings::DirtyIncludedPurposes;
@@ -1144,6 +1136,16 @@ HdDirtyBitsTranslator::BprimLocatorSetToDirtyBits(
                 HdRenderSettingsSchema::GetMaterialBindingPurposesLocator(),
                 end, &it)) {
             bits |= HdRenderSettings::DirtyMaterialBindingPurposes;
+        }
+        if (_FindLocator(HdRenderSettingsSchema::GetNamespacedSettingsLocator(),
+                end, &it)) {
+            bits |= HdRenderSettings::DirtyNamespacedSettings;
+        }
+        // In lexicographic ordering of camel case strings, uppercase comes 
+        // before lowercase, so renderProducts < renderingColorSpace
+        if (_FindLocator(HdRenderSettingsSchema::GetRenderProductsLocator(),
+                end, &it)) {
+            bits |= HdRenderSettings::DirtyRenderProducts;
         }
         if (_FindLocator(
                 HdRenderSettingsSchema::GetRenderingColorSpaceLocator(),

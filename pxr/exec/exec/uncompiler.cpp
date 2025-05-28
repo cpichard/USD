@@ -7,6 +7,7 @@
 #include "pxr/exec/exec/uncompiler.h"
 
 #include "pxr/exec/exec/program.h"
+#include "pxr/exec/exec/runtime.h"
 #include "pxr/exec/exec/uncompilationRuleSet.h"
 #include "pxr/exec/exec/uncompilationTable.h"
 
@@ -104,7 +105,9 @@ Exec_Uncompiler::_ProcessUncompilationRuleSet(
         // If the rule's input name is empty, then the entire node should be
         // uncompiled. Otherwise, only uncompile the input on that node.
         if (rule.inputName.IsEmpty()) {
+            _runtime->ClearData(*node);
             _program->DisconnectAndDeleteNode(node);
+            _didUncompile = true;
         }
         else {
             // TODO: Disconnecting the input does not delete the node, nor does
@@ -116,6 +119,7 @@ Exec_Uncompiler::_ProcessUncompilationRuleSet(
             // this from being a problem, but it needs to be corrected when
             // we handle namespace edits.
             _program->DisconnectInput(node->GetInput(rule.inputName));
+            _didUncompile = true;
         }
 
         // The rule has triggered and is no longer valid.

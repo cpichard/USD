@@ -10,7 +10,6 @@
 #include "pxr/pxr.h"
 
 #include "pxr/exec/exec/api.h"
-#include "pxr/exec/exec/types.h"
 
 #include "pxr/exec/esf/stage.h"
 
@@ -24,10 +23,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 class EfTime;
 class Exec_Program;
 class Exec_RequestImpl;
+class Exec_Runtime;
 class ExecValueKey;
+class SdfPath;
 template <typename> class TfSpan;
-class VdfExecutorErrorLogger;
-class VdfExecutorInterface;
 class VdfMaskedOutput;
 class VdfRequest;
 class VdfSchedule;
@@ -56,6 +55,15 @@ protected:
     EXEC_API
     ~ExecSystem();
 
+    /// Changes time on the system.
+    /// 
+    /// This stores the new time value in the time input node output,
+    /// invalidates all time dependent computed values, and notifies requests of
+    /// the change in time.
+    /// 
+    EXEC_API
+    void _ChangeTime(const EfTime &time);
+
     /// Transfer ownership of a newly-created request impl to the system.
     ///
     /// The system is responsible for managing the lifetime of the impl in
@@ -76,13 +84,13 @@ protected:
     class _ChangeProcessor;
 
 private:
-    // Requires access to _Compile
+    // Requires access to _CacheValues, _Compile, and _HasPendingRecompilation.
     friend class Exec_RequestImpl;
     std::vector<VdfMaskedOutput> _Compile(TfSpan<const ExecValueKey> valueKeys);
 
-    // Returns a pointer to the main executor.
+    // Returns true if the program has inputs requiring recompilation.
     EXEC_API
-    VdfExecutorInterface *_GetMainExecutor();
+    bool _HasPendingRecompilation() const;
 
     // Discards all internal state, and constructs new internal data structures
     // leaving the system in the same state as if it was newly constructed.
@@ -90,26 +98,19 @@ private:
     EXEC_API
     void _InvalidateAll();
 
+    // Notifies the system of invalidation due to uncompilation.
+    EXEC_API
+    void _InvalidateDisconnectedInputs();
+
     // Notifies the system of authored value invalidation.
     EXEC_API
-    void _InvalidateAuthoredValues(
-        TfSpan<ExecInvalidAuthoredValue> invalidProperties);
-
-    // Notifies the system of changes to time.
-    EXEC_API
-    void _ChangeTime(const EfTime &time);
-
-    // Reports any executor errors raised during a round of evaluation.
-    EXEC_API
-    void _ReportExecutorErrors(const VdfExecutorErrorLogger &errorLogger) const;
+    void _InvalidateAuthoredValues(TfSpan<const SdfPath> invalidProperties);
 
 private:
     EsfStage _stage;
 
     std::unique_ptr<Exec_Program> _program;
-
-    class _ExecutorState;
-    std::unique_ptr<_ExecutorState> _executorState;
+    std::unique_ptr<Exec_Runtime> _runtime;
 
     tbb::concurrent_vector<std::shared_ptr<Exec_RequestImpl>> _requests;
 };

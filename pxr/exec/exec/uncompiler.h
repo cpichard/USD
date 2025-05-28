@@ -16,6 +16,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 class Exec_Program;
+class Exec_Runtime;
 class Exec_UncompilationRuleSet;
 class SdfPath;
 
@@ -23,8 +24,10 @@ class SdfPath;
 class Exec_Uncompiler
 {
 public:
-    explicit Exec_Uncompiler(Exec_Program *program)
+    Exec_Uncompiler(Exec_Program *program, Exec_Runtime *runtime)
         : _program(program)
+        , _runtime(runtime)
+        , _didUncompile(false)
     {}
 
     /// Deletes portions of the compiled network when the given \p editReasons
@@ -38,6 +41,11 @@ public:
         const SdfPath &path,
         EsfEditReason editReasons);
 
+    /// Returns `true` if uncompilation resulted in changes to the network.
+    bool DidUncompile() const {
+        return _didUncompile;
+    }
+
 private:
     // Process a single \p ruleSet for \p path that has been changed by the
     // given \p editReasons.
@@ -46,7 +54,7 @@ private:
     // network objects that no longer exist, those rules are also removed from
     // the \p ruleSet. Rules that do not match the given \p editReasons are
     // skipped.
-    //
+    // 
     void _ProcessUncompilationRuleSet(
         const SdfPath &path,
         EsfEditReason editReasons,
@@ -54,6 +62,8 @@ private:
 
 private:
     Exec_Program *_program;
+    Exec_Runtime *_runtime;
+    bool _didUncompile;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

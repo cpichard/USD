@@ -53,6 +53,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_ENV_SETTING(HD_ENABLE_SCENE_INDEX_EMULATION, true,
                       "Enable scene index emulation in the render index.");
+TF_DEFINE_ENV_SETTING(HD_ENABLE_TERMINAL_CACHING_SCENE_INDEX, false,
+                  "Enable terminal HdCachingSceneIndex in the render index.");
 
 TF_DEFINE_PRIVATE_TOKENS(
     _noticeBatchingTokens,
@@ -64,8 +66,15 @@ TF_DEFINE_PRIVATE_TOKENS(
 static bool
 _IsEnabledSceneIndexEmulation()
 {
-    static bool enabled = 
-        (TfGetEnvSetting(HD_ENABLE_SCENE_INDEX_EMULATION) == true);
+    static bool enabled = TfGetEnvSetting(HD_ENABLE_SCENE_INDEX_EMULATION);
+    return enabled;
+}
+
+static bool
+_IsEnabledTerminalCachingSceneIndex()
+{
+    static bool enabled =
+        TfGetEnvSetting(HD_ENABLE_TERMINAL_CACHING_SCENE_INDEX);
     return enabled;
 }
 
@@ -179,13 +188,16 @@ HdRenderIndex::HdRenderIndex(
 
         // The legacy prim scene index holds prims contributed from
         // upstream scene delegates.  Convert any legacy subsets
-        // to HdGeomSubsetSchema.
+        // to HdGeomSubsetSchema.  Since legacy prims are typically
+        // populated iteratively, use notice batching upstream from
+        // scanning for geom subsets.
         HdLegacyGeomSubsetSceneIndexRefPtr legacyGeomSubsetSceneIndex =
-            HdLegacyGeomSubsetSceneIndex::New(_emulationSceneIndex);
+            HdLegacyGeomSubsetSceneIndex::New(
+                _emulationBatchingCtx->Append(_emulationSceneIndex));
 
         _mergingSceneIndex = HdMergingSceneIndex::New();
         _mergingSceneIndex->AddInputScene(
-            _emulationBatchingCtx->Append(legacyGeomSubsetSceneIndex),
+            legacyGeomSubsetSceneIndex,
             SdfPath::AbsoluteRootPath());
 
         _terminalSceneIndex =
@@ -206,9 +218,10 @@ HdRenderIndex::HdRenderIndex(
                         instanceName, appName);
         }
 
-// XXX(blevin) Temporarily disabled
-//        _terminalSceneIndex =
-//            HdCachingSceneIndex::New(_terminalSceneIndex);
+        if (_IsEnabledTerminalCachingSceneIndex()) {
+            _terminalSceneIndex =
+                HdCachingSceneIndex::New(_terminalSceneIndex);
+        }
 
         _siSd = std::make_unique<HdSceneIndexAdapterSceneDelegate>(
             _terminalSceneIndex,

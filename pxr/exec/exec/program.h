@@ -11,12 +11,15 @@
 
 #include "pxr/exec/exec/attributeInputNode.h"
 #include "pxr/exec/exec/compiledOutputCache.h"
-#include "pxr/exec/exec/types.h"
+#include "pxr/exec/exec/inputKey.h"
+#include "pxr/exec/exec/nodeRecompilationInfoTable.h"
 #include "pxr/exec/exec/uncompilationTable.h"
 
 #include "pxr/base/tf/bits.h"
+#include "pxr/base/ts/spline.h"
 #include "pxr/exec/ef/leafNodeCache.h"
 #include "pxr/exec/ef/time.h"
+#include "pxr/exec/vdf/isolatedSubnetwork.h"
 #include "pxr/exec/vdf/maskedOutput.h"
 #include "pxr/exec/vdf/maskedOutputVector.h"
 #include "pxr/exec/vdf/network.h"
@@ -27,6 +30,7 @@
 
 #include <atomic>
 #include <memory>
+#include <optional>
 #include <tuple>
 #include <type_traits>
 #include <unordered_set>
@@ -38,10 +42,12 @@ class EfTime;
 class EfTimeInputNode;
 class EsfJournal;
 class Exec_AuthoredValueInvalidationResult;
+class Exec_DisconnectedInputsInvalidationResult;
 class Exec_TimeChangeInvalidationResult;
 class TfBits;
 template <typename> class TfSpan;
 class VdfExecutorInterface;
+class VdfGrapherOptions;
 class VdfInput;
 class VdfNode;
 
@@ -146,21 +152,40 @@ public:
         return _network.GetVersion();
     }
 
-    /// Notifies the program of authored value invalidation.
-    ///
-    /// \return a vector of invalid leaf nodes, a bit set indicating which 
-    /// \p invalidProperties are compiled, and a time interval indicating the
-    /// combined invalidation interval.
+    /// Gathers the information required to invalidate the system and notify
+    /// requests after uncompilation.
+    /// 
+    Exec_DisconnectedInputsInvalidationResult InvalidateDisconnectedInputs();
+
+    /// Gathers the information required to invalidate the system and notify
+    /// requests after authored value invalidation.
     /// 
     Exec_AuthoredValueInvalidationResult InvalidateAuthoredValues(
-        TfSpan<ExecInvalidAuthoredValue> invalidProperties);
+        TfSpan<const SdfPath> invalidProperties);
 
-    /// Initializes all invalid input nodes in the network.
-    void InitializeInputNodes(VdfExecutorInterface *executor);
+    /// Resets the accumulated set of uninitialized input nodes.
+    /// 
+    /// Returns an executor invalidation requests with all the uninitialized
+    /// input node outputs for the call site to perform initialization and
+    /// executor invalidation.
+    /// 
+    VdfMaskedOutputVector ResetUninitializedInputNodes();
 
-    /// Initializes time in the network.
-    Exec_TimeChangeInvalidationResult InitializeTime(
-        const EfTime &newTime, VdfExecutorInterface *executor);
+    /// Gathers the information required to invalidate the system and notify
+    /// requests after time has changed.
+    /// 
+    Exec_TimeChangeInvalidationResult InvalidateTime(
+        const EfTime &oldTime, const EfTime &newTime);
+
+    /// Returns the time input node.
+    ///
+    /// Unlike most nodes, a program always has exactly one time input node.
+    /// Compilation may not create additional time input nodes and
+    /// uncompilation may not remove the time input node.
+    ///
+    EfTimeInputNode *GetTimeInputNode() const {
+        return _timeInputNode;
+    }
 
     /// Returns the node with the given \p nodeId, or nullptr if no such node
     /// exists.
@@ -224,15 +249,51 @@ public:
         return _uncompilationTable.Find(changedPath);
     }
 
+    /// Sets recompilation info for the given \p node after it has been
+    /// compiled.
+    ///
+    /// This information will be retrieved during recompilation when inputs of
+    /// \p node need to be recompiled.
+    ///
+    void SetNodeRecompilationInfo(
+        const VdfNode *node,
+        const EsfObject &provider,
+        Exec_InputKeyVectorConstRefPtr &&inputKeys) {
+        _nodeRecompilationInfoTable.SetNodeRecompilationInfo(
+            node,
+            provider,
+            std::move(inputKeys));
+    }
+
+    /// Retrieves the recompilation information stored for \p node.
+    const Exec_NodeRecompilationInfo *GetNodeRecompilationInfo(
+        const VdfNode *node) const {
+        return _nodeRecompilationInfoTable.GetNodeRecompilationInfo(node);
+    }
+
+    /// Starting from the set of potentially isolated nodes, creates a
+    /// subnetwork containing all isolated nodes and connections.
+    ///
+    /// \note
+    /// This method doesn't remove the isolated objects from the network; the
+    /// caller can either call
+    /// VdfIsolatedSubnetwork::RemoveIsolatedObjectsFromNetwork or the
+    /// VdfIsolatedSubnetwork destructor will remove the objects before it
+    /// deletes them.
+    ///
+    std::unique_ptr<VdfIsolatedSubnetwork> CreateIsolatedSubnetwork();
+
     /// Writes the compiled network to a file at \p filename.
-    void GraphNetwork(const char *filename) const;
+    void GraphNetwork(
+        const char *filename,
+        const VdfGrapherOptions &grapherOptions) const;
 
 private:
     // Updates data structures for a newly-added node.
     void _AddNode(const EsfJournal &journal, const VdfNode *node);
 
     // Registers an input node for authored value initialization.
-    void _RegisterInputNode(const Exec_AttributeInputNode *inputNode);
+    void _RegisterInputNode(Exec_AttributeInputNode *inputNode);
 
     // Unregisters an input node from authored value initialization.
     void _UnregisterInputNode(const Exec_AttributeInputNode *inputNode);
@@ -262,8 +323,8 @@ private:
 
     // Collection of compiled input nodes.
     struct _InputNodeEntry {
-        VdfId nodeId;
-        bool isTimeDependent;
+        Exec_AttributeInputNode *node;
+        std::optional<TsSpline> oldSpline;
     };
     using _InputNodesMap =
         tbb::concurrent_unordered_map<SdfPath, _InputNodeEntry, SdfPath::Hash>;
@@ -289,6 +350,9 @@ private:
 
     // Inputs that were disconnected during uncompilation.
     std::unordered_set<VdfInput *> _inputsRequiringRecompilation;
+
+    // Stores recompilation info for every node.
+    Exec_NodeRecompilationInfoTable _nodeRecompilationInfoTable;
 };
 
 
@@ -298,11 +362,9 @@ NodeType *Exec_Program::CreateNode(
     NodeCtorArgs... nodeCtorArgs)
 {
     static_assert(std::is_base_of_v<VdfNode, NodeType>);
-
-    // The time node is a special case.
-    if constexpr (std::is_same_v<EfTimeInputNode, NodeType>) {
-        return _timeInputNode;
-    }
+    static_assert(!std::is_same_v<EfTimeInputNode, NodeType>,
+                  "CreateNode may not construct additional EfTimeInputNodes. "
+                  "Use GetTimeInputNode() to access the time node.");
 
     NodeType *const node = new NodeType(
         &_network, std::forward<NodeCtorArgs>(nodeCtorArgs)...);

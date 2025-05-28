@@ -15,6 +15,7 @@
 #include "pxr/exec/esf/stage.h"
 #include "pxr/exec/esfUsd/sceneAdapter.h"
 
+#include "pxr/base/arch/systemInfo.h"
 #include "pxr/base/plug/plugin.h"
 #include "pxr/base/plug/registry.h"
 #include "pxr/base/tf/diagnostic.h"
@@ -29,7 +30,10 @@
 #include "pxr/usd/usd/stage.h"
 #include "pxr/usd/usd/timeCode.h"
 
+#include <algorithm>
 #include <iostream>
+#include <iterator>
+#include <set>
 
 PXR_NAMESPACE_USING_DIRECTIVE;
 
@@ -48,16 +52,18 @@ TF_DEFINE_PRIVATE_TOKENS(
     (noInputsComputation)
     (primComputation)
     (stageAccessComputation)
+    (unknownSchemaTypeComputation)
 );
 
 // A type that is not registered with TfType.
-EXEC_REGISTER_SCHEMA(TestUnknownType)
+EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(TestUnknownSchemaType)
 {
-    self.PrimComputation(_tokens->noInputsComputation)
+    self.PrimComputation(_tokens->unknownSchemaTypeComputation)
         .Callback<double>(+[](const VdfContext &) { return 1.0; });
 }
 
-EXEC_REGISTER_SCHEMA(TestExecComputationRegistrationCustomSchema)
+EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
+    TestExecComputationRegistrationCustomSchema)
 {
     self.PrimComputation(_tokens->emptyComputation);
 
@@ -111,7 +117,8 @@ EXEC_REGISTER_SCHEMA(TestExecComputationRegistrationCustomSchema)
         .Callback(+[](const VdfContext &) { return 1.0; });
 }
 
-EXEC_REGISTER_SCHEMA(TestExecComputationRegistrationDerivedCustomSchema)
+EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
+    TestExecComputationRegistrationDerivedCustomSchema)
 {
     self.PrimComputation(_tokens->derivedSchemaComputation)
         .Callback(+[](const VdfContext &) { return 1.0; });
@@ -135,7 +142,7 @@ namespace client_namespace {
 struct TestNamespacedSchemaType {};
 
 
-EXEC_REGISTER_SCHEMA(TestNamespacedSchemaType)
+EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(TestNamespacedSchemaType)
 {
     self.PrimComputation(_tokens->noInputsComputation)
         .Callback(+[](const VdfContext &) { return 1.0; });
@@ -161,26 +168,51 @@ EXEC_REGISTER_SCHEMA(TestNamespacedSchemaType)
 // strings.
 class ExpectedErrors {
 public:
-    ExpectedErrors(const std::vector<std::string> &expectedErrors)
+    ExpectedErrors(const std::set<std::string> &expectedErrors)
         : _expectedErrors(expectedErrors)
     {
     }
 
     ~ExpectedErrors() {
-        size_t i=0;
+        const size_t numErrors = std::distance(_mark.begin(), _mark.end());
+        ASSERT_EQ(numErrors, _expectedErrors.size());
+
+        std::set<std::string> errors;
         for (auto it=_mark.begin(); it!=_mark.end(); ++it) {
-            if (i < _expectedErrors.size()) {
-                ASSERT_EQ(it->GetCommentary(), _expectedErrors[i]);
-            }
-            ++i;
+            errors.insert(it->GetCommentary());
         }
-        ASSERT_EQ(i, _expectedErrors.size());
+
+        if (errors != _expectedErrors) {
+            std::set<std::string> missingErrors, unexpectedErrors;
+            std::set_difference(
+                _expectedErrors.begin(), _expectedErrors.end(),
+                errors.begin(), errors.end(),
+                std::inserter(missingErrors, missingErrors.begin()));
+            std::set_difference(
+                errors.begin(), errors.end(),
+                _expectedErrors.begin(), _expectedErrors.end(),
+                std::inserter(unexpectedErrors, unexpectedErrors.begin()));
+
+            std::string errorMessage =
+                "Emitted errors differed from expected errors:\n";
+            if (!missingErrors.empty()) {
+                errorMessage += TfStringPrintf(
+                    "Missing:\n  %s\n",
+                    TfStringJoin(missingErrors, "\n  ").c_str());
+            }
+            if (!unexpectedErrors.empty()) {
+                errorMessage += TfStringPrintf(
+                    "Unexpected:\n  %s\n",
+                    TfStringJoin(unexpectedErrors, "\n  ").c_str());
+            }
+            TF_FATAL_ERROR("%s", errorMessage.c_str());
+        }
 
         _mark.Clear();
     }
 
 private:
-    const std::vector<std::string> _expectedErrors;
+    const std::set<std::string> _expectedErrors;
     TfErrorMark _mark;
 };
 
@@ -220,8 +252,8 @@ static void
 TestRegistrationErrors()
 {
     ExpectedErrors expected({
-        "Attempt to register computation 'noInputsComputation' using an unknown "
-        "type.",
+        "Attempt to register computation 'unknownSchemaTypeComputation' using "
+        "an unknown type.",
         "Attempt to register computation '__computeTime' with a name that uses "
         "the prefix '__', which is reserved for builtin computations."
     });
@@ -237,7 +269,7 @@ TestUnknownSchemaType()
     EsfJournal *const nullJournal = nullptr;
     const Exec_DefinitionRegistry &reg = Exec_DefinitionRegistry::GetInstance();
     const EsfStage stage = _NewStageFromLayer(R"usd(#usda 1.0
-        def TestUnknownType "Prim" {
+        def TestUnknownSchemaType "Prim" {
         }
     )usd");
     const EsfPrim prim = stage->GetPrimAtPath(SdfPath("/Prim"), nullJournal);
@@ -264,7 +296,7 @@ TestStageBuiltinComputationOnPrim()
     EsfJournal *const nullJournal = nullptr;
     const Exec_DefinitionRegistry &reg = Exec_DefinitionRegistry::GetInstance();
     const EsfStage stage = _NewStageFromLayer(R"usd(#usda 1.0
-        def TestUnknownType "Prim" {
+        def TestUnknownSchemaType "Prim" {
         }
     )usd");
     const EsfPrim prim = stage->GetPrimAtPath(SdfPath("/Prim"), nullJournal);
@@ -308,7 +340,7 @@ TestComputationRegistration()
         TF_AXIOM(primCompDef);
 
         ASSERT_EQ(
-            primCompDef->GetInputKeys(*prim, nullJournal).size(),
+            primCompDef->GetInputKeys(*prim, nullJournal)->Get().size(),
             0);
     }
 
@@ -320,7 +352,7 @@ TestComputationRegistration()
         TF_AXIOM(primCompDef);
 
         ASSERT_EQ(
-            primCompDef->GetInputKeys(*prim, nullJournal).size(),
+            primCompDef->GetInputKeys(*prim, nullJournal)->Get().size(),
             0);
     }
 
@@ -332,7 +364,7 @@ TestComputationRegistration()
         TF_AXIOM(primCompDef);
 
         ASSERT_EQ(
-            primCompDef->GetInputKeys(*prim, nullJournal).size(),
+            primCompDef->GetInputKeys(*prim, nullJournal)->Get().size(),
             0);
     }
 
@@ -353,13 +385,13 @@ TestComputationRegistration()
 
         const auto inputKeys =
             primCompDef->GetInputKeys(*prim, nullJournal);
-        ASSERT_EQ(inputKeys.size(), 4);
+        ASSERT_EQ(inputKeys->Get().size(), 4);
 
-        _PrintInputKeys(inputKeys);
+        _PrintInputKeys(inputKeys->Get());
 
         size_t index = 0;
         {
-            const Exec_InputKey &key = inputKeys[index++];
+            const Exec_InputKey &key = inputKeys->Get()[index++];
             ASSERT_EQ(key.inputName, _tokens->primComputation);
             ASSERT_EQ(key.computationName, _tokens->primComputation);
             ASSERT_EQ(key.resultType, TfType::Find<double>());
@@ -370,7 +402,7 @@ TestComputationRegistration()
         }
 
         {
-            const Exec_InputKey &key = inputKeys[index++];
+            const Exec_InputKey &key = inputKeys->Get()[index++];
             ASSERT_EQ(key.inputName, _tokens->attributeComputation);
             ASSERT_EQ(key.computationName, _tokens->attributeComputation);
             ASSERT_EQ(key.resultType, TfType::Find<int>());
@@ -382,7 +414,7 @@ TestComputationRegistration()
         }
 
         {
-            const Exec_InputKey &key = inputKeys[index++];
+            const Exec_InputKey &key = inputKeys->Get()[index++];
             ASSERT_EQ(key.inputName, _tokens->attributeName);
             ASSERT_EQ(
                 key.computationName, ExecBuiltinComputations->computeValue);
@@ -395,7 +427,7 @@ TestComputationRegistration()
         }
 
         {
-            const Exec_InputKey &key = inputKeys[index++];
+            const Exec_InputKey &key = inputKeys->Get()[index++];
             ASSERT_EQ(key.inputName, _tokens->namespaceAncestorInput);
             ASSERT_EQ(key.computationName, _tokens->primComputation);
             ASSERT_EQ(key.resultType, TfType::Find<bool>());
@@ -415,11 +447,11 @@ TestComputationRegistration()
 
         const auto inputKeys =
             primCompDef->GetInputKeys(*prim, nullJournal);
-        ASSERT_EQ(inputKeys.size(), 1);
+        ASSERT_EQ(inputKeys->Get().size(), 1);
 
-        _PrintInputKeys(inputKeys);
+        _PrintInputKeys(inputKeys->Get());
 
-        const Exec_InputKey &key = inputKeys[0];
+        const Exec_InputKey &key = inputKeys->Get()[0];
         ASSERT_EQ(key.inputName, ExecBuiltinComputations->computeTime);
         ASSERT_EQ(key.computationName, ExecBuiltinComputations->computeTime);
         ASSERT_EQ(key.resultType, TfType::Find<EfTime>());
@@ -438,11 +470,11 @@ TestComputationRegistration()
 
         const auto inputKeys =
             primCompDef->GetInputKeys(*prim, nullJournal);
-        ASSERT_EQ(inputKeys.size(), 1);
+        ASSERT_EQ(inputKeys->Get().size(), 1);
 
-        _PrintInputKeys(inputKeys);
+        _PrintInputKeys(inputKeys->Get());
 
-        const Exec_InputKey &key = inputKeys[0];
+        const Exec_InputKey &key = inputKeys->Get()[0];
         ASSERT_EQ(key.inputName, ExecBuiltinComputations->computeValue);
         ASSERT_EQ(key.computationName, ExecBuiltinComputations->computeValue);
         ASSERT_EQ(key.resultType, TfType::Find<double>());
@@ -485,7 +517,7 @@ TestDerivedSchemaComputationRegistration()
         // stronger one).
         const auto inputKeys =
             primCompDef->GetInputKeys(*prim, nullJournal);
-        ASSERT_EQ(inputKeys.size(), 1);
+        ASSERT_EQ(inputKeys->Get().size(), 1);
     }
 
     {
@@ -497,23 +529,107 @@ TestDerivedSchemaComputationRegistration()
     }
 }
 
+static void
+TestPluginSchemaComputationRegistration()
+{
+    EsfJournal *const nullJournal = nullptr;
+    const Exec_DefinitionRegistry &reg = Exec_DefinitionRegistry::GetInstance();
+    const EsfStage stage = _NewStageFromLayer(R"usd(#usda 1.0
+        def PluginComputationSchema "Prim"
+        {
+        }
+
+        def ExtraPluginComputationSchema "ExtraPrim"
+        {
+        }
+    )usd");
+    const EsfPrim prim = stage->GetPrimAtPath(SdfPath("/Prim"), nullJournal);
+    TF_AXIOM(prim->IsValid(nullJournal));
+
+    {
+        ExpectedErrors expected({
+            "Duplicate registrations of plugin computations for schema "
+            "TestExecComputationRegistrationCustomSchema."
+        });
+
+        // Look up a computation registered in a plugin.
+        const Exec_ComputationDefinition *const primCompDef =
+            reg.GetComputationDefinition(
+                *prim, TfToken("myComputation"), nullJournal);
+        TF_AXIOM(primCompDef);
+
+        const auto inputKeys =
+            primCompDef->GetInputKeys(*prim, nullJournal);
+        ASSERT_EQ(inputKeys->Get().size(), 2);
+    }
+
+    {
+        // Look up another computation that was registered by the plugin we just
+        // loaded.
+        const Exec_ComputationDefinition *const primCompDef =
+            reg.GetComputationDefinition(
+                *prim, TfToken("anotherComputation"), nullJournal);
+        TF_AXIOM(primCompDef);
+
+        const auto inputKeys =
+            primCompDef->GetInputKeys(*prim, nullJournal);
+        ASSERT_EQ(inputKeys->Get().size(), 1);
+    }
+
+    {
+        // Look up a computation on a prim with a different schema, which is
+        // defined in the same plugin that defines computations for
+        // PluginComputationSchema.
+        const EsfPrim extraPrim =
+            stage->GetPrimAtPath(SdfPath("/ExtraPrim"), nullJournal);
+        TF_AXIOM(extraPrim->IsValid(nullJournal));
+
+        const Exec_ComputationDefinition *const extraPrimCompDef =
+            reg.GetComputationDefinition(
+                *extraPrim, TfToken("myComputation"), nullJournal);
+        TF_AXIOM(extraPrimCompDef);
+
+        const auto inputKeys =
+            extraPrimCompDef->GetInputKeys(*extraPrim, nullJournal);
+        ASSERT_EQ(inputKeys->Get().size(), 0);
+    }
+}
+
+static void
+_SetupTestPlugins()
+{
+    const std::string pluginPath =
+        TfStringCatPaths(
+            TfGetPathName(ArchGetExecutablePath()),
+            "ExecPlugins/lib/TestExecPluginComputation*/Resources/") + "/";
+
+    const PlugPluginPtrVector plugins =
+        PlugRegistry::GetInstance().RegisterPlugins(pluginPath);
+    
+    ASSERT_EQ(plugins.size(), 1);
+    ASSERT_EQ(plugins[0]->GetName(), "TestExecPluginComputation");
+}
+
 int main()
 {
     // Load the custom schema.
     const PlugPluginPtrVector testPlugins =
         PlugRegistry::GetInstance().RegisterPlugins(TfAbsPath("resources"));
-    TF_AXIOM(testPlugins.size() == 1);
-    TF_AXIOM(testPlugins[0]->GetName() == "testExecComputationRegistration");
+    ASSERT_EQ(testPlugins.size(), 1);
+    ASSERT_EQ(testPlugins[0]->GetName(), "testExecComputationRegistration");
 
     const TfType schemaType =
         TfType::FindByName("TestExecComputationRegistrationCustomSchema");
     TF_AXIOM(!schemaType.IsUnknown());
+
+    _SetupTestPlugins();
 
     TestRegistrationErrors();
     TestUnknownSchemaType();
     TestStageBuiltinComputationOnPrim();
     TestComputationRegistration();
     TestDerivedSchemaComputationRegistration();
+    TestPluginSchemaComputationRegistration();
 
     return 0;
 }

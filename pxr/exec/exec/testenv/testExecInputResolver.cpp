@@ -94,7 +94,7 @@ PXR_NAMESPACE_CLOSE_SCOPE
 
 // TestExecInputResolverCustomSchema is a codeless schema that's loaded for this
 // test only. The schema is loaded from testenv/testExecInputResolver/resources.
-EXEC_REGISTER_SCHEMA(TestExecInputResolverCustomSchema)
+EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(TestExecInputResolverCustomSchema)
 {
     self.PrimComputation(_tokens->customComputation)
         .Callback<int>(+[](const VdfContext &){ return 0; });
@@ -451,8 +451,8 @@ int main()
     // Load the custom schema.
     const PlugPluginPtrVector testPlugins = PlugRegistry::GetInstance()
         .RegisterPlugins(TfAbsPath("resources"));
-    TF_AXIOM(testPlugins.size() == 1);
-    TF_AXIOM(testPlugins[0]->GetName() == "testExecInputResolver");
+    ASSERT_EQ(testPlugins.size(), 1);
+    ASSERT_EQ(testPlugins[0]->GetName(), "testExecInputResolver");
 
     const TfType customSchemaType =
         TfType::FindByName("TestExecInputResolverCustomSchema");

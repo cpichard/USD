@@ -6,7 +6,8 @@
 //
 #include "pxr/exec/exec/cacheView.h"
 
-#include "pxr/exec/vdf/executorInterface.h"
+#include "pxr/exec/exec/valueExtractor.h"
+
 #include "pxr/exec/vdf/maskedOutput.h"
 #include "pxr/exec/vdf/vector.h"
 
@@ -14,11 +15,31 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+Exec_CacheView::Exec_CacheView(
+    const VdfDataManagerFacade dataManager,
+    TfSpan<const VdfMaskedOutput> outputs,
+    TfSpan<const Exec_ValueExtractor> extractors)
+    : _dataManager(
+        // Set the view to an invalid state if the outputs and extractors
+        // don't line up.
+        TF_VERIFY(outputs.size() == extractors.size())
+        ? std::optional(dataManager)
+        : std::nullopt)
+    , _outputs(outputs)
+    , _extractors(extractors)
+{
+}
+
 bool
 Exec_CacheView::Extract(int idx, VtValue *result) const
 {
-    if (!_executor) {
+    if (!_dataManager) {
         TF_CODING_ERROR("Cannot extract from invalid view");
+        return false;
+    }
+
+    if (!result) {
+        TF_CODING_ERROR("Got NULL result");
         return false;
     }
 
@@ -32,7 +53,7 @@ Exec_CacheView::Extract(int idx, VtValue *result) const
         return false;
     }
 
-    const VdfVector *v = _executor->GetOutputValue(
+    const VdfVector *v = _dataManager->GetOutputValue(
         *mo.GetOutput(), mo.GetMask());
     if (!v) {
         TF_CODING_ERROR("No value cached for output '%s' (idx=%d)",
@@ -40,10 +61,9 @@ Exec_CacheView::Extract(int idx, VtValue *result) const
         return false;
     }
 
-    // TODO: VdfVector -> VtValue extraction
-
-    TF_CODING_ERROR("Extraction is not yet implemented");
-    return false;
+    const Exec_ValueExtractor extractor = _extractors[idx];
+    *result = extractor(*v, mo.GetMask());
+    return true;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -8,6 +8,7 @@
 
 #include "pxr/exec/exec/compilationState.h"
 #include "pxr/exec/exec/computationDefinition.h"
+#include "pxr/exec/exec/inputKey.h"
 #include "pxr/exec/exec/inputResolvingCompilationTask.h"
 #include "pxr/exec/exec/program.h"
 
@@ -47,13 +48,13 @@ Exec_OutputProvidingCompilationTask::_Compile(
                 *_outputKey.GetProviderObject(),
                 &_nodeJournal);
 
-        _inputSources.resize(_inputKeys.size());
-        _inputJournals.resize(_inputKeys.size());
-        const size_t numInputKeys = _inputKeys.size();
+        const size_t numInputKeys = _inputKeys->Get().size();
+        _inputSources.resize(numInputKeys);
+        _inputJournals.resize(numInputKeys);
         for (size_t i = 0; i < numInputKeys; ++i) {
             deps.NewSubtask<Exec_InputResolvingCompilationTask>(
                 compilationState,
-                _inputKeys[i],
+                _inputKeys->Get()[i],
                 _outputKey.GetProviderObject(),
                 &_inputSources[i],
                 &_inputJournals[i]);
@@ -79,12 +80,17 @@ Exec_OutputProvidingCompilationTask::_Compile(
             return keyIdentity.GetDebugName();
         });
 
+        compilationState.GetProgram()->SetNodeRecompilationInfo(
+            node,
+            _outputKey.GetProviderObject(),
+            Exec_InputKeyVectorConstRefPtr(_inputKeys));
+
         for (size_t i = 0; i < _inputSources.size(); ++i) {
             compilationState.GetProgram()->Connect(
                 _inputJournals[i],
                 _inputSources[i],
                 node,
-                _inputKeys[i].inputName);
+                _inputKeys->Get()[i].inputName);
         }
 
         // Return the compiled output to the calling task.

@@ -12,10 +12,13 @@
 #include "pxr/exec/exec/api.h"
 
 #include "pxr/base/tf/span.h"
+#include "pxr/exec/vdf/dataManagerFacade.h"
+
+#include <optional>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class VdfExecutorInterface;
+class Exec_ValueExtractor;
 class VdfMaskedOutput;
 class VtValue;
 
@@ -42,15 +45,14 @@ public:
 private:
     friend class Exec_RequestImpl;
     Exec_CacheView(
-        const VdfExecutorInterface *executor,
-        TfSpan<const VdfMaskedOutput> outputs)
-        : _executor(executor)
-        , _outputs(outputs)
-    {}
+        const VdfDataManagerFacade dataManager,
+        TfSpan<const VdfMaskedOutput> outputs,
+        TfSpan<const Exec_ValueExtractor> extractors);
 
 private:
-    const VdfExecutorInterface * const _executor = nullptr;
+    std::optional<const VdfDataManagerFacade> _dataManager;
     const TfSpan<const VdfMaskedOutput> _outputs{};
+    const TfSpan<const Exec_ValueExtractor> _extractors{};
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
