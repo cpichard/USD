@@ -44,6 +44,30 @@ static TfBits
 _FilterTimeDependentInputNodeOutputs(
     const VdfMaskedOutputVector &, const EfTime &, const EfTime &);
 
+namespace {
+
+// An edit filter that won't allow the time input node to be deleted, even if it
+// becomes isolated.
+//
+class _EditFilter final : public VdfNetwork::EditFilter
+{
+public:
+    _EditFilter(EfTimeInputNode *const timeInputNode)
+        : _timeInputNode(timeInputNode)
+    {}
+
+    ~_EditFilter() override = default;
+
+    bool CanDelete(const VdfNode *node) override {
+        return node != _timeInputNode;
+    }
+
+private:
+    EfTimeInputNode *const _timeInputNode;
+};
+
+} // anonymous namespace
+
 class Exec_Program::_EditMonitor final : public VdfNetwork::EditMonitor {
 public:
     explicit _EditMonitor(Exec_Program *const program)
@@ -68,6 +92,12 @@ public:
         // TODO: When we implement parallel node deletion, this needs to be made
         // thread-safe.
         _program->_compiledOutputCache.EraseByNodeId(node->GetId());
+
+        // Only update the CompiledLeafNodeCache if the deleted node looks
+        // like a leaf node.
+        if (node->GetNumOutputs() == 0) {
+            _program->_compiledLeafNodeCache.WillDeleteNode(node);
+        }
 
         // Unregister this node if it is an attribute input node.
         // 
@@ -421,13 +451,13 @@ Exec_Program::CreateIsolatedSubnetwork()
 {
     TRACE_FUNCTION();
 
+    _EditFilter filter(_timeInputNode);
+
     std::unique_ptr<VdfIsolatedSubnetwork> subnetwork =
         VdfIsolatedSubnetwork::New(&_network);
 
-    // TODO: We can probably modify VdfIsolatedSubnetwork to make it safe to
-    // concurrently isolate branches.
     for (VdfNode *const node : _potentiallyIsolatedNodes) {
-        subnetwork->AddIsolatedBranch(node, /* filter */ nullptr);
+        subnetwork->AddIsolatedBranch(node, &filter);
     }
 
     _potentiallyIsolatedNodes.clear();

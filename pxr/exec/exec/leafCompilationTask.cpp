@@ -17,24 +17,24 @@
 #include "pxr/exec/esf/editReason.h"
 #include "pxr/exec/esf/journal.h"
 #include "pxr/exec/esf/object.h"
-#include "pxr/exec/vdf/maskedOutput.h"
+#include "pxr/exec/exec/providerResolution.h"
 
 #include <initializer_list>
+#include <utility>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-static Exec_InputKey _MakeInputKey(const ExecValueKey &valueKey);
-static Exec_InputKeyVectorConstRefPtr _MakeInputKeyVector(
-    const ExecValueKey &valueKey);
+static Exec_InputKeyVectorConstRefPtr
+_MakeInputKeyVector(const ExecValueKey &valueKey);
 
 void
 Exec_LeafCompilationTask::_Compile(
     Exec_CompilationState &compilationState,
-    TaskStages &taskStages)
+    TaskPhases &taskPhases)
 {
     TRACE_FUNCTION();
 
-    taskStages.Invoke(
+    taskPhases.Invoke(
     // Turn the value key into an input key and create an input resolving
     // subtask to compile the source output to later connect to the leaf node.
     [this, &compilationState]
@@ -45,12 +45,12 @@ Exec_LeafCompilationTask::_Compile(
         _originObject = _valueKey.GetProvider();
 
         // Make an input key from the value key
-        const Exec_InputKey inputKey = _MakeInputKey(_valueKey);
+        _inputKeys = _MakeInputKeyVector(_valueKey);
 
         // Run a new subtask to compile the input
         deps.NewSubtask<Exec_InputResolvingCompilationTask>(
             compilationState,
-            inputKey,
+            _inputKeys->Get()[0],
             *_originObject,
             &_resultOutputs,
             &_journal);
@@ -76,6 +76,14 @@ Exec_LeafCompilationTask::_Compile(
         // Return the compiled source output as the requested leaf output
         *_leafOutput = sourceOutput;
 
+        // If a leaf node is already compiled for this value key, then
+        // compilation is done. This happens when requests are recompiled, in
+        // which case the only purpose of LeafCompilationTask is to resolve the
+        // new leaf output.
+        if (compilationState.GetProgram()->GetCompiledLeafNode(_valueKey)) {
+            return;
+        }
+
         // Leaf nodes should be uncompiled when a resync occurs on the value
         // key's provider.
         EsfJournal nodeJournal;
@@ -95,7 +103,9 @@ Exec_LeafCompilationTask::_Compile(
         compilationState.GetProgram()->SetNodeRecompilationInfo(
             leafNode, 
             _valueKey.GetProvider(), 
-            _MakeInputKeyVector(_valueKey));
+            std::move(_inputKeys));
+
+        compilationState.GetProgram()->SetCompiledLeafNode(_valueKey, leafNode);
 
         compilationState.GetProgram()->Connect(
             _journal,
@@ -106,24 +116,23 @@ Exec_LeafCompilationTask::_Compile(
     );
 }
 
-Exec_InputKey
-_MakeInputKey(const ExecValueKey &valueKey)
-{
-    return {
-        EfLeafTokens->in,
-        valueKey.GetComputationName(),
-        TfType(),
-        {SdfPath::ReflexiveRelativePath(),
-            ExecProviderResolution::DynamicTraversal::Local},
-        false /* optional */
-    };
-}
-
-Exec_InputKeyVectorConstRefPtr
+static Exec_InputKeyVectorConstRefPtr
 _MakeInputKeyVector(const ExecValueKey &valueKey)
 {
     return TfMakeDelegatedCountPtr<const Exec_InputKeyVector>(
-        std::initializer_list<Exec_InputKey>({_MakeInputKey(valueKey)}));
+        std::initializer_list<Exec_InputKey> {
+            Exec_InputKey {
+                EfLeafTokens->in,
+                valueKey.GetComputationName(),
+                TfType(),
+                ExecProviderResolution {
+                    SdfPath::ReflexiveRelativePath(),
+                    ExecProviderResolution::DynamicTraversal::Local
+                },
+                false /* optional */
+            }
+        }
+    );
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

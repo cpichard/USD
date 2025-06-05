@@ -56,20 +56,6 @@ pxr_register_test(testExecUsdBasicCompilation
     TESTENV testExecUsdBasicCompilation
 )
 
-pxr_build_test(testExecUsdExternalRegistration
-    LIBRARIES
-        exec
-        tf
-        vdf
-    CPPFILES
-        testenv/testExecUsdExternalRegistration.cpp
-)
-
-pxr_register_test(testExecUsdExternalRegistration
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdExternalRegistration"
-    EXPECTED_RETURN_CODE 0
-)
-
 pxr_build_test(testExecUsdRecompilation
     LIBRARIES
         exec
@@ -94,21 +80,33 @@ pxr_register_test(testExecUsdRecompilation
     POST_COMMAND "${PYTHON_EXECUTABLE} normalizeDotFiles.py                    \
         TestRecompileDisconnectedAttributeInput-1.dot                          \
         TestRecompileDisconnectedAttributeInput-2.dot                          \
+        TestRecompileDisconnectedAttributeInput-3.dot                          \
         TestRecompileMultipleRequests-1.dot                                    \
         TestRecompileMultipleRequests-2.dot                                    \
         TestRecompileMultipleRequests-3.dot                                    \
         TestRecompileDeletedPrim-1.dot                                         \
         TestRecompileDeletedPrim-2.dot                                         \
         TestRecompileDeletedPrim-3.dot                                         \
+        TestRecompileChangedRelationshipTargets-1.dot                          \
+        TestRecompileChangedRelationshipTargets-2.dot                          \
+        TestRecompileChangedRelationshipTargets-3.dot                          \
+        TestRecompileChangedRelationshipTargets-4.dot                          \
+        TestRecompileChangedRelationshipTargets-5.dot                          \
         "
     DIFF_COMPARE TestRecompileDisconnectedAttributeInput-1.out
     DIFF_COMPARE TestRecompileDisconnectedAttributeInput-2.out
+    DIFF_COMPARE TestRecompileDisconnectedAttributeInput-3.out
     DIFF_COMPARE TestRecompileMultipleRequests-1.out
     DIFF_COMPARE TestRecompileMultipleRequests-2.out
     DIFF_COMPARE TestRecompileMultipleRequests-3.out
     DIFF_COMPARE TestRecompileDeletedPrim-1.out
     DIFF_COMPARE TestRecompileDeletedPrim-2.out
     DIFF_COMPARE TestRecompileDeletedPrim-3.out
+    DIFF_COMPARE TestRecompileChangedRelationshipTargets-1.out
+    DIFF_COMPARE TestRecompileChangedRelationshipTargets-2.out
+    DIFF_COMPARE TestRecompileChangedRelationshipTargets-3.out
+    DIFF_COMPARE TestRecompileChangedRelationshipTargets-4.out
+    DIFF_COMPARE TestRecompileChangedRelationshipTargets-5.out
 )
 
 pxr_build_test(testExecUsdRequest

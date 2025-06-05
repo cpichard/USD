@@ -6,6 +6,7 @@
 //
 #include "pxr/pxr.h"
 
+#include "pxr/exec/execUsd/cacheView.h"
 #include "pxr/exec/execUsd/request.h"
 #include "pxr/exec/execUsd/system.h"
 #include "pxr/exec/execUsd/valueKey.h"
@@ -15,14 +16,17 @@
 #include "pxr/base/tf/diagnosticLite.h"
 #include "pxr/base/tf/pathUtils.h"
 #include "pxr/base/tf/staticTokens.h"
+#include "pxr/exec/exec/builtinComputations.h"
 #include "pxr/exec/exec/computationBuilders.h"
 #include "pxr/exec/exec/registerSchema.h"
 #include "pxr/exec/exec/systemDiagnostics.h"
 #include "pxr/exec/vdf/context.h"
+#include "pxr/exec/vdf/readIterator.h"
 #include "pxr/usd/sdf/layer.h"
 #include "pxr/usd/sdf/types.h"
 #include "pxr/usd/usd/common.h"
 #include "pxr/usd/usd/prim.h"
+#include "pxr/usd/usd/relationship.h"
 #include "pxr/usd/usd/stage.h"
 
 PXR_NAMESPACE_USING_DIRECTIVE;
@@ -32,7 +36,9 @@ TF_DEFINE_PRIVATE_TOKENS(
     
     (computeOnNamespaceAncestor)
     (computeUsingCustomAttr)
+    (computeUsingCustomRel)
     (customAttr)
+    (customRel)
 );
 
 static void
@@ -53,11 +59,30 @@ CommonComputationCallback(const VdfContext &ctx)
 
 EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(TestExecUsdRecompilationCustomSchema)
 {
-    // Computation depends on customAttr only.
+    // A computation that depends on customAttr only.
     self.PrimComputation(_tokens->computeUsingCustomAttr)
-        .Callback(CommonComputationCallback)
+        .Callback(+[](const VdfContext &context) {
+            const int *const valuePtr =
+                context.GetInputValuePtr<int>(_tokens->customAttr);
+            return valuePtr ? *valuePtr : -1;
+        })
         .Inputs(
             AttributeValue<int>(_tokens->customAttr));
+
+    // A computation that depends on the targets of customRel.
+    self.PrimComputation(_tokens->computeUsingCustomRel)
+        .Callback(+[](const VdfContext &context) {
+            int result = 0;
+            VdfReadIterator<int> it(
+                context, ExecBuiltinComputations->computeValue);
+            for (; !it.IsAtEnd(); ++it) {
+                result += *it;
+            }
+            return result;
+        })
+        .Inputs(
+            Relationship(_tokens->customRel)
+            .TargetedObjects<int>(ExecBuiltinComputations->computeValue));
 
     // A computation that depends on the namespace ancestor.
     self.PrimComputation(_tokens->computeOnNamespaceAncestor)
@@ -101,6 +126,10 @@ public:
         return _stage->GetAttributeAtPath(SdfPath(pathStr));
     }
 
+    UsdRelationship GetRelationshipAtPath(const char *const pathStr) const {
+        return _stage->GetRelationshipAtPath(SdfPath(pathStr));
+    }
+
     void GraphNetwork(const char *const filename) {
         ExecSystem::Diagnostics diagnostics(&*_system);
         diagnostics.GraphNetwork(filename);
@@ -130,13 +159,128 @@ TestRecompileDisconnectedAttributeInput(Fixture &fixture)
     });
     system.PrepareRequest(request);
     fixture.GraphNetwork("TestRecompileDisconnectedAttributeInput-1.dot");
+    {
+        ExecUsdCacheView view = system.CacheValues(request);
+        VtValue v;
+        TF_AXIOM(view.Extract(0, &v));
+        TF_AXIOM(v.Get<int>() == -1);
+    }
 
     // Create the attribute. The next round of compilation should compile and
     // connect the `customAttr` input of the callback node.
-    fixture.GetPrimAtPath("/Prim").CreateAttribute(
+    UsdAttribute attr = fixture.GetPrimAtPath("/Prim").CreateAttribute(
         _tokens->customAttr, SdfValueTypeNames->Int);
+    attr.Set(2);
     system.PrepareRequest(request);
     fixture.GraphNetwork("TestRecompileDisconnectedAttributeInput-2.dot");
+    {
+        ExecUsdCacheView view = system.CacheValues(request);
+        VtValue v;
+        TF_AXIOM(view.Extract(0, &v));
+        TF_AXIOM(v.Get<int>() == 2);
+    }
+
+    // Delete the attribute. The next round of compilation should uncompile the
+    // attribute input node--but it should *not* uncompile the time input node.
+    const SdfLayerHandle layer = fixture.GetStage()->GetRootLayer();
+    TF_AXIOM(layer);
+    layer->ImportFromString(R"usd(#usda 1.0
+        def CustomSchema "Prim" {
+        }
+    )usd");
+    system.PrepareRequest(request);
+    fixture.GraphNetwork("TestRecompileDisconnectedAttributeInput-3.dot");
+    {
+        ExecUsdCacheView view = system.CacheValues(request);
+        VtValue v;
+        TF_AXIOM(view.Extract(0, &v));
+        TF_AXIOM(v.Get<int>() == -1);
+    }
+}
+// 
+static void
+TestRecompileChangedRelationshipTargets(Fixture &fixture)
+{
+    // Tests that we recompile a disconnected attribute input, when that
+    // attribute comes into existence.
+
+    ExecUsdSystem &system = fixture.NewSystemFromLayer(R"usd(#usda 1.0
+        def CustomSchema "Prim" {
+            add rel customRel = [</Prim.forwardingRel>, </C.customAttr>]
+            add rel forwardingRel
+        }
+        def Scope "A" {
+            int customAttr = 1
+        }
+        def Scope "B" {
+            int customAttr = 2
+        }
+        def Scope "C" {
+        }
+    )usd");
+
+    ExecUsdRequest request = fixture.BuildRequest({
+        {fixture.GetPrimAtPath("/Prim"), _tokens->computeUsingCustomRel}
+    });
+    system.PrepareRequest(request);
+    fixture.GraphNetwork("TestRecompileChangedRelationshipTargets-1.dot");
+    {
+        ExecUsdCacheView view = system.CacheValues(request);
+        VtValue v;
+        TF_AXIOM(view.Extract(0, &v));
+        TF_AXIOM(v.Get<int>() == 0);
+    }
+
+    // Create a second target.
+    fixture.GetRelationshipAtPath("/Prim.customRel").AddTarget(
+        SdfPath("/A.customAttr"));
+    system.PrepareRequest(request);
+    fixture.GraphNetwork("TestRecompileChangedRelationshipTargets-2.dot");
+    {
+        ExecUsdCacheView view = system.CacheValues(request);
+        VtValue v;
+        TF_AXIOM(view.Extract(0, &v));
+        TF_AXIOM(v.Get<int>() == 1);
+    }
+
+    // Add a second target on the forwarding relationship.
+    fixture.GetRelationshipAtPath("/Prim.forwardingRel").AddTarget(
+        SdfPath("/B.customAttr"));
+    system.PrepareRequest(request);
+    fixture.GraphNetwork("TestRecompileChangedRelationshipTargets-3.dot");
+    {
+        ExecUsdCacheView view = system.CacheValues(request);
+        VtValue v;
+        TF_AXIOM(view.Extract(0, &v));
+        TF_AXIOM(v.Get<int>() == 3);
+    }
+
+    // Create the missing 'customAttr' on prim C.
+    UsdPrim primC = fixture.GetPrimAtPath("/C");
+    TF_AXIOM(primC);
+    UsdAttribute attr =
+        primC.CreateAttribute(_tokens->customAttr, SdfValueTypeNames->Int);
+    attr.Set(3);
+    system.PrepareRequest(request);
+    fixture.GraphNetwork("TestRecompileChangedRelationshipTargets-4.dot");
+    {
+        ExecUsdCacheView view = system.CacheValues(request);
+        VtValue v;
+        TF_AXIOM(view.Extract(0, &v));
+        TF_AXIOM(v.Get<int>() == 6);
+    }
+
+    // Clear all targets.
+    fixture.GetRelationshipAtPath("/Prim.customRel")
+        .ClearTargets(/* removeSpec */ true);
+    system.PrepareRequest(request);
+    fixture.GraphNetwork("TestRecompileChangedRelationshipTargets-5.dot");
+    {
+        ExecUsdCacheView view = system.CacheValues(request);
+        VtValue v;
+        TF_AXIOM(view.Extract(0, &v));
+        TF_AXIOM(v.Get<int>() == 0);
+    }
 }
 
 static void
@@ -244,6 +388,7 @@ int main()
     std::vector tests {
         TestRecompileDisconnectedAttributeInput,
         TestRecompileMultipleRequests,
+        TestRecompileChangedRelationshipTargets,
         TestRecompileDeletedPrim
     };
     for (const auto &test : tests) {

@@ -12,17 +12,18 @@
 #include "pxr/exec/exec/api.h"
 
 #include "pxr/exec/exec/compilationTask.h"
+#include "pxr/exec/exec/inputKey.h"
 #include "pxr/exec/exec/valueKey.h"
 
 #include "pxr/base/tf/smallVector.h"
 #include "pxr/exec/esf/journal.h"
+#include "pxr/exec/vdf/maskedOutput.h"
 
 #include <optional>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 class Exec_CompilationState;
-class VdfMaskedOutput;
 
 /// Leaf compilation task for compiling requested outputs.
 ///
@@ -45,7 +46,7 @@ public:
 private:
     void _Compile(
         Exec_CompilationState &compilationState,
-        TaskStages &taskStages) override;
+        TaskPhases &taskPhases) override;
 
     // The value key for the requested output.
     const ExecValueKey _valueKey;
@@ -54,6 +55,11 @@ private:
     // not default-constructible, but construction must be deferred until
     // _Compile. Therefore, the EsfObject is held by a std::optional.
     std::optional<EsfObject> _originObject;
+
+    // The input keys that resolve to the leaf outputs. This only contains a
+    // single input key, but Exec_Program::SetRecompilationInfo requires input
+    // keys be specified by an Exec_InputKeyVectorConstRefPtr.
+    Exec_InputKeyVectorConstRefPtr _inputKeys;
 
     // The array of outputs populated by the input resolving task.
     TfSmallVector<VdfMaskedOutput, 1> _resultOutputs;
