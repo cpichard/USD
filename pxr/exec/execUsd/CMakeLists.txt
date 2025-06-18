@@ -87,11 +87,18 @@ pxr_register_test(testExecUsdRecompilation
         TestRecompileDeletedPrim-1.dot                                         \
         TestRecompileDeletedPrim-2.dot                                         \
         TestRecompileDeletedPrim-3.dot                                         \
+        TestRecompileResyncedPrim-1.dot                                        \
+        TestRecompileResyncedPrim-2.dot                                        \
+        TestRecompileResyncedPrim-3.dot                                        \
         TestRecompileChangedRelationshipTargets-1.dot                          \
         TestRecompileChangedRelationshipTargets-2.dot                          \
         TestRecompileChangedRelationshipTargets-3.dot                          \
         TestRecompileChangedRelationshipTargets-4.dot                          \
         TestRecompileChangedRelationshipTargets-5.dot                          \
+        TestRecompileAfterChangingOldRelationshipTarget-1.dot                  \
+        TestRecompileAfterChangingOldRelationshipTarget-2.dot                  \
+        TestRecompileAfterChangingOldRelationshipTarget-3.dot                  \
+        TestRecompileAfterChangingOldRelationshipTarget-4.dot                  \
         "
     DIFF_COMPARE TestRecompileDisconnectedAttributeInput-1.out
     DIFF_COMPARE TestRecompileDisconnectedAttributeInput-2.out
@@ -102,11 +109,18 @@ pxr_register_test(testExecUsdRecompilation
     DIFF_COMPARE TestRecompileDeletedPrim-1.out
     DIFF_COMPARE TestRecompileDeletedPrim-2.out
     DIFF_COMPARE TestRecompileDeletedPrim-3.out
+    DIFF_COMPARE TestRecompileResyncedPrim-1.out
+    DIFF_COMPARE TestRecompileResyncedPrim-2.out
+    DIFF_COMPARE TestRecompileResyncedPrim-3.out
     DIFF_COMPARE TestRecompileChangedRelationshipTargets-1.out
     DIFF_COMPARE TestRecompileChangedRelationshipTargets-2.out
     DIFF_COMPARE TestRecompileChangedRelationshipTargets-3.out
     DIFF_COMPARE TestRecompileChangedRelationshipTargets-4.out
     DIFF_COMPARE TestRecompileChangedRelationshipTargets-5.out
+    DIFF_COMPARE TestRecompileAfterChangingOldRelationshipTarget-1.out
+    DIFF_COMPARE TestRecompileAfterChangingOldRelationshipTarget-2.out
+    DIFF_COMPARE TestRecompileAfterChangingOldRelationshipTarget-3.out
+    DIFF_COMPARE TestRecompileAfterChangingOldRelationshipTarget-4.out
 )
 
 pxr_build_test(testExecUsdRequest
