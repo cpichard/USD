@@ -9,10 +9,7 @@ pxr_library(pcp
         sdf
         work
         ar
-        ${TBB_tbb_LIBRARY}
-
-    INCLUDE_DIRS
-        ${TBB_INCLUDE_DIRS}
+        TBB::tbb
         
     PUBLIC_HEADERS
         api.h
@@ -562,6 +559,11 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testPcpMuseum_SpecializesAndAncestralArcs4.testenv
     DEST testPcpMuseum_SpecializesAndAncestralArcs4
+)
+
+pxr_install_test_dir(
+    SRC testenv/testPcpMuseum_SpecializesAndAncestralArcs5.testenv
+    DEST testPcpMuseum_SpecializesAndAncestralArcs5
 )
 
 pxr_install_test_dir(
@@ -1388,6 +1390,13 @@ pxr_register_test(testPcpMuseum_SpecializesAndAncestralArcs4_graph
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults --usd --dumpPath /Parent/Child SpecializesAndAncestralArcs4/root.usda" 
     STDOUT_REDIRECT compositionResults_SpecializesAndAncestralArcs4_graph.txt
     DIFF_COMPARE compositionResults_SpecializesAndAncestralArcs4_graph.txt 
+)
+
+pxr_register_test(testPcpMuseum_SpecializesAndAncestralArcs5
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults --usd SpecializesAndAncestralArcs5/root.usda" 
+    STDOUT_REDIRECT compositionResults_SpecializesAndAncestralArcs5.txt
+    DIFF_COMPARE compositionResults_SpecializesAndAncestralArcs5.txt 
 )
 
 pxr_register_test(testPcpMuseum_SpecializesAndVariants

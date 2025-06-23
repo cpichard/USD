@@ -14,6 +14,7 @@
 #include "pxr/exec/esf/api.h"
 #include "pxr/exec/esf/fixedSizePolymorphicHolder.h"
 #include "pxr/exec/esf/object.h"
+#include "pxr/exec/esf/primSchemaID.h"
 
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/type.h"
@@ -39,7 +40,7 @@ public:
     ESF_API ~EsfPrimInterface() override;
 
     /// \see UsdPrim::GetAppliedSchemas
-    ESF_API TfTokenVector GetAppliedSchemas(EsfJournal *journal) const;
+    ESF_API const TfTokenVector &GetAppliedSchemas(EsfJournal *journal) const;
 
     /// \see UsdPrim::GetAttribute
     ESF_API EsfAttribute GetAttribute(
@@ -57,6 +58,13 @@ public:
     /// \see UsdPrim::GetPrimTypeInfo and \see UsdPrimTypeInfo::GetSchemaType
     ESF_API TfType GetType(EsfJournal *journal) const;
 
+    /// Returns an opaque value that is guaranteed to be unique and stable.
+    /// 
+    /// Any prims that have the same typed schema and the same list of applied
+    /// schemas will have the same schema ID.
+    ///
+    ESF_API EsfPrimSchemaID GetPrimSchemaID(EsfJournal *journal) const;
+
     /// \see UsdPrim::IsPseudoRoot
     virtual bool IsPseudoRoot() const = 0;
 
@@ -64,15 +72,20 @@ protected:
     /// This constructor may only be called by the scene adapter implementation.
     EsfPrimInterface(const SdfPath &path) : EsfObjectInterface(path) {}
 
+    static EsfPrimSchemaID CreatePrimSchemaID(const void *const id) {
+        return EsfPrimSchemaID(id);
+    }
+
 private:
     // These methods must be implemented by the scene adapter implementation.
-    virtual TfTokenVector _GetAppliedSchemas() const = 0;
+    virtual const TfTokenVector &_GetAppliedSchemas() const = 0;
     virtual EsfAttribute _GetAttribute(
         const TfToken &attributeName) const = 0;
     virtual EsfPrim _GetParent() const = 0;
     virtual EsfRelationship _GetRelationship(
         const TfToken &relationshipName) const = 0;
     virtual TfType _GetType() const = 0;
+    virtual EsfPrimSchemaID _GetPrimSchemaID() const = 0;
 };
 
 /// Holds an implementation of EsfPrimInterface in a fixed-size buffer.
