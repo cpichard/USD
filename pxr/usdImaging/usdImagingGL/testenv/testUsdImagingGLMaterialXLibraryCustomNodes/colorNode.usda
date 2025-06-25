@@ -11,7 +11,7 @@ def Sphere "CustomColorNode" (
 }
 
 def Scope "MaterialX"(
-    references = @./customColorMaterial.mtlx@</MaterialX>
+    references = @./mtlxFiles/colorNodeMaterial.mtlx@</MaterialX>
 )
 {
 }
