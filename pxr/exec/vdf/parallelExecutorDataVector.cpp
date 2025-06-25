@@ -55,7 +55,7 @@ _ResetConcurrentVector(T *vector, const size_t capacity)
     // zero-initialized, we cannot simply clear the vector. In that case we
     // have to make sure to reset the memory back to zero.
     typedef typename T::allocator_type Allocator;
-    typedef typename tbb::zero_allocator<typename T::value_type> ZeroAllocator;
+    typedef WorkZeroAllocator<typename T::value_type> ZeroAllocator;
     if (!std::is_same<Allocator, ZeroAllocator>::value &&
         vector->capacity() <= capacity) {
         vector->clear();

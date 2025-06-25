@@ -33,11 +33,12 @@
 #include "pxr/base/tf/errorMark.h"
 #include "pxr/base/tf/errorTransport.h"
 #include "pxr/base/tf/pyLock.h"
+
+#include "pxr/base/work/taskGraph.h"
 #include "pxr/base/work/threadLimits.h"
 
 #include <tbb/concurrent_vector.h>
 #include <tbb/enumerable_thread_specific.h>
-#include <tbb/task.h>
 #include <tbb/task_arena.h>
 #include <tbb/parallel_for.h>
 
@@ -107,24 +108,17 @@ public:
         Callback &&callback);
 
 protected:
-
     // The data handle type from the data manager implementation.
-    //
     typedef typename DataManager::DataHandle _DataHandle;
 
     // An integer type for storing the current per-task evaluation stage.
-    //
     typedef uint32_t _EvaluationStage;
 
-    // TBB task wrapping a leaf task, i.e. the entry point for parallel
-    // evaluation.
-    //
+    // A leaf task, i.e. the entry point for parallel evaluation.
     template < typename Callback >
-    class _LeafTask : public tbb::task
+    class _LeafTask : public WorkTaskGraph::BaseTask
     {
     public:
-        // Constructor.
-        //
         _LeafTask(
             This *engine,
             const VdfEvaluationState &state,
@@ -140,8 +134,7 @@ protected:
         {}
 
         // Task execution entry point.
-        //
-        tbb::task *execute() override;
+        WorkTaskGraph::BaseTask * execute() override;
 
     private:
         This *_engine;
@@ -152,13 +145,10 @@ protected:
         _EvaluationStage _evaluationStage;
     };
 
-    // TBB task wrapping a scheduled compute task.
-    //
-    class _ComputeTask : public tbb::task
+    // A scheduled compute task.
+    class _ComputeTask : public WorkTaskGraph::BaseTask
     {
     public:
-        // Constructor.
-        //
         _ComputeTask(
             This *engine,
             const VdfEvaluationState &state,
@@ -172,8 +162,7 @@ protected:
         {}
 
         // Task execution entry point.
-        //
-        tbb::task *execute() override;
+        WorkTaskGraph::BaseTask *execute() override;
 
     private:
         This *_engine;
@@ -183,13 +172,10 @@ protected:
         _EvaluationStage _evaluationStage;
     };
 
-    // TBB task wrapping a scheduled inputs task.
-    //
-    class _InputsTask : public tbb::task
+    // A scheduled inputs task.
+    class _InputsTask : public WorkTaskGraph::BaseTask
     {
     public:
-        // Constructor.
-        //
         _InputsTask(
             This *engine,
             const VdfEvaluationState &state,
@@ -203,8 +189,7 @@ protected:
         {}
 
         // Task execution entry point.
-        //
-        tbb::task *execute();
+        WorkTaskGraph::BaseTask *execute();
 
     private:
         This *_engine;
@@ -214,13 +199,10 @@ protected:
         _EvaluationStage _evaluationStage;
     };
 
-    // TBB task wrapping a scheduled keep task.
-    //
-    class _KeepTask : public tbb::task
+    // A scheduled keep task.
+    class _KeepTask : public WorkTaskGraph::BaseTask
     {
     public:
-        // Constructor.
-        //
         _KeepTask(
             This *engine,
             const VdfEvaluationState &state,
@@ -234,8 +216,7 @@ protected:
         {}
 
         // Task execution entry point.
-        //
-        tbb::task *execute();
+        WorkTaskGraph::BaseTask *execute();
 
     private:
         This *_engine;
@@ -245,14 +226,11 @@ protected:
         _EvaluationStage _evaluationStage;
     };
 
-    // TBB touch-task for touching all outputs between a from-buffer source
+    // A touch-task for touching all outputs between a from-buffer source
     // and a destination output.
-    //
-    class _TouchTask : public tbb::task
+    class _TouchTask : public WorkTaskGraph::BaseTask
     {
     public:
-        // Constructor.
-        //
         _TouchTask(
             This *engine,
             const VdfOutput &dest,
@@ -263,8 +241,7 @@ protected:
         {}
 
         // Task execution entry point.
-        //
-        tbb::task *execute();
+        WorkTaskGraph::BaseTask *execute();
 
     private:
         This *_engine;
@@ -272,117 +249,128 @@ protected:
         const VdfOutput &_source;
     };
 
+    // A task that invokes all compute tasks scheduled for a particular node. 
+    class _ComputeAllTask : public WorkTaskGraph::BaseTask {
+    public:
+        _ComputeAllTask(
+            This *engine, 
+            const VdfEvaluationState &state, 
+            const VdfNode &node) :
+            _engine(engine),
+            _state(state),
+            _node(node),
+            _completed(false)
+        {}
+        
+        WorkTaskGraph::BaseTask *execute();
+
+    private:
+        This *_engine;
+        const VdfEvaluationState &_state;
+        const VdfNode &_node;
+        bool _completed;
+    };
+
     // Reset the engine's internal state. Every round of evaluation starts with
     // clean state.
-    //
     void _ResetState(const VdfSchedule &schedule);
 
     // Run a single, requested output. If the output is uncached, this will
     // reset the internal state (if not already done), and add the leaf task to
     // the task list.
-    //
     template < typename Callback >
     void _RunOutput(
         const VdfEvaluationState &state,
         const VdfMaskedOutput &maskedOutput,
         const size_t requestedIndex,
         Callback &callback,
-        tbb::task_list *taskList);
+        WorkTaskGraph::TaskList *taskList);
 
     // Executes the callable within this engine's arena.
-    //
     template < typename F >
     void _ArenaExecute(const F &callable);
 
     // Spawn the task(s) requested for a given node. These are the tasks spawn
     // as entry points into evaluating the schedule. Remaining tasks will be
     // spawn as input dependencies to these requested tasks.
-    //
     void _SpawnRequestedTasks(
         const VdfEvaluationState &state,
         const VdfNode &node,
-        tbb::task *successor,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask *successor,
+        WorkTaskGraph::BaseTask **bypass);
 
     // Spawn a new task, or assign the task to the bypass output parameter,
     // if no task has previously been assigned to bypass. The output
     // parameter can later be used to drive scheduler bypassing in order to
     // reduce scheduling overhead.
-    //
     void _SpawnOrBypass(
-        tbb::task *task,
-        tbb::task **bypass) const;
+        WorkTaskGraph::BaseTask *task,
+        WorkTaskGraph::BaseTask **bypass);
 
     // The task execution entry point for the scheduled leaf tasks. These tasks
     // are the main entry points to evaluation. The engine will spawn one leaf
     // task for each uncached requested output. Returns true if the task is not
     // done after returning, and must therefore be recycled for re-execution
     // after all its input dependencies have been completed.
-    //
     template < typename Callback >
     bool _ProcessLeafTask(
-        tbb::task *task,
+        WorkTaskGraph::BaseTask *task,
         const VdfEvaluationState &state,
         const VdfMaskedOutput &maskedOutput,
         const size_t requestedIndex,
         Callback &callback,
         _EvaluationStage *evaluationStage,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask **bypass);
 
     // The task execution entry point for scheduled compute tasks. Returns
     // true if the task is not done after returning, and must therefore be
     // recycled for re-execution after all its input dependencies have been
     // completed.
-    //
     bool _ProcessComputeTask(
-        tbb::task *task,
+        WorkTaskGraph::BaseTask *task,
         const VdfEvaluationState &state,
         const VdfNode &node,
         const VdfScheduleComputeTask &scheduleTask,
         _EvaluationStage *evaluationStage,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask **bypass);
 
     // The task execution entry point for scheduled inputs tasks. Returns
     // true if the task is not done after returning, and must therefore be
     // recycled for re-execution after all its input dependencies have been
     // completed.
-    //
     bool _ProcessInputsTask(
-        tbb::task *task,
+        WorkTaskGraph::BaseTask *task,
         const VdfEvaluationState &state,
         const VdfNode &node,
         const VdfScheduleInputsTask &scheduleTask,
         _EvaluationStage *evaluationStage,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask **bypass);
 
     // The task execution entry point for scheduled keep tasks. Returns
     // true if the task is not done after returning, and must therefore be
     // recycled for re-execution after all its input dependencies have been
     // completed.
-    //
     bool _ProcessKeepTask(
-        tbb::task *task,
+        WorkTaskGraph::BaseTask *task,
         const VdfEvaluationState &state,
         const VdfNode &node,
         _EvaluationStage *evaluationStage,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask **bypass);
 
     // Invokes a keep task, as an input dependency to the successor task.
     // Returns true if the successor must wait for completion of the newly
     // invoked task. If this method returns false, the input dependency
     // has already been fulfilled.
-    //
     bool _InvokeKeepTask(
         const VdfScheduleTaskIndex idx,
         const VdfNode &node,
         const VdfEvaluationState &state,
-        tbb::task *successor,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask *successor,
+        WorkTaskGraph::BaseTask **bypass);
 
     // Invokes a touch task, touching all outputs between dest and source. The
     // touching happens in the background. Only the root task synchronizes on
     // this work.
-    //
     void _InvokeTouchTask(
         const VdfOutput &dest,
         const VdfOutput &source);
@@ -391,27 +379,24 @@ protected:
     // Returns true if the successor must wait for completion of the newly
     // invoked task. If this method returns false, the input dependency
     // has already been fulfilled.
-    //
     bool _InvokeComputeTask(
         const VdfScheduleTaskId taskIndex,
         const VdfEvaluationState &state,
         const VdfNode &node,
-        tbb::task *successor,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask *successor,
+        WorkTaskGraph::BaseTask **bypass);
 
     // Calls _InvokeComputeTask on an iterable range of tasks.
-    //
     template < typename Iterable >
     bool _InvokeComputeTasks(
         const Iterable &tasks,
         const VdfEvaluationState &state,
         const VdfNode &node,
-        tbb::task *sucessor,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask *successor,
+        WorkTaskGraph::BaseTask **bypass);
 
     // Check whether the output attached to the input dependency has already
     // been cached.
-    //
     bool _IsInputDependencyCached(
         VdfScheduleInputDependencyUniqueIndex uniqueIndex,
         const VdfOutput &output,
@@ -420,100 +405,90 @@ protected:
     // Calls _InvokeComputeTask on a range of tasks specified by input.
     // Alternatively, if input specifies a keep task, this method will invoke
     // the keep task instead.
-    //
     bool _InvokeComputeOrKeepTasks(
         const VdfScheduleInputDependency &input,
         const VdfEvaluationState &state,
-        tbb::task *successor,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask *successor,
+        WorkTaskGraph::BaseTask **bypass);
 
     // Calls _InvokeComputeTask on a range of tasks providing values for the
     // specified output. Alternatively, if the values for the specified output
     // are being provided by a keep task, this method will invoke the keep task
     // instead.
-    //
     bool _InvokeComputeOrKeepTasks(
         const VdfOutput &output,
         const VdfEvaluationState &state,
-        tbb::task *successor,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask *successor,
+        WorkTaskGraph::BaseTask **bypass);
 
     // Invokes all the compute tasks required to fulfill all prereq
     // dependencies. Returns true if the successor must wait for completion of
     // the newly invoked tasks. If this method returns false, the input
     // dependencies have already been fulfilled.
-    //
     bool _InvokePrereqInputs(
         const VdfScheduleInputsTask &scheduleTask,
         const VdfEvaluationState &state,
-        tbb::task *sucessor,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask *successor,
+        WorkTaskGraph::BaseTask **bypass);
 
     // Invokes all the compute tasks required to fulfill all optional input
     // dependencies (those dependent on the results of prereqs). Returns true
     // if the successor must wait for completion of the newly invoked tasks. If
     // this method returns false, the input dependencies have already been
     // fulfilled.
-    //
     bool _InvokeOptionalInputs(
         const VdfScheduleInputsTask &scheduleTask,
         const VdfEvaluationState &state,
         const VdfNode &node,
-        tbb::task *sucessor,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask *successor,
+        WorkTaskGraph::BaseTask **bypass);
 
     // Invokes all the compute tasks required to fulfill all required input
     // dependencies (those not dependent on prereqs, and read/writes). Returns
     // true if the successor must wait for completion of the newly invoked
     // tasks. If this method returns false, the input dependencies have already
     // been fulfilled.
-    //
     bool _InvokeRequiredInputs(
         const VdfScheduleComputeTask &scheduleTask,
         const VdfEvaluationState &state,
-        tbb::task *successor,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask *successor,
+        WorkTaskGraph::BaseTask **bypass);
 
     // Invokes an inputs task, as an input dependency to the successor task.
     // Returns true if the successor must wait for completion of the newly
     // invoked task. If this method returns false, the input dependency
     // has already been fulfilled.
-    //
     bool _InvokeInputsTask(
         const VdfScheduleComputeTask &scheduleTask,
         const VdfEvaluationState &state,
         const VdfNode &node,
-        tbb::task *successor,
-        tbb::task **bypass);
+        WorkTaskGraph::BaseTask *successor,
+        WorkTaskGraph::BaseTask **bypass);
 
     // Invokes a task that prepares a node for execution, as an input
     // dependency to the successor task. Returns true if the successor must
     // wait for completion of the newly invoked task. If this method returns
     // false, the input dependency has already been fulfilled.
-    //
     bool _InvokePrepTask(
         const VdfScheduleComputeTask &scheduleTask,
         const VdfEvaluationState &state,
         const VdfNode &node,
-        tbb::task *successor);
+        WorkTaskGraph::BaseTask *successor);
 
     // Prepares a node for execution. Every node has to be prepared exactly
     // once. Nodes with multiple invocations will be prepared by the first
     // compute task that gets to the node preparation stage.
-    //
     void _PrepareNode(
         const VdfEvaluationState &state,
         const VdfNode &node);
 
     // Prepares an output for execution.
-    //
     void _PrepareOutput(
         const VdfSchedule &schedule,
         const VdfSchedule::OutputId outputId);
 
     // Create the cache for the scratch buffer. This will make sure the cache
     // can accomodate all the data denoted by mask.
-    //
     void _CreateScratchCache(
         const VdfOutput &output,
         const _DataHandle dataHandle,
@@ -522,29 +497,25 @@ protected:
 
     // Evaluate a node by either invoking its Compute() method, or passing
     // through all data.
-    //
     void _EvaluateNode(
         const VdfScheduleComputeTask &scheduleTask,
         const VdfEvaluationState &state,
         const VdfNode &node,
-        tbb::task *successor);
+        WorkTaskGraph::BaseTask *successor);
 
     // Compute a node by invoking its Compute() method.
-    //
     void _ComputeNode(
         const VdfScheduleComputeTask &scheduleTask,
         const VdfEvaluationState &state,
         const VdfNode &node);
 
     // Pass all the read/write data through the node.
-    //
     void _PassThroughNode(
         const VdfScheduleComputeTask &scheduleTask,
         const VdfEvaluationState &state,
         const VdfNode &node);
 
     // Process an output after execution.
-    //
     void _ProcessOutput(
         const VdfScheduleComputeTask &scheduleTask,
         const VdfEvaluationState &state,
@@ -556,7 +527,6 @@ protected:
 
     // Prepares a read/write buffer by ensure that the private data is
     // available at the output.
-    //
     void _PrepareReadWriteBuffer(
         const VdfOutput &output,
         const VdfSchedule::OutputId outputId,
@@ -566,7 +536,6 @@ protected:
 
     // Pass a read/write buffer from the source output to the destination
     // output, or copy the data if required.
-    // 
     void _PassOrCopyBuffer(
         const VdfOutput &output,
         const VdfOutput &source,
@@ -583,7 +552,6 @@ protected:
 
     // Copy a read/write buffer from the source output to the destination
     // output.
-    //
     void _CopyBuffer(
         const VdfOutput &output,
         const VdfOutput &source,
@@ -591,7 +559,6 @@ protected:
         VdfExecutorBufferData *toData) const;
 
     // Publish the data in the scratch buffers of this node.
-    //
     void _PublishScratchBuffers(
         const VdfSchedule &schedule,
         const VdfNode &node);
@@ -599,7 +566,6 @@ protected:
     // Copies all of the publicly available data missing from \p haveMask into
     // the scratch buffer and extends the executor cache mask. Returns a pointer
     // to the destination vector if any data was copied.
-    //
     VdfVector *_AbsorbPublicBuffer(
         const VdfOutput &output,
         const _DataHandle dataHandle,
@@ -608,56 +574,46 @@ protected:
     // Detects interruption by querying the executor interruption API and
     // calling into the derived engine to do cycle detection. Sets the
     // interruption flag if interruption (or a cycle) has been detected.
-    //
     bool _DetectInterruption(
         const VdfEvaluationState &state,
         const VdfNode &node);
 
     // Returns true if the interruption flag (as determined by
     // _DetectInterruption()) has been set.
-    //
     bool _HasDetectedInterruption() const;
 
     // Create an error transport out of an error mark to enable transferring
     // the errors to the calling thread later on.
-    //
     void _TransportErrors(const TfErrorMark &errorMark);
 
     // Post all the transported errors on the calling thread.
-    //
     void _PostTransportedErrors();
 
     // Returns a reference to the derived class for static polymorphism.
-    //
     Derived &_Self() {
         return *static_cast<Derived *>(this);
     }
 
     // The executor that uses this engine.
-    //
     const VdfExecutorInterface &_executor;
 
     // The data manager populated by this engine.
-    //
     DataManager *_dataManager;
 
-    // An empty TBB task, which serves as the task graph root for
-    // synchronization, and its associated task group context.
-    //
-    tbb::empty_task *_rootTask;
-    tbb::task_group_context _taskGroupContext;
+    // A task graph for dynamically adding and spawning tasks during execution. 
+    WorkTaskGraph _taskGraph;
+    
+    // A task arena for isolating parallel tasks. 
     tbb::task_arena _taskArena;
 
     // Keep track of which unique input dependencies have had their cached
     // state checked.
-    //
     std::unique_ptr<std::atomic<uint8_t>[]> _dependencyState;
 
     // The structures that orchestrate synchronization for the different task
     // types.
     //
     // XXX: We should explore folding all these into a single instance.
-    //
     std::atomic<bool> _resetState;
     VdfParallelTaskSync _computeTasks;
     VdfParallelTaskSync _inputsTasks;
@@ -665,11 +621,9 @@ protected:
     VdfParallelTaskSync _keepTasks;
 
     // Keep a record of errors to post to the calling thread.
-    //
     tbb::concurrent_vector<TfErrorTransport> _errors;
 
     // Stores the interruption signal as determined by _DetectInterruption.
-    //
     std::atomic<bool> _isInterrupted;
 };
 
@@ -682,25 +636,20 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::
         DataManager *dataManager) :
         _executor(executor),
         _dataManager(dataManager),
-        _rootTask(nullptr),
-        _taskGroupContext(
-            tbb::task_group_context::isolated,
-            tbb::task_group_context::concurrent_wait |
-            tbb::task_group_context::default_traits),
         _taskArena(WorkGetConcurrencyLimit()),
         _resetState(),
+        _computeTasks(&_taskGraph),
+        _inputsTasks(&_taskGraph),
+        _prepTasks(&_taskGraph),
+        _keepTasks(&_taskGraph),
         _isInterrupted()
 {
-    _rootTask = new (tbb::task::allocate_root(_taskGroupContext))
-        tbb::empty_task();
-    _rootTask->set_ref_count(1);
 }
 
 template < typename Derived, typename DataManager >
 VdfParallelExecutorEngineBase<Derived, DataManager>::
     ~VdfParallelExecutorEngineBase()
 {
-    tbb::task::destroy(*_rootTask);
 }
 
 template < typename Derived, typename DataManager >
@@ -736,40 +685,35 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::RunSchedule(
     _ArenaExecute([engine, &state, &view, &callback] {
         // Collect all the leaf tasks, which are the entry point for evaluation.
         // We will later spawn all these tasks together.
-        using _TaskLists = tbb::enumerable_thread_specific<tbb::task_list>;
-        _TaskLists taskLists;
+        WorkTaskGraph::TaskLists taskLists;
 
         // Run all the outputs in parallel. This will reset the internal state,
         // if necessary, and collect all the leaf tasks for uncached outputs.
         tbb::parallel_for(tbb::blocked_range<size_t>(0, view.GetSize()),
             [engine, &state, &view, &callback, &taskLists]
             (const tbb::blocked_range<size_t> &range) {
-                tbb::task_list *taskList = &taskLists.local();
+                WorkTaskGraph::TaskList *taskList = &taskLists.local();
+                
                 for (size_t i = range.begin(); i != range.end(); ++i) {
                     if (const VdfMaskedOutput *maskedOutput = view.Get(i)) {
                         engine->_RunOutput(
                             state, *maskedOutput, i, callback, taskList);
                     }
                 }
-            }, engine->_taskGroupContext);
+            });
 
         // Now, spawn all the leaf tasks for uncached outputs. We need to first
         // check the cache for all requested outputs, before even running the
         // first uncached one. Otherwise, we could get cache hits for outputs
         // that were just computed, failing to invoke the callback. 
-        tbb::parallel_for(taskLists.range(),
-            [] (const _TaskLists::range_type &range) {
-                for (tbb::task_list &taskList : range) {
-                    tbb::task::spawn(taskList);
-                }
-            }, engine->_taskGroupContext);
+        engine->_taskGraph.RunLists(taskLists);
 
         // Now, wait for all the tasks to complete.
         {
             TRACE_SCOPE(
                 "VdfParallelExecutorEngineBase::RunSchedule "
                 "(wait for parallel tasks)");
-            engine->_rootTask->wait_for_all();
+            engine->_taskGraph.Wait();
         }
     });
 
@@ -818,7 +762,7 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_RunOutput(
     const VdfMaskedOutput &maskedOutput,
     const size_t requestedIndex,
     Callback &callback,
-    tbb::task_list *taskList)
+    WorkTaskGraph::TaskList *taskList)
 {
     // The output and mask for the output to run.
     const VdfOutput &output = *maskedOutput.GetOutput();
@@ -843,40 +787,39 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_RunOutput(
 
     // Then allocate a leaf task and add it to the task list. We will spawn it
     // later along with all other leaf tasks.
-    tbb::task *task =
-        new (tbb::task::allocate_additional_child_of(*_rootTask))
-            _LeafTask<Callback>(
-                this, state, maskedOutput, requestedIndex, callback);
-    taskList->push_back(*task);
+    WorkTaskGraph::BaseTask * task = 
+       _taskGraph.AllocateTask< _LeafTask<Callback> >(
+            this, state, maskedOutput, requestedIndex, callback);
+    taskList->push_back(task);
 }
 
 template < typename Derived, typename DataManager >
 template < typename Callback >
-tbb::task *
+WorkTaskGraph::BaseTask *
 VdfParallelExecutorEngineBase<Derived, DataManager>::
     _LeafTask<Callback>::execute()
 {
-    // Bump the ref count to 1, because as child tasks finish executing before
-    // returning from this function, we don't want this task to get re-executed
-    // prematurely.
-    increment_ref_count();
+    // Bump the ref count to 1, because as child tasks finish executing before 
+    // returning from this function, we don't want this task to get re-executed 
+    // prematurely. 
+    AddChildReference();
 
     // Dedicate one task for scheduler bypass to reduce scheduling overhead.
-    tbb::task *bypass = nullptr;
+    WorkTaskGraph::BaseTask *bypass = nullptr;
 
     // Process the scheduled task, and recycle this task for re-execution if
     // requested. Note that this will implicitly decrement the ref count.
     if (_engine->_ProcessLeafTask(
-            this, _state, _output, _requestedIndex, _callback,
-            &_evaluationStage, &bypass)) {
-        recycle_as_safe_continuation();
+        this, _state, _output, _requestedIndex, _callback, &_evaluationStage, 
+            &bypass)) {
+        _RecycleAsContinuation();
     } 
 
     // If the task is done and does not require re-execution we will have to
     // manually decrement the task's ref count here in order to undo the
     // increment above.
     else {
-        decrement_ref_count();
+        RemoveChildReference();
     }
 
     // Return a task for scheduler bypassing, if any.
@@ -884,7 +827,7 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::
 }
 
 template < typename Derived, typename DataManager >
-tbb::task *
+WorkTaskGraph::BaseTask *
 VdfParallelExecutorEngineBase<Derived, DataManager>::_ComputeTask::execute()
 {
     // Create an error mark, so that we can later detect if any errors have
@@ -894,10 +837,10 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_ComputeTask::execute()
     // Bump the ref count to 1, because as child tasks finish executing before
     // returning from this function, we don't want this task to get re-executed
     // prematurely.
-    increment_ref_count();
+    AddChildReference();
 
     // Dedicate one task for scheduler bypass to reduce scheduling overhead.
-    tbb::task *bypass = nullptr;
+    WorkTaskGraph::BaseTask *bypass = nullptr;
 
     // Get the scheduled task.
     const VdfScheduleComputeTask &scheduleTask =
@@ -907,7 +850,7 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_ComputeTask::execute()
     // requested. Note that this will implicitly decrement the ref count.
     if (_engine->_ProcessComputeTask(
             this, _state, _node, scheduleTask, &_evaluationStage, &bypass)) {
-        recycle_as_safe_continuation();
+        _RecycleAsContinuation();
     }
 
     // If the task is done and does not require re-execution, mark it as done.
@@ -915,7 +858,7 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_ComputeTask::execute()
     // its ref count.
     else {
         _engine->_computeTasks.MarkDone(_taskIndex);
-        decrement_ref_count();
+        RemoveChildReference();
     }
 
     // If any errors have been recorded, transport them so that they can later
@@ -929,16 +872,16 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_ComputeTask::execute()
 }
 
 template < typename Derived, typename DataManager >
-tbb::task *
+WorkTaskGraph::BaseTask *
 VdfParallelExecutorEngineBase<Derived, DataManager>::_InputsTask::execute()
 {
     // Bump the ref count to 1, because as child tasks finish executing before
     // returning from this function, we don't want this task to get re-executed
     // prematurely.
-    increment_ref_count();
+    AddChildReference();
 
     // Dedicate one task for scheduler bypass to reduce scheduling overhead.
-    tbb::task *bypass = nullptr;
+    WorkTaskGraph::BaseTask *bypass = nullptr;
 
     // Get the scheduled task.
     const VdfScheduleInputsTask &scheduleTask =
@@ -948,14 +891,14 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InputsTask::execute()
     // requested. Note that this will implicitly decrement the ref count.
     if (_engine->_ProcessInputsTask(
             this, _state, _node, scheduleTask, &_evaluationStage, &bypass)) {
-        recycle_as_safe_continuation();
+        _RecycleAsContinuation();
     } 
 
     // If the task is done and does not require re-execution, mark it as done.
     // We will have to manually decrement the task's ref count here.
     else {
         _engine->_inputsTasks.MarkDone(_taskIndex);
-        decrement_ref_count();
+        RemoveChildReference();
     }
 
     // Return a task for scheduler bypassing, if any.
@@ -963,29 +906,29 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InputsTask::execute()
 }
 
 template < typename Derived, typename DataManager >
-tbb::task *
+WorkTaskGraph::BaseTask *
 VdfParallelExecutorEngineBase<Derived, DataManager>::_KeepTask::execute()
 {
     // Bump the ref count to 1, because as child tasks finish executing before
     // returning from this function, we don't want this task to get re-executed
     // prematurely.
-    increment_ref_count();
+    AddChildReference();
 
     // Dedicate one task for scheduler bypass to reduce scheduling overhead.
-    tbb::task *bypass = nullptr;
+    WorkTaskGraph::BaseTask *bypass = nullptr;
 
     // Process the scheduled task, and recycle this task for re-execution if
     // requested. Note that this will implicitly decrement the ref count.
     if (_engine->_ProcessKeepTask(
             this, _state, _node, &_evaluationStage, &bypass)) {
-        recycle_as_safe_continuation();
+        _RecycleAsContinuation();
     } 
 
     // If the task is done and does not require re-execution, mark it as done.
     // We will have to manually decrement the task's ref count here.
     else {
         _engine->_keepTasks.MarkDone(_taskIndex);
-        decrement_ref_count();
+        RemoveChildReference();
     }
 
     // Return a task for scheduler bypassing, if any.
@@ -993,7 +936,7 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_KeepTask::execute()
 }
 
 template < typename Derived, typename DataManager >
-tbb::task *
+WorkTaskGraph::BaseTask *
 VdfParallelExecutorEngineBase<Derived, DataManager>::_TouchTask::execute()
 {
     // Touch all the output buffers between the source output and the
@@ -1002,6 +945,43 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_TouchTask::execute()
     while (output && output != &_source) {
         _engine->_Self()._Touch(*output);
         output = VdfGetAssociatedSourceOutput(*output);
+    }
+
+    // No scheduler bypass.
+    return nullptr;
+}
+
+template < typename Derived, typename DataManager >
+WorkTaskGraph::BaseTask *
+VdfParallelExecutorEngineBase<Derived, DataManager>::_ComputeAllTask::execute()
+{
+    if (_completed) {
+        return nullptr;
+    }
+
+    // Bump the ref count to 1, because as child tasks finish executing before
+    // returning from this function, we don't want this task to get re-executed
+    // prematurely.
+    AddChildReference();
+
+    // Invoke all the compute tasks associated with the given node.
+    const bool invoked = _engine->_InvokeComputeTasks(
+        _state.GetSchedule().GetComputeTaskIds(_node),
+        _state, _node, this, nullptr);
+
+    // If any compute tasks were invoked, recycle this task for re-execution.
+    // This task will not perform any work upon re-execution, but we use its
+    // ref count to synchronize completion of all the compute tasks.
+    // Note that recycling will implicitly decrement the ref count.
+    if (invoked) {
+        _RecycleAsContinuation();
+        _completed = true;
+    }
+
+    // If the task is done and does not require re-execution, manually decrement
+    // the ref count here.
+    else {
+        RemoveChildReference();
     }
 
     // No scheduler bypass.
@@ -1021,8 +1001,8 @@ void
 VdfParallelExecutorEngineBase<Derived, DataManager>::_SpawnRequestedTasks(
     const VdfEvaluationState &state,
     const VdfNode &node,
-    tbb::task *successor,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask *successor,
+    WorkTaskGraph::BaseTask **bypass)
 {
     // Get the compute tasks associated with the requested node.
     const VdfSchedule &schedule = state.GetSchedule();
@@ -1044,9 +1024,9 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_SpawnRequestedTasks(
         if (!VdfScheduleTaskIsInvalid(keepTaskIndex)) {
             if (_keepTasks.Claim(keepTaskIndex, successor) ==
                     VdfParallelTaskSync::State::Claimed) {
-                tbb::task *task =
-                    new (tbb::task::allocate_additional_child_of(*successor))
-                        _KeepTask(this, state, node, keepTaskIndex);
+                _KeepTask *task = 
+                    successor->AllocateChild<_KeepTask>(
+                        this, state, node, keepTaskIndex);
                 _SpawnOrBypass(task, bypass);
             }
             return;
@@ -1057,9 +1037,9 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_SpawnRequestedTasks(
     for (const VdfScheduleTaskId computeTaskIndex : tasks) {
         if (_computeTasks.Claim(computeTaskIndex, successor) ==
                 VdfParallelTaskSync::State::Claimed) {
-            tbb::task *task =
-                new (tbb::task::allocate_additional_child_of(*successor))
-                    _ComputeTask(this, state, node, computeTaskIndex);
+            _ComputeTask *task = 
+                successor->AllocateChild<_ComputeTask>(
+                    this, state, node, computeTaskIndex);
             _SpawnOrBypass(task, bypass);
         }
     }
@@ -1068,15 +1048,15 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_SpawnRequestedTasks(
 template < typename Derived, typename DataManager >
 void
 VdfParallelExecutorEngineBase<Derived, DataManager>::_SpawnOrBypass(
-    tbb::task *task,
-    tbb::task **bypass) const
+    WorkTaskGraph::BaseTask *task,
+    WorkTaskGraph::BaseTask **bypass)
 {
     // If bypass has already been assigned a value, spawn the specified task.
     // Otherwise, assign the task to bypass, and later use it to drive the
     // scheduler bypass optimization.
 
     if (!bypass || *bypass) {
-        tbb::task::spawn(*task);
+        _taskGraph.RunTask(task);
     } else {
         *bypass = task;
     }
@@ -1086,13 +1066,13 @@ template < typename Derived, typename DataManager >
 template < typename Callback >
 bool
 VdfParallelExecutorEngineBase<Derived, DataManager>::_ProcessLeafTask(
-    tbb::task *task,
+    WorkTaskGraph::BaseTask *task,
     const VdfEvaluationState &state,
     const VdfMaskedOutput &maskedOutput,
     const size_t requestedIndex,
     Callback &callback,
     _EvaluationStage *evaluationStage,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask **bypass)
 {
     // The evaluation stages this task can be in.
     enum {
@@ -1126,12 +1106,12 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_ProcessLeafTask(
 template < typename Derived, typename DataManager >
 bool
 VdfParallelExecutorEngineBase<Derived, DataManager>::_ProcessComputeTask(
-    tbb::task *task,
+    WorkTaskGraph::BaseTask *task,
     const VdfEvaluationState &state,
     const VdfNode &node,
     const VdfScheduleComputeTask &scheduleTask,
     _EvaluationStage *evaluationStage,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask **bypass)
 {
     // The evaluation stages this task can be in.
     enum {
@@ -1211,12 +1191,12 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_ProcessComputeTask(
 template < typename Derived, typename DataManager >
 bool
 VdfParallelExecutorEngineBase<Derived, DataManager>::_ProcessInputsTask(
-    tbb::task *task,
+    WorkTaskGraph::BaseTask *task,
     const VdfEvaluationState &state,
     const VdfNode &node,
     const VdfScheduleInputsTask &scheduleTask,
     _EvaluationStage *evaluationStage,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask **bypass)
 {
     // The evaluation stages this task can be in.
     enum {
@@ -1274,11 +1254,11 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_ProcessInputsTask(
 template < typename Derived, typename DataManager >
 bool
 VdfParallelExecutorEngineBase<Derived, DataManager>::_ProcessKeepTask(
-    tbb::task *task,
+    WorkTaskGraph::BaseTask *task,
     const VdfEvaluationState &state,
     const VdfNode &node,
     _EvaluationStage *evaluationStage,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask **bypass)
 {
     // The evaluation stages this task can be in.
     enum {
@@ -1343,8 +1323,8 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeKeepTask(
     const VdfScheduleTaskIndex idx,
     const VdfNode &node,
     const VdfEvaluationState &state,
-    tbb::task *successor,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask *successor,
+    WorkTaskGraph::BaseTask **bypass)
 {
     // Attempt to claim the keep task.
     VdfParallelTaskSync::State claimState = _keepTasks.Claim(idx, successor);
@@ -1352,9 +1332,8 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeKeepTask(
     // If the task has been claimed successfully, i.e. we are the first to claim
     // it as an input dependency, go ahead and spawn a corresponding TBB task.
     if (claimState == VdfParallelTaskSync::State::Claimed) {
-        _KeepTask *task =
-            new (tbb::task::allocate_additional_child_of(*successor))
-                _KeepTask(this, state, node, idx);
+        _KeepTask *task = successor->AllocateChild<_KeepTask>(
+            this, state, node, idx);
         _SpawnOrBypass(task, bypass);
     } 
 
@@ -1373,10 +1352,9 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeTouchTask(
     // to wait for completion of this task, since this is purely background
     // work.
 
-    _TouchTask *task =
-        new (tbb::task::allocate_additional_child_of(*_rootTask))
-            _TouchTask(this, dest, source);
-    tbb::task::spawn(*task);
+    _TouchTask *task = _taskGraph.AllocateTask<_TouchTask>(
+        this, dest, source);
+    _taskGraph.RunTask(task);
 }
 
 template < typename Derived, typename DataManager >
@@ -1385,8 +1363,8 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeComputeTask(
     const VdfScheduleTaskId taskIndex,
     const VdfEvaluationState &state,
     const VdfNode &node,
-    tbb::task *successor,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask *successor,
+    WorkTaskGraph::BaseTask **bypass)
 {
     // Attempt to claim the compute task.
     VdfParallelTaskSync::State claimState = VdfParallelTaskSync::State::Claimed;
@@ -1395,9 +1373,9 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeComputeTask(
     // If the task has been claimed successfully, i.e. we are the first to claim
     // it as an input dependency, go ahead and spawn a corresponding TBB task.
     if (claimState == VdfParallelTaskSync::State::Claimed) {
-        _ComputeTask *task =
-            new (tbb::task::allocate_additional_child_of(*successor))
-                _ComputeTask(this, state, node, taskIndex);
+        _ComputeTask *task = 
+            successor->AllocateChild<_ComputeTask>(
+                this, state, node, taskIndex);
         _SpawnOrBypass(task, bypass);
     }
 
@@ -1413,8 +1391,8 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeComputeTasks(
     const Iterable &tasks,
     const VdfEvaluationState &state,
     const VdfNode &node,
-    tbb::task *successor,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask *successor,
+    WorkTaskGraph::BaseTask **bypass)
 {
     // Invoke all compute tasks within the iterable range.
     bool invoked = false;
@@ -1467,8 +1445,8 @@ bool
 VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeComputeOrKeepTasks(
     const VdfScheduleInputDependency &input,
     const VdfEvaluationState &state,
-    tbb::task *successor,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask *successor,
+    WorkTaskGraph::BaseTask **bypass)
 {
     // Check if the input dependency has already been fulfilled by looking up
     // the relevant output data in the executor caches. If the data is there,
@@ -1512,8 +1490,8 @@ bool
 VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeComputeOrKeepTasks(
     const VdfOutput &output,
     const VdfEvaluationState &state,
-    tbb::task *successor,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask *successor,
+    WorkTaskGraph::BaseTask **bypass)
 {
     // Get the current schedule.
     const VdfSchedule &schedule = state.GetSchedule();
@@ -1556,8 +1534,8 @@ bool
 VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokePrereqInputs(
     const VdfScheduleInputsTask &scheduleTask,
     const VdfEvaluationState &state,
-    tbb::task *successor,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask *successor,
+    WorkTaskGraph::BaseTask **bypass)
 {
     PEE_TRACE_SCOPE("VdfParallelExecutorEngineBase::_InvokePrereqInputs");
 
@@ -1587,8 +1565,8 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeOptionalInputs(
     const VdfScheduleInputsTask &scheduleTask,
     const VdfEvaluationState &state,
     const VdfNode &node,
-    tbb::task *successor,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask *successor,
+    WorkTaskGraph::BaseTask **bypass)
 {
     PEE_TRACE_SCOPE("VdfParallelExecutorEngineBase::_InvokeOptionalInputs");
 
@@ -1652,8 +1630,8 @@ bool
 VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeRequiredInputs(
     const VdfScheduleComputeTask &scheduleTask,
     const VdfEvaluationState &state,
-    tbb::task *successor,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask *successor,
+    WorkTaskGraph::BaseTask **bypass)
 {
     PEE_TRACE_SCOPE("VdfParallelExecutorEngineBase::_InvokeRequiredInputs");
 
@@ -1680,8 +1658,8 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeInputsTask(
     const VdfScheduleComputeTask &scheduleTask,
     const VdfEvaluationState &state,
     const VdfNode &node,
-    tbb::task *successor,
-    tbb::task **bypass)
+    WorkTaskGraph::BaseTask *successor,
+    WorkTaskGraph::BaseTask **bypass)
 {
     PEE_TRACE_SCOPE("VdfParallelExecutorEngineBase::_InvokeInputsTask");
 
@@ -1700,8 +1678,8 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokeInputsTask(
     // to claim this task, go ahead an allocate and spawn a TBB task.
     if (claimState == VdfParallelTaskSync::State::Claimed) {
         _InputsTask *task =
-            new (tbb::task::allocate_additional_child_of(*successor))
-                _InputsTask(this, state, node, inputsTaskIndex);
+            successor->AllocateChild<_InputsTask>(
+                this, state, node, inputsTaskIndex);
         _SpawnOrBypass(task, bypass);
     }
 
@@ -1716,7 +1694,7 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_InvokePrepTask(
     const VdfScheduleComputeTask &scheduleTask,
     const VdfEvaluationState &state,
     const VdfNode &node,
-    tbb::task *successor)
+    WorkTaskGraph::BaseTask *successor)
 {
     PEE_TRACE_SCOPE("VdfParallelExecutorEngineBase::_InvokePrepTask");
 
@@ -1859,7 +1837,7 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_EvaluateNode(
     const VdfScheduleComputeTask &scheduleTask,
     const VdfEvaluationState &state,
     const VdfNode &node,
-    tbb::task *successor)
+    WorkTaskGraph::BaseTask *successor)
 {
     PEE_TRACE_SCOPE("VdfParallelExecutorEngineBase::_EvaluateNode");
 
