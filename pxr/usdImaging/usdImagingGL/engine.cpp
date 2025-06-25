@@ -2355,7 +2355,8 @@ UsdImagingGLEngine::_GetDefaultRendererPluginId()
 
     // Look for the one with the matching display name
     for (size_t i = 0; i < pluginDescs.size(); ++i) {
-        if (pluginDescs[i].displayName == defaultRendererDisplayName) {
+        if (pluginDescs[i].displayName == defaultRendererDisplayName
+        ||  pluginDescs[i].id == defaultRendererDisplayName) {
             return pluginDescs[i].id;
         }
     }
