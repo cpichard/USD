@@ -28,19 +28,13 @@
 #include "pxr/exec/vdf/schedule.h"
 #include "pxr/exec/vdf/vector.h"
 
-#include "pxr/base/trace/trace.h"
-
 #include "pxr/base/tf/errorMark.h"
 #include "pxr/base/tf/errorTransport.h"
-#include "pxr/base/tf/pyLock.h"
-
+#include "pxr/base/trace/trace.h"
 #include "pxr/base/work/taskGraph.h"
-#include "pxr/base/work/threadLimits.h"
+#include "pxr/base/work/withScopedParallelism.h"
 
 #include <tbb/concurrent_vector.h>
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/task_arena.h>
-#include <tbb/parallel_for.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -285,10 +279,6 @@ protected:
         const size_t requestedIndex,
         Callback &callback,
         WorkTaskGraph::TaskList *taskList);
-
-    // Executes the callable within this engine's arena.
-    template < typename F >
-    void _ArenaExecute(const F &callable);
 
     // Spawn the task(s) requested for a given node. These are the tasks spawn
     // as entry points into evaluating the schedule. Remaining tasks will be
@@ -602,9 +592,6 @@ protected:
 
     // A task graph for dynamically adding and spawning tasks during execution. 
     WorkTaskGraph _taskGraph;
-    
-    // A task arena for isolating parallel tasks. 
-    tbb::task_arena _taskArena;
 
     // Keep track of which unique input dependencies have had their cached
     // state checked.
@@ -636,7 +623,6 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::
         DataManager *dataManager) :
         _executor(executor),
         _dataManager(dataManager),
-        _taskArena(WorkGetConcurrencyLimit()),
         _resetState(),
         _computeTasks(&_taskGraph),
         _inputsTasks(&_taskGraph),
@@ -663,9 +649,6 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::RunSchedule(
 {
     TRACE_SCOPE("VdfParallelExecutorEngineBase::RunSchedule");
 
-    // Make sure the GIL has been released (sad face)
-    TF_PY_ALLOW_THREADS_IN_SCOPE();
-
     // Make sure the data manager is appropriately sized.
     _dataManager->Resize(*schedule.GetNetwork());
 
@@ -679,10 +662,11 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::RunSchedule(
     // view for random access into the compute request in a parallel for-loop.
     VdfRequest::IndexedView view(computeRequest);
 
-    // Perform all the work of spawning and waiting on tasks in an arena, in
-    // order to prevent evaluation tasks from being stolen in unrelated loops.
+    // Perform all the work of spawning and waiting on tasks with scoped
+    // parallelism, in order to prevent evaluation tasks from being stolen in
+    // unrelated loops.
     VdfParallelExecutorEngineBase<Derived, DataManager> *engine = this;
-    _ArenaExecute([engine, &state, &view, &callback] {
+    WorkWithScopedParallelism([engine, &state, &view, &callback] {
         // Collect all the leaf tasks, which are the entry point for evaluation.
         // We will later spawn all these tasks together.
         WorkTaskGraph::TaskLists taskLists;
@@ -986,14 +970,6 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::_ComputeAllTask::execute()
 
     // No scheduler bypass.
     return nullptr;
-}
-
-template < typename Derived, typename DataManager >
-template < typename F >
-void
-VdfParallelExecutorEngineBase<Derived, DataManager>::_ArenaExecute(
-    const F &callable) {
-    _taskArena.execute(callable);
 }
 
 template < typename Derived, typename DataManager >

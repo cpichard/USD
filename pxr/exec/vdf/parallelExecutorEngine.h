@@ -14,6 +14,7 @@
 #include "pxr/exec/vdf/parallelExecutorEngineBase.h"
 
 #include "pxr/base/work/taskGraph.h"
+#include "pxr/base/work/withScopedParallelism.h"
 
 #include <tbb/concurrent_unordered_map.h>
 
@@ -30,9 +31,10 @@ template <typename> class VdfParallelSpeculationExecutorEngine;
 ///
 /// \class VdfParallelExecutorEngine
 ///
-/// A generic, parallel executor engine, deriving from
-/// VdfParallelExecutorEngineBase. The engine supports arena execution,
-/// locking, and touching. This engine does not do cycle detection.
+/// A generic, but fully-featured parallel executor engine, deriving from
+/// VdfParallelExecutorEngineBase.
+/// 
+/// This engine does not perform cycle detection.
 ///
 template < typename DataManagerType >
 class VdfParallelExecutorEngine :
@@ -287,28 +289,25 @@ VdfParallelExecutorEngine<DataManagerType>::_PublishLockedBuffers()
 
     PEE_TRACE_SCOPE("VdfParallelExecutorEngine::_PublishLockedBuffers");
 
-    // For each entry in the locked data map, spawn a new task to publish the
-    // locked data.
-    for (const auto &data : _lockedDataMap) {
-        // Allocate a new task responsible for publishing the data. Note that
-        // the _PublishLockedDataTask will take ownership of the locked data
-        // structure, and is responsible for deallocating it.
-        _PublishLockedDataTask * const task =
-            Base::_taskGraph.template AllocateTask<_PublishLockedDataTask>(
-                Base::_dataManager, data.first, data.second);
-
-        // Spawn the newly allocated task in this engine's own arena.
-        Base::_ArenaExecute([&taskGraph = Base::_taskGraph, task] {
+    WorkWithScopedParallelism(
+        [&lockedDataMap = _lockedDataMap, &taskGraph = Base::_taskGraph,
+            &dataManager = Base::_dataManager] {
+        // For each entry in the locked data map, spawn a new task to publish
+        // the locked data.
+        for (const auto &data : lockedDataMap) {
+            // Allocate a new task responsible for publishing the data. Note
+            // that the _PublishLockedDataTask will take ownership of the locked
+            // data structure, and is responsible for deallocating it.
+            _PublishLockedDataTask * const task =
+                taskGraph.template AllocateTask<_PublishLockedDataTask>(
+                    dataManager, data.first, data.second);
             taskGraph.RunTask(task);
-        });
-    }
+        }
 
-    // Clear the map, while the data is still being published.
-    _lockedDataMap.clear();
+        // Clear the map, while the data is still being published.
+        lockedDataMap.clear();
 
-    // Wait for all the publishing to complete, while joining the arena to
-    // help out with any of the remaining work.
-    Base::_ArenaExecute([&taskGraph = Base::_taskGraph] {
+        // Wait for all the publishing to complete.
         taskGraph.Wait();
     });
 }
