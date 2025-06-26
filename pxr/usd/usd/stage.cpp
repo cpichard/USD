@@ -38,6 +38,7 @@
 #include "pxr/usd/pcp/layerStackIdentifier.h"
 #include "pxr/usd/pcp/site.h"
 
+#include "pxr/usd/sdf/assetPath.h"
 #include "pxr/usd/sdf/attributeSpec.h"
 #include "pxr/usd/sdf/changeBlock.h"
 #include "pxr/usd/sdf/layerUtils.h"
@@ -477,33 +478,6 @@ _CreatePathResolverContext(
     return ArGetResolver().CreateDefaultContext();
 }
 
-static std::string
-_AnchorAssetPathRelativeToLayer(
-    const SdfLayerHandle& anchor,
-    const std::string& assetPath)
-{
-    if (assetPath.empty() ||
-        SdfLayer::IsAnonymousLayerIdentifier(assetPath)) {
-        return assetPath;
-    }
-
-    return SdfComputeAssetPathRelativeToLayer(anchor, assetPath);
-}
-
-static std::string
-_ResolveAssetPathRelativeToLayer(
-    const SdfLayerHandle& anchor,
-    const std::string& assetPath)
-{
-    const std::string computedAssetPath = 
-        _AnchorAssetPathRelativeToLayer(anchor, assetPath);
-    if (computedAssetPath.empty()) {
-        return computedAssetPath;
-    }
-
-    return ArGetResolver().Resolve(computedAssetPath);
-}
-
 // If forFlattening is true, this function will only
 // update the authored assetPaths by anchoring them to the
 // anchor layer; it will not fill in the resolved path field.
@@ -515,48 +489,23 @@ _MakeResolvedAssetPathsImpl(const Usd_AssetPathContext &assetContext,
                             bool forFlattening)
 {
     ArResolverContextBinder binder(resolverContext);
-    for (size_t i = 0; i != numAssetPaths; ++i) {
 
-        if (SdfVariableExpression::IsExpression(assetPaths[i].GetAuthoredPath())) {
-            const PcpExpressionVariables& exprVars =
+    if (assetContext) {
+        const PcpExpressionVariables& exprVars =
                 assetContext.node.GetLayerStack()->GetExpressionVariables();
-
-            SdfVariableExpression::Result r = 
-                SdfVariableExpression(assetPaths[i].GetAuthoredPath())
-                .EvaluateTyped<std::string>(exprVars.GetVariables());
-
-            if (!r.errors.empty()) {
-                assetContext.ReportErrors(r.errors);
-                continue;
-            }
-
-            if (r.value.IsHolding<std::string>()) {
-                assetPaths[i].SetEvaluatedPath(
-                    r.value.UncheckedGet<std::string>());
-            }
-        }
-
-        // When flattening, if the resolver can't handle this path 
-        // (e.g., it's a URI and no associated URI resolver is registered),
-        // the result of anchoring may be non-sensical. We try to detect this 
-        // by comparing the anchored result to the unanchored identifier.  
-        // If they're the same, then we assume the path is absolute since the 
-        // anchor had no effect, and we can just leave the path as-is.
+        std::vector<std::string> errors;
         if (forFlattening) {
-            const std::string anchoredPath = _AnchorAssetPathRelativeToLayer(
-                    assetContext.layer, assetPaths[i].GetAssetPath());
-
-            const std::string unanchoredPath = ArGetResolver().CreateIdentifier(
-                    assetPaths[i].GetAssetPath());
-
-            if (anchoredPath != unanchoredPath) {
-                assetPaths[i] = SdfAssetPath(anchoredPath);
-            }
+            SdfAnchorAssetPaths(
+                assetContext.layer, exprVars.GetVariables(), 
+                TfSpan<SdfAssetPath>(assetPaths, numAssetPaths), &errors);
+        } else {
+            SdfResolveAssetPaths(
+                assetContext.layer, exprVars.GetVariables(), 
+                TfSpan<SdfAssetPath>(assetPaths, numAssetPaths), &errors);
         }
-        else {
-            assetPaths[i].SetResolvedPath(_ResolveAssetPathRelativeToLayer(
-                assetContext.layer, assetPaths[i].GetAssetPath())
-            );
+
+        if (!errors.empty()) {
+            assetContext.ReportErrors(errors);
         }
     }
 }
@@ -10203,7 +10152,7 @@ UsdStage::ResolveIdentifierToEditTarget(std::string const &identifier) const
 
     // Handles non-relative paths also
     const std::string resolved = 
-        _ResolveAssetPathRelativeToLayer(anchor, identifier);
+        SdfResolveAssetPathRelativeToLayer(anchor, identifier);
     TF_DEBUG(USD_PATH_RESOLUTION).Msg("Resolved identifier \"%s\" against layer "
                                       "@%s@ to: \"%s\"\n",
                                       identifier.c_str(), 
