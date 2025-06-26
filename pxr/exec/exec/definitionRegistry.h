@@ -12,6 +12,7 @@
 #include "pxr/exec/exec/api.h"
 #include "pxr/exec/exec/computationDefinition.h"
 #include "pxr/exec/exec/inputKey.h"
+#include "pxr/exec/exec/pluginComputationDefinition.h"
 #include "pxr/exec/exec/types.h"
 
 #include "pxr/exec/esf/prim.h"
@@ -222,12 +223,12 @@ private:
         TfHash>
     _pluginPrimComputationDefinitions;
 
-    // Map from an opaque ID to composed prim exec definition.
+    // Map from an opaque key to composed prim exec definition.
     //
     // This is a concurrent map to allow computation lookup to happen in
     // parallel with lazy caching of composed prim definitions.
     mutable tbb::concurrent_unordered_map<
-        EsfPrimSchemaID,
+        EsfSchemaConfigKey,
         _ComposedPrimDefinition,
         TfHash>
     _composedPrimDefinitions;
