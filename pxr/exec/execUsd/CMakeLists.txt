@@ -147,6 +147,23 @@ pxr_register_test(testExecUsdRequest
     EXPECTED_RETURN_CODE 0
 )
 
+pxr_build_test(testExecUsdRequestExpiration
+    LIBRARIES
+        tf
+        ef
+        esf
+        exec
+        execUsd
+        vdf
+    CPPFILES
+        testenv/testExecUsdRequestExpiration.cpp
+)
+
+pxr_register_test(testExecUsdRequestExpiration
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdRequestExpiration"
+    EXPECTED_RETURN_CODE 0
+)
+
 pxr_build_test(testExecUsdRequestInvalidation
     LIBRARIES
         gf

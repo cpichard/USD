@@ -480,10 +480,6 @@ TestRecompileResyncedPrim(Fixture &fixture)
 
     // Apply a schema to the prim. This produduces a resync event for the prim,
     // but the prim still exists.
-    //
-    // TODO: When we implement ExecRequest expiration, this change will likely
-    // expire the request, in which case, this test case needs to rebuild the
-    // request before proceeding.
     prim.AddAppliedSchema(TfToken("CustomAppliedSchema"));
     fixture.GraphNetwork("TestRecompileResyncedPrim-2.dot");
     
