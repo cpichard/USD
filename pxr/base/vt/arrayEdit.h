@@ -18,6 +18,7 @@
 #include "pxr/base/vt/traits.h"
 
 #include "pxr/base/tf/diagnostic.h"
+#include "pxr/base/tf/hash.h"
 #include "pxr/base/trace/trace.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -190,6 +191,11 @@ public:
     
 private:
     friend class VtArrayEditBuilder<ELEM>;
+
+    template <class HashState>
+    friend void TfHashAppend(HashState &h, VtArrayEdit const &self) {
+        h.Append(self._denseOrLiterals, self._ops, self._isDense);
+    }
     
     using _Ops = Vt_ArrayEditOps;
     

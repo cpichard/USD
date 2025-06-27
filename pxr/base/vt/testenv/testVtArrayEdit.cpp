@@ -80,6 +80,13 @@ static void testBasics()
     VtIntArray one23 { 1, 2, 3 };
     TF_AXIOM(ident.ComposeOver(one23).IsDenseArray());
     CHECK_EQUAL(ident.ComposeOver(one23).GetDenseArray(), one23);
+
+    // Hash
+    TfHash h;
+    CHECK_EQUAL(h(ident), h(VtIntArrayEdit {}));
+    CHECK_EQUAL(h(emptyDense), h(VtIntArrayEdit{ VtIntArray{} }));
+    CHECK_EQUAL(h(VtIntArrayEdit{ one23 }),
+                h(VtIntArrayEdit{ VtIntArray { 1, 2, 3 } }));
 }
 
 static void testBuilderAndComposition()
