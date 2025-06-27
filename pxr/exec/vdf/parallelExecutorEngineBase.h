@@ -31,6 +31,7 @@
 #include "pxr/base/tf/errorMark.h"
 #include "pxr/base/tf/errorTransport.h"
 #include "pxr/base/trace/trace.h"
+#include "pxr/base/work/loops.h"
 #include "pxr/base/work/taskGraph.h"
 #include "pxr/base/work/withScopedParallelism.h"
 
@@ -673,12 +674,12 @@ VdfParallelExecutorEngineBase<Derived, DataManager>::RunSchedule(
 
         // Run all the outputs in parallel. This will reset the internal state,
         // if necessary, and collect all the leaf tasks for uncached outputs.
-        tbb::parallel_for(tbb::blocked_range<size_t>(0, view.GetSize()),
+        WorkParallelForN(
+            view.GetSize(),
             [engine, &state, &view, &callback, &taskLists]
-            (const tbb::blocked_range<size_t> &range) {
+            (size_t b, size_t e) {
                 WorkTaskGraph::TaskList *taskList = &taskLists.local();
-                
-                for (size_t i = range.begin(); i != range.end(); ++i) {
+                for (size_t i = b; i != e; ++i) {
                     if (const VdfMaskedOutput *maskedOutput = view.Get(i)) {
                         engine->_RunOutput(
                             state, *maskedOutput, i, callback, taskList);

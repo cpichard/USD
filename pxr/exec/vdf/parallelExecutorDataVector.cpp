@@ -12,8 +12,6 @@
 #include "pxr/base/trace/trace.h"
 #include "pxr/base/work/loops.h"
 
-#include <tbb/parallel_for.h>
-
 #include <algorithm>
 #include <type_traits>
 
