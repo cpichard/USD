@@ -15,6 +15,7 @@
 #include "pxr/base/vt/array.h"
 #include "pxr/base/vt/arrayEditOps.h"
 #include "pxr/base/vt/streamOut.h"
+#include "pxr/base/vt/traits.h"
 
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/trace/trace.h"
@@ -369,6 +370,10 @@ VtArrayEdit<ELEM>::_ComposeEdits(VtArrayEdit &&weaker) &&
 
     return std::move(weaker);
 }
+
+// Specialize traits for VtArrayEdit.
+template <typename T>
+struct VtIsArrayEdit<VtArrayEdit<T>> : public std::true_type {};
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
