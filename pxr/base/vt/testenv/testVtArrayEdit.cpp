@@ -213,6 +213,30 @@ static void testBuilderAndComposition()
         CHECK_EQUAL(
             size7Fill3.ComposeOver(VtIntArray(27, 9)).GetDenseArray(),
             (VtIntArray(7, 9)));
+
+        // Check that the serialization data will reproduce an equivalent edit.
+        {
+            VtIntArray vals;
+            std::vector<int64_t> indexes;
+
+            auto check = [&](VtIntArrayEdit const &test) {
+                VtIntArrayEditBuilder::
+                    GetSerializationData(test, &vals, &indexes);
+                VtIntArrayEdit reconstituted =
+                    VtIntArrayEditBuilder::CreateFromSerializationData(
+                        vals, indexes, test.IsDenseArray());
+                TF_AXIOM(test == reconstituted);
+            };
+
+            check(size7Fill3);
+            check(size7);
+            check(size10to15);
+            check(minSize10Fill9);
+            check(zeroNineMixAndTrim);
+
+            check({}); // identity.
+            check(VtIntArray {}); // empty dense array.
+        }
     }
 }
 
