@@ -380,7 +380,8 @@ class VtValue
 
     // Type-dispatching overloads.
 
-    // Array type helper.
+    // Array type helpers.  Non-array types have no shape data, no elements and
+    // report `void` for their element types.
     template <class T>
     struct _NonArrayHelper
     {
@@ -390,6 +391,7 @@ class VtValue
             return typeid(void);
         }
     };
+    // VtArray types report their qualities.
     template <class Array>
     struct _IsArrayHelper
     {
@@ -403,10 +405,25 @@ class VtValue
             return typeid(typename Array::ElementType);
         }
     };
+    // VtArrayEdit types are identical to non-array types except that they do
+    // report their underlying element type.
+    template <class ArrayEdit>
+    struct _IsArrayEditHelper : _NonArrayHelper<ArrayEdit>
+    {
+        constexpr static std::type_info const &GetElementTypeid() {
+            return typeid(typename ArrayEdit::ElementType);
+        }
+    };
 
+    // Select which flavor of array helper to use -- VtArray uses
+    // _IsArrayHelper, VtArrayEdit uses _IsArrayEditHelper, all other types use
+    // _NonArrayHelper.
     template <class T>
     using _ArrayHelper = TfConditionalType<
-        VtIsArray<T>::value, _IsArrayHelper<T>, _NonArrayHelper<T>>;
+        VtIsArray<T>::value, _IsArrayHelper<T>,
+        TfConditionalType<VtIsArrayEdit<T>::value,
+                          _IsArrayEditHelper<T>, _NonArrayHelper<T>>
+        >;
 
     // Function used in case T has equality comparison.
     template <class T>
@@ -1027,18 +1044,19 @@ public:
         return _info.GetLiteral() && _TypeIs<T>();
     }
 
-    /// Returns true iff this is holding an array type (see VtIsArray<>).
+    /// Return true if this holds a VtArray instance, false otherwise.
     VT_API bool IsArrayValued() const;
 
     /// Return the number of elements in the held value if IsArrayValued(),
     /// return 0 otherwise.
     size_t GetArraySize() const { return _GetNumElements(); }
 
-    /// Returns the typeid of the type held by this value.
+    /// Return the typeid of the type held by this value.
     VT_API std::type_info const &GetTypeid() const;
 
-    /// Return the typeid of elements in a array valued type.  If not
-    /// holding an array valued type, return typeid(void).
+    /// If this value holds a VtArray or VtArrayEdit instance, return the typeid
+    /// of its element type.  For example, if this value holds a VtIntArray or a
+    /// VtIntArrayEdit, return typeid(int).  Otherwise return typeid(void).
     VT_API std::type_info const &GetElementTypeid() const;
 
     /// Returns the TfType of the type held by this value.
