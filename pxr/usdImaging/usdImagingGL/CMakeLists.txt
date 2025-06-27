@@ -547,6 +547,11 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
+    SRC testenv/testUsdImagingGLCameraExposure
+    DEST testUsdImagingGLCameraExposure
+)
+
+pxr_install_test_dir(
     SRC testenv/testUsdImagingGLClippingPlanes
     DEST testUsdImagingGLClippingPlanes
 )
@@ -4238,6 +4243,19 @@ pxr_register_test(testUsdImagingGLAnimatedCamera
     PERCEPTUAL
     EXPECTED_RETURN_CODE 0
     TESTENV testUsdImagingGLAnimatedCamera
+)
+
+pxr_register_test(testUsdImagingGLCameraExposure
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -frameAll -camera /World/main_cam -times 1 2 3 -stage cameraExposure.usda -write testUsdImagingGLCameraExposure.png"
+    IMAGE_DIFF_COMPARE
+        testUsdImagingGLCameraExposure_001.png
+        testUsdImagingGLCameraExposure_002.png
+        testUsdImagingGLCameraExposure_003.png
+    FAIL 1
+    FAIL_PERCENT 1
+    PERCEPTUAL
+    EXPECTED_RETURN_CODE 0
+    TESTENV testUsdImagingGLCameraExposure
 )
 
 pxr_register_test(testUsdImagingGLAnimatedLights
