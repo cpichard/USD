@@ -278,20 +278,24 @@ _GetValueExtractor(
     const ExecTypeRegistry &typeReg,
     const ExecValueKey &vk)
 {
+    EsfJournal *const nullJournal = nullptr;
+
     const EsfObject &provider = vk.GetProvider();
-    if (!provider->IsValid(nullptr)) {
+    if (!provider->IsValid(nullJournal)) {
         TF_CODING_ERROR("Invalid provider");
         return Exec_ValueExtractor();
     }
 
     const TfToken &computationName = vk.GetComputationName();
     const Exec_ComputationDefinition *def = defReg.GetComputationDefinition(
-        *provider, computationName, /* journal */ nullptr);
+        *provider, computationName,
+        EsfSchemaConfigKey(),
+        nullJournal);
 
     if (!def) {
         TF_CODING_ERROR("Failed to find computation '%s' on provider '%s'",
                         computationName.GetText(),
-                        provider->GetPath(nullptr).GetText());
+                        provider->GetPath(nullJournal).GetText());
         return Exec_ValueExtractor();
     }
 

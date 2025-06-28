@@ -48,6 +48,7 @@ void
 Exec_NodeRecompilationInfoTable::SetNodeRecompilationInfo(
     const VdfNode *const node,
     const EsfObject &provider,
+    const EsfSchemaConfigKey dispatchingSchemaId,
     Exec_InputKeyVectorConstRefPtr &&inputKeys)
 {
     // TODO: This tag currently fails to collect any allocations because the
@@ -92,6 +93,7 @@ Exec_NodeRecompilationInfoTable::SetNodeRecompilationInfo(
     // Initialize recompilation info in the storage's buffer.
     ::new (storage->buffer) Exec_NodeRecompilationInfo(
         provider,
+        dispatchingSchemaId,
         std::move(inputKeys));
     storage->isInfoConstructed = true;
 }

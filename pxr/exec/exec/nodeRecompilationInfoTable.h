@@ -40,6 +40,7 @@ public:
     void SetNodeRecompilationInfo(
         const VdfNode *node,
         const EsfObject &provider,
+        EsfSchemaConfigKey dispatchingSchemaId,
         Exec_InputKeyVectorConstRefPtr &&inputKeys);
 
     /// Gets the recompiation info for the given \p node.
