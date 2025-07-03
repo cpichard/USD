@@ -90,6 +90,17 @@ if(@Imath_FOUND@)
     find_dependency(Imath)
 endif()
 
+# If this build is using a custom work implementation, find the package
+# providing that implementation.
+if(NOT "@PXR_WORK_IMPL_PACKAGE@" STREQUAL "")
+    if (NOT DEFINED @PXR_WORK_IMPL_CONFIG_DIR_VAR@)
+        if (NOT [[@PXR_WORK_IMPL_CONFIG_DIR@]] STREQUAL "")
+            set(@PXR_WORK_IMPL_CONFIG_DIR_VAR@ [[@PXR_WORK_IMPL_CONFIG_DIR@]])
+        endif()
+    endif()
+    find_dependency(@PXR_WORK_IMPL_PACKAGE@)
+endif()
+
 include("${PXR_CMAKE_DIR}/cmake/pxrTargets.cmake")
 if (TARGET usd_ms)
     set(libs "usd_ms")
