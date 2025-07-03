@@ -176,18 +176,6 @@ Exec_ComputationBuilder::PrimComputation(
     return Exec_PrimComputationBuilder(_schemaType, computationName);
 }
 
-// Exec_PrimComputationBuilder 
-// Exec_ComputationBuilder::DispatchedPrimComputation(
-//     const TfToken &computationName,
-//     const TfType &ontoSchema)
-// {
-//     return Exec_PrimComputationBuilder(
-//         _schemaType,
-//         computationName,
-//         /* dispatched */ true,
-//         {ontoSchema});
-// }
-
 Exec_PrimComputationBuilder 
 Exec_ComputationBuilder::DispatchedPrimComputation(
     const TfToken &computationName,
