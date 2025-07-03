@@ -45,6 +45,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (filename)
     (ND_surface)
     (typeName)
+    (mtlx)
     ((mtlxVersion, "mtlx:version"))
 );
 
@@ -122,13 +123,45 @@ _GetMxNodeString(mx::NodeDefPtr const& mxNodeDef)
         : mxNodeDef->getNodeString();
 }
 
+mx::NodeDefPtr
+HdMtlxGetNodeDef(TfToken const& hdNodeType, mx::DocumentPtr const& mxDoc)
+{
+    const mx::DocumentPtr& stdLibraries =
+        (mxDoc) ? mxDoc : HdMtlxStdLibraries();
+    const mx::NodeDefPtr mxNodeDef =
+        stdLibraries->getNodeDef(hdNodeType.GetString());
+    if (mxNodeDef) {
+        return mxNodeDef;
+    }
+
+    // If we were not able to find the nodeDef in the stdLibraries it
+    // may have been implemented within an asset, stored on the sdrNode.
+    const SdrShaderNodeConstPtr sdrNode =
+        SdrRegistry::GetInstance().GetShaderNodeByIdentifierAndType(
+            hdNodeType, _tokens->mtlx);
+    if (!sdrNode) {
+        return nullptr;
+    }
+
+    const std::string assetPath = sdrNode->GetResolvedImplementationURI();
+    if (assetPath.empty()) {
+        return nullptr;
+    }
+
+    // If we found an asset path load it to the stdLibraries and try and
+    // get the nodeDef again. 
+    mx::loadLibrary(assetPath, stdLibraries);
+    const std::string nodeDefName = sdrNode->GetImplementationName();
+    return stdLibraries->getNodeDef(nodeDefName);
+}
+
 // Return the MaterialX Node Type based on the corresponding NodeDef name, 
 // which is stored as the hdNodeType. 
 static TfToken
 _GetMxNodeType(mx::DocumentPtr const& mxDoc, TfToken const& hdNodeType)
 {
-    mx::NodeDefPtr mxNodeDef = mxDoc->getNodeDef(hdNodeType.GetString());
-    if (!mxNodeDef){
+    mx::NodeDefPtr mxNodeDef = HdMtlxGetNodeDef(hdNodeType, mxDoc);
+    if (!mxNodeDef) {
         TF_WARN("Unsupported node type '%s' cannot find the associated NodeDef.",
                 hdNodeType.GetText());
         return TfToken();

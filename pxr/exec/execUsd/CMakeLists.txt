@@ -56,6 +56,29 @@ pxr_register_test(testExecUsdBasicCompilation
     TESTENV testExecUsdBasicCompilation
 )
 
+pxr_build_test(testExecUsdDispatchedComputations
+    LIBRARIES
+        tf
+        esf
+        exec
+        execUsd
+        vdf
+        usdGeom
+    CPPFILES
+        testenv/testExecUsdDispatchedComputations.cpp
+)
+
+pxr_install_test_dir(
+    SRC testenv/testExecUsdDispatchedComputations
+    DEST testExecUsdDispatchedComputations
+)
+
+pxr_register_test(testExecUsdDispatchedComputations
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdDispatchedComputations"
+    EXPECTED_RETURN_CODE 0
+    TESTENV testExecUsdDispatchedComputations
+)
+
 pxr_build_test(testExecUsdRecompilation
     LIBRARIES
         exec
@@ -144,6 +167,23 @@ pxr_install_test_dir(
 
 pxr_register_test(testExecUsdRequest
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdRequest"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_build_test(testExecUsdRequestExpiration
+    LIBRARIES
+        tf
+        ef
+        esf
+        exec
+        execUsd
+        vdf
+    CPPFILES
+        testenv/testExecUsdRequestExpiration.cpp
+)
+
+pxr_register_test(testExecUsdRequestExpiration
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdRequestExpiration"
     EXPECTED_RETURN_CODE 0
 )
 

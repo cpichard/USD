@@ -12,6 +12,7 @@
 #include "pxr/exec/exec/inputKey.h"
 
 #include "pxr/exec/esf/object.h"
+#include "pxr/exec/esf/schemaConfigKey.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -23,8 +24,10 @@ class Exec_NodeRecompilationInfo
 public:
     Exec_NodeRecompilationInfo(
         const EsfObject &provider,
+        const EsfSchemaConfigKey dispatchingSchemaId,
         Exec_InputKeyVectorConstRefPtr &&inputKeys)
         : _provider(provider)
+        , _dispatchingSchemaId(dispatchingSchemaId)
         , _inputKeys(std::move(inputKeys))
     {}
 
@@ -33,6 +36,17 @@ public:
     ///
     const EsfObject &GetProvider() const {
         return _provider;
+    }
+
+    /// Gets the schema config key from the output key that was used to
+    /// initially compile the node.
+    ///
+    /// The returned schema config key is the config key of the provider (if
+    /// this node is for a non-dispatched computation), or the config key of the
+    /// dispatcher (if this node is for a dispatched computation).
+    ///
+    EsfSchemaConfigKey GetDispatchingSchemaKey() const {
+        return _dispatchingSchemaId;
     }
 
     /// Gets the input key to re-resolve \p input on the node.
@@ -46,6 +60,8 @@ private:
     // TODO: This needs to be updated in response to namespace edits.
     const EsfObject _provider;
     
+    const EsfSchemaConfigKey _dispatchingSchemaId;
+
     Exec_InputKeyVectorConstRefPtr _inputKeys;
 };
 

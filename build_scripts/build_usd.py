@@ -1591,11 +1591,35 @@ def InstallEmbree(context, force, buildArgs):
             '-DEMBREE_TUTORIALS=OFF',
             '-DEMBREE_ISPC_SUPPORT=OFF'
         ]
-
-        if MacOS() and context.targetUniversal:
-            extraArgs += [
-                '-DEMBREE_MAX_ISA=NEON',
-                '-DEMBREE_ISA_NEON=ON']
+        if MacOS():
+            # Backport fix for clang build errors in debug output operators
+            # to Embree 3.13.3. This is fixed in Embree 4.3.2.
+            # https://github.com/RenderKit/embree/issues/486
+            PatchFile("kernels/subdiv/bezier_curve.h",
+                [('return cout << "QuadraticBezierCurve ( (" << a.u.lower << ", " << a.u.upper << "), " << a.v0 << ", " << a.v1 << ", " << a.v2 << ")";',
+                'return cout << "QuadraticBezierCurve (" << a.v0 << ", " << a.v1 << ", " << a.v2 << ")";'),
+                ]
+            )
+            PatchFile("kernels/geometry/pointi.h",
+                [("friend __forceinline embree_ostream operator<<(embree_ostream cout, const PointMi& line)",
+                "friend __forceinline embree_ostream operator<<(embree_ostream cout, const PointMi& point)"),
+                ('return cout << "Line" << M << "i {" << line.v0 << ", " << line.geomID() << ", " << line.primID() << "}";',
+                'return cout << "Point" << M << "i {" << point.geomID() << ", " << point.primID() << "}";')
+                ]
+            )
+            # Suppress clang build warnings as errors
+            PatchFile("kernels/CMakeLists.txt",
+                [("DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES})\n"
+                "ADD_LIBRARY(embree ${EMBREE_LIB_TYPE} ${EMBREE_LIBRARY_FILES})\n",
+                "DISABLE_STACK_PROTECTOR_FOR_INTERSECTORS(${EMBREE_LIBRARY_FILES})\n"
+                "ADD_LIBRARY(embree ${EMBREE_LIB_TYPE} ${EMBREE_LIBRARY_FILES})\n"
+                "target_compile_options(embree PRIVATE -Wno-unused-but-set-variable)\n")],
+                multiLineMatches=True,
+            )
+            if context.targetUniversal:
+                extraArgs += [
+                    '-DEMBREE_MAX_ISA=NEON',
+                    '-DEMBREE_ISA_NEON=ON']
 
         extraArgs += buildArgs
 

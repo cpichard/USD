@@ -54,6 +54,7 @@ Exec_InputRecompilationTask::_Compile(
             compilationState,
             *inputKey,
             originObject,
+            nodeRecompilationInfo->GetDispatchingSchemaKey(),
             &_resultOutputs,
             &_journal);
     },
