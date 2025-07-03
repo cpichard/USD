@@ -119,6 +119,11 @@ HgiVulkanCapabilities::HgiVulkanCapabilities(HgiVulkanDevice* device)
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_ATTRIBUTE_DIVISOR_PROPERTIES_EXT;
     vkDeviceProperties2.pNext = &vkVertexAttributeDivisorProperties;
 
+    vkPhysicalDeviceIdProperties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES_KHR;
+    vkPhysicalDeviceIdProperties.pNext = vkDeviceProperties2.pNext;
+    vkDeviceProperties2.pNext =  &vkPhysicalDeviceIdProperties;
+
     // Query device properties
     vkGetPhysicalDeviceProperties2(physicalDevice, &vkDeviceProperties2);
     vkGetPhysicalDeviceMemoryProperties(physicalDevice, &vkMemoryProperties);
