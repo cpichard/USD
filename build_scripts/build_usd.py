@@ -354,7 +354,7 @@ def AppendCXX11ABIArg(buildFlag, context, buildArgs):
     buildArgs.append('{flag}="{flags}"'.format(
         flag=buildFlag, flags=" ".join(cxxFlags)))
 
-def RunCMake(context, force, extraArgs = None):
+def RunCMake(context, force, extraArgs = None, installDir = None):
     """Invoke CMake to configure, build, and install a library whose 
     source code is located in the current working directory."""
     # Create a directory for out-of-source builds in the build directory
@@ -365,11 +365,11 @@ def RunCMake(context, force, extraArgs = None):
         # ensure we can freely modify our extraArgs without affecting caller
         extraArgs = list(extraArgs)
 
+    instDir = installDir if installDir else context.instDir
+
     if context.cmakeBuildArgs:
         extraArgs.insert(0, context.cmakeBuildArgs)
     srcDir = os.getcwd()
-    instDir = (context.usdInstDir if srcDir == context.usdSrcDir
-               else context.instDir)
     buildDir = os.path.join(context.buildDir, os.path.split(srcDir)[1])
     if force and os.path.isdir(buildDir):
         shutil.rmtree(buildDir)
@@ -1843,7 +1843,7 @@ def InstallUSD(context, force, buildArgs):
 
         extraArgs += buildArgs
 
-        RunCMake(context, force, extraArgs)
+        RunCMake(context, force, extraArgs, context.usdInstDir)
 
 USD = Dependency("USD", InstallUSD, "include/pxr/pxr.h")
 
