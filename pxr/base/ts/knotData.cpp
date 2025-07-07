@@ -9,6 +9,8 @@
 #include "pxr/base/ts/knotData.h"
 #include "pxr/base/ts/valueTypeDispatch.h"
 
+#include <algorithm>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 
