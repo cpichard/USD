@@ -134,11 +134,11 @@ HdMergingSceneIndex::_RebuildInputsPathTable()
     for (auto const &inputEntry: _inputs) {
         _inputsPathTable[inputEntry.sceneRoot];
     }
-    for (auto& [path, entriesForPath]: _inputsPathTable) {
-        for (auto const &inputEntry: _inputs) {
-            if (path.HasPrefix(inputEntry.sceneRoot)) {
-                entriesForPath.push_back(inputEntry);
-            }
+    for (auto const &inputEntry: _inputs) {
+        const auto [start, end] =
+            _inputsPathTable.FindSubtreeRange(inputEntry.sceneRoot);
+        for (auto it = start; it != end; ++it) {
+            it->second.push_back(inputEntry);
         }
     }
 }
