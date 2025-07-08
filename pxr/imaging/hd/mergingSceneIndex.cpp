@@ -47,22 +47,6 @@ _FillAddedChildEntriesRecursively(
     }
 }
 
-static
-bool
-_Contains(const SdfPath &path, const SdfPathVector &v)
-{
-    return std::find(v.begin(), v.end(), path) != v.end();
-}
-
-static
-bool
-_HasPrim(HdSceneIndexBase * const sceneIndex, const SdfPath &path)
-{
-    TRACE_FUNCTION();
-    
-    return _Contains(path, sceneIndex->GetChildPrimPaths(path.GetParentPath()));
-}
-
 void
 HdMergingSceneIndex::AddInputScene(
     const HdSceneIndexBaseRefPtr &inputScene,
@@ -104,6 +88,39 @@ HdMergingSceneIndex::_GetInputEntriesByPath(SdfPath const& primPath) const
 
     static const HdMergingSceneIndex::_InputEntries empty;
     return empty;
+}
+
+static
+bool
+_Contains(const SdfPath &path, const SdfPathVector &v)
+{
+    return std::find(v.begin(), v.end(), path) != v.end();
+}
+
+bool
+HdMergingSceneIndex::_HasPrim(const SdfPath &path)
+{
+    TRACE_FUNCTION();
+
+    if (_inputsPathTable.find(path) != _inputsPathTable.end()) {
+        return true;
+    }
+
+    {
+        const HdSceneIndexPrim prim = GetPrim(path);
+        if (!prim.primType.IsEmpty()) {
+            return true;
+        }
+        if (prim.dataSource) {
+            return true;
+        }
+    }
+
+    if (_Contains(path, GetChildPrimPaths(path.GetParentPath()))) {
+        return true;
+    }
+
+    return false;
 }
 
 void
@@ -169,7 +186,7 @@ HdMergingSceneIndex::InsertInputScenes(
             size_t i = 0;
             // Add 1 to skip the activeInputSceneRoot itself.
             for ( ; i + 1 < prefixes.size(); i++) {
-                if (!(_HasPrim(this, prefixes[i]) ||
+                if (!(_HasPrim(prefixes[i]) ||
                       visited.count(prefixes[i]))) {
                     break;
                 }
