@@ -61,6 +61,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (otherComputation)
     (primComputation)
     (relationshipName)
+    (relationshipTargetsInput)
     (stageAccessComputation)
     (unknownSchemaTypeComputation)
 );
@@ -142,7 +143,24 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
         .Callback<double>([](const VdfContext &ctx) { ctx.SetOutput(11.0); })
         .Inputs(
             // Take input from another computation provided by the attribute.
-            Computation<double>(ExecBuiltinComputations->computeValue)
+            Computation<double>(ExecBuiltinComputations->computeValue),
+
+            // Take input from a computation on the attribute's owning prim.
+            Prim().Computation<double>(_tokens->primComputation),
+
+            // Take input from the value of a sibling attribute.
+            Prim().AttributeValue<double>(_tokens->otherAttr),
+
+            // Take input from a computation on a sibling attribute.
+            Prim()
+                .Attribute(_tokens->otherAttr)
+                .Computation<double>(_tokens->attributeComputation),
+
+            // Take input via relationship targets on a sibling relationship.
+            Prim()
+                .Relationship(_tokens->relationshipName)
+                .TargetedObjects<int>(_tokens->primComputation)
+                .InputName(_tokens->relationshipTargetsInput)
         );
 
     // A prim computation that returns the current time.
@@ -725,7 +743,7 @@ TestTypedSchemaComputationRegistration()
 
         const auto inputKeys =
             attrCompDef->GetInputKeys(*attribute, nullJournal);
-        ASSERT_EQ(inputKeys->Get().size(), 1);
+        ASSERT_EQ(inputKeys->Get().size(), 5);
 
         _PrintInputKeys(inputKeys->Get());
 
@@ -739,6 +757,55 @@ TestTypedSchemaComputationRegistration()
             ASSERT_EQ(key.providerResolution.localTraversal, SdfPath("."));
             ASSERT_EQ(key.providerResolution.dynamicTraversal,
                       ExecProviderResolution::DynamicTraversal::Local);
+            ASSERT_EQ(key.optional, true);
+        }
+
+        {
+            const Exec_InputKey &key = inputKeys->Get()[index++];
+            ASSERT_EQ(key.inputName, _tokens->primComputation);
+            ASSERT_EQ(key.computationName, _tokens->primComputation);
+            ASSERT_EQ(key.resultType, TfType::Find<double>());
+            ASSERT_EQ(key.providerResolution.localTraversal, SdfPath(".."));
+            ASSERT_EQ(key.providerResolution.dynamicTraversal,
+                      ExecProviderResolution::DynamicTraversal::Local);
+            ASSERT_EQ(key.optional, true);
+        }
+
+        {
+            const Exec_InputKey &key = inputKeys->Get()[index++];
+            ASSERT_EQ(key.inputName, _tokens->otherAttr);
+            ASSERT_EQ(key.computationName,
+                      ExecBuiltinComputations->computeValue);
+            ASSERT_EQ(key.resultType, TfType::Find<double>());
+            ASSERT_EQ(key.providerResolution.localTraversal,
+                      SdfPath("../.otherAttr"));
+            ASSERT_EQ(key.providerResolution.dynamicTraversal,
+                      ExecProviderResolution::DynamicTraversal::Local);
+            ASSERT_EQ(key.optional, true);
+        }
+
+        {
+            const Exec_InputKey &key = inputKeys->Get()[index++];
+            ASSERT_EQ(key.inputName, _tokens->attributeComputation);
+            ASSERT_EQ(key.computationName, _tokens->attributeComputation);
+            ASSERT_EQ(key.resultType, TfType::Find<double>());
+            ASSERT_EQ(key.providerResolution.localTraversal,
+                      SdfPath("../.otherAttr"));
+            ASSERT_EQ(key.providerResolution.dynamicTraversal,
+                      ExecProviderResolution::DynamicTraversal::Local);
+            ASSERT_EQ(key.optional, true);
+        }
+
+        {
+            const Exec_InputKey &key = inputKeys->Get()[index++];
+            ASSERT_EQ(key.inputName, _tokens->relationshipTargetsInput);
+            ASSERT_EQ(key.computationName, _tokens->primComputation);
+            ASSERT_EQ(key.resultType, TfType::Find<int>());
+            ASSERT_EQ(key.providerResolution.localTraversal,
+                      SdfPath("../.relationshipName"));
+            ASSERT_EQ(key.providerResolution.dynamicTraversal,
+                      ExecProviderResolution::DynamicTraversal::
+                          RelationshipTargetedObjects);
             ASSERT_EQ(key.optional, true);
         }
     }
