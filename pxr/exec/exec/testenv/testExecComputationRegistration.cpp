@@ -528,6 +528,67 @@ TestRegistrationErrors()
     }
 }
 
+// Test cases where we should fail to find a specified computation.
+//
+static void
+TestUndefinedComputations()
+{
+    EsfJournal *const nullJournal = nullptr;
+    const Exec_DefinitionRegistry &reg = Exec_DefinitionRegistry::GetInstance();
+    const EsfStage stage = _NewStageFromLayer(R"usd(#usda 1.0
+        def ConflictingComputationalSchema "Prim"
+        {
+            int attr
+        }
+        )usd");
+
+    const EsfPrim pseudoroot =
+        stage->GetPrimAtPath(SdfPath("/"), nullJournal);
+    const EsfPrim prim = stage->GetPrimAtPath(SdfPath("/Prim"), nullJournal);
+    TF_AXIOM(prim->IsValid(nullJournal));
+    const EsfAttribute attr =
+        stage->GetAttributeAtPath(SdfPath("/Prim.attr"), nullJournal);
+    TF_AXIOM(attr->IsValid(nullJournal));
+
+    const Exec_ComputationDefinition *compDef;
+
+    compDef = reg.GetComputationDefinition(
+        *pseudoroot,
+        TfToken("bogusStageComputation"),
+        EsfSchemaConfigKey(), nullJournal);
+    TF_AXIOM(!compDef);
+
+    compDef = reg.GetComputationDefinition(
+        *pseudoroot,
+        TfToken("__bogusBuiltinStageComputation"),
+        EsfSchemaConfigKey(), nullJournal);
+    TF_AXIOM(!compDef);
+
+    compDef = reg.GetComputationDefinition(
+        *prim,
+        TfToken("bogusPrimComputation"),
+        EsfSchemaConfigKey(), nullJournal);
+    TF_AXIOM(!compDef);
+
+    compDef = reg.GetComputationDefinition(
+        *prim,
+        TfToken("__bogusBuiltinPrimComputation"),
+        EsfSchemaConfigKey(), nullJournal);
+    TF_AXIOM(!compDef);
+
+    compDef = reg.GetComputationDefinition(
+        *attr,
+        TfToken("bogusAttrComputation"),
+        EsfSchemaConfigKey(), nullJournal);
+    TF_AXIOM(!compDef);
+
+    compDef = reg.GetComputationDefinition(
+        *attr,
+        TfToken("__bogusBuiltinAttrComputation"),
+        EsfSchemaConfigKey(), nullJournal);
+    TF_AXIOM(!compDef);
+}
+
 // Test that an unknown applied schema is ignored and we still find computations
 // registered for an applied schema.
 //
@@ -1202,6 +1263,7 @@ int main()
     _SetupTestPlugins();
 
     TestRegistrationErrors();
+    TestUndefinedComputations();
     TestUnknownSchemaType();
     TestStageBuiltinComputationOnPrim();
     TestTypedSchemaComputationRegistration();

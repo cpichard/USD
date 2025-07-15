@@ -329,7 +329,7 @@ Exec_DefinitionRegistry::GetComputationDefinition(
         // Look for a builtin computation.
         const auto builtinIt =
             _builtinAttributeComputationDefinitions.find(computationName);
-        if (builtinIt != _builtinPrimComputationDefinitions.end()) {
+        if (builtinIt != _builtinAttributeComputationDefinitions.end()) {
             return builtinIt->second.get();
         }
 
