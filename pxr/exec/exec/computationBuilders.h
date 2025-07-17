@@ -424,27 +424,7 @@ struct Exec_ComputationBuilderAccessor
     /// \addtogroup group_Exec_ValueSpecifiers
     /// @{
 
-    /// Requests an input value from the computation \p computationName of type
-    /// \p ResultType.
-    ///
-    /// # Example
-    ///
-    /// ```{.cpp}
-    /// EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(MySchemaType)
-    /// {
-    ///     // Register a prim computation that returns the value of another
-    ///     // prim computation.
-    ///     self.PrimComputation(_tokens->myComputation)
-    ///         .Callback<double>(+[](const VdfContext &ctx) {
-    ///             const double *const valuePtr =
-    ///                 ctx.GetInputValuePtr<double>(_tokens->sourceComputation);
-    ///             return valuePtr ? *valuePtr : 0.0;
-    ///         })
-    ///         .Inputs(
-    ///             Computation<double>(_tokens->sourceComputation)
-    /// }
-    /// ```
-    ///
+    /// See [Computation()](#exec_registration::Computation)
     template <typename ResultType>
     ValueSpecifier
     Computation(const TfToken &computationName)
@@ -462,7 +442,7 @@ struct Exec_ComputationBuilderAccessor
     // XXX:TODO
     // - Metadata
 
-    /// @}
+    /// @} // Value specifiers
 };
 
 /// Property accessor
@@ -513,6 +493,9 @@ struct Exec_ComputationBuilderRelationshipAccessor
     /// Relationship forwarding is applied, so if the relationship targets
     /// another relationship, the targets are transitively expanded, resulting
     /// in the ultimately targeted, non-relationship objects.
+    ///
+    /// The default input name is \p computationName; use InputName to specify a
+    /// different input name.
     ///
     /// # Example
     ///
@@ -752,7 +735,30 @@ struct Computation
     /// \addtogroup group_Exec_ValueSpecifiers
     /// @{
 
-    /// See [Computation()](#Exec_ComputationBuilderAccessor::Computation)
+    /// Requests an input value from the computation \p computationName of type
+    /// \p ResultType.
+    ///
+    /// The default input name is \p computationName; use InputName to specify a
+    /// different input name.
+    /// 
+    /// # Example
+    ///
+    /// ```{.cpp}
+    /// EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(MySchemaType)
+    /// {
+    ///     // Register a prim computation that returns the value of another
+    ///     // prim computation.
+    ///     self.PrimComputation(_tokens->myComputation)
+    ///         .Callback<double>(+[](const VdfContext &ctx) {
+    ///             const double *const valuePtr =
+    ///                 ctx.GetInputValuePtr<double>(_tokens->sourceComputation);
+    ///             return valuePtr ? *valuePtr : 0.0;
+    ///         })
+    ///         .Inputs(
+    ///             Computation<double>(_tokens->sourceComputation)
+    /// }
+    /// ```
+    ///
     Computation(const TfToken &computationName)
         : Exec_ComputationBuilderComputationValueSpecifier<
             Exec_ComputationBuilderProviderTypes::Any>(
@@ -783,6 +789,9 @@ struct NamespaceAncestor
     /// On a prim computation, requests an input value from the computation
     /// \p computationName of type \p ResultType on the nearest namespace
     /// ancestor prim.
+    ///
+    /// The default input name is \p computationName; use InputName to specify a
+    /// different input name.
     ///
     /// # Example
     ///
