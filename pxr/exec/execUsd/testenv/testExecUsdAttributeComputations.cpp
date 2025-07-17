@@ -63,7 +63,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
     self.AttributeComputation(
         _tokens->attr,
         _tokens->computeConstant)
-        .Callback(+[](const VdfContext &ctx) -> std::string {
+        .Callback<std::string>(+[](const VdfContext &ctx) {
             return "attribute computation result";
         });
 

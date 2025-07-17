@@ -1119,6 +1119,9 @@ private:
 template <typename Derived>
 class Exec_ComputationBuilderCRTPBase : public Exec_ComputationBuilderBase
 {
+    // Type used as a default template parameter type for metaprogramming.
+    struct _UnspecifiedType {};
+
 protected:
     EXEC_API
     Exec_ComputationBuilderCRTPBase(
@@ -1140,26 +1143,49 @@ public:
     /// This registration must follow a [computation
     /// registration](#group_Exec_ComputationRegistrations).
     ///
+    /// Callback functions must be function pointers where the signature is
+    /// `ReturnType (*)(const VdfContext &)` and \p ReturnType can be any of the
+    /// following:
+    ///
+    /// - The result type of the computation, in which case `ResultType` can be
+    ///   deduced from the callback type.
+    /// - A type that is convertible to the result type of the computaion, in
+    ///   which case \p ResultType must be explicitly specified as a template
+    ///   parameter.
+    /// - `void` in which case \p ResultType must be explicitly specified as a
+    ///   template parameter *and* the callback must call VdfContext::SetOutput
+    ///   to provide the output value.
+    ///
     /// # Example
     ///
     /// ```{.cpp}
     /// EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(MySchemaType)
     /// {
-    ///     // Register a trivial prim computation that returns a constant
-    ///     // value.
-    ///     self.PrimComputation(_tokens->eleven)
-    ///         .Callback<double>(+[](const VdfContext &) { return 11.0; })
+    ///     // Register a prim computation with a callback where the result type
+    ///     // is deduced to be `float`.
+    ///     self.PrimComputation(_tokens->doubleValuedComputation)
+    ///         .Callback(
+    ///             +[](const VdfContext &) { return 11.0f; });
+    ///
+    ///     // Register a prim computation with a callback where the explicit
+    ///     // result type is `std::string`.
+    ///     self.PrimComputation(_tokens->stringValuedComputation)
+    ///         .Callback<std::string>(
+    ///             +[](const VdfContext &) { return "a string value"; });
+    ///
+    ///     // Register a prim computation with a callback that explicitly calls
+    ///     // SetValue.
+    ///     self.PrimComputation(_tokens->stringValuedComputation)
+    ///         .Callback<int>(
+    ///             +[](const VdfContext &) { ctx.SetValue(42); });
     /// }
     /// ```
     ///
-    template <typename ResultType>
+    template<
+        typename ResultType = _UnspecifiedType,
+        typename ReturnType = _UnspecifiedType>
     Derived&
-    Callback(ExecCallbackFn &&callback);
-
-    /// \overload
-    template <typename ResultType>
-    std::enable_if_t<!std::is_void_v<ResultType>, Derived&>
-    Callback(ResultType (*callback)(const VdfContext &));
+    Callback(ReturnType (*callback)(const VdfContext &));
 };
 
 
@@ -1280,35 +1306,49 @@ Exec_ComputationBuilderBase::_ValidateInputs() {
 //
 
 template <typename Derived>
-template <typename ResultType>
+template <typename InputResultType, typename ReturnType>
 Derived&
 Exec_ComputationBuilderCRTPBase<Derived>::Callback(
-    ExecCallbackFn &&callback)
+    ReturnType (*callback)(const VdfContext &))
 {
-    static_assert(!VtIsArray<ResultType>::value,
-                  "VtArray is not a supported result type");
+    // In order to allow the return type of the callback to be different from
+    // the computation result type in some cases AND be able to deduce the
+    // result type from the return type in others, we have to default both
+    // template parameters to _UnspecifiedType and use metaprogramming to get
+    // the actual result type.
+    using ResultType =
+        std::conditional_t<
+            std::is_same_v<InputResultType, _UnspecifiedType>,
+            ReturnType,
+            InputResultType>;
 
-    _AddCallback(
-        std::move(callback),
-        ExecTypeRegistry::GetInstance().CheckForRegistration<ResultType>());
+    static_assert(
+        !std::is_void_v<ResultType> ||
+        std::is_convertible_v<ReturnType, ResultType>,
+        "Callback return type must be convertible to the computation result "
+        "type");
+    static_assert(
+        !std::is_reference_v<ResultType>,
+        "Callback functions must return by value");
+    static_assert(
+        !VtIsArray<ResultType>::value,
+        "VtArray is not a supported result type");
 
-    return *static_cast<Derived*>(this);
-}
+    const TfType resultType =
+        ExecTypeRegistry::GetInstance().CheckForRegistration<ResultType>();
 
-template <typename Derived>
-template <typename ResultType>
-std::enable_if_t<!std::is_void_v<ResultType>, Derived&>
-Exec_ComputationBuilderCRTPBase<Derived>::Callback(
-    ResultType (*callback)(const VdfContext&))
-{
-    static_assert(!std::is_reference_v<ResultType>,
-                  "Callback functions must return by value");
-    static_assert(!VtIsArray<ResultType>::value,
-                  "VtArray is not a supported result type");
-
-    _AddCallback(
-        [callback](const VdfContext& ctx) { ctx.SetOutput(callback(ctx)); },
-        ExecTypeRegistry::GetInstance().CheckForRegistration<ResultType>());
+    // If the return type is void, the callback is on the hook to call
+    // VdfContext::SetOutput; otherwise, we wrap it in a lambda that passes
+    // the callback return value to SetOutput.
+    if constexpr (std::is_void_v<ReturnType>) {
+        _AddCallback(callback, resultType);
+    } else {
+        _AddCallback(
+            [callback](const VdfContext& ctx) {
+                ctx.SetOutput<ResultType>(callback(ctx));
+            },
+            resultType);
+    }
 
     return *static_cast<Derived*>(this);
 }

@@ -47,11 +47,13 @@ TF_DEFINE_PRIVATE_TOKENS(
     (attributeComputedValueComputation)
     (attributeName)
     (baseAndDerivedSchemaComputation)
+    (convertibleReturnTypeComputation)
     (derivedSchemaComputation)
     (dispatchedAttributeComputation)
     (dispatchedPrimComputation)
     (dispatchedPrimComputationOnCustomSchema)
     (emptyComputation)
+    (functionPointerComputation)
     (missingComputation)
     (multiApplySchemaComputation)
     (namespaceAncestorInput)
@@ -62,8 +64,11 @@ TF_DEFINE_PRIVATE_TOKENS(
     (primComputation)
     (relationshipName)
     (relationshipTargetsInput)
+    (returnTypeLambdaComputation)
     (stageAccessComputation)
     (unknownSchemaTypeComputation)
+    (voidFunctionPointerComputation)
+    (voidLambdaComputation)
 );
 
 // Attempt to register a computation for a schema type that is not registered
@@ -94,22 +99,79 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(TestExecConflictingComputationalSchema)
         .Callback<double>(+[](const VdfContext &) { return 1.0; });
 }
 
+static double
+_CallbackFunction(const VdfContext &) {
+    return 1.0;
+}
+
+static void
+_CallbackFunctionVoidReturn(const VdfContext &ctx) {
+    ctx.SetOutput<double>(1.0);
+}
+
 // Register computations for a typed schema.
 EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
     TestExecComputationRegistrationCustomSchema)
 {
+    //
+    // Test different kinds of callback functions.
+    //
+    // Here, we just verify that these compile.
+    //
+
+    /// Callback: a lambda that returns the deduced result type
+    self.PrimComputation(_tokens->returnTypeLambdaComputation)
+        .Callback(+[](const VdfContext &) {
+            return 1.0;
+        });
+
+    // Callback: a lambda that returns void
+    self.PrimComputation(
+        _tokens->voidLambdaComputation)
+        .Callback<double>(+[](const VdfContext &ctx) {
+            ctx.SetOutput(1.0);
+        });
+
+    // Callback: a pointer to a function where the return type is the deduced
+    // computation result type
+    self.PrimComputation(
+        _tokens->functionPointerComputation)
+        .Callback(_CallbackFunction);
+
+    // Callback: a pointer to a function that returns void
+    self.PrimComputation(
+        _tokens->voidFunctionPointerComputation)
+        .Callback<double>(_CallbackFunctionVoidReturn);
+
+    // Callback: a lambda that returns a type that is convertible to the
+    // computation result type
+    self.PrimComputation(
+        _tokens->convertibleReturnTypeComputation)
+        .Callback<std::string>(+[](const VdfContext &ctx) {
+            return "string result value";
+        });
+
+    //
+    // Error cases
+    //
+
+    // A computation registration that has no callback.
     self.PrimComputation(_tokens->emptyComputation);
 
     // Attempt to register a prim computation that uses a builtin computation
     // name.
     self.PrimComputation(ExecBuiltinComputations->computeTime);
 
+    //
+    // Test different kinds of computation inputs.
+    //
+
     self.PrimComputation(_tokens->noInputsComputation)
         .Callback(+[](const VdfContext &) { return 1.0; });
 
     // A prim computation that exercises various kinds of inputs.
     self.PrimComputation(_tokens->primComputation)
-        .Callback<double>([](const VdfContext &ctx) { ctx.SetOutput(11.0); })
+        .Callback<double>(+[](const VdfContext &ctx) { ctx.SetOutput(11.0); })
         .Inputs(
             // Take input from another computation provided by the prim.
             Computation<double>(_tokens->otherComputation),
@@ -140,7 +202,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
     self.AttributeComputation(
         _tokens->attr,
         _tokens->attributeComputation)
-        .Callback<double>([](const VdfContext &ctx) { ctx.SetOutput(11.0); })
+        .Callback<double>(+[](const VdfContext &ctx) { ctx.SetOutput(11.0); })
         .Inputs(
             // Take input from another computation provided by the attribute.
             Computation<double>(ExecBuiltinComputations->computeValue),
@@ -165,7 +227,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
 
     // A prim computation that returns the current time.
     self.PrimComputation(_tokens->stageAccessComputation)
-        .Callback<EfTime>([](const VdfContext &ctx) {
+        .Callback<EfTime>(+[](const VdfContext &ctx) {
             ctx.SetOutput(EfTime());
         })
         .Inputs(
@@ -180,7 +242,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
     // type double), or 0.0, if there is no attribute of that name on the
     // owning prim.
     self.PrimComputation(_tokens->attributeComputedValueComputation)
-        .Callback<double>([](const VdfContext &ctx) {
+        .Callback<double>(+[](const VdfContext &ctx) {
             const double *const valuePtr =
                 ctx.GetInputValuePtr<double>(
                     ExecBuiltinComputations->computeValue);
@@ -194,6 +256,10 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
     // A computation that is registered on both the base and derived schemas.
     self.PrimComputation(_tokens->baseAndDerivedSchemaComputation)
         .Callback(+[](const VdfContext &) { return 1.0; });
+
+    //
+    // Test dispatched computations
+    //
 
     // A dispatched prim computation.
     self.DispatchedPrimComputation(_tokens->dispatchedPrimComputation)
@@ -238,7 +304,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
     // A computation that is registered for the applied schema and also for a
     // typed schema.
     self.PrimComputation(_tokens->primComputation)
-        .Callback<double>([](const VdfContext &ctx) { ctx.SetOutput(42.0); });
+        .Callback<double>(+[](const VdfContext &ctx) { ctx.SetOutput(42.0); });
 }
 
 // Register computations for a multi-apply schema.

@@ -85,6 +85,29 @@ pxr_register_test(testExecUsdAttributeComputations
     TESTENV testExecUsdAttributeComputations
 )
 
+pxr_build_test(testExecUsdComputations
+    LIBRARIES
+        tf
+        esf
+        exec
+        execUsd
+        vdf
+        usdGeom
+    CPPFILES
+        testenv/testExecUsdComputations.cpp
+)
+
+pxr_install_test_dir(
+    SRC testenv/testExecUsdComputations
+    DEST testExecUsdComputations
+)
+
+pxr_register_test(testExecUsdComputations
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdComputations"
+    EXPECTED_RETURN_CODE 0
+    TESTENV testExecUsdComputations
+)
+
 pxr_build_test(testExecUsdDispatchedComputations
     LIBRARIES
         tf
