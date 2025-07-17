@@ -1573,17 +1573,13 @@ MATERIALX = Dependency("MaterialX", InstallMaterialX, "include/MaterialXCore/Lib
 
 ############################################################
 # Embree
-# For MacOS we use version 3.13.3 to include a fix from Intel
-# to build on Apple Silicon.
-if MacOS():
-    EMBREE_URL = "https://github.com/embree/embree/archive/v3.13.3.zip"
-else:
-    EMBREE_URL = "https://github.com/embree/embree/archive/v3.2.2.zip"
 
 def InstallEmbree(context, force, buildArgs):
+    EMBREE_URL = "https://github.com/RenderKit/embree/archive/refs/tags/v4.3.3.zip"
+
     with CurrentWorkingDirectory(DownloadURL(EMBREE_URL, context, force)):
         extraArgs = [
-            '-DTBB_ROOT={instDir}'.format(instDir=context.instDir),
+            '-DTBB_ROOT="{instDir}"'.format(instDir=context.instDir),
             '-DEMBREE_TUTORIALS=OFF',
             '-DEMBREE_ISPC_SUPPORT=OFF'
         ]
@@ -1621,7 +1617,8 @@ def InstallEmbree(context, force, buildArgs):
 
         RunCMake(context, force, extraArgs)
 
-EMBREE = Dependency("Embree", InstallEmbree, "include/embree3/rtcore.h")
+EMBREE = Dependency("Embree", InstallEmbree,
+                    "include/embree4/rtcore.h")
 
 ############################################################
 # AnimX
