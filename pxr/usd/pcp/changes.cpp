@@ -1593,7 +1593,6 @@ PcpChanges::_DidMuteLayer(
     PcpCacheChanges& cacheChanges = _GetCacheChanges(cache);
     if (mutedLayer) {
         _lifeboat.Retain(mutedLayer);
-        cacheChanges.didMuteOrUnmuteNonEmptyLayer |= !mutedLayer->IsEmpty();
 
         // Track sublayers that have been muted separately. These
         // layers should no longer contribute opinions to the composed
@@ -1660,7 +1659,6 @@ PcpChanges::_DidUnmuteLayer(
     PcpCacheChanges& cacheChanges = _GetCacheChanges(cache);
     if (unmutedLayer) {
         _lifeboat.Retain(unmutedLayer);
-        cacheChanges.didMuteOrUnmuteNonEmptyLayer |= !unmutedLayer->IsEmpty();
     }
 
     PCP_APPEND_DEBUG("  Did unmute layer @%s@\n", layerId.c_str());
@@ -2380,7 +2378,6 @@ PcpChanges::_DidAddOrRemoveSublayer(
         {
             if (sublayer) {
                 _lifeboat.Retain(sublayer);
-                cacheChanges.didAddOrRemoveNonEmptySublayer |= !sublayer->IsEmpty();
 
                 // Track sublayers that have been removed separately. These
                 // layers should no longer contribute opinions to the composed
