@@ -283,6 +283,14 @@ Pcp_EntryRequiresPrimIndexChange(const SdfChangeList::Entry& entry)
             p.first == SdfFieldKeys->VariantSelection ||
             p.first == SdfFieldKeys->Instanceable) {
             return true;
+        } else if (p.first == SdfFieldKeys->Clips) {
+            // Recompute prim indexes when clips are added or removed;
+            // Pcp cares only about clips' presence, not contents.
+            const VtValue& oldValue = p.second.first;
+            const VtValue& newValue = p.second.second;
+            if (oldValue.IsEmpty() || newValue.IsEmpty()) {
+                return true;
+            }
         }
     }
 
