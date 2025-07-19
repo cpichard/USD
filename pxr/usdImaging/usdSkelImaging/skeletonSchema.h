@@ -44,9 +44,9 @@ TF_DECLARE_PUBLIC_TOKENS(UsdSkelImagingSkeletonSchemaTokens, USDSKELIMAGING_API,
 
 //-----------------------------------------------------------------------------
 
-// Corresponds to UsdSkelSkeleton.
-//
 
+/// Corresponds to UsdSkelSkeleton.
+///
 class UsdSkelImagingSkeletonSchema : public HdSchema
 {
 public:

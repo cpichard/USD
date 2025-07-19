@@ -44,10 +44,10 @@ TF_DECLARE_PUBLIC_TOKENS(UsdSkelImagingResolvedSkeletonSchemaTokens, USDSKELIMAG
 
 //-----------------------------------------------------------------------------
 
-// Resolved data for a skeleton and the targeted skelAnim. Populated by the
-// skeleton resolving scene index.
-//
 
+/// Resolved data for a skeleton and the targeted skelAnim. Populated by the
+/// skeleton resolving scene index.
+///
 class UsdSkelImagingResolvedSkeletonSchema : public HdSchema
 {
 public:

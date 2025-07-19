@@ -41,13 +41,13 @@ TF_DECLARE_PUBLIC_TOKENS(HdMaterialConnectionSchemaTokens, HD_API,
 
 //-----------------------------------------------------------------------------
 
-// The MaterialConnection schema defines an upstream connected node and
-// output.
-//
-// See MaterialNode schema's documentation on its 'inputConnections' member
-// for an example.
-//
 
+/// The MaterialConnection schema defines an upstream connected node and
+/// output.
+///
+/// See MaterialNode schema's documentation on its 'inputConnections' member
+/// for an example.
+///
 class HdMaterialConnectionSchema : public HdSchema
 {
 public:

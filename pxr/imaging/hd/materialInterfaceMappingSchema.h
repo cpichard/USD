@@ -41,13 +41,13 @@ TF_DECLARE_PUBLIC_TOKENS(HdMaterialInterfaceMappingSchemaTokens, HD_API,
 
 //-----------------------------------------------------------------------------
 
-// The MaterialInterfaceMapping schema identifies a material node parameter
-// using its two members 'nodePath' and 'inputName'.
-//
-// See MaterialNetwork schema's documentation on its 'interfaceMappings'
-// member for an example.
-//
 
+/// The MaterialInterfaceMapping schema identifies a material node parameter
+/// using its two members 'nodePath' and 'inputName'.
+///
+/// See MaterialNetwork schema's documentation on its 'interfaceMappings'
+/// member for an example.
+///
 class HdMaterialInterfaceMappingSchema : public HdSchema
 {
 public:

@@ -41,10 +41,10 @@ TF_DECLARE_PUBLIC_TOKENS(HdCollectionsSchemaTokens, HD_API,
 
 //-----------------------------------------------------------------------------
 
-// The HdCollectionsSchema specifies a wrapper container for collection
-// entries with the key being the collection name.
-//
 
+/// The HdCollectionsSchema specifies a wrapper container for collection
+/// entries with the key being the collection name.
+///
 class HdCollectionsSchema : public HdSchema
 {
 public:

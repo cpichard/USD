@@ -43,10 +43,10 @@ TF_DECLARE_PUBLIC_TOKENS(HdarSystemSchemaTokens, HDAR_API,
 
 //-----------------------------------------------------------------------------
 
-// The HdarSystemSchema specifies a container that will hold "system" data
-// that is relevant to asset resolution.
-//
 
+/// The HdarSystemSchema specifies a container that will hold "system" data
+/// that is relevant to asset resolution.
+///
 class HdarSystemSchema : public HdSchema
 {
 public:
