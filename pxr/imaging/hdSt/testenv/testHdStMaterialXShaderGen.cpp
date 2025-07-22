@@ -8,6 +8,7 @@
 #include "pxr/imaging/hdSt/materialXShaderGen.h"
 #include "pxr/imaging/hdSt/tokens.h"
 #include "pxr/imaging/hdMtlx/hdMtlx.h"
+#include "pxr/imaging/hdMtlx/tokens.h"
 #include "pxr/imaging/hgi/tokens.h"
 
 #include "pxr/base/tf/diagnostic.h"
@@ -65,40 +66,22 @@ _GetUsdPreviewSurfaceMaterialTag(mx::NodePtr const &terminalNode)
 static TfToken
 _GetMaterialTag(mx::DocumentPtr const& mxDoc)
 {
-    // Find renderable elements in the Mtlx Document.
-    // Note this code also lives in HdSt_GenMaterialXShader()
-    std::vector<mx::TypedElementPtr> renderableElements;
-    mx::findRenderableElements(mxDoc, renderableElements);
-
-    // Should have exactly one renderable element (material).
-    if (renderableElements.size() != 1) {
-        TF_CODING_ERROR("Generated MaterialX Document does not "
-                        "have 1 material");
+    // Find shader element in the mtlx document.
+    const mx::NodePtr shaderNode =
+        mxDoc->getNode(HdMtlxTokens->surfaceshaderName);
+    if (!shaderNode) {
         return HdStMaterialTagTokens->defaultMaterialTag;
-    }
-
-    // Extract out the Surface Shader Node for the Material Node
-    mx::TypedElementPtr renderableElem = renderableElements.at(0);
-    mx::NodePtr node = renderableElem->asA<mx::Node>();
-    if (node && node->getType() == mx::MATERIAL_TYPE_STRING) {
-        // Use auto so can compile against MaterialX 1.38.0 or 1.38.1
-        auto mxShaderNodes =
-            mx::getShaderNodes(node, mx::SURFACE_SHADER_TYPE_STRING);
-        if (!mxShaderNodes.empty()) {
-            renderableElem = *mxShaderNodes.begin();
-        }
     }
 
     // The custom code to handle masked mode prevents MaterialX from 
     // correctly deducing transparency with mx::isTransparentSurface()
-    node = renderableElem->asA<mx::Node>();
-    if (node && node->getCategory() == "UsdPreviewSurface") {
-        return _GetUsdPreviewSurfaceMaterialTag(node);
+    if (shaderNode->getCategory() == "UsdPreviewSurface") {
+        return _GetUsdPreviewSurfaceMaterialTag(shaderNode);
     }
 
     // XXX: Once other material tests are added (eg. glTf) similar helper 
     // helper functions will need to be added to get the correct MaterialTag
-    if (mx::isTransparentSurface(renderableElem)) {
+    if (mx::isTransparentSurface(shaderNode)) {
         return HdStMaterialTagTokens->translucent;
     }
     return HdStMaterialTagTokens->defaultMaterialTag;
@@ -114,7 +97,8 @@ void TestShaderGen(
 
     // Read the mtlx file
     mx::DocumentPtr mxDoc = mx::createDocument();
-    fprintf(stderr, "reading the mtlx file: \n - %s\n", mtlxFilename.asString().c_str());
+    fprintf(stderr, "reading the mtlx file: \n - %s\n", 
+            mtlxFilename.asString().c_str());
 
     try {
         mx::readFromXmlFile(mxDoc, mtlxFilename, searchPaths);

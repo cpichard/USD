@@ -6,6 +6,7 @@
 //
 #include "pxr/imaging/hdMtlx/hdMtlx.h"
 #include "pxr/imaging/hdMtlx/debugCodes.h"
+#include "pxr/imaging/hdMtlx/tokens.h"
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/materialNetwork2Interface.h"
 
@@ -708,7 +709,8 @@ HdMtlxCreateMtlxDocumentFromHdMaterialNetworkInterface(
     const std::string mxTerminalType = 
         (terminalNodeDef) ? _GetMxNodeString(terminalNodeDef) : "";
     mx::NodePtr mxShaderNode = mxDoc->addNode(
-        mxTerminalType, "Surface", mx::SURFACE_SHADER_TYPE_STRING);
+        mxTerminalType,
+        HdMtlxTokens->surfaceshaderName, mx::SURFACE_SHADER_TYPE_STRING);
 
     const std::string &materialName =
         netInterface->GetMaterialPrimPath().GetName();
