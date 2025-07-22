@@ -219,6 +219,16 @@ HdxOitResolveTask::_GetAovBindings(
     return ctxRenderPassState->GetAovBindings();
 }
 
+static
+bool
+_HasColorAov(HdRenderPassAovBindingVector const& aovBindings)
+{
+    return std::find_if(aovBindings.begin(), aovBindings.end(),
+        [](HdRenderPassAovBinding const& binding){
+            return binding.aovName == HdAovTokens->color; })
+                != aovBindings.end();
+}
+
 GfVec2i
 HdxOitResolveTask::_ComputeScreenSize(
     HdTaskContext* ctx,
@@ -365,6 +375,12 @@ HdxOitResolveTask::Prepare(HdTaskContext* ctx,
     // iteration.
     ctx->erase(HdxTokens->oitClearedFlag);
 
+    // If there are aovs, but none of them are color, skip this task.
+    const HdRenderPassAovBindingVector aovBindings = _GetAovBindings(ctx);
+    if (!aovBindings.empty() && !_HasColorAov(aovBindings)) {
+        return;
+    }
+
     if (!_renderPass) {
         HdRprimCollection collection;
         HdRenderDelegate* renderDelegate = renderIndex->GetRenderDelegate();
@@ -402,10 +418,16 @@ HdxOitResolveTask::Execute(HdTaskContext* ctx)
     // OIT render and resolve tasks.
     ctx->erase(HdxTokens->oitClearedFlag);
 
+    // If there are aovs, but none of them are color, skip this task.
+    HdRenderPassAovBindingVector const& aovBindings = _GetAovBindings(ctx);
+    if (!aovBindings.empty() && !_HasColorAov(aovBindings)) {
+        return;
+    }
+
     if (!TF_VERIFY(_renderPassState)) return;
     if (!TF_VERIFY(_renderPassShader)) return;
 
-    _renderPassState->SetAovBindings(_GetAovBindings(ctx));
+    _renderPassState->SetAovBindings(aovBindings);
     _UpdateCameraFraming(ctx);
 
     HdxOitBufferAccessor oitBufferAccessor(ctx);
