@@ -1466,7 +1466,7 @@ HdxTaskControllerSceneIndex::SetRenderOutputs(
     if (_aovNames == aovNames) {
         return;
     }
-    _aovNames = _aovNames;
+    _aovNames = aovNames;
 
     _SetRenderOutputs(_ResolvedRenderOutputs(aovNames, _IsForStorm()));
 
