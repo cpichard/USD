@@ -1,6 +1,6 @@
 # Change Log
 
-## [25.08] - 2025-07-28
+## [25.08] - 2025-07-29
 
 This release includes the preview release of OpenExec. See more details in the
 OpenExec section below.
@@ -47,12 +47,15 @@ OpenExec section below.
   other libraries.
 
 - Disable TF_DECLARE_PUBLIC_TOKENS macro expansion to avoid Intellisense hangs. 
-  (PR: [#3732](https://github.com/PixarAnimationStudios/OpenUSD/pull/3732)
+  (PR: [#3732](https://github.com/PixarAnimationStudios/OpenUSD/pull/3732))
 
 - `Tf.ScopeDescription` can now be used as a decorator in Python, making
   it easier to annotate functions or methods.
 
 - Fixed matrix multiplication order issue with color transforms in GfColor.
+
+- Fixed colorspace accuracy issues in GfColorSpace.
+  (Issue: [#3697](https://github.com/PixarAnimationStudios/OpenUSD/issues/3697))
 
 - Various TsSpline updates.
   - Knots now have tangent algorithms for the knot's pre and post tangents. 
