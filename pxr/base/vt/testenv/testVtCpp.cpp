@@ -1453,6 +1453,7 @@ static void testValue() {
         v = b;
         TF_AXIOM(v.Get<VtVec2iArray>().size() == 3);
         TF_AXIOM(v.IsArrayValued());
+        TF_AXIOM(!v.IsArrayEditValued());
         TF_AXIOM(v.GetElementTypeid() == typeid(GfVec2i));
         TF_AXIOM(vclone.Get<VtVec2iArray>().size() == 2);
     }
@@ -1463,6 +1464,7 @@ static void testValue() {
         VtValue v { dae };
         TF_AXIOM(v.IsHolding<VtDoubleArrayEdit>());
         TF_AXIOM(!v.IsArrayValued());
+        TF_AXIOM(v.IsArrayEditValued());
         TF_AXIOM(v.GetElementTypeid() == typeid(double));
     }
 
@@ -1689,6 +1691,7 @@ testTypedVtValueProxy()
     TF_AXIOM(varrayProxy.IsHolding<_TypedProxy<VtFloatArray>>());
     
     TF_AXIOM(varrayProxy.IsArrayValued());
+    TF_AXIOM(!varrayProxy.IsArrayEditValued());
     TF_AXIOM(varrayProxy.GetArraySize() == 7);
     TF_AXIOM(varrayProxy.GetElementTypeid() == typeid(float));
     TF_AXIOM(varrayProxy.Get<VtFloatArray>() == fa);
