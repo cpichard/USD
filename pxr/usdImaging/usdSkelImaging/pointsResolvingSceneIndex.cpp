@@ -182,6 +182,14 @@ _ProcessPrimsNeedingRefreshAndSendNotices(
             if (!hasAddedEntry && (removed || added)) {
                 dirtiedEntries->push_back(
                     { primPath, HdDataSourceLocatorSet::UniversalSet() });
+                if (hasExtComputations) {
+                    for (const TfToken &name :
+                            UsdSkelImagingExtComputationNameTokens->allTokens) {
+                        dirtiedEntries->push_back(
+                            { primPath.AppendChild(name),
+                              HdDataSourceLocatorSet::UniversalSet() });
+                    }
+                }
             }
         }
         if (removedEntries) {
