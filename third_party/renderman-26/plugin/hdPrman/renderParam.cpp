@@ -3330,6 +3330,7 @@ HdPrman_RenderParam::StartRender()
 void
 HdPrman_RenderParam::End()
 {
+    StopRender(true);
     DeleteRenderThread();
     _framebuffer.reset();
     _DestroyRiley();
