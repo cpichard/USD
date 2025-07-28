@@ -234,6 +234,11 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
+    SRC testenv/testUsdviewInstancingEdits
+    DEST testUsdviewInstancingEdits_SceneIndex
+)
+
+pxr_install_test_dir(
     SRC testenv/testUsdviewAnimatedBounds
     DEST testUsdviewAnimatedBounds
 )
@@ -609,6 +614,30 @@ pxr_register_test(testUsdviewInstancingEdits
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewInstancingEdits.py test.usda"
     EXPECTED_RETURN_CODE 0
+    IMAGE_DIFF_COMPARE
+        instanceWithParent
+        instanceWithParentDeactivated
+    FAIL 0.02
+    FAIL_PERCENT 0.01
+    WARN 0.01
+    WARN_PERCENT 0.02
+    ENV
+        USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=false
+)
+
+pxr_register_test(testUsdviewInstancingEdits_SceneIndex
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewInstancingEdits.py test.usda"
+    EXPECTED_RETURN_CODE 0
+    IMAGE_DIFF_COMPARE
+        instanceWithParent
+        instanceWithParentDeactivated
+    FAIL 0.02
+    FAIL_PERCENT 0.01
+    WARN 0.01
+    WARN_PERCENT 0.02
+    ENV
+        USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true
 )
 
 pxr_register_test(testUsdviewPrimTreeExpansion
