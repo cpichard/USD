@@ -3523,7 +3523,7 @@ the same time-remapping that TimeSample coordinates do. Such timeCode-valued
 attributes can serve as "timing curves" that maintain their accuracy through 
 composed layer offsets.
 
-.. _usdglossary-timecodes-scaled
+.. _usdglossary-timecodes-scaled:
 
 TimeCodes Scaled to Real Time
 *****************************
