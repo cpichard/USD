@@ -11,11 +11,82 @@
 #include "pxr/base/trace/trace.h"
 #include "pxr/base/work/utils.h"
 
+#include <optional>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace HdFlatteningSceneIndex_Impl
 {
 
+/// A cache for HdContainerDataSourceHandle that has suitable semantics
+/// for flattened data sources which are stateful and can be invalidated
+/// rather than dropped.
+///
+/// In particular, the scene index should return the same instance of the
+/// flattened data source when queried for the same prim and locator multiple
+/// times. If we were to return different instances for different queries, we would need
+/// to invalidate all of those instances since a client can potentially hold on
+/// to any of them.
+///    
+class _ContainerDataSourceCache
+{
+public:
+    _ContainerDataSourceCache() { };
+    
+    _ContainerDataSourceCache(HdContainerDataSourceHandle const &ds)
+     : _ds(_ToNonNull(ds))
+    {
+    }
+
+    /// Returns cached result or nullopt if not cached.
+    std::optional<HdContainerDataSourceHandle> Get()
+    {
+        if (auto const ds = HdDataSourceBase::AtomicLoad(_ds)) {
+            return HdContainerDataSource::Cast(ds);
+        } else {
+            return {};
+        }
+    }
+
+    /// If called concurrently, only one call will set the cache and the data
+    /// source passed to all other calls will be ignored. All calls to Cache
+    /// return the same result (if Invalidate was not called inbetween).
+    ///
+    HdContainerDataSourceHandle Cache(HdContainerDataSourceHandle const &ds)
+    {
+        HdDataSourceBaseHandle const newDs = _ToNonNull(ds);
+        
+        HdDataSourceBaseAtomicHandle existingDs;
+        if (HdDataSourceBase::AtomicCompareExchange(_ds, existingDs, newDs)) {
+            return HdContainerDataSource::Cast(newDs);
+        } else {
+            return HdContainerDataSource::Cast(existingDs);
+        }
+    }
+
+    void Invalidate()
+    {
+        HdDataSourceBase::AtomicStore(_ds, nullptr);
+    }
+    
+private:
+    /// Turn null ptr to non-container data source handle to distinguish
+    /// between the case where we have not cached the container data source yet
+    /// and the case where we have cached it but it is null.
+    static
+    HdDataSourceBaseHandle _ToNonNull(
+        HdContainerDataSourceHandle const &ds)
+    {
+        if (ds) {
+            return ds;
+        } else {
+            return HdRetainedTypedSampledDataSource<bool>::New(false);
+        }
+    }
+    
+    HdDataSourceBaseAtomicHandle _ds;    
+};
+    
 /// wraps the input scene's prim-level data sources in order to deliver
 /// overriden value
 class _PrimLevelWrappingDataSource : public HdContainerDataSource
@@ -66,7 +137,7 @@ private:
     const HdSceneIndexPrim _inputPrim;
 
     // Parallel to HdFlatteningSceneIndex::GetFlattenedDataSourceNames()
-    TfSmallVector<HdDataSourceBaseAtomicHandle, _smallVectorSize>
+    TfSmallVector<_ContainerDataSourceCache, _smallVectorSize>
                                 _computedDataSources;
 };
     
@@ -83,9 +154,8 @@ _PrimLevelWrappingDataSource::PrimDirtied(
             continue;
         }
 
-        HdDataSourceBaseAtomicHandle &dsAtomicHandle = _computedDataSources[i];
-        HdDataSourceBaseHandle const ds =
-            HdDataSourceBase::AtomicLoad(dsAtomicHandle);
+        _ContainerDataSourceCache &dsCache = _computedDataSources[i];
+        const std::optional<HdContainerDataSourceHandle> ds = dsCache.Get();
         if (!ds) {
             continue;
         }
@@ -93,14 +163,14 @@ _PrimLevelWrappingDataSource::PrimDirtied(
                 HdDataSourceLocator::EmptyLocator())) {
             if (HdInvalidatableContainerDataSourceHandle const
                     invalidatableDs =
-                        HdInvalidatableContainerDataSource::Cast(ds)) {
+                        HdInvalidatableContainerDataSource::Cast(*ds)) {
                 anyDirtied |=
                     invalidatableDs->Invalidate(relativeDirtyLocators[i]);
                 continue;
             }
         }
 
-        HdDataSourceBase::AtomicStore(dsAtomicHandle, nullptr);
+        dsCache.Invalidate();
         anyDirtied = true;
     }
 
@@ -167,39 +237,17 @@ _PrimLevelWrappingDataSource::Get(
             continue;
         }
 
-        HdDataSourceBaseAtomicHandle &dsAtomicHandle =
-            _computedDataSources[i];
-        if (HdDataSourceBaseHandle const computedDs =
-                HdDataSourceBase::AtomicLoad(dsAtomicHandle)) {
-            return HdContainerDataSource::Cast(computedDs);
+        _ContainerDataSourceCache &dsCache = _computedDataSources[i];
+        if (const std::optional<HdContainerDataSourceHandle> ds =
+                                        dsCache.Get()) {
+            return *ds;
         }
         const HdFlattenedDataSourceProvider::Context ctx(
             _flatteningSceneIndex,
             _primPath,
             name,
             _inputPrim);
-        HdDataSourceBaseHandle flattenedDs = 
-            providers[i]->GetFlattenedDataSource(ctx);
-        if (!flattenedDs) {
-            // A nullptr means cache miss. To distinguish a cache miss from
-            // the flattened data source being null, we store a bool
-            // data source.
-            flattenedDs = HdRetainedTypedSampledDataSource<bool>::New(false);
-        }
-
-        HdDataSourceBaseAtomicHandle existingDs;
-        // Make sure that we only set the flattened data source only once.
-        // Flattened data source can cache state and need to be invalidated.
-        //
-        // It would be bad if we return different flattened data sources
-        // on different calls and only invalidate the last one that was
-        // returned.
-        if (HdDataSourceBase::AtomicCompareExchange(
-                dsAtomicHandle, existingDs, flattenedDs)) {
-            return HdContainerDataSource::Cast(flattenedDs);
-        } else {
-            return HdContainerDataSource::Cast(existingDs);
-        }
+        return dsCache.Cache(providers[i]->GetFlattenedDataSource(ctx));
     }
 
     if (_inputPrim.dataSource) {
