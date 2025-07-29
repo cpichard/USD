@@ -65,6 +65,7 @@ pxr_library(exec
         outputKey
         outputProvidingCompilationTask
         pluginComputationDefinition
+        pluginData
         program
         registrationBarrier
         requestTracker
