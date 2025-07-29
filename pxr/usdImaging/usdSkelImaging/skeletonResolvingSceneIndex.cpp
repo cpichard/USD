@@ -130,21 +130,35 @@ UsdSkelImagingSkeletonResolvingSceneIndex::_PrimsAdded(
     HdSceneIndexObserver::DirtiedPrimEntries newDirtiedEntries;
 
     const bool hasSkelAnimDependencies = !_skelAnimPathToSkeletonPaths.empty();
+    const bool hasInstancerDependencies = !_instancerPathToSkeletonPaths.empty();
     
-    if (hasSkelAnimDependencies) {
+    if (hasSkelAnimDependencies || hasInstancerDependencies) {
         TRACE_SCOPE("Second loop over prim added entries");
 
         SdfPathSet skelPathsNeedingRefresh;
         
         for (const HdSceneIndexObserver::AddedPrimEntry &entry : entries) {
-            // Schedule resync for each skeleton whose animation
-            // relationship points to prim added here.
-            for (const SdfPath &primPath :
-                     _Lookup(_skelAnimPathToSkeletonPaths, entry.primPath)) {
-                if (skelsJustAdded.count(primPath)) {
-                    continue;
+            if (hasSkelAnimDependencies) {
+                // Schedule resync for each skeleton whose animation
+                // relationship points to prim added here.
+                for (const SdfPath &primPath :
+                         _Lookup(_skelAnimPathToSkeletonPaths, entry.primPath)) {
+                    if (skelsJustAdded.count(primPath)) {
+                        continue;
+                    }
+                    skelPathsNeedingRefresh.insert(primPath);
                 }
-                skelPathsNeedingRefresh.insert(primPath);
+            }
+            if (hasInstancerDependencies) {
+                // Schedule resync for each skeleton that is affected by an
+                // instancer that gets added/resync'ed here.
+                for (const SdfPath &primPath :
+                         _Lookup(_instancerPathToSkeletonPaths, entry.primPath)) {
+                    if (skelsJustAdded.count(primPath)) {
+                        continue;
+                    }
+                    skelPathsNeedingRefresh.insert(primPath);
+                }
             }
         }
         for (const SdfPath &skelPath : skelPathsNeedingRefresh) {
@@ -223,6 +237,7 @@ UsdSkelImagingSkeletonResolvingSceneIndex::_PrimsDirtied(
         TRACE_SCOPE("Looping over dirtied entries");
 
         const bool hasAnimDependencies = !_skelAnimPathToSkeletonPaths.empty();
+        const bool hasInstancerDependencies = !_instancerPathToSkeletonPaths.empty();
         
         for (const HdSceneIndexObserver::DirtiedPrimEntry &entry : entries) {
             if (entry.dirtyLocators.Intersects(
@@ -243,6 +258,24 @@ UsdSkelImagingSkeletonResolvingSceneIndex::_PrimsDirtied(
                     _ProcessDirtyLocators(
                         skelPath,
                         UsdSkelImagingPrimTypeTokens->skelAnimation,
+                        entry.dirtyLocators,
+                        newDirtiedEntriesPtr);
+                }
+            }
+
+            static const HdDataSourceLocatorSet instancerLocators{
+                UsdSkelImagingDataSourceXformResolver::GetInstancedByLocator(),
+                UsdSkelImagingDataSourceXformResolver::GetXformLocator(),
+                UsdSkelImagingDataSourceXformResolver::GetInstanceXformLocator()};
+            
+            if (hasInstancerDependencies &&
+                    entry.dirtyLocators.Intersects(instancerLocators)) {
+                for (const SdfPath &skelPath :
+                         _Lookup(
+                             _instancerPathToSkeletonPaths, entry.primPath)) {
+                    _ProcessDirtyLocators(
+                        skelPath,
+                        HdPrimTypeTokens->instancer,
                         entry.dirtyLocators,
                         newDirtiedEntriesPtr);
                 }
@@ -314,8 +347,9 @@ UsdSkelImagingSkeletonResolvingSceneIndex::_PrimsRemoved(
     HdSceneIndexObserver::DirtiedPrimEntries newDirtiedEntries;
 
     const bool hasSkelAnimationDependencies = !_skelAnimPathToSkeletonPaths.empty();
+    const bool hasInstancerDependencies = !_instancerPathToSkeletonPaths.empty();
 
-    if (hasSkelAnimationDependencies) {
+    if (hasSkelAnimationDependencies || hasInstancerDependencies) {
         TRACE_SCOPE("Second loop over prim removed entries");
 
         SdfPathSet skelPathsNeedingRefresh;
@@ -326,9 +360,16 @@ UsdSkelImagingSkeletonResolvingSceneIndex::_PrimsRemoved(
         // that was just removed.
         //
         for (const HdSceneIndexObserver::RemovedPrimEntry &entry : entries) {
-            _PopulateFromDependencies(
-                _skelAnimPathToSkeletonPaths, entry.primPath,
-                &skelPathsNeedingRefresh);
+            if (hasSkelAnimationDependencies) {
+                _PopulateFromDependencies(
+                    _skelAnimPathToSkeletonPaths, entry.primPath,
+                    &skelPathsNeedingRefresh);
+            }
+            if (hasInstancerDependencies) {
+                _PopulateFromDependencies(
+                    _instancerPathToSkeletonPaths, entry.primPath,
+                    &skelPathsNeedingRefresh);
+            }
         }
 
         for (const SdfPath &skelPath : skelPathsNeedingRefresh) {
@@ -388,6 +429,10 @@ UsdSkelImagingSkeletonResolvingSceneIndex::_AddDependenciesForResolvedSkeleton(
         // animationSource or the prim is not a skelAnimation.
         _skelAnimPathToSkeletonPaths[animationSource].insert(skeletonPath);
     }
+
+    for (const SdfPath &instancerPath : resolvedSkeleton->GetInstancerPaths()) {
+        _instancerPathToSkeletonPaths[instancerPath].insert(skeletonPath);
+    }
 }
 
 bool
@@ -435,6 +480,10 @@ _RemoveDependenciesForResolvedSkeleton(
     const SdfPath animationSource = resolvedSkeleton->GetAnimationSource();
     if (!animationSource.IsEmpty()) {
         _Remove(animationSource, skeletonPath, &_skelAnimPathToSkeletonPaths);
+    }
+
+    for (const SdfPath &instancerPath : resolvedSkeleton->GetInstancerPaths()) {
+        _Remove(instancerPath, skeletonPath, &_instancerPathToSkeletonPaths);
     }
 }
 

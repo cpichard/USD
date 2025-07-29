@@ -102,7 +102,7 @@ UsdSkelImagingInvokeExtComputation(
                 ->hasConstantInfluences);
     const VtValue primWorldToLocalValue =
         ctx->GetInputValue(
-            UsdSkelImagingExtComputationInputNameTokens
+            UsdSkelImagingExtComputationLegacyInputNameTokens
                 ->primWorldToLocal);
     const VtValue blendShapeOffsetsValue =
         ctx->GetInputValue(
@@ -122,7 +122,7 @@ UsdSkelImagingInvokeExtComputation(
                 ->skinningXforms);
     const VtValue skelLocalToWorldValue =
         ctx->GetInputValue(
-            UsdSkelImagingExtComputationInputNameTokens
+            UsdSkelImagingExtComputationLegacyInputNameTokens
                 ->skelLocalToWorld);
 
     // Ensure inputs are holding the right value types.

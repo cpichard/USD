@@ -23,7 +23,7 @@
 #include "pxr/imaging/hd/overlayContainerDataSource.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
 #include "pxr/imaging/hd/sceneIndex.h"
-#include "pxr/imaging/hd/xformSchema.h"
+#include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/base/trace/trace.h"
 
@@ -180,6 +180,7 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim(
  , _resolvedSkeletonSchema(std::move(resolvedSkeletonSchema))
  , _blendShapeDataCache(sceneIndex, primPath)
  , _jointInfluencesDataCache(_primSource, _skeletonPrimSource)
+ , _xformResolver(sceneIndex, _primSource)
 {
 }
 
@@ -286,10 +287,10 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::GetNames()
 }
 
 HdMatrixDataSourceHandle
-UsdSkelImagingDataSourceResolvedPointsBasedPrim::GetPrimWorldToLocal() const {
+UsdSkelImagingDataSourceResolvedPointsBasedPrim::
+GetCommonSpaceToPrimLocal() const {
     return
-        _MatrixInverseDataSource::New(
-            HdXformSchema::GetFromParent(_primSource).GetMatrix());
+        _MatrixInverseDataSource::New(_xformResolver.GetPrimLocalToCommonSpace());
 }
 
 std::shared_ptr<UsdSkelImagingBlendShapeData>
@@ -310,7 +311,7 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::GetDependendendOnDataSourceLoca
     static const HdDataSourceLocatorSet result{
         UsdSkelImagingBindingSchema::GetDefaultLocator(),
         HdPrimvarsSchema::GetDefaultLocator(),
-        HdXformSchema::GetDefaultLocator()
+        UsdSkelImagingDataSourceXformResolver::GetXformLocator()
     };
 
     return result;
@@ -322,6 +323,8 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::_ProcessDirtyLocators(
     HdDataSourceLocatorSet * const dirtyLocatorsForAggregatorComputation,
     HdDataSourceLocatorSet * const dirtyLocatorsForComputation)
 {
+    TRACE_FUNCTION();
+    
     if (dirtyLocators.Contains(
             UsdSkelImagingBindingSchema::GetSkeletonLocator())) {
         return true;
@@ -336,6 +339,12 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::_ProcessDirtyLocators(
     }
     if (dirtyLocators.Contains(
             HdPrimvarsSchema::GetDefaultLocator())) {
+        return true;
+    }
+    if (dirtyLocators.Contains(
+            UsdSkelImagingDataSourceXformResolver::GetInstancedByLocator())) {
+        // Instancers have changed.
+        // Just indicate that we want to blow everything.
         return true;
     }
     static const HdDataSourceLocator skinningMethodLocator =
@@ -450,13 +459,14 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::_ProcessDirtyLocators(
         }
     }
 
-    if (dirtyLocators.Intersects(HdXformSchema::GetDefaultLocator())) {
+    if (dirtyLocators.Intersects(
+            UsdSkelImagingDataSourceXformResolver::GetXformLocator())) {
         if (dirtyLocatorsForComputation) {
             static const HdDataSourceLocator inputLocator =
                 HdExtComputationSchema::GetInputValuesLocator()
                     .Append(
                         UsdSkelImagingExtComputationInputNameTokens
-                        ->primWorldToLocal);
+                        ->commonSpaceToPrimLocal);
             dirtyLocatorsForComputation->insert(inputLocator);
         }
     }
@@ -470,7 +480,8 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::_ProcessDirtySkeletonLocators(
     HdDataSourceLocatorSet * const dirtyLocatorsForAggregatorComputation,
     HdDataSourceLocatorSet * const dirtyLocatorsForComputation)
 {
-
+    TRACE_FUNCTION();
+    
     if (dirtyLocators.Contains(
             UsdSkelImagingResolvedSkeletonSchema::GetDefaultLocator())) {
         return true;
@@ -482,13 +493,13 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::_ProcessDirtySkeletonLocators(
 
     if (dirtyLocators.Intersects(
             UsdSkelImagingResolvedSkeletonSchema::
-            GetSkelLocalToWorldLocator())) {
+            GetSkelLocalToCommonSpaceLocator())) {
         if (dirtyLocatorsForComputation) {
             static const HdDataSourceLocator inputLocator =
                 HdExtComputationSchema::GetInputValuesLocator()
                     .Append(
                         UsdSkelImagingExtComputationInputNameTokens
-                        ->skelLocalToWorld);
+                        ->skelLocalToCommonSpace);
             dirtyLocatorsForComputation->insert(
                 inputLocator);
         }
@@ -532,6 +543,8 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::_ProcessDirtySkelBlendShapeLoca
         HdDataSourceLocatorSet * const dirtyLocatorsForAggregatorComputation,
         HdDataSourceLocatorSet * const dirtyLocatorsForComputation)
 {
+    TRACE_FUNCTION();
+
     if (!_resolvedSkeletonSchema) {
         return false;
     }
@@ -573,11 +586,47 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::_ProcessDirtySkelBlendShapeLoca
 }
 
 bool
+UsdSkelImagingDataSourceResolvedPointsBasedPrim::_ProcessDirtyInstancerLocators(
+        const HdDataSourceLocatorSet &dirtyLocators,
+        HdDataSourceLocatorSet * const dirtyLocatorsForAggregatorComputation,
+        HdDataSourceLocatorSet * const dirtyLocatorsForComputation)
+{
+    TRACE_FUNCTION();
+
+    if (dirtyLocators.Intersects(
+            UsdSkelImagingDataSourceXformResolver::GetInstancedByLocator())) {
+        return true;
+    }
+
+    if (!_resolvedSkeletonSchema) {
+        return false;
+    }
+
+    if (dirtyLocators.Intersects(
+            UsdSkelImagingDataSourceXformResolver::GetXformLocator()) ||
+        dirtyLocators.Intersects(
+            UsdSkelImagingDataSourceXformResolver::GetInstanceXformLocator())) {
+        if (dirtyLocatorsForComputation) {
+            static const HdDataSourceLocator inputLocator =
+                HdExtComputationSchema::GetInputValuesLocator()
+                    .Append(
+                        UsdSkelImagingExtComputationInputNameTokens
+                        ->commonSpaceToPrimLocal);
+            dirtyLocatorsForComputation->insert(inputLocator);
+        }
+    }
+
+    return false;
+}
+
+bool
 UsdSkelImagingDataSourceResolvedPointsBasedPrim::ProcessDirtyLocators(
     const TfToken &dirtiedPrimType,
     const HdDataSourceLocatorSet &dirtyLocators,
     HdSceneIndexObserver::DirtiedPrimEntries * const entries)
 {
+    TRACE_FUNCTION();
+    
     HdDataSourceLocatorSet dirtyLocatorsForAggregatorComputation;
     HdDataSourceLocatorSet dirtyLocatorsForComputation;
 
@@ -597,6 +646,11 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::ProcessDirtyLocators(
     } else if (dirtiedPrimType ==
                             UsdSkelImagingPrimTypeTokens->skelBlendShape) {
         result = _ProcessDirtySkelBlendShapeLocators(
+            dirtyLocators,
+            dirtyLocatorsForAggregatorComputationPtr,
+            dirtyLocatorsForComputationPtr);
+    } else if (dirtiedPrimType == HdPrimTypeTokens->instancer) {
+        result = _ProcessDirtyInstancerLocators(
             dirtyLocators,
             dirtyLocatorsForAggregatorComputationPtr,
             dirtyLocatorsForComputationPtr);

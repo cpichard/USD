@@ -1049,14 +1049,14 @@ UsdSkelImagingSkeletonAdapter::GetExtComputationSceneInputNames(
 
             static TfTokenVector sceneInputNames({
                     // From the skinned prim
-                    UsdSkelImagingExtComputationInputNameTokens
+                    UsdSkelImagingExtComputationLegacyInputNameTokens
                         ->primWorldToLocal,
                     // From the skeleton
                     UsdSkelImagingExtComputationInputNameTokens
                         ->blendShapeWeights,
                     UsdSkelImagingExtComputationInputNameTokens
                         ->skinningXforms,
-                    UsdSkelImagingExtComputationInputNameTokens
+                    UsdSkelImagingExtComputationLegacyInputNameTokens
                         ->skelLocalToWorld
             });
             return sceneInputNames;
@@ -1077,7 +1077,7 @@ UsdSkelImagingSkeletonAdapter::GetExtComputationSceneInputNames(
             // This should be revisited if/when this becomes a performance issue.
             static TfTokenVector sceneInputNames({
                     // From the skinned prim
-                    UsdSkelImagingExtComputationInputNameTokens
+                    UsdSkelImagingExtComputationLegacyInputNameTokens
                         ->primWorldToLocal,
                     // From the skeleton
                     UsdSkelImagingExtComputationInputNameTokens
@@ -1088,7 +1088,7 @@ UsdSkelImagingSkeletonAdapter::GetExtComputationSceneInputNames(
                         ->skinningScaleXforms,
                     UsdSkelImagingExtComputationInputNameTokens
                         ->skinningDualQuats,
-                    UsdSkelImagingExtComputationInputNameTokens
+                    UsdSkelImagingExtComputationLegacyInputNameTokens
                         ->skelLocalToWorld
                 });
             return sceneInputNames;
@@ -1464,7 +1464,7 @@ UsdSkelImagingSkeletonAdapter::_GetExtComputationInputForSkinningComputation(
     }
 
     // primWorldToLocal
-    if (name == UsdSkelImagingExtComputationInputNameTokens
+    if (name == UsdSkelImagingExtComputationLegacyInputNameTokens
                     ->primWorldToLocal) {
         UsdGeomXformCache xformCache(time);
         GfMatrix4d primWorldToLocal =
@@ -1480,7 +1480,7 @@ UsdSkelImagingSkeletonAdapter::_GetExtComputationInputForSkinningComputation(
                     ->skinningScaleXforms ||
         name == UsdSkelImagingExtComputationInputNameTokens
                     ->skinningDualQuats ||
-        name == UsdSkelImagingExtComputationInputNameTokens
+        name == UsdSkelImagingExtComputationLegacyInputNameTokens
                     ->skelLocalToWorld ||
         name == UsdSkelImagingExtComputationInputNameTokens
                     ->blendShapeWeights)
@@ -1561,7 +1561,7 @@ UsdSkelImagingSkeletonAdapter::_GetExtComputationInputForSkinningComputation(
 
         }
 
-        if (name == UsdSkelImagingExtComputationInputNameTokens
+        if (name == UsdSkelImagingExtComputationLegacyInputNameTokens
                         ->skelLocalToWorld) {
             // PERFORMANCE:
             // Would be better if we could access a shared xformCache here?
@@ -1786,7 +1786,7 @@ UsdSkelImagingSkeletonAdapter::_SampleExtComputationInputForSkinningComputation(
     }
 
     // primWorldToLocal
-    if (name == UsdSkelImagingExtComputationInputNameTokens
+    if (name == UsdSkelImagingExtComputationLegacyInputNameTokens
                     ->primWorldToLocal) {
         // This "CAPACITY = 4" indicates the maximum size of the stack in these 
         // TfSmallVectors. Ideally, this would be configurable by higher level 
@@ -1817,7 +1817,7 @@ UsdSkelImagingSkeletonAdapter::_SampleExtComputationInputForSkinningComputation(
                     ->skinningScaleXforms ||
         name == UsdSkelImagingExtComputationInputNameTokens
                     ->skinningDualQuats ||
-        name == UsdSkelImagingExtComputationInputNameTokens
+        name == UsdSkelImagingExtComputationLegacyInputNameTokens
                     ->skelLocalToWorld ||
         name == UsdSkelImagingExtComputationInputNameTokens
                     ->blendShapeWeights)
@@ -1937,7 +1937,7 @@ UsdSkelImagingSkeletonAdapter::_SampleExtComputationInputForSkinningComputation(
             }
         }
 
-        if (name == UsdSkelImagingExtComputationInputNameTokens
+        if (name == UsdSkelImagingExtComputationLegacyInputNameTokens
                         ->skelLocalToWorld) {
             UsdPrim skelPrim(skelData->skelQuery.GetPrim());
             if (skelPrim.IsInPrototype()) {
