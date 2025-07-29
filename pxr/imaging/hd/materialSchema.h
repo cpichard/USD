@@ -48,6 +48,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdMaterialSchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdMaterialSchema
+///
 /// The Material schema is a container schema that provides the correct
 /// material definition per render context.
 ///

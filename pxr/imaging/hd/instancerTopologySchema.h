@@ -46,6 +46,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdInstancerTopologySchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdInstancerTopologySchema
+///
 /// Since the instancing schema is complicated:
 ///
 /// An instancer is a prim at a certain scenegraph location that causes other

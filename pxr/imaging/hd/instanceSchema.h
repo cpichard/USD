@@ -44,6 +44,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdInstanceSchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdInstanceSchema
+///
 /// This schema can be considered the opposite of instancerTopology's
 /// "instanceLocations". When the scene coalesces scene prims into multiple
 /// instances of a single prototype, it inserts "instance" prims at the site of

@@ -43,6 +43,8 @@ TF_DECLARE_PUBLIC_TOKENS(UsdSkelImagingInbetweenShapeSchemaTokens, USDSKELIMAGIN
 //-----------------------------------------------------------------------------
 
 
+/// \class UsdSkelImagingInbetweenShapeSchema
+///
 /// Corresponds to UsdSkelInbetweenShape. Each instance corresponds to a group
 /// of attributes on a UsdSkelBlendShape that share a prefix inbetweens:NAME.
 ///

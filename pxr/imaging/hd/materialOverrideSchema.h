@@ -43,6 +43,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdMaterialOverrideSchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdMaterialOverrideSchema
+///
 /// The MaterialOverride schema allows overrides to be made to the material's
 /// public UI. Overrides can be applied to both material or geometry scene
 /// index prim locations.

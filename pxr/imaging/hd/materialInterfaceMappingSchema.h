@@ -42,6 +42,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdMaterialInterfaceMappingSchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdMaterialInterfaceMappingSchema
+///
 /// The MaterialInterfaceMapping schema identifies a material node parameter
 /// using its two members 'nodePath' and 'inputName'.
 ///

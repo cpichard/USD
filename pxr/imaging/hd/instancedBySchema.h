@@ -43,6 +43,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdInstancedBySchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdInstancedBySchema
+///
 /// A schema marking a prim as instanced by another prim.
 ///
 /// Many renderers need to know not what prototypes an instancer has, but

@@ -51,6 +51,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdSceneGlobalsSchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdSceneGlobalsSchema
+///
 /// The HdSceneGlobalsSchema encapsulates "global" state to orchestrate a
 /// render. It currently houses the active render settings and pass prim paths
 /// that describe the information necessary to generate images from a single

@@ -45,6 +45,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdMaterialNetworkSchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdMaterialNetworkSchema
+///
 /// The MaterialNetwork schema is a container schema that defines a material
 /// for a specific render context. A network is composed of nodes, terminals,
 /// and interface mappings.

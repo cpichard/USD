@@ -43,6 +43,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdPrmanRileyParamListSchemaTokens, HDPRMAN_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdPrmanRileyParamListSchema
+///
 /// Schema to describe RtParamList.
 ///
 /// To obtain an RtParamList from this schema, we call the appropriate

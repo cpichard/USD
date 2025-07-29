@@ -48,6 +48,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdPrmanRileyPrimvarListSchemaTokens, HDPRMAN_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdPrmanRileyPrimvarListSchema
+///
 /// Schema to describe RtPrimvarList.
 ///
 /// To obtain an RtPrimvarList we pass numUniform, numVertex, numVarying,

@@ -42,6 +42,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdMaterialConnectionSchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdMaterialConnectionSchema
+///
 /// The MaterialConnection schema defines an upstream connected node and
 /// output.
 ///

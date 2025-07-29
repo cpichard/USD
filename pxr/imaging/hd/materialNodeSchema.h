@@ -46,6 +46,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdMaterialNodeSchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdMaterialNodeSchema
+///
 /// The MaterialNode schema is a container schema that defines a particular
 /// node in a material network.
 ///

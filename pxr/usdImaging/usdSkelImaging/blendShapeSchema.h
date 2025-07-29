@@ -48,6 +48,8 @@ TF_DECLARE_PUBLIC_TOKENS(UsdSkelImagingBlendShapeSchemaTokens, USDSKELIMAGING_AP
 //-----------------------------------------------------------------------------
 
 
+/// \class UsdSkelImagingBlendShapeSchema
+///
 /// Corresponds to UsdSkelBlendShape.
 ///
 class UsdSkelImagingBlendShapeSchema : public HdSchema

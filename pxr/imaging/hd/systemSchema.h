@@ -43,6 +43,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdSystemSchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdSystemSchema
+///
 /// The HdSystemSchema specifies a container that will hold "system" data. Each
 /// piece of system data is identified by a key within the container. A piece
 /// of system data is evaluated at a given location by walking up the namespace

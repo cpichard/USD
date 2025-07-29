@@ -60,6 +60,8 @@ TF_DECLARE_PUBLIC_TOKENS(HdLegacyTaskSchemaTokens, HD_API,
 //-----------------------------------------------------------------------------
 
 
+/// \class HdLegacyTaskSchema
+///
 /// The HdLegacyTaskSchema specifies a Hydra task by providing a task factory
 /// and data.
 ///
