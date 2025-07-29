@@ -31,6 +31,7 @@ pxr_library(execUsd
 
     DOXYGEN_FILES
         README.md        
+        docs/overview.md
 )
 
 pxr_build_test(testExecUsdBasicCompilation

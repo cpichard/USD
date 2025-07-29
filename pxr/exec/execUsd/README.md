@@ -3,6 +3,11 @@
 The execUsd library is built on top of [exec](../exec/README.md) and
 [esfUsd](../esfUsd/README.md).
 
-The execUsd library is the primary entry point for OpenExec. This library
-provides facilities for compiling and evaluating data flow networks built from
-UsdStage%s.
+The execUsd library is the primary entry point for OpenExec. The API defined
+here, and in the [exec](../exec/README.md) library, supports:
+- Registration of computational behaviors associated with USD schemas
+- Ingesting UsdStage%s to compile data flow networks that contain nodes that
+  embody computations
+- Requesting values for efficient, vectorized, multithreaded evaluation
+
+See the [OpenExec overview](docs/overview.md) for more details.
