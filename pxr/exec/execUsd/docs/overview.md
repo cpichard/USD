@@ -49,17 +49,14 @@ provide a `computeValue` builtin computation that yields the value of the
 attribute at the current evaluation time.
 
 See the [builtin computation documentation](#group_Exec_Builtin_Computations)
-for a desciption of the builin computations that are available.
-
-TODO:
-- ExecUsdSystem & ExecUsdRequest?
+for a desciption of the builtin computations that are available.
 
 
 ## Tutorials {#section_Tutorials}
 
-TODO:
-- Title/brief description of each tutorial, with a link to the document that
-  contains it.
+- [Tutorial 1: Computing Values](tutorial1ComputingValues.md)
+- [Tutorial 2: Invalidation](tutorial2Invalidation.md)
+- [Tutorial 3: Defining Schema Computations](tutorial3DefiningComputations.md)
 
 
 ## Advanced Topics {#section_AdvancedTopics}
@@ -67,5 +64,4 @@ TODO:
 TODO:
 - Exec architecture/phases of execution: compilation, scheduling, evaluation
 - Dispatched computations
-- Invalidation callbacks
 - Anything else?
