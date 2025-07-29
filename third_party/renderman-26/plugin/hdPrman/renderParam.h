@@ -425,6 +425,14 @@ public:
     bool SetArbitraryValue(const TfToken& key, const VtValue& value) override;
 #endif
 
+    // Return the id map product name (ri:productType=idMap) in the provided
+    // provided render settings. Returns an empty token if not found.
+    static TfToken GetIdMapProductName(HdPrman_RenderSettings* renderSettings); 
+
+    // Write the path to id mapping to a file with the provided name.
+    static void WriteIdMap(HdRenderIndex* renderIndex, 
+                           const TfToken& productName);
+
 private:
     void _CreateStatsSession();
     void _CreateRiley(const std::string &rileyVariant,
