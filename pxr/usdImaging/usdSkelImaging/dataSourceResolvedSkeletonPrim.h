@@ -17,8 +17,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class UsdSkelImagingSkelData;
-class UsdSkelImagingSkelGuideData;
+struct UsdSkelImagingSkelData;
+struct UsdSkelImagingSkelGuideData;
 
 /// \class UsdSkelImagingDataSourceResolvedSkeletonPrim
 ///
