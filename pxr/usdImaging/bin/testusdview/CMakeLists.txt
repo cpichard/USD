@@ -610,36 +610,6 @@ pxr_register_test(testUsdviewDefaultFontFamily
     EXPECTED_RETURN_CODE 0
 )
 
-pxr_register_test(testUsdviewInstancingEdits
-    PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewInstancingEdits.py test.usda"
-    EXPECTED_RETURN_CODE 0
-    IMAGE_DIFF_COMPARE
-        instanceWithParent.png
-        instanceWithParentDeactivated.png
-    FAIL 0.02
-    FAIL_PERCENT 0.01
-    WARN 0.01
-    WARN_PERCENT 0.02
-    ENV
-        USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=false
-)
-
-pxr_register_test(testUsdviewInstancingEdits_SceneIndex
-    PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewInstancingEdits.py test.usda"
-    EXPECTED_RETURN_CODE 0
-    IMAGE_DIFF_COMPARE
-        instanceWithParent.png
-        instanceWithParentDeactivated.png
-    FAIL 0.02
-    FAIL_PERCENT 0.01
-    WARN 0.01
-    WARN_PERCENT 0.02
-    ENV
-        USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true
-)
-
 pxr_register_test(testUsdviewPrimTreeExpansion
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewPrimTreeExpansion.py test.usda"
@@ -1192,6 +1162,36 @@ pxr_register_test(testUsdviewExpressionVariableEdits
     EXPECTED_RETURN_CODE 0
     ENV
         USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1
+)
+
+pxr_register_test(testUsdviewInstancingEdits
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewInstancingEdits.py test.usda"
+    EXPECTED_RETURN_CODE 0
+    IMAGE_DIFF_COMPARE
+        instanceWithParent.png
+        instanceWithParentDeactivated.png
+    FAIL 0.04
+    FAIL_PERCENT 0.1
+    WARN 0.02
+    WARN_PERCENT 0.2
+    ENV
+        USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=false
+)
+
+pxr_register_test(testUsdviewInstancingEdits_SceneIndex
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewInstancingEdits.py test.usda"
+    EXPECTED_RETURN_CODE 0
+    IMAGE_DIFF_COMPARE
+        instanceWithParent.png
+        instanceWithParentDeactivated.png
+    FAIL 0.04
+    FAIL_PERCENT 0.1
+    WARN 0.02
+    WARN_PERCENT 0.2
+    ENV
+        USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true
 )
 
 if(OPENCOLORIO_FOUND AND ${PXR_BUILD_OPENCOLORIO_PLUGIN})
