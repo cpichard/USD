@@ -55,13 +55,14 @@ for a desciption of the builtin computations that are available.
 ## Tutorials {#section_Tutorials}
 
 - [Tutorial 1: Computing Values](tutorial1ComputingValues.md)
-- [Tutorial 2: Invalidation](tutorial2Invalidation.md)
-- [Tutorial 3: Defining Schema Computations](tutorial3DefiningComputations.md)
+
+**Coming Soon:**
+- Tutorial 2: Defining Schema Computations
 
 
 ## Advanced Topics {#section_AdvancedTopics}
 
-TODO:
+**Coming Soon:**
+- Caching, invalidation, and invalidation notification
 - Exec architecture/phases of execution: compilation, scheduling, evaluation
 - Dispatched computations
-- Anything else?
