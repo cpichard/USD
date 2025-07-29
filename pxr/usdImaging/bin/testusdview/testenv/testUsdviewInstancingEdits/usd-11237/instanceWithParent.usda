@@ -5,9 +5,9 @@
 
 class Xform "MyPrototype"
 {
-    def Sphere "MySphere"
+    def Cube "MyCube"
     {
-        double radius = 5
+        double size = 8
     }
 }
 
