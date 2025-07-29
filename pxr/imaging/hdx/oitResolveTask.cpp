@@ -340,22 +340,25 @@ HdxOitResolveTask::_PrepareOitBuffers(
                                    screenSize[1] > _screenSize[1]);
 
     if (resizeOitBuffers) {
-        _screenSize = screenSize;
+        const int oldBufferSize = _screenSize[0] * _screenSize[1];
         const int newBufferSize = screenSize[0] * screenSize[1];
+        _screenSize = screenSize;
 
-        // +1 because element 0 of the counter buffer is used as an atomic
-        // counter in the shader to give each fragment a unique index.
-        _counterBar->Resize(newBufferSize + 1);
-        _indexBar->Resize(newBufferSize * numSamples);
-        _dataBar->Resize(newBufferSize * numSamples);
-        _depthBar->Resize(newBufferSize * numSamples);
+        if (oldBufferSize < newBufferSize) {
+            // +1 because element 0 of the counter buffer is used as an atomic
+            // counter in the shader to give each fragment a unique index.
+            _counterBar->Resize(newBufferSize + 1);
+            _indexBar->Resize(newBufferSize * numSamples);
+            _dataBar->Resize(newBufferSize * numSamples);
+            _depthBar->Resize(newBufferSize * numSamples);
+        }
 
         // Update the values in the uniform buffer
         hdStResourceRegistry->AddSource(
             _uniformBar,
             std::make_shared<HdVtBufferSource>(
                 HdxTokens->oitScreenSize,
-                VtValue(screenSize)));
+                VtValue(_screenSize)));
     }
 }
 
