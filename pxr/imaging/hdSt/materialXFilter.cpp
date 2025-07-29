@@ -406,24 +406,26 @@ _AddFallbackDomeLightTextureNode(
 }
 
 // Store texture node connections, default dome light texture path and any
-// filename inputs from the terminal nodeto the mxHdTextureMap
+// filename inputs from the terminal node to the mxHdTextureNames
 static void 
-_UpdateMxHdTextureMap(
+_UpdateMxHdTextureNames(
     std::set<SdfPath> const& hdTextureNodes,
     HdMtlxTexturePrimvarData::TextureMap const& hdMtlxTextureInfo,
     HdMaterialNode2 const& hdTerminalNode,
     SdfPath const& terminalNodePath,
-    mx::StringMap* mxHdTextureMap)
+    mx::StringVec* mxHdTextureNames)
 {
     // Store the added connection to the terminal node for MaterialXShaderGen
     for (SdfPath const& texturePath : hdTextureNodes) {
         auto mtlxTextureInfo = hdMtlxTextureInfo.find(texturePath.GetName());
         if (mtlxTextureInfo != hdMtlxTextureInfo.end()) {
-            for (std::string const& fileInputName: mtlxTextureInfo->second) {
+            for (std::string const& fileInputName : mtlxTextureInfo->second) {
                 // Note these connections were made in _UpdateTextureNode()
+                // and use the mtlx paramName which follows the pattern:
+                // 'nodeName_paramName'
                 const std::string newConnName =
                     texturePath.GetName() + "_" + fileInputName;
-                mxHdTextureMap->emplace(newConnName, newConnName);
+                mxHdTextureNames->push_back(newConnName);
             }
         }
     }
@@ -431,7 +433,7 @@ _UpdateMxHdTextureMap(
     // Add the Dome Texture name to the TextureMap for MaterialXShaderGen
     const SdfPath domeTexturePath =
         terminalNodePath.ReplaceName(_tokens->domeLightFallback);
-    (*mxHdTextureMap)[domeTexturePath.GetName()] = domeTexturePath.GetName();
+    mxHdTextureNames->push_back(domeTexturePath.GetName());
 
     // Check the terminal node for any filename inputs requiring special
     // handling due to node remapping:
@@ -440,7 +442,7 @@ _UpdateMxHdTextureMap(
     if (terminalNodeDef) {
         for (auto const& mxInput : terminalNodeDef->getActiveInputs()) {
             if (mxInput->getType() == _tokens->filename) {
-                (*mxHdTextureMap)[mxInput->getName()] = mxInput->getName();
+                mxHdTextureNames->push_back(mxInput->getName());
             }
         }
     }
@@ -1269,9 +1271,9 @@ _GenerateMaterialXShader(
     // Add domelight and other textures to mxHdInfo so the proper entry points
     // get generated in MaterialXShaderGen
     HdSt_MxShaderGenInfo mxHdInfo;
-    _UpdateMxHdTextureMap(
+    _UpdateMxHdTextureNames(
         hdMtlxData.hdTextureNodes, hdMtlxData.mxHdTextureMap,
-        terminalNode, terminalNodePath, &mxHdInfo.textureMap);
+        terminalNode, terminalNodePath, &mxHdInfo.textureNames);
 
     _UpdatePrimvarNodes(
         mtlxDoc, hdNetwork, hdMtlxData.hdPrimvarNodes, 

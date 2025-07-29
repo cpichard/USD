@@ -138,19 +138,9 @@ int main(int argc, char *argv[])
         if (arg == "--filename") {
             mtlxFile = mx::FilePath(argv[++i]);
         }
-        if (arg == "--textureMap") {
-            const std::string textureMap(argv[++i]);
-            auto const& npos = textureMap.find(":");
-            if (npos != std::string::npos) {
-                const std::string mx = textureMap.substr(0, npos);
-                const std::string hd = textureMap.substr(npos + 1);
-                mxHdInfo.textureMap[mx] = hd;
-            }
-            else {
-                std::cerr << "textureMap input not formatted correctly.\n";
-                std::cerr << "--textureMap <mxTextureNodeName>:<HdInptName>\n";
-                return EXIT_FAILURE;
-            }
+        if (arg == "--textureName") {
+            const std::string textureName(argv[++i]);
+            mxHdInfo.textureNames.push_back(textureName);
         }
         if (arg == "--primvarMap") {
             const std::string primvarMap(argv[++i]);
