@@ -615,8 +615,8 @@ pxr_register_test(testUsdviewInstancingEdits
     COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewInstancingEdits.py test.usda"
     EXPECTED_RETURN_CODE 0
     IMAGE_DIFF_COMPARE
-        instanceWithParent
-        instanceWithParentDeactivated
+        instanceWithParent.png
+        instanceWithParentDeactivated.png
     FAIL 0.02
     FAIL_PERCENT 0.01
     WARN 0.01
@@ -630,8 +630,8 @@ pxr_register_test(testUsdviewInstancingEdits_SceneIndex
     COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewInstancingEdits.py test.usda"
     EXPECTED_RETURN_CODE 0
     IMAGE_DIFF_COMPARE
-        instanceWithParent
-        instanceWithParentDeactivated
+        instanceWithParent.png
+        instanceWithParentDeactivated.png
     FAIL 0.02
     FAIL_PERCENT 0.01
     WARN 0.01
