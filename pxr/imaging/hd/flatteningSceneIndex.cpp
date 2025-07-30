@@ -510,9 +510,11 @@ HdFlatteningSceneIndex::_PrimDirtied(
         HdDataSourceLocatorSentinelTokens->container);
     if (entry.dirtyLocators.Contains(primLevelContainer)) {
         const _PrimTable::iterator it = _prims.find(entry.primPath);
-        if (auto const ds = _PrimLevelWrappingDataSource::Cast(
-                it->second.dataSource)) {
-            ds->PrimContainerDirtied();
+        if (it != _prims.end() && it->second.dataSource) {
+            if (auto const ds = _PrimLevelWrappingDataSource::Cast(
+                    it->second.dataSource)) {
+                ds->PrimContainerDirtied();
+            }
         }
     }
 }
