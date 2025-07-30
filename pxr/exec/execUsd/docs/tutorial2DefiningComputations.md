@@ -1,4 +1,4 @@
-# Tutorial 2: Defining Schema Computations
+# OpenExec Tutorial 2: Defining Schema Computations
 
 ## Overview
 

@@ -1,4 +1,4 @@
-# Tutorial 1: Computing values in OpenExec
+# OpenExec Tutorial 1: Computing Values
 
 ## Overview
 
