@@ -221,7 +221,7 @@ also be run to validate local runtime environments and hardware configurations.
 
 Performance metrics are generating using the :program:`usdmeasureperformance.py`
 script found in ``pxr/extras/performance``. See the 
-`usdmeasureperformance tool docs <toolset>`_ for more 
+:ref:`usdmeasureperformance tool docs <toolset:usdmeasureperformance>` for more 
 information on the different parameters available.
 
 :program:`usdmeasureperformance.py` uses :program:`usdview` and 
