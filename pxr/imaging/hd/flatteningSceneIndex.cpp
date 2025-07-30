@@ -118,7 +118,9 @@ public:
     // invalidated.
     bool PrimDirtied(
         const _DataSourceLocatorSetVector &relativeDirtyLocators);
-    
+
+    void PrimContainerDirtied();
+
 private:
     _PrimLevelWrappingDataSource(
         const HdFlatteningSceneIndex &flatteningSceneIndex,
@@ -126,15 +128,19 @@ private:
         const HdSceneIndexPrim &inputPrim)
       : _flatteningSceneIndex(flatteningSceneIndex)
       , _primPath(primPath)
-      , _inputPrim(inputPrim)
+      , _primType(inputPrim.primType)
+      , _primSourceCache(inputPrim.dataSource)
       , _computedDataSources(
           _flatteningSceneIndex.GetFlattenedDataSourceNames().size())
     {
     }
-    
+
+    HdContainerDataSourceHandle _GetPrimSource();
+
     const HdFlatteningSceneIndex &_flatteningSceneIndex;
     const SdfPath _primPath;
-    const HdSceneIndexPrim _inputPrim;
+    const TfToken _primType;
+    _ContainerDataSourceCache _primSourceCache;
 
     // Parallel to HdFlatteningSceneIndex::GetFlattenedDataSourceNames()
     TfSmallVector<_ContainerDataSourceCache, _smallVectorSize>
@@ -178,6 +184,12 @@ _PrimLevelWrappingDataSource::PrimDirtied(
 }
 
 void
+_PrimLevelWrappingDataSource::PrimContainerDirtied()
+{
+    _primSourceCache.Invalidate();
+}
+   
+void
 _Insert(const TfTokenVector &vec,
         TfTokenVector * const result)
 {
@@ -214,11 +226,13 @@ _Insert(const TfTokenVector &vec,
 TfTokenVector
 _PrimLevelWrappingDataSource::GetNames()
 {
-    if (!_inputPrim.dataSource) {
+    HdContainerDataSourceHandle const primSource = _GetPrimSource();
+
+    if (!primSource) {
         return _flatteningSceneIndex.GetFlattenedDataSourceNames();
     }
 
-    TfTokenVector result = _inputPrim.dataSource->GetNames();
+    TfTokenVector result = primSource->GetNames();
     _Insert(_flatteningSceneIndex.GetFlattenedDataSourceNames(), &result);
     return result;
 };        
@@ -242,18 +256,32 @@ _PrimLevelWrappingDataSource::Get(
                                         dsCache.Get()) {
             return *ds;
         }
+
         const HdFlattenedDataSourceProvider::Context ctx(
             _flatteningSceneIndex,
             _primPath,
             name,
-            _inputPrim);
+            HdSceneIndexPrim{_primType, _GetPrimSource()});
         return dsCache.Cache(providers[i]->GetFlattenedDataSource(ctx));
     }
 
-    if (_inputPrim.dataSource) {
-        return _inputPrim.dataSource->Get(name);
+    if (HdContainerDataSourceHandle const primSource = _GetPrimSource()) {
+        return primSource->Get(name);
     }
     return nullptr;
+}
+
+HdContainerDataSourceHandle
+_PrimLevelWrappingDataSource::_GetPrimSource()
+{
+    if (std::optional<HdContainerDataSourceHandle> const primSource =
+            _primSourceCache.Get()) {
+        return *primSource;
+    }
+
+    const HdSceneIndexPrim prim =
+        _flatteningSceneIndex._GetInputSceneIndex()->GetPrim(_primPath);
+    return _primSourceCache.Cache(prim.dataSource);
 }
 
 }
@@ -476,15 +504,15 @@ HdFlatteningSceneIndex::_PrimDirtied(
             entry.primPath, relativeDirtyLocators, dirtyLocators, dirtyEntries);
     }
 
-    // Empty locator indicates that we need to pull the input data source
-    // again - which we achieve by destroying the data source wrapping the
-    // input data source.
-    // Note that we destroy it after calling _DirtyHierarchy to not prevent
-    // _DirtyHierarchy propagating the invalidation to the descendants.
-    if (entry.dirtyLocators.Contains(HdDataSourceLocator::EmptyLocator())) {
+    // Mark _PrimLevelWrappingDataSource to refetch input data source again
+    // if the dirtyLocators indicate so.
+    static const HdDataSourceLocator primLevelContainer(
+        HdDataSourceLocatorSentinelTokens->container);
+    if (entry.dirtyLocators.Contains(primLevelContainer)) {
         const _PrimTable::iterator it = _prims.find(entry.primPath);
-        if (it != _prims.end() && it->second.dataSource) {
-            WorkSwapDestroyAsync(it->second.dataSource);
+        if (auto const ds = _PrimLevelWrappingDataSource::Cast(
+                it->second.dataSource)) {
+            ds->PrimContainerDirtied();
         }
     }
 }
