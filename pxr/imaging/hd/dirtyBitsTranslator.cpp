@@ -863,6 +863,12 @@ HdDirtyBitsTranslator::SprimLocatorSetToDirtyBits(
                     }
                     else if (terminal == HdMaterialSchemaTokens->volume) {
                         bits |= HdMaterial::DirtyVolume;
+                    } else {
+                        // There is no specific terminal mentioned,
+                        // so consider the entire material dirty.
+                        // This can happen, for example, when a
+                        // material/{renderContext} locator is invalidated.
+                        bits |= HdMaterial::AllDirty;
                     }
                 }
             }
