@@ -2638,8 +2638,8 @@ UsdSkelImagingSkeletonAdapter::_SkelData::ComputePoints(
         }
 
         if(TF_VERIFY(_boneMeshPoints.size() == _boneMeshJointIndices.size())) {
-            // TODO: MakeUnique()
             VtVec3fArray skinnedPoints(_boneMeshPoints);
+            skinnedPoints.MakeUnique();
 
             const int* jointIndices = _boneMeshJointIndices.cdata();
             const GfMatrix4d* jointXforms = xforms.cdata();

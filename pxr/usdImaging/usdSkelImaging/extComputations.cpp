@@ -140,8 +140,8 @@ UsdSkelImagingInvokeExtComputation(
         ctx->RaiseComputationError();
         return;
     }
-    // TODO: MakeUnique()
     VtVec3fArray skinnedPoints = restPointsValue.UncheckedGet<VtVec3fArray>();
+    skinnedPoints.MakeUnique();
 
     _ApplyPackedBlendShapes(
         blendShapeOffsetsValue.UncheckedGet<VtVec4fArray>(),
