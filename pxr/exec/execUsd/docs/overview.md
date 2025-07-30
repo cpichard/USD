@@ -33,13 +33,13 @@ attribute that provides the computation.
 
 #### Plugin Computations
 
-Computations that are published by schemas are called **plugin computations**;
-OpenExec will load the plugin that defines computations for a given schema the
-first time any computation is requested for a prim that uses that schema. Plugin
-computations are registered using an embedded [computation definition
-language](#group_Exec_ComputationDefinitionLanguage), which allows schema
-authors to register the callback that implements the computation, along with a
-specification of the input values required by the computation.
+Computations that are associated with schemas are called **plugin
+computations**; OpenExec will load the plugin that defines computations for a
+given schema the first time any computation is requested for a prim that uses
+that schema. Plugin computations are registered using an embedded [computation
+definition language](#group_Exec_ComputationDefinitionLanguage), which allows
+schema authors to register the callback that implements the computation, along
+with a specification of the input values required by the computation.
 
 #### Builtin Computations
 
@@ -55,9 +55,7 @@ for a desciption of the builtin computations that are available.
 ## Tutorials {#section_Tutorials}
 
 - [Tutorial 1: Computing Values](tutorial1ComputingValues.md)
-
-**Coming Soon:**
-- Tutorial 2: Defining Schema Computations
+- [Tutorial 2: Defining Schema Computations](tutorial2DefiningComputations.md)
 
 
 ## Advanced Topics {#section_AdvancedTopics}
