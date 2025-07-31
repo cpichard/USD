@@ -80,7 +80,9 @@ pxr_library(exec
         plugInfo.json
 
     DOXYGEN_FILES
-        README.md        
+        README.md 
+        docs/executionSystemDesign.md
+        docs/images/executionSystemDesignEngineArchitecture.drawio.svg       
 )
 
 #
