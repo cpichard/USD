@@ -63,6 +63,7 @@ struct Fixture
             ) {
                 int attr1 (doc = "attr doc")
                 int attr1 = 1
+                int attr1.connect = [</Prim1.ns1:ns2:attr2>, </Prim1.attr3>]
                 int ns1:ns2:attr2 (doc = "prop doc")
                 int ns1:ns2:attr2 = 2
                 double attr3.spline = {
@@ -127,7 +128,7 @@ TestStage(Fixture &fixture)
     TF_AXIOM(prop->IsValid(fixture.journal));
 }
 
-// Tests that ExecUsd_Objects behave as UsdObjects.
+// Tests that EsfUsd_Objects behave as UsdObjects.
 static void
 TestObject(Fixture &fixture)
 {
@@ -151,7 +152,7 @@ TestObject(Fixture &fixture)
     TF_AXIOM(!invalidObject->IsValid(fixture.journal));
 }
 
-// Tests that ExecUsd_Prims behave as UsdPrims.
+// Tests that EsfUsd_Prims behave as UsdPrims.
 static void
 TestPrim(Fixture &fixture)
 {
@@ -176,7 +177,7 @@ TestPrim(Fixture &fixture)
     TF_AXIOM(attr->GetPath(fixture.journal) == SdfPath("/Prim1.attr1"));
 }
 
-// Tests that ExecUsd_Properties behave as UsdProperties.
+// Tests that EsfUsd_Properties behave as UsdProperties.
 static void
 TestProperty(Fixture &fixture)
 {
@@ -189,7 +190,7 @@ TestProperty(Fixture &fixture)
     TF_AXIOM(prop->GetNamespace(fixture.journal) == TfToken("ns1:ns2"));
 }
 
-// Tests that ExecUsd_Attributes behave as UsdAttributes.
+// Tests that EsfUsd_Attributes behave as UsdAttributes.
 static void
 TestAttribute(Fixture &fixture)
 {
@@ -199,9 +200,16 @@ TestAttribute(Fixture &fixture)
     _TestMetadata(fixture, attr, "attr doc");
 
     TF_AXIOM(attr->GetValueTypeName(fixture.journal) == SdfValueTypeNames->Int);
+
+    const SdfPathVector targets = attr->GetConnections(fixture.journal);
+    ASSERT_EQ(targets.size(), 2);
+    TF_AXIOM(
+        targets ==
+        SdfPathVector({
+            SdfPath("/Prim1.ns1:ns2:attr2"), SdfPath("/Prim1.attr3")}));
 }
 
-// Tests that ExecUsd_AttributeQuery behaves as UsdAttributeQuery.
+// Tests that EsfUsd_AttributeQuery behaves as UsdAttributeQuery.
 static void
 TestAttributeQuery(Fixture &fixture)
 {
@@ -228,7 +236,7 @@ TestAttributeQuery(Fixture &fixture)
         UsdTimeCode::Default(), UsdTimeCode(0.0)));
 }
 
-// Tests ExecUsd_AttributeQuery with a time-varying spline attribute.
+// Tests EsfUsd_AttributeQuery with a time-varying spline attribute.
 static void
 TestSplineAttributeQuery(Fixture &fixture)
 {
