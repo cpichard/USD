@@ -793,7 +793,7 @@ void
 Exec_DefinitionRegistry::_SetComputationRegistrationComplete(
     const TfType schemaType)
 {
-    _computationsRegisteredForSchema.emplace(schemaType, true).second;
+    _computationsRegisteredForSchema.emplace(schemaType, true);
 }
 
 // Returns all ancestor types of the provider's schema type, from derived to
