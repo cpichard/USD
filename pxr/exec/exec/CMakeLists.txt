@@ -47,6 +47,7 @@ pxr_library(exec
     PRIVATE_CLASSES
         attributeInputNode
         builtinAttributeComputations
+        builtinObjectComputations
         builtinStageComputations
         callbackNode
         compilationTask
@@ -60,12 +61,14 @@ pxr_library(exec
         inputResolver
         inputResolvingCompilationTask
         leafCompilationTask
+        metadataInputNode
         nodeRecompilationInfo
         nodeRecompilationInfoTable
         outputKey
         outputProvidingCompilationTask
         pluginComputationDefinition
         pluginData
+        privateBuiltinComputations
         program
         registrationBarrier
         requestTracker

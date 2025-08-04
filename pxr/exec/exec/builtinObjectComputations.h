@@ -4,27 +4,28 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_EXEC_EXEC_BUILTIN_ATTRIBUTE_COMPUTATIONS_H
-#define PXR_EXEC_EXEC_BUILTIN_ATTRIBUTE_COMPUTATIONS_H
+#ifndef PXR_EXEC_EXEC_BUILTIN_OBJECT_COMPUTATIONS_H
+#define PXR_EXEC_EXEC_BUILTIN_OBJECT_COMPUTATIONS_H
 
 /// \file
 ///
-/// This file defines builtin computations that are provided by attributes.
+/// This file defines builtin computations that are provided by objects (prims or
+/// attributes).
 ///
 
 #include "pxr/exec/exec/computationDefinition.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-/// A computation that yields the computed value of an attribute.
+/// A computation that yields the value of a specified metadata field.
 ///
-class Exec_ComputeValueComputationDefinition final
+class Exec_ComputeMetadataComputationDefinition final
     : public Exec_ComputationDefinition
 {
 public:
-    Exec_ComputeValueComputationDefinition();
+    Exec_ComputeMetadataComputationDefinition();
 
-    ~Exec_ComputeValueComputationDefinition() override;
+    ~Exec_ComputeMetadataComputationDefinition() override;
 
     TfType GetResultType(
         const EsfObjectInterface &providerObject,
@@ -43,12 +44,6 @@ public:
         const TfToken &metadataKey,
         EsfJournal *nodeJournal,
         Exec_Program *program) const override;
-
-private:
-    static Exec_InputKeyVectorConstRefPtr _MakeInputKeys();
-
-private:
-    const Exec_InputKeyVectorConstRefPtr _inputKeys;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

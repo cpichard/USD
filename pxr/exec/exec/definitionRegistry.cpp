@@ -8,8 +8,10 @@
 
 #include "pxr/exec/exec/builtinAttributeComputations.h"
 #include "pxr/exec/exec/builtinComputations.h"
+#include "pxr/exec/exec/builtinObjectComputations.h"
 #include "pxr/exec/exec/builtinStageComputations.h"
 #include "pxr/exec/exec/pluginData.h"
+#include "pxr/exec/exec/privateBuiltinComputations.h"
 #include "pxr/exec/exec/registrationBarrier.h"
 #include "pxr/exec/exec/typeRegistry.h"
 #include "pxr/exec/exec/types.h"
@@ -709,11 +711,27 @@ Exec_DefinitionRegistry::_RegisterBuiltinComputations()
         ExecBuiltinComputations->computeValue,
         std::make_unique<Exec_ComputeValueComputationDefinition>());
 
+    // Register object computations for prims and attributes.
+    //
+    // We register each computation twice, but count it once for the purposes
+    // of validating that the expected number of builtin computations is
+    // registered.
+    size_t numObjectComputations = 0;
+    _RegisterBuiltinPrimComputation(
+        Exec_PrivateBuiltinComputations->computeMetadata,
+        std::make_unique<Exec_ComputeMetadataComputationDefinition>());
+    _RegisterBuiltinAttributeComputation(
+        Exec_PrivateBuiltinComputations->computeMetadata,
+        std::make_unique<Exec_ComputeMetadataComputationDefinition>());
+    ++numObjectComputations;
+
     // Make sure we registered all builtins.
     TF_VERIFY(_builtinStageComputationDefinitions.size() +
               _builtinPrimComputationDefinitions.size() +
-              _builtinAttributeComputationDefinitions.size() ==
-              ExecBuiltinComputations->GetComputationTokens().size());
+              _builtinAttributeComputationDefinitions.size() -
+              numObjectComputations ==
+              ExecBuiltinComputations->GetComputationTokens().size() +
+              Exec_PrivateBuiltinComputations->GetComputationTokens().size());
 }
 
 void
