@@ -33,6 +33,7 @@ pxr_library(execUsd
         README.md        
         docs/overview.md
         docs/tutorial1ComputingValues.md
+        docs/tutorial2DefiningComputations.md
 )
 
 pxr_build_test(testExecUsdBasicCompilation

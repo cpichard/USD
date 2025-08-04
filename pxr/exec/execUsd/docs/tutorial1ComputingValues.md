@@ -1,16 +1,9 @@
-# Tutorial 1: Computing values in OpenExec
+# OpenExec Tutorial 1: Computing Values
 
 ## Overview
 
 The purpose of this tutorial is to demonstrate how to use OpenExec APIs to
 request values to be computed.
-
-One thing to note is that the API that is presented here is the lowest-level
-API, designed for performance-intensive clients, such as an imaging
-system. OpenExec will eventually include convenience API, layered on top of the
-API shown here, for use cases that don't require maximum performance and for use
-cases that adhere to certain patterns that allow for more convenient API while
-still maintaining maxiumum performance.
 
 For this tutorial, we will make use of the `computeLocalToWorldTransform`
 computations provided by UsdGeomXformable prims. The result of this computation
@@ -19,6 +12,14 @@ points in world-space. The result of this computation depends on two values:
   1. The authored value of the `transform` attribute on the given Xform.
   2. The computed result of `computeLocalToWorldTransform` recursively invoked
      on the Xform's parent Xform.
+
+> **Note:**  
+> The API that is presented here is the lowest-level API, designed for
+> performance-intensive clients, such as an imaging system. OpenExec will
+> eventually include convenience API, layered on top of the API shown here, for
+> use cases that don't require maximum performance and for use cases that adhere
+> to certain patterns that allow for more convenient API while still maintaining
+> maxiumum performance.
 
 ## Create a UsdStage
 
@@ -52,7 +53,7 @@ UsdGeomXformable prims, such as the scene described by this usda file:
     }
 ```
 
-Assuming this layer is in a file named "xformPrims.usda" we can open the layer
+Assuming this layer is in a file named `xformPrims.usda` we can open the layer
 on a UsdStage as follows:
 
 ```cpp
@@ -61,16 +62,20 @@ on a UsdStage as follows:
 
 ## Create an ExecUsdSystem
 
-In order to compute values from a UsdStage, we first need to create an
-ExecUsdSystem object from the stage:
+In order to compute values from a UsdStage, we need to create an ExecUsdSystem
+object from the stage:
 
 ```cpp
     ExecUsdSystem execSystem(stage);
 ```
 
-The system maintains the internal state needed to compute values that is common
-across different requests for values from a given UsdStage. In particular, it
-holds onto the compiled data flow **network** that is used for evaluation.
+The ExecUsdSystem maintains the internal state needed to compute values from a
+given UsdStage. In particular, the system object holds onto the compiled data
+flow **network** that is used for evaluation. Note that we can make requests for
+different sets of values originating from the same stage using the same system
+object and the execution processes benefit from the shared state, amortizing
+costs (including the cost of compiling the network) across different value
+requests.
 
 ## Build an ExecUsdRequest
 
@@ -95,18 +100,19 @@ ExecUsdSystem::BuildRequest:
 
 A request maintains state that is required to effiently compute the particular
 set of requested values that it represents. In particular, it holds onto a
-**schedule** that is used to accelerate evaluation, by amortizing across
-multiple rounds of computation for a given request.
+**schedule** that is used to accelerate evaluation, by amortizing the cost of
+creating the schedule across multiple rounds of computation using the same
+request.
 
 ## Prepare the request
 
 Preparing the request, by calling ExecUsdSystem::PrepareRequest, does two
 things:
 1. It ensures that the network held by the system is compiled for the
-   request. I.e., it makes sure that all data flow nodes and connections that
-   are required to compute the requested values are in present the network and
-   that their structure is up-to-date with respect to the current authored state
-   of the UsdStage.
+   request. I.e., it makes sure that all data flow nodes, and connections that
+   flow data between nodes, that are required to compute the requested values
+   are present in the network and that their structure is up-to-date with
+   respect to the current authored state of the UsdStage.
 2. It ensures that the request's schedule is up-to-date, and will re-schedule
    (including scheduling for the first time) if necessary.
 
@@ -114,13 +120,13 @@ things:
     execSystem.PrepareRequest(request);
 ```
 
-Note that explicitly preparing the request is optional; if we call `Compute`
-without first calling `PrepareRequest`, the call to `Compute` will prepare the
-request before computing. However, it is often desirable for client code to
-have explicit control over when the request is prepared, because of the cost of
-doing so. I.e., compiling and scheduling tend to be more expensive than
-computing, so it often makes sense to ensure these happen first, before multiple
-rounds of computation.
+Note that explicitly preparing the request is optional; if a client calls
+`Compute` without first calling `PrepareRequest`, the call to `Compute` will
+prepare the request before computing. However, it is often desirable for client
+code to have explicit control over *when* the request is prepared, because of
+the cost of doing so. Specifically, compiling and scheduling tend to be more
+expensive than evaluation, so it often makes sense to ensure that these happen
+first, before multiple rounds of computation.
 
 ## Compute values
 
@@ -136,11 +142,12 @@ ExecUsdCacheView object.
 ## Extract computed values
 
 To access the computed values, we call ExecUsdCacheView::Get to extract them,
-using indices that correspond to order of value keys in the vector used to build
-the request:
+using indices that correspond to the order of the value keys in the vector used
+to build the request:
 
 ```cpp
-    VtValue value = cache.Get(0);
+    VtValue value;
+    value = cache.Get(0);
     const GfMatrix4d a1LocalToWorld = value.Get<GfMatrix4d>();
     value = cache.Get(1);
     const GfMatrix4d a2LocalToWorld = value.Get<GfMatrix4d>();
@@ -194,7 +201,8 @@ Bringing this all together into a single block of example code:
         ExecUsdCacheView cache = execSystem.Compute(request);
 
         // Extract the values.
-        VtValue value = cache.Get(0);
+        VtValue value;
+        value = cache.Get(0);
         const GfMatrix4d a1LocalToWorld = value.Get<GfMatrix4d>();
         value = cache.Get(1);
         const GfMatrix4d a2LocalToWorld = value.Get<GfMatrix4d>();

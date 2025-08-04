@@ -12,6 +12,7 @@
    :caption: Learn
 
    intro
+   intro_to_openexec
    Terms and Concepts <glossary>
    Tutorials <tut_usd_tutorials>
    dl_downloads

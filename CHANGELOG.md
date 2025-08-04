@@ -1,6 +1,6 @@
 # Change Log
 
-## [25.08] - 2025-07-29
+## [25.08] - 2025-07-31
 
 This release includes the preview release of OpenExec. See more details in the
 OpenExec section below.
