@@ -154,6 +154,39 @@ pxr_register_test(testExecUsdMetadataInput
     TESTENV testExecUsdMetadataInput
 )
 
+pxr_build_test(testExecUsdCycleDetection
+    LIBRARIES
+        tf
+        plug
+        exec
+        execUsd
+        vdf
+        sdf
+        usd
+    CPPFILES
+        testenv/testExecUsdCycleDetection.cpp
+)
+
+pxr_install_test_dir(
+    SRC testenv/testExecUsdCycleDetection
+    DEST testExecUsdCycleDetection
+)
+
+function(pxr_register_test_ExecUsdCycleDetection TESTNAME)
+    pxr_register_test(testExecUsdCycleDetection_${TESTNAME}
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdCycleDetection ${TESTNAME}"
+        EXPECTED_RETURN_CODE 134
+        TESTENV testExecUsdCycleDetection
+        ENV TF_FATAL_VERIFY=0
+    )
+endfunction()
+
+pxr_register_test_ExecUsdCycleDetection(CyclicComputation)
+pxr_register_test_ExecUsdCycleDetection(CyclicComputationPair)
+pxr_register_test_ExecUsdCycleDetection(CyclicRelationshipComputation)
+pxr_register_test_ExecUsdCycleDetection(LargeCyclicRelationshipComputation)
+pxr_register_test_ExecUsdCycleDetection(CyclicAncestorComputation)
+
 pxr_build_test(testExecUsdRecompilation
     LIBRARIES
         exec

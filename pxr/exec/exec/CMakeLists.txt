@@ -73,6 +73,7 @@ pxr_library(exec
         registrationBarrier
         requestTracker
         runtime
+        taskCycleDetector
         uncompilationRuleSet
         uncompilationTable
         uncompilationTarget
