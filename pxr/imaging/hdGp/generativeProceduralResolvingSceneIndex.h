@@ -240,7 +240,7 @@ private:
     mutable _MapMutex _dependenciesMutex;
     mutable _MapMutex _proceduralsMutex;
 
-    TfToken _targetPrimTypeName;
+    const TfToken _targetPrimTypeName;
 
     bool _attemptAsync;
 };
