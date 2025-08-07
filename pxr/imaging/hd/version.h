@@ -116,8 +116,10 @@
 // 84 -> 85: Deprecate HdMaterialNetworkSchema::GetInterfaceMappings().
 //           Add HdMaterialNetworkSchema::GetInterface().
 //           Add HdMaterialInterfaceSchema, HdMaterialInterfaceParameterSchema.
+// 85 -> 86: Rename Hd[Typed|SchemaBased][Container|Vector]Schema to
+//           Hd[Container|Vector]Of[Schemas|TypedSampledDataSources]Schema.
 
-#define HD_API_VERSION 85
+#define HD_API_VERSION 86
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 #define HD_SHADER_API 2

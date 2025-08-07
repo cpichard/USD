@@ -472,7 +472,7 @@ bool TestContainerSchemas()
         TfToken("b"), HdRetainedTypedSampledDataSource<int>::New(2),
         TfToken("c"), HdRetainedTypedSampledDataSource<float>::New(3.0f));
 
-    HdTypedContainerSchema<HdIntDataSource> s1(c1);
+    HdContainerOfTypedSampledDataSourcesSchema<HdIntDataSource> s1(c1);
 
     if (!s1.Get(TfToken("a")) || !s1.Get(TfToken("b"))) {
         std::cerr << "expected int data source result" << std::endl;
