@@ -7,7 +7,6 @@
 #include "pxr/exec/exec/program.h"
 
 #include "pxr/exec/exec/invalidationResult.h"
-#include "pxr/exec/exec/parallelForRange.h"
 #include "pxr/exec/exec/timeChangeInvalidationResult.h"
 
 #include "pxr/base/tf/span.h"
