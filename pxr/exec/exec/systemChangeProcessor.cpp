@@ -71,6 +71,10 @@ ExecSystem::_ChangeProcessor::DidChangeInfoOnly(
                 _state->uncompiler.UncompileForSceneChange(
                     path, EsfEditReason::ChangedTargetPaths);
             }
+            else if (field == SdfFieldKeys->ConnectionPaths) {
+                _state->uncompiler.UncompileForSceneChange(
+                    path, EsfEditReason::ChangedConnectionPaths);
+            }
         }
     }
 }

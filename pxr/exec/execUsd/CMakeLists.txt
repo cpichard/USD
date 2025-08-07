@@ -36,6 +36,29 @@ pxr_library(execUsd
         docs/tutorial2DefiningComputations.md
 )
 
+pxr_build_test(testExecUsdAttributeComputations
+    LIBRARIES
+        tf
+        esf
+        exec
+        execUsd
+        vdf
+        usdGeom
+    CPPFILES
+        testenv/testExecUsdAttributeComputations.cpp
+)
+
+pxr_install_test_dir(
+    SRC testenv/testExecUsdAttributeComputations
+    DEST testExecUsdAttributeComputations
+)
+
+pxr_register_test(testExecUsdAttributeComputations
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdAttributeComputations"
+    EXPECTED_RETURN_CODE 0
+    TESTENV testExecUsdAttributeComputations
+)
+
 pxr_build_test(testExecUsdBasicCompilation
     LIBRARIES
         gf
@@ -62,29 +85,6 @@ pxr_register_test(testExecUsdBasicCompilation
     TESTENV testExecUsdBasicCompilation
 )
 
-pxr_build_test(testExecUsdAttributeComputations
-    LIBRARIES
-        tf
-        esf
-        exec
-        execUsd
-        vdf
-        usdGeom
-    CPPFILES
-        testenv/testExecUsdAttributeComputations.cpp
-)
-
-pxr_install_test_dir(
-    SRC testenv/testExecUsdAttributeComputations
-    DEST testExecUsdAttributeComputations
-)
-
-pxr_register_test(testExecUsdAttributeComputations
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdAttributeComputations"
-    EXPECTED_RETURN_CODE 0
-    TESTENV testExecUsdAttributeComputations
-)
-
 pxr_build_test(testExecUsdComputations
     LIBRARIES
         tf
@@ -106,6 +106,29 @@ pxr_register_test(testExecUsdComputations
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdComputations"
     EXPECTED_RETURN_CODE 0
     TESTENV testExecUsdComputations
+)
+
+pxr_build_test(testExecUsdConnectionTargetedObjects
+    LIBRARIES
+        tf
+        esf
+        exec
+        execUsd
+        vdf
+        usdGeom
+    CPPFILES
+        testenv/testExecUsdConnectionTargetedObjects.cpp
+)
+
+pxr_install_test_dir(
+    SRC testenv/testExecUsdConnectionTargetedObjects
+    DEST testExecUsdConnectionTargetedObjects
+)
+
+pxr_register_test(testExecUsdConnectionTargetedObjects
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdConnectionTargetedObjects"
+    EXPECTED_RETURN_CODE 0
+    TESTENV testExecUsdConnectionTargetedObjects
 )
 
 pxr_build_test(testExecUsdDispatchedComputations
