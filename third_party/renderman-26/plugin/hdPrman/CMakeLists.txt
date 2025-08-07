@@ -162,8 +162,9 @@ pxr_plugin(${PXR_PACKAGE}
         renderBuffer
         renderParam
         renderPass
-        renderPassSceneIndex
-        renderPassSceneIndexPlugin
+        renderPassPruneSceneIndexPlugin
+        renderPassVisibilitySceneIndex
+        renderPassVisibilitySceneIndexPlugin
         renderSettingsFilteringSceneIndexPlugin
         renderViewContext
         resourceRegistry

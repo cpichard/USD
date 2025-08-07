@@ -87,11 +87,17 @@
                         "priority": 0,
                         "displayName": "Prman ExtComputation Primvar Pruning Scene Index"
                     },
-                    "HdPrman_RenderPassSceneIndexPlugin" : {
+                    "HdPrman_RenderPassPruneSceneIndexPlugin" : {
                         "bases": ["HdSceneIndexPlugin"],
                         "loadWithRenderer": ["RenderMan RIS", "RenderMan XPU", "RenderMan XPU - CPU", "RenderMan XPU - GPU"],
                         "priority": 0,
-                        "displayName": "Prman Render Pass Scene Index"
+                        "displayName": "Prman Render Pass Prune Scene Index"
+                    },
+                    "HdPrman_RenderPassVisibilitySceneIndexPlugin" : {
+                        "bases": ["HdSceneIndexPlugin"],
+                        "loadWithRenderer": ["RenderMan RIS", "RenderMan XPU", "RenderMan XPU - CPU", "RenderMan XPU - GPU"],
+                        "priority": 0,
+                        "displayName": "Prman Render Pass Visibility Scene Index"
                     },
                     "HdPrman_RenderSettingsFilteringSceneIndexPlugin" : {
                         "bases": ["HdSceneIndexPlugin"],

@@ -109,6 +109,7 @@ pxr_library(hdSt
         renderDelegate
         renderParam
         renderPass
+        renderPassPruneSceneIndexPlugin
         renderPassShader
         renderPassState
         resourceRegistry
