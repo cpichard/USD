@@ -118,8 +118,9 @@
 //           Add HdMaterialInterfaceSchema, HdMaterialInterfaceParameterSchema.
 // 85 -> 86: Rename Hd[Typed|SchemaBased][Container|Vector]Schema to
 //           Hd[Container|Vector]Of[Schemas|TypedSampledDataSources]Schema.
+// 86 -> 87: Added HdContainerDataSourceEditor::ComputeDirtyLocators.
 
-#define HD_API_VERSION 86
+#define HD_API_VERSION 87
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 #define HD_SHADER_API 2
