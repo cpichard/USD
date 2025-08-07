@@ -165,7 +165,6 @@ pxr_plugin(${PXR_PACKAGE}
         renderSettingsFilteringSceneIndexPlugin
         renderViewContext
         resourceRegistry
-        retesselationSceneIndexPlugin
         rileyCameraPrim
         rileyCoordinateSystemPrim
         rileyClippingPlanePrim
@@ -188,6 +187,7 @@ pxr_plugin(${PXR_PACKAGE}
         rileySampleFilterPrim
         rileyTypes
         sceneIndexObserverApi
+        worldOffsetSceneIndexPlugin
         updateObjectSettingsSceneIndex
         updateObjectSettingsSceneIndexPlugin
         utils
