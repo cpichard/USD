@@ -194,13 +194,12 @@ public:
     Exec_MetadataInvalidationResult InvalidateMetadataValues(
         TfSpan<const std::pair<SdfPath, TfToken>> invalidFields);
 
-    /// Resets the accumulated set of uninitialized input nodes.
+    /// Resets the accumulated set of input nodes that require invalidation.
     /// 
-    /// Returns an executor invalidation requests with all the uninitialized
-    /// input node outputs for the call site to perform initialization and
+    /// Returns an executor invalidation requests for the call site to perform
     /// executor invalidation.
     /// 
-    VdfMaskedOutputVector ResetUninitializedInputNodes();
+    VdfMaskedOutputVector ResetInputNodesRequiringInvalidation();
 
     /// Gathers the information required to invalidate the system and notify
     /// requests after time has changed.
@@ -394,8 +393,8 @@ private:
     // must be re-computed.
     std::atomic<bool> _timeDependentOutputsValid;
 
-    // Input nodes currently queued for initialization.
-    std::vector<VdfId> _uninitializedInputNodes;
+    // Input nodes currently queued for invalidation.
+    std::vector<VdfId> _inputNodesRequiringInvalidation;
 
     // On behalf of the program intercepts and responds to fine-grained network
     // edits.

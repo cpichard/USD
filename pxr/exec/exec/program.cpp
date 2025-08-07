@@ -209,8 +209,8 @@ Exec_Program::InvalidateAttributeAuthoredValues(
     VdfMaskedOutputVector leafInvalidationRequest;
     leafInvalidationRequest.reserve(numInvalidAttributes);
     TfBits compiledProperties(numInvalidAttributes);
-    _uninitializedInputNodes.reserve(
-        _uninitializedInputNodes.size() + numInvalidAttributes);
+    _inputNodesRequiringInvalidation.reserve(
+        _inputNodesRequiringInvalidation.size() + numInvalidAttributes);
     EfTimeInterval totalInvalidInterval;
     bool isTimeDependencyChange = false;
 
@@ -248,8 +248,8 @@ Exec_Program::InvalidateAttributeAuthoredValues(
         }
 
         // Since this is an input node to the exec network, we need to make sure
-        // that it is re-initialized before the next round of evaluation.
-        _uninitializedInputNodes.push_back(node->GetId());
+        // that executors are invalidated before the next round of evaluation.
+        _inputNodesRequiringInvalidation.push_back(node->GetId());
 
         // Queue the input node's output(s) for leaf node invalidation.
         leafInvalidationRequest.emplace_back(
@@ -298,8 +298,8 @@ Exec_Program::InvalidateMetadataValues(
     VdfMaskedOutputVector leafInvalidationRequest;
     leafInvalidationRequest.reserve(numInvalidFields);
     TfBits compiledProperties(numInvalidFields);
-    _uninitializedInputNodes.reserve(
-        _uninitializedInputNodes.size() + numInvalidFields);
+    _inputNodesRequiringInvalidation.reserve(
+        _inputNodesRequiringInvalidation.size() + numInvalidFields);
 
     for (size_t i = 0; i < numInvalidFields; ++i) {
         const auto it = _metadataInputNodes.find(invalidFields[i]);
@@ -312,8 +312,8 @@ Exec_Program::InvalidateMetadataValues(
         Exec_MetadataInputNode *const node = it->second;
 
         // Since this is an input node to the exec network, we need to make sure
-        // that it is re-initialized before the next round of evaluation.
-        _uninitializedInputNodes.push_back(node->GetId());
+        // that executors are invalidated before the next round of evaluation.
+        _inputNodesRequiringInvalidation.push_back(node->GetId());
 
         // Queue the input node's output(s) for leaf node invalidation.
         leafInvalidationRequest.emplace_back(
@@ -383,9 +383,9 @@ Exec_Program::InvalidateTime(const EfTime &oldTime, const EfTime &newTime)
 }
 
 VdfMaskedOutputVector
-Exec_Program::ResetUninitializedInputNodes()
+Exec_Program::ResetInputNodesRequiringInvalidation()
 {
-    if (_uninitializedInputNodes.empty()) {
+    if (_inputNodesRequiringInvalidation.empty()) {
         return {};
     }
 
@@ -394,8 +394,8 @@ Exec_Program::ResetUninitializedInputNodes()
     // Collect the invalid outputs for all invalid input nodes accumulated
     // through previous rounds of authored value invalidation.
     VdfMaskedOutputVector invalidationRequest;
-    invalidationRequest.reserve(_uninitializedInputNodes.size());
-    for (const VdfId nodeId : _uninitializedInputNodes) {
+    invalidationRequest.reserve(_inputNodesRequiringInvalidation.size());
+    for (const VdfId nodeId : _inputNodesRequiringInvalidation) {
         VdfNode *const node = _network.GetNodeById(nodeId);
 
         // Some nodes may have been uncompiled since they were marked as being
@@ -408,7 +408,7 @@ Exec_Program::ResetUninitializedInputNodes()
             node->GetOutput(), VdfMask::AllOnes(1));
     }
 
-    _uninitializedInputNodes.clear();
+    _inputNodesRequiringInvalidation.clear();
 
     return invalidationRequest;
 }

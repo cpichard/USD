@@ -80,10 +80,10 @@ ExecSystem::_Compute(
 {
     TRACE_FUNCTION();
 
-    // Reset the accumulated uninitialized input nodes on the program, and
-    // retain the invalidation request for executor invalidation below.
+    // Reset the accumulated input nodes requiring invalidation on the program,
+    // and retain the invalidation request for executor invalidation below.
     const VdfMaskedOutputVector invalidationRequest =
-        _program->ResetUninitializedInputNodes();
+        _program->ResetInputNodesRequiringInvalidation();
 
     // Make sure that the executor data manager is properly invalidated for any
     // input nodes that were just initialized.
