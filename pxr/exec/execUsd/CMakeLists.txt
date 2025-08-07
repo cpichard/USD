@@ -85,7 +85,7 @@ pxr_register_test(testExecUsdBasicCompilation
     TESTENV testExecUsdBasicCompilation
 )
 
-pxr_build_test(testExecUsdComputations
+pxr_build_test(testExecUsdCallbacks
     LIBRARIES
         tf
         esf
@@ -94,18 +94,18 @@ pxr_build_test(testExecUsdComputations
         vdf
         usdGeom
     CPPFILES
-        testenv/testExecUsdComputations.cpp
+        testenv/testExecUsdCallbacks.cpp
 )
 
 pxr_install_test_dir(
-    SRC testenv/testExecUsdComputations
-    DEST testExecUsdComputations
+    SRC testenv/testExecUsdCallbacks
+    DEST testExecUsdCallbacks
 )
 
-pxr_register_test(testExecUsdComputations
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdComputations"
+pxr_register_test(testExecUsdCallbacks
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdCallbacks"
     EXPECTED_RETURN_CODE 0
-    TESTENV testExecUsdComputations
+    TESTENV testExecUsdCallbacks
 )
 
 pxr_build_test(testExecUsdConnectionTargetedObjects
