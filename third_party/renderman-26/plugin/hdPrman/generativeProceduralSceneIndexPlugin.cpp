@@ -7,7 +7,6 @@
 #include "hdPrman/generativeProceduralSceneIndexPlugin.h"
 #include "hdPrman/tokens.h"
 #include "pxr/imaging/hdGp/generativeProceduralResolvingSceneIndex.h"
-#include "pxr/imaging/hdGp/generativeProceduralPluginRegistry.h"
 #include "pxr/imaging/hdGp/sceneIndexPlugin.h"
 #include "pxr/imaging/hd/sceneIndexPluginRegistry.h"
 #include "pxr/base/tf/envSetting.h"
@@ -49,12 +48,6 @@ HdPrman_GenerativeProceduralSceneIndexPlugin::_AppendSceneIndex(
     const HdSceneIndexBaseRefPtr &inputScene,
     const HdContainerDataSourceHandle &inputArgs)
 {
-    // Ensure that procedurals are discovered are prior to the scene index
-    // querying for specific procedurals. Absence of this was causing a test
-    // case to non-deterministically fail due to not finding a registered
-    // procedural.
-    HdGpGenerativeProceduralPluginRegistry::GetInstance();
-
     return HdGpGenerativeProceduralResolvingSceneIndex::New(inputScene);
 }
 

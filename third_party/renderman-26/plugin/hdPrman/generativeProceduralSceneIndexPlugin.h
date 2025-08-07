@@ -9,6 +9,7 @@
 
 #include "pxr/imaging/hd/sceneIndexPlugin.h"
 #include "pxr/imaging/hd/sceneIndexPluginRegistry.h"
+#include "hdPrman/api.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
