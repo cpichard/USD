@@ -67,6 +67,7 @@ Linux
 
 * **OS**: CentOS Linux 7
 * **CPU**: AMD EPYC 7763 64-Core Processor, 2450 Mhz
+* **CPU Utilization**: 31 Core(s), 31 Logical Processor(s) (no hyperthreading)
 * **RAM**: 117GB
 * **GPU**: NVIDIA RTXA6000-24Q
 
@@ -82,7 +83,8 @@ Windows
 =======
 
 * **OS**: Microsoft Windows 11 Enterprise
-* **CPU**: AMD EPYC 7763 64-Core Processor, 2450 Mhz, 31 Core(s), 31 Logical Processor(s)
+* **CPU**: AMD EPYC 7763 64-Core Processor, 2450 Mhz
+* **CPU Utilization**: 31 Core(s), 31 Logical Processor(s) (no hyperthreading)
 * **RAM**: 128GB
 * **GPU**: NVIDIA RTXA6000-24Q
 
@@ -118,7 +120,7 @@ data from the four most recent releases is reported on a rolling basis.
     For 25.08, the "render first image" metric on macOS is reported. This
     reported metric does not include platform-specific imaging initialization
     time, which is included in the corresponding Linux and Windows metrics.
-    In the upcoming 25.11 release, historical performance re-evaluations will
+    For the 25.11 release, historical performance re-evaluations will
     be performed on all platforms to exclude imaging initialization time from
     all "render first image" datapoints. The initialization time is roughly
     constant across all assets, around 0.3-0.4 seconds.
