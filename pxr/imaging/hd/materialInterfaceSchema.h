@@ -15,14 +15,13 @@
 /* **                                                                      ** */
 /* ************************************************************************** */
 
-#ifndef PXR_IMAGING_HD_MATERIAL_NETWORK_SCHEMA_H
-#define PXR_IMAGING_HD_MATERIAL_NETWORK_SCHEMA_H
+#ifndef PXR_IMAGING_HD_MATERIAL_INTERFACE_SCHEMA_H
+#define PXR_IMAGING_HD_MATERIAL_INTERFACE_SCHEMA_H
 
 /// \file
 
 #include "pxr/imaging/hd/api.h"
 #include "pxr/imaging/hd/schemaTypeDefs.h"
-#include "pxr/imaging/hd/materialInterfaceSchema.h"
 
 #include "pxr/imaging/hd/schema.h"
 
@@ -34,33 +33,28 @@ PXR_NAMESPACE_OPEN_SCOPE
 // --(BEGIN CUSTOM CODE: Declares)--
 // --(END CUSTOM CODE: Declares)--
 
-#define HD_MATERIAL_NETWORK_SCHEMA_TOKENS \
-    (nodes) \
-    (terminals) \
-    (interface) \
-    (config) \
+#define HD_MATERIAL_INTERFACE_SCHEMA_TOKENS \
+    (parameters) \
+    (parameterOrder) \
 
-TF_DECLARE_PUBLIC_TOKENS(HdMaterialNetworkSchemaTokens, HD_API,
-    HD_MATERIAL_NETWORK_SCHEMA_TOKENS);
+TF_DECLARE_PUBLIC_TOKENS(HdMaterialInterfaceSchemaTokens, HD_API,
+    HD_MATERIAL_INTERFACE_SCHEMA_TOKENS);
 
 //-----------------------------------------------------------------------------
 
 
-/// \class HdMaterialNetworkSchema
+/// \class HdMaterialInterfaceSchema
 ///
-/// The MaterialNetwork schema is a container schema that defines a material
-/// for a specific render context. A network is composed of nodes, terminals,
-/// and interface.
+/// The MaterialInterface schema describes a material's interface parameters,
+/// also known as public UI parameters.
 ///
-/// See also the Material schema documentation for ASCII art diagram.
-///
-class HdMaterialNetworkSchema : public HdSchema
+class HdMaterialInterfaceSchema : public HdSchema
 {
 public:
     /// \name Schema retrieval
     /// @{
 
-    HdMaterialNetworkSchema(HdContainerDataSourceHandle container)
+    HdMaterialInterfaceSchema(HdContainerDataSourceHandle container)
       : HdSchema(container) {}
 
     /// @}
@@ -71,24 +65,17 @@ public:
     /// \name Member accessor
     /// @{
 
-    /// Maps node names to material nodes. Each material node is a container
-    /// that is defined by the MaterialNode schema. The topology of the
-    /// network is expressed by the connections found on each material node.
+    /// A container for all the material's interface parameters.
     HD_API
-    HdMaterialNodeContainerSchema GetNodes() const;
+    HdMaterialInterfaceParameterContainerSchema GetParameters() const;
 
-    /// Maps terminal names to material connections. Each connection is a
-    /// container defined by the MaterialConnection schema.
+    /// Provides the intended order of the interface parameters for UI
+    /// purposes. Any member of 'parameters' that is not found in this list
+    /// can come after all listed members. The order of display groups is
+    /// implicitly encoded. As this list is traversed, display groups are
+    /// ordered by first encounter.
     HD_API
-    HdMaterialConnectionContainerSchema GetTerminals() const;
-
-    /// Describes the material's interface (public UI). A material's public
-    /// interface has user-authored order, grouping, naming, and mappings.
-    HD_API
-    HdMaterialInterfaceSchema GetInterface() const;
-
-    HD_API
-    HdSampledDataSourceContainerSchema GetConfig() const; 
+    HdTokenArrayDataSourceHandle GetParameterOrder() const; 
 
     /// @} 
 
@@ -105,13 +92,11 @@ public:
     HD_API
     static HdContainerDataSourceHandle
     BuildRetained(
-        const HdContainerDataSourceHandle &nodes,
-        const HdContainerDataSourceHandle &terminals,
-        const HdContainerDataSourceHandle &interface,
-        const HdContainerDataSourceHandle &config
+        const HdContainerDataSourceHandle &parameters,
+        const HdTokenArrayDataSourceHandle &parameterOrder
     );
 
-    /// \class HdMaterialNetworkSchema::Builder
+    /// \class HdMaterialInterfaceSchema::Builder
     /// 
     /// Utility class for setting sparse sets of child data source fields to be
     /// filled as arguments into BuildRetained. Because all setter methods
@@ -121,27 +106,19 @@ public:
     {
     public:
         HD_API
-        Builder &SetNodes(
-            const HdContainerDataSourceHandle &nodes);
+        Builder &SetParameters(
+            const HdContainerDataSourceHandle &parameters);
         HD_API
-        Builder &SetTerminals(
-            const HdContainerDataSourceHandle &terminals);
-        HD_API
-        Builder &SetInterface(
-            const HdContainerDataSourceHandle &interface);
-        HD_API
-        Builder &SetConfig(
-            const HdContainerDataSourceHandle &config);
+        Builder &SetParameterOrder(
+            const HdTokenArrayDataSourceHandle &parameterOrder);
 
         /// Returns a container data source containing the members set thus far.
         HD_API
         HdContainerDataSourceHandle Build();
 
     private:
-        HdContainerDataSourceHandle _nodes;
-        HdContainerDataSourceHandle _terminals;
-        HdContainerDataSourceHandle _interface;
-        HdContainerDataSourceHandle _config;
+        HdContainerDataSourceHandle _parameters;
+        HdTokenArrayDataSourceHandle _parameterOrder;
 
     };
 

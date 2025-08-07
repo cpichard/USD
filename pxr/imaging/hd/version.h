@@ -113,8 +113,11 @@
 // 82 -> 83: Added overloads for HdRendererPlugin::IsSupported and
 //           HdRendererPluginRegistry::GetDefaultPluginId.
 // 83 -> 84: Added HdDataSourceLocatorSentinelTokens.
+// 84 -> 85: Deprecate HdMaterialNetworkSchema::GetInterfaceMappings().
+//           Add HdMaterialNetworkSchema::GetInterface().
+//           Add HdMaterialInterfaceSchema, HdMaterialInterfaceParameterSchema.
 
-#define HD_API_VERSION 84
+#define HD_API_VERSION 85
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 #define HD_SHADER_API 2

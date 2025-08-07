@@ -46,6 +46,8 @@ using HdMaterialNetworkContainerSchema =
     HdSchemaBasedContainerSchema<class HdMaterialNetworkSchema>;
 using HdMaterialConnectionContainerSchema =
     HdSchemaBasedContainerSchema<HdMaterialConnectionSchema>;
+using HdMaterialInterfaceParameterContainerSchema =
+    HdSchemaBasedContainerSchema<class HdMaterialInterfaceParameterSchema>;
 using HdExtComputationInputComputationContainerSchema =
     HdSchemaBasedContainerSchema<class HdExtComputationInputComputationSchema>;
 using HdExtComputationOutputContainerSchema =
@@ -56,8 +58,6 @@ using HdSampledDataSourceContainerContainerSchema =
 // Containers of vectors of schemas
 using HdMaterialConnectionVectorContainerSchema =
     HdSchemaBasedContainerSchema<HdMaterialConnectionVectorSchema>;
-using HdMaterialInterfaceMappingsContainerSchema =
-    HdSchemaBasedContainerSchema<HdMaterialInterfaceMappingVectorSchema>;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
