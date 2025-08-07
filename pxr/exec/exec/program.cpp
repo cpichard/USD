@@ -83,13 +83,18 @@ public:
             _program->_compiledLeafNodeCache.WillDeleteNode(leafNode);
         }
 
-        // Unregister this node if it is an attribute input node.
+        // Unregister this node if it is an attribute input node or a metadata
+        // input node.
         // 
         // The edit monitor captures both node deletion through
         // DisconnectAndDeleteNode() as well as isolated sub-network deletion.
-        if (const Exec_AttributeInputNode *const inputNode = 
+        else if (const Exec_AttributeInputNode *const inputNode = 
                 dynamic_cast<const Exec_AttributeInputNode *const>(node)) {
             _program->_UnregisterAttributeInputNode(inputNode);
+        }
+        else if (const Exec_MetadataInputNode *const inputNode = 
+                dynamic_cast<const Exec_MetadataInputNode *const>(node)) {
+            _program->_UnregisterMetadataInputNode(inputNode);
         }
 
         _program->_nodeRecompilationInfoTable.WillDeleteNode(node);
@@ -281,6 +286,55 @@ Exec_Program::InvalidateAttributeAuthoredValues(
         std::move(compiledProperties),
         totalInvalidInterval,
         isTimeDependencyChange};
+}
+
+Exec_MetadataInvalidationResult
+Exec_Program::InvalidateMetadataValues(
+    TfSpan<const std::pair<SdfPath, TfToken>> invalidFields)
+{
+    TRACE_FUNCTION();
+
+    const size_t numInvalidFields = invalidFields.size();
+
+    VdfMaskedOutputVector leafInvalidationRequest;
+    leafInvalidationRequest.reserve(numInvalidFields);
+    TfBits compiledProperties(numInvalidFields);
+    _uninitializedInputNodes.reserve(
+        _uninitializedInputNodes.size() + numInvalidFields);
+
+    for (size_t i = 0; i < numInvalidFields; ++i) {
+        const auto it = _metadataInputNodes.find(invalidFields[i]);
+
+        // The corresponding metadata input may not have been compiled.
+        if (it == _metadataInputNodes.end()) {
+            continue;
+        }
+
+        Exec_MetadataInputNode *const node = it->second;
+
+        // Since this is an input node to the exec network, we need to make sure
+        // that it is re-initialized before the next round of evaluation.
+        _uninitializedInputNodes.push_back(node->GetId());
+
+        // Queue the input node's output(s) for leaf node invalidation.
+        leafInvalidationRequest.emplace_back(
+            node->GetOutput(), VdfMask::AllOnes(1));
+    }
+
+    // Find all the leaf nodes reachable from the input nodes.
+    //
+    // We won't ask the leaf node cache to incur the cost of performing
+    // incremental updates on the resulting cached traversal, because it is not
+    // guaranteed that we will repeatedly see the exact same authored value
+    // invalidation across rounds of structural change processing (in contrast
+    // to time invalidation).
+    const std::vector<const VdfNode *> &leafNodes = _leafNodeCache.FindNodes(
+        leafInvalidationRequest, /* updateIncrementally */ false);
+
+    return {
+        std::move(leafInvalidationRequest),
+        leafNodes
+    };
 }
 
 Exec_TimeChangeInvalidationResult
@@ -489,6 +543,33 @@ Exec_Program::_UnregisterAttributeInputNode(
     }
     
     _attributeInputNodes.unsafe_erase(it);
+}
+
+void
+Exec_Program::_RegisterMetadataInputNode(
+    Exec_MetadataInputNode *const inputNode)
+{
+    const auto [it, emplaced] = _metadataInputNodes.emplace(
+        std::piecewise_construct,
+        std::forward_as_tuple(
+            inputNode->GetObjectPath(),
+            inputNode->GetMetadataKey()),
+        std::forward_as_tuple(inputNode));
+    TF_VERIFY(emplaced);
+}
+
+void
+Exec_Program::_UnregisterMetadataInputNode(
+    const Exec_MetadataInputNode *const inputNode)
+{
+    const SdfPath &objectPath = inputNode->GetObjectPath();
+    const TfToken &metadataKey = inputNode->GetMetadataKey();
+    const auto it = _metadataInputNodes.find({objectPath, metadataKey});
+    if (!TF_VERIFY(it != _metadataInputNodes.end())) {
+        return;
+    }
+    
+    _metadataInputNodes.unsafe_erase(it);
 }
 
 void

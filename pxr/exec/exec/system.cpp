@@ -208,4 +208,35 @@ ExecSystem::_InvalidateAttributeValues(TfSpan<const SdfPath> invalidAttributes)
     });
 }
 
+void
+ExecSystem::_InvalidateMetadataValues(
+    TfSpan<const std::pair<SdfPath, TfToken>> invalidObjects)
+{
+    TRACE_FUNCTION();
+
+    const Exec_MetadataInvalidationResult invalidationResult =
+        _program->InvalidateMetadataValues(invalidObjects);
+
+    const EfTimeInterval fullTimeInterval = EfTimeInterval::GetFullInterval();
+
+    // Invalidate the executor and send request invalidation.
+    WorkWithScopedDispatcher(
+        [&runtime = _runtime, &invalidationResult,
+         &requestTracker = _requestTracker,
+         &fullTimeInterval]
+        (WorkDispatcher &dispatcher){
+        // Invalidate values in the page cache.
+        dispatcher.Run([&](){
+            runtime->InvalidatePageCache(
+                invalidationResult.invalidationRequest,
+                fullTimeInterval);
+        });
+
+        // Notify all the requests of computed value invalidation. Not all the
+        // requests will contain all the invalid leaf nodes, and the request
+        // impls are responsible for filtering the provided information.
+        requestTracker->DidInvalidateComputedValues(invalidationResult);
+    });
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
