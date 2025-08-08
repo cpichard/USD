@@ -676,6 +676,11 @@ pxr_install_test_dir(
     DEST testUsdImagingGLMaterialsAndInstancers
 )
 
+pxr_install_test_dir(
+    SRC testenv/testUsdImagingGLUsdRenderPass
+    DEST testUsdImagingGLUsdRenderPass
+)
+
 #
 # Register tests that don't depend on build configuration or external libraries
 # (such as MaterialX, OpenVDB, PTEX).
@@ -5023,6 +5028,19 @@ pxr_register_test(testUsdImagingGLMaterialsAndInstancers_materialAsNiInstance
     TESTENV testUsdImagingGLMaterialsAndInstancers
     ENV
         USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true)
+
+pxr_register_test(testUsdImagingGLUsdRenderPass
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --disableCameraLight --renderPassPrimPath /Render/Passes/nospheres input.usda nospheres.exr"
+    IMAGE_DIFF_COMPARE
+        nospheres.exr
+    FAIL 1
+    FAIL_PERCENT 1
+    PERCEPTUAL
+    EXPECTED_RETURN_CODE 0
+    TESTENV testUsdImagingGLUsdRenderPass
+    ENV
+       USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true)
 
 #
 # Conditionally install and register MaterialX tests
