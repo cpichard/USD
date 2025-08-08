@@ -884,8 +884,11 @@ SdrShaderProperty::_ConvertExpressions(
 {
     const TfToken& shownIf = SdrPropertyMetadata->ShownIf;
     if (_metadata.count(shownIf) == 0) {
-        _metadata[shownIf] = ShaderMetadataHelpers::ComputeShownIfFromMetadata(
+        std::string expr = ShaderMetadataHelpers::ComputeShownIfFromMetadata(
             this, properties, shader);
+        if (!expr.empty()) {
+            _metadata[shownIf] = expr;
+        }
     }
 }
 
