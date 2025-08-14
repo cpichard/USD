@@ -346,11 +346,54 @@ private:
             }
         }
 
-        // Clear the current object to make it clear that the traversal has
-        // terminated.
+        // Clear the current object, because the traversal has terminated.
         _currentObjectVariant = std::monostate{};
         _currentObject = nullptr;
         _currentRelationship = nullptr;
+
+        return outputKeys;
+    }
+
+    // Returns the ouput keys for the objects targeted by the connections of the
+    // currrent attribute, for the computation of the given name and result
+    // type.
+    //
+    // The current object must be a valid attribute prior to calling this
+    // method.
+    //
+    Exec_OutputKeyVector _TraverseToConnectionTargetedObjects(
+        const TfToken &computationName,
+        const TfType resultType)
+    {
+        if (!TF_VERIFY(_currentAttribute->IsValid(_journal))) {
+            return {};
+        }
+
+        Exec_OutputKeyVector outputKeys;
+
+        for (const SdfPath &path : _currentAttribute->GetConnections(_journal)) {
+            if (!_TraverseToAbsolutePath(path)) {
+                continue;
+            }
+
+            // Note that there's no way to directly request metadata via an
+            // attribute connection, so we just pass an empty key.
+            if (const Exec_ComputationDefinition *const computationDefinition =
+                _FindComputationDefinition(
+                    computationName,
+                    resultType,
+                    /* metadataKey */ TfToken())) {
+                outputKeys.emplace_back(
+                    _currentObject->AsObject(),
+                    _GetDispatchingConfigKeyForOutputKey(computationDefinition),
+                    computationDefinition);
+            }
+        }
+
+        // Clear the current object since the traversal has terminated.
+        _currentObjectVariant = std::monostate{};
+        _currentObject = nullptr;
+        _currentAttribute = nullptr;
 
         return outputKeys;
     }
@@ -514,6 +557,12 @@ private:
         case ExecProviderResolution::DynamicTraversal::
             RelationshipTargetedObjects:
             return _TraverseToRelationshipTargetedObjects(
+                inputKey.computationName,
+                inputKey.resultType);
+            
+        case ExecProviderResolution::DynamicTraversal::
+            ConnectionTargetedObjects:
+            return _TraverseToConnectionTargetedObjects(
                 inputKey.computationName,
                 inputKey.resultType);
             

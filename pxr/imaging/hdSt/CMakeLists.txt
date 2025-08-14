@@ -72,6 +72,7 @@ pxr_library(hdSt
         drawItemInstance
         drawTarget
         drawTargetRenderPassState
+        dynamicCubemapTextureObject
         dynamicUvTextureObject
         extComputation
         extCompCpuComputation
@@ -108,6 +109,7 @@ pxr_library(hdSt
         renderDelegate
         renderParam
         renderPass
+        renderPassPruneSceneIndexPlugin
         renderPassShader
         renderPassState
         resourceRegistry
@@ -140,6 +142,7 @@ pxr_library(hdSt
 
     PUBLIC_HEADERS
         api.h
+        dynamicCubemapTextureImplementation.h
         dynamicUvTextureImplementation.h
         enums.h
 
