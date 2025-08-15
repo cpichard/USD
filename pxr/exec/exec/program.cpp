@@ -562,8 +562,8 @@ Exec_Program::_UnregisterMetadataInputNode(
     const Exec_MetadataInputNode *const inputNode)
 {
     const SdfPath &objectPath = inputNode->GetObjectPath();
-    const TfToken &metadataKey = inputNode->GetMetadataKey();
-    const auto it = _metadataInputNodes.find({objectPath, metadataKey});
+    const TfToken &disambiguatingId = inputNode->GetMetadataKey();
+    const auto it = _metadataInputNodes.find({objectPath, disambiguatingId});
     if (!TF_VERIFY(it != _metadataInputNodes.end())) {
         return;
     }

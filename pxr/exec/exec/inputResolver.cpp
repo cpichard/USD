@@ -318,7 +318,8 @@ private:
     //
     Exec_OutputKeyVector _TraverseToRelationshipTargetedObjects(
         const TfToken &computationName,
-        const TfType resultType)
+        const TfType resultType,
+        const TfToken &disambiguatingId)
     {
         if (!TF_VERIFY(_currentRelationship->IsValid(_journal))) {
             return {};
@@ -332,13 +333,11 @@ private:
                 continue;
             }
 
-            // Note that there's no way to directly request metadata via a
-            // relationship target, so we just pass an empty key.
             if (const Exec_ComputationDefinition *const computationDefinition =
                 _FindComputationDefinition(
                     computationName,
                     resultType,
-                    /* metadataKey */ TfToken())) {
+                    disambiguatingId)) {
                 outputKeys.emplace_back(
                     _currentObject->AsObject(),
                     _GetDispatchingConfigKeyForOutputKey(computationDefinition),
@@ -363,7 +362,8 @@ private:
     //
     Exec_OutputKeyVector _TraverseToConnectionTargetedObjects(
         const TfToken &computationName,
-        const TfType resultType)
+        const TfType resultType,
+        const TfToken &disambiguatingId)
     {
         if (!TF_VERIFY(_currentAttribute->IsValid(_journal))) {
             return {};
@@ -376,13 +376,11 @@ private:
                 continue;
             }
 
-            // Note that there's no way to directly request metadata via an
-            // attribute connection, so we just pass an empty key.
             if (const Exec_ComputationDefinition *const computationDefinition =
                 _FindComputationDefinition(
                     computationName,
                     resultType,
-                    /* metadataKey */ TfToken())) {
+                    disambiguatingId)) {
                 outputKeys.emplace_back(
                     _currentObject->AsObject(),
                     _GetDispatchingConfigKeyForOutputKey(computationDefinition),
@@ -414,6 +412,7 @@ private:
     bool _TraverseToNamespaceAncestor(
         const TfToken &computationName,
         const TfType resultType,
+        const TfToken &disambiguatingId,
         const Exec_ComputationDefinition **const foundComputationDefinition)
     {
         if (!TF_VERIFY(_currentPrim && !_currentPrim->IsPseudoRoot())) {
@@ -434,12 +433,10 @@ private:
                     _dispatchingSchemaKey,
                     _journal);
 
-            // Note that there's no way to directly request metadata from a
-            // namespace ancestor, so we just pass an empty key.
             if (computationDefinition &&
                 computationDefinition->GetResultType(
                     *_currentPrim,
-                    /* metadataKey */ TfToken(),
+                    disambiguatingId,
                     _journal) ==
                 resultType) {
                 *foundComputationDefinition = computationDefinition;
@@ -462,13 +459,11 @@ private:
     //
     // If found, the returned definition may refer to a prim computation or an
     // attribute computation. If not found, this returns nullptr.
-    //
-    // \p metadataKey is only used for the computeMetadata builtin computation.
     // 
     const Exec_ComputationDefinition *_FindComputationDefinition(
         const TfToken &computationName,
         const TfType resultType,
-        const TfToken &metadataKey) const
+        const TfToken &disambiguatingId) const
     {
         const Exec_ComputationDefinition *computationDefinition = nullptr;
 
@@ -499,7 +494,7 @@ private:
         if (resultType.IsUnknown() ||
             resultType ==
             computationDefinition->GetResultType(
-                *_currentObject, metadataKey, _journal)) {
+                *_currentObject, disambiguatingId, _journal)) {
             return computationDefinition;
         }
 
@@ -551,25 +546,28 @@ private:
             computationDefinition = _FindComputationDefinition(
                 inputKey.computationName,
                 inputKey.resultType,
-                inputKey.metadataKey);
+                inputKey.disambiguatingId);
             break;
             
         case ExecProviderResolution::DynamicTraversal::
             RelationshipTargetedObjects:
             return _TraverseToRelationshipTargetedObjects(
                 inputKey.computationName,
-                inputKey.resultType);
+                inputKey.resultType,
+                inputKey.disambiguatingId);
             
         case ExecProviderResolution::DynamicTraversal::
             ConnectionTargetedObjects:
             return _TraverseToConnectionTargetedObjects(
                 inputKey.computationName,
-                inputKey.resultType);
+                inputKey.resultType,
+                inputKey.disambiguatingId);
             
         case ExecProviderResolution::DynamicTraversal::NamespaceAncestor:
             if (!_TraverseToNamespaceAncestor(
                 inputKey.computationName,
                 inputKey.resultType,
+                inputKey.disambiguatingId,
                 &computationDefinition)) {
                 return {};
             }
@@ -584,7 +582,7 @@ private:
             {_currentObject->AsObject(),
              _GetDispatchingConfigKeyForOutputKey(computationDefinition),
              computationDefinition,
-             inputKey.metadataKey}
+             inputKey.disambiguatingId}
         };
     }
 

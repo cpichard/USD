@@ -212,8 +212,8 @@ public:
         const Exec_InputKey inputKey {
             _tokens->inputName,
             computationName,
-            resultType,
             /* metadataKey */ TfToken(),
+            resultType,
             ExecProviderResolution {
                 localTraversal,
                 dynamicTraversal
