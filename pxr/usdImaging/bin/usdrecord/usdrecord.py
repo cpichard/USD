@@ -171,12 +171,12 @@ def main() -> int:
             'Indicates if the default camera lights should not be used '
             'for rendering.'))
 
-    parser.add_argument('--resolver',
-        dest='resolver',
+    parser.add_argument('--resolverContext',
+        dest='resolverContext',
         choices=['root', 'inherit'],
         default='root',
         help=(
-            'Indicates which resolver to use. '
+            'Indicates which resolver context to use. '
             'Choosing "root" will create a resolver based on the '
             'rootLayer. Choosing "inherit" will inherit the '
             'incoming resolver from the environment.'))
@@ -272,7 +272,7 @@ def main() -> int:
 
     # Create the proper resolver to pass to the usd stage.
     resolver = Ar.GetResolver()
-    if args.resolver == 'inherit':
+    if args.resolverContext == 'inherit':
         resolverContext = resolver.CreateDefaultContext()
     else:
         resolverContext = resolver.CreateDefaultContextForAsset(args.usdFilePath)
