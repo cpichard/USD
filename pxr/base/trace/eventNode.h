@@ -151,7 +151,7 @@ private:
     TimeStamp _endTime;
     // Empirical results show ~75% of nodes have < 2 children.
     TfSmallVector<TraceEventNodeRefPtr, 1> _children;
-    TfPointerAndBits<AttributeMap> _attributesAndSeparateEvents;;
+    TfPointerAndBits<AttributeMap> _attributesAndSeparateEvents;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
