@@ -60,9 +60,6 @@ Trace_AggregateTreeBuilder::_CreateAggregateNodes()
         treeStack.push(std::make_pair(*it, 0));
     }
     
-    // A valid id needed for node creation.
-    TraceAggregateNode::Id id = TraceAggregateNode::Id(TraceThreadId());
-
     while (!treeStack.empty()) {
         TreeIt it = treeStack.top();
         treeStack.pop();
@@ -77,7 +74,7 @@ Trace_AggregateTreeBuilder::_CreateAggregateNodes()
             }
 
             TraceAggregateNodePtr newNode = aggStack.top()->Append(
-                id, it.first->GetKey(), duration);
+                it.first->GetKey(), duration);
             aggStack.push(newNode);
         }
         // When there are no more children to visit, pop the aggregate tree
