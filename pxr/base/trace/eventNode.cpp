@@ -12,6 +12,12 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 TraceEventNodeRefPtr
+TraceEventNode::New() {
+    return TraceEventNode::New(
+        TfToken("root"), TraceCategory::Default, 0, 0, {}, false);
+}
+
+TraceEventNodeRefPtr
 TraceEventNode::Append(
     const TfToken &key, 
     TraceCategoryId category, 
@@ -22,7 +28,7 @@ TraceEventNode::Append(
     TraceEventNodeRefPtr n = 
         TraceEventNode::New(
             key, category, beginTime, endTime, {}, separateEvents);
-    Append(std::move(n)); 
+    Append(n);
     return n;
 }
 
@@ -54,17 +60,27 @@ const TraceEventNode::AttributeMap&
 TraceEventNode::GetAttributes() const
 {
     static const AttributeMap empty;
-    return _attributesAndSeparateEvents.Get() ? *_attributesAndSeparateEvents: empty;
+    if (AttributeMap const *attrMap = _attributesAndSeparateEvents.Get()) {
+        return *attrMap;
+    }
+    return empty;
 }
 
 void
 TraceEventNode::AddAttribute(
-    const TfToken& key, const AttributeData& attr)
+    const TfToken& key, AttributeData&& attr)
 {
     if (!_attributesAndSeparateEvents.Get()) {
         _attributesAndSeparateEvents.Set(new AttributeMap);
     }
-    _attributesAndSeparateEvents->emplace(key, attr);
+    _attributesAndSeparateEvents->emplace(key, std::move(attr));
 }
+
+void
+TraceEventNode::_DeleteAttrMap(AttributeMap *attrMap)
+{
+    delete attrMap;
+}
+
 
 PXR_NAMESPACE_CLOSE_SCOPE

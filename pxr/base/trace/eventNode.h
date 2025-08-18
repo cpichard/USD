@@ -34,7 +34,7 @@ TF_DECLARE_REF_PTRS(TraceEventNode);
 /// useful for timeline views of a trace.
 ///
 
-class TraceEventNode : public TfRefBase {
+class TraceEventNode : public TfSimpleRefBase {
 public:
 
     using TimeStamp = TraceEvent::TimeStamp;
@@ -43,11 +43,8 @@ public:
 
     /// Creates a new root node.
     ///
-    static TraceEventNodeRefPtr New() {
-        return TraceEventNode::New(
-            TfToken("root"), TraceCategory::Default, 0.0, 0.0, {}, false);
-    }
-
+    TRACE_API static TraceEventNodeRefPtr New();
+    
     /// Creates a new node with \p key, \p category, \p beginTime and 
     /// \p endTime.
     static TraceEventNodeRefPtr New(const TfToken &key,
@@ -68,33 +65,33 @@ public:
 
     /// Appends a new child node with \p key, \p category, \p beginTime and 
     /// \p endTime.
-    TraceEventNodeRefPtr Append(const TfToken &key, 
-                                      TraceCategoryId category,
-                                      TimeStamp beginTime,
-                                      TimeStamp endTime,
-                                      bool separateEvents);
-
+    TRACE_API TraceEventNodeRefPtr Append(const TfToken &key, 
+                                          TraceCategoryId category,
+                                          TimeStamp beginTime,
+                                          TimeStamp endTime,
+                                          bool separateEvents);
+    
     /// Appends \p node as a child node.
-    void Append(TraceEventNodeRefPtr node);
-
+    TRACE_API void Append(TraceEventNodeRefPtr node);
+    
     /// Returns the name of this node.
-    TfToken GetKey() { return _key;}
+    const TfToken &GetKey() const { return _key; }
 
     /// Returns the category of this node.
     TraceCategoryId GetCategory() const { return _category; }
 
     /// Sets this node's begin and end time to the time extents of its direct 
     /// children.
-    void SetBeginAndEndTimesFromChildren();
+    TRACE_API void SetBeginAndEndTimesFromChildren();
 
     /// \name Profile Data Accessors
     /// @{
 
     /// Returns the time that this scope started.
-    TimeStamp GetBeginTime() { return _beginTime; }
+    TimeStamp GetBeginTime() const { return _beginTime; }
 
     /// Returns the time that this scope ended.
-    TimeStamp GetEndTime()   { return _endTime; }
+    TimeStamp GetEndTime() const { return _endTime; }
 
     /// @}
 
@@ -102,8 +99,8 @@ public:
     /// @{
 
     /// Returns a TfSpan of references to the children of this node.
-    TfSpan<TraceEventNodeRefPtr> GetChildrenRef() {
-        return TfSpan(_children.data(), _children.size());
+    TfSpan<const TraceEventNodeRefPtr> GetChildrenRef() const {
+        return _children;
     }
 
     /// @}
@@ -112,7 +109,7 @@ public:
     TRACE_API const AttributeMap& GetAttributes() const;
 
     /// Add data to this node.
-    void AddAttribute(const TfToken& key, const AttributeData& attr);
+    TRACE_API void AddAttribute(const TfToken& key, AttributeData&& attr);
 
     /// Returns whether this node was created from a Begin-End pair or a single
     /// Timespan event.
@@ -121,8 +118,8 @@ public:
     }
 
     ~TraceEventNode() {
-        if (_attributesAndSeparateEvents.Get()) {
-            delete _attributesAndSeparateEvents.Get();
+        if (AttributeMap *attrMap = _attributesAndSeparateEvents.Get()) {
+            _DeleteAttrMap(attrMap);
         }
     }
 
@@ -140,16 +137,21 @@ private:
         , _key(key)
         , _beginTime(beginTime)
         , _endTime(endTime)
-        , _children(children.begin(), children.end())
+        , _children(std::make_move_iterator(children.begin()),
+                    std::make_move_iterator(children.end()))
         , _attributesAndSeparateEvents(nullptr, separateEvents)
     {
     }
 
+    // Out-of-line to avoid inlining the multimap dtor code.
+    TRACE_API void _DeleteAttrMap(AttributeMap *attrMap);
+
+    // _category (4 bytes) is first so it packs with TfRefBase's 4-byte count.
     const TraceCategoryId _category;
     const TfToken _key;
     TimeStamp _beginTime;
     TimeStamp _endTime;
-    // Empirical results show ~75% of nodes have < 2 children.
+    // Empirical results show ~85% of nodes have < 2 children.
     TfSmallVector<TraceEventNodeRefPtr, 1> _children;
     TfPointerAndBits<AttributeMap> _attributesAndSeparateEvents;
 };
