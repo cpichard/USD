@@ -54,12 +54,11 @@ Trace_AggregateTreeBuilder::_CreateAggregateNodes()
 
     // Prime the stack with the children of the root. These are the node that
     // represent threads.
-    for (TraceEventNodeRefPtrVector::const_reverse_iterator it =
-            _tree->GetRoot()->GetChildrenRef().rbegin(); 
-            it != _tree->GetRoot()->GetChildrenRef().rend(); ++it) {
+    TfSpan<TraceEventNodeRefPtr> children = _tree->GetRoot()->GetChildrenRef();
+    for (auto it = children.rbegin(); it != children.rend(); ++it) {
         treeStack.push(std::make_pair(*it, 0));
     }
-    
+
     while (!treeStack.empty()) {
         TreeIt it = treeStack.top();
         treeStack.pop();
@@ -181,15 +180,15 @@ TraceAggregateNodePtr
         const TraceThreadId& threadId, const TraceEvent::TimeStamp ts) const
 {
     // Find the root node of the thread.
-    const TraceEventNodeRefPtrVector& threadNodeList =
-        _tree->GetRoot()->GetChildrenRef();
+    TfSpan<TraceEventNodeRefPtr> threadNodes
+        = _tree->GetRoot()->GetChildrenRef();
     TfToken threadKey(threadId.ToString());
-    TraceEventNodeRefPtrVector::const_iterator it =
-        std::find_if(threadNodeList.begin(), threadNodeList.end(), 
+    auto it =
+        std::find_if(threadNodes.begin(), threadNodes.end(), 
         [&threadKey](const TraceEventNodeRefPtr& node) {
             return node->GetKey() == threadKey;
         });
-    if (it == threadNodeList.end()) {
+    if (it == threadNodes.end()) {
         return nullptr;
     }
 
@@ -200,7 +199,7 @@ TraceAggregateNodePtr
     while (true) {
         path.push_back(node->GetKey());
         // Find the first child which contains this timestamp
-        TraceEventNodeRefPtrVector::const_iterator childIt = 
+        auto childIt = 
             std::lower_bound(
                 node->GetChildrenRef().begin(),
                 node->GetChildrenRef().end(), ts, 

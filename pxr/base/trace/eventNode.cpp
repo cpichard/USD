@@ -22,14 +22,14 @@ TraceEventNode::Append(
     TraceEventNodeRefPtr n = 
         TraceEventNode::New(
             key, category, beginTime, endTime, {}, separateEvents);
-    _children.push_back(n);
+    Append(std::move(n)); 
     return n;
 }
 
 void
 TraceEventNode::Append(TraceEventNodeRefPtr node)
 {
-    _children.push_back(node);
+    _children.emplace_back(std::move(node));
 }
 
 void 
@@ -48,14 +48,23 @@ TraceEventNode::SetBeginAndEndTimesFromChildren()
         _beginTime = std::min(_beginTime, c->GetBeginTime());
         _endTime   = std::max(_endTime, c->GetEndTime());
     }
+}
 
+const TraceEventNode::AttributeMap&
+TraceEventNode::GetAttributes() const
+{
+    static const AttributeMap empty;
+    return _attributesAndSeparateEvents.Get() ? *_attributesAndSeparateEvents: empty;
 }
 
 void
 TraceEventNode::AddAttribute(
     const TfToken& key, const AttributeData& attr)
 {
-    _attributes.emplace(key, attr);
+    if (!_attributesAndSeparateEvents.Get()) {
+        _attributesAndSeparateEvents.Set(new AttributeMap);
+    }
+    _attributesAndSeparateEvents->emplace(key, attr);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
