@@ -225,6 +225,7 @@ HdsiRenderPassPruneSceneIndex::_PrimsDirtied(
 
     _SendPrimsAdded(extraAddedEntries);
     _SendPrimsRemoved(extraRemovedEntries);
+    _SendPrimsDirtied(extraDirtyEntries);
 }
 
 HdsiRenderPassPruneSceneIndex::~HdsiRenderPassPruneSceneIndex() = default;

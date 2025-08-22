@@ -355,6 +355,17 @@
         SCHEMA_TOKEN = 'purpose',
         MEMBERS = [
             ('purpose', T_TOKEN, {}),
+            ('inheritable', T_BOOL,
+             dict(DOC = ('The "inheritable" flag indicates if this purpose '
+             'schema should be inherited by the '
+             'HdFlattenedPurposeDataSourceProvider.'))),
+            ('fallback', T_TOKEN,
+             dict(DOC = ('The "purpose" concept in Hydra is modelled after '+
+             'the UsdGeomImageable concept, which allows prim types to '+
+             'define a purpose fallback value to be used when no '
+             'purpose value is found on a prim or its ancestors.  The '+
+             'Hydra schema transports this fallback, if present, to apply '+
+             'it during flattening.'))),
         ],
         ADD_DEFAULT_LOCATOR = True,
     ),

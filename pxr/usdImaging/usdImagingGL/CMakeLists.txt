@@ -153,6 +153,14 @@ pxr_build_test(testUsdImagingGLTaskController
         testenv/testUsdImagingGLTaskController.cpp
 )
 
+pxr_build_test(testUsdImagingGLTextureResync
+    LIBRARIES
+        ${TEST_LIBS}
+    CPPFILES
+        unitTestGLDrawing.cpp
+        testenv/testUsdImagingGLTextureResync.cpp
+)
+
 if (${PXR_HEADLESS_TEST_MODE})
     message(STATUS "Skipping ${PXR_PACKAGE} tests because PXR_HEADLESS_TEST_MODE is ON")
     return()
@@ -674,6 +682,16 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testUsdImagingGLMaterialsAndInstancers
     DEST testUsdImagingGLMaterialsAndInstancers
+)
+
+pxr_install_test_dir(
+    SRC testenv/testUsdImagingGLUsdRenderPass
+    DEST testUsdImagingGLUsdRenderPass
+)
+
+pxr_install_test_dir(
+    SRC testenv/testUsdImagingGLTextureResync
+    DEST testUsdImagingGLTextureResync
 )
 
 #
@@ -5021,6 +5039,30 @@ pxr_register_test(testUsdImagingGLMaterialsAndInstancers_materialAsNiInstance
         FAIL 0.008
         FAIL_PERCENT 0.001
     TESTENV testUsdImagingGLMaterialsAndInstancers
+    ENV
+        USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true)
+
+pxr_register_test(testUsdImagingGLUsdRenderPass
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --disableCameraLight --renderPassPrimPath /Render/Passes/nospheres input.usda nospheres.exr"
+    IMAGE_DIFF_COMPARE
+        nospheres.exr
+    FAIL 1
+    FAIL_PERCENT 1
+    PERCEPTUAL
+    EXPECTED_RETURN_CODE 0
+    TESTENV testUsdImagingGLUsdRenderPass
+    ENV
+       USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true)
+
+pxr_register_test(testUsdImagingGLTextureResync
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLTextureResync --stage testUsdImagingGLTextureResync.usda --deactivate /Scene/Looks/Material1/Texture --deactivate /Scene/Looks/Material2/Texture --write testUsdImagingGLTextureResync.png"
+    IMAGE_DIFF_COMPARE
+        testUsdImagingGLTextureResync.png
+    FAIL .001
+    FAIL_PERCENT .001
+    EXPECTED_RETURN_CODE 0
+    TESTENV testUsdImagingGLTextureResync
     ENV
         USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true)
 

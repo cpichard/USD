@@ -136,10 +136,6 @@ TestAttributeConnections()
         /* custom */ true);
     attr2.Set("attr2 value");
 
-    std::string c;
-    layer->ExportToString(&c);
-    std::cout << c;
-
     {
         ExecUsdCacheView view = execSystem.Compute(request);
         VtValue v = view.Get(0);
