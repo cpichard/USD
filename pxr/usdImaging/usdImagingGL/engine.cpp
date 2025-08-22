@@ -145,24 +145,6 @@ _GetUseTaskControllerSceneIndex()
     return result;
 }
 
-bool
-_AreTasksConverged(HdRenderIndex * const renderIndex,
-                   const SdfPathVector &taskPaths)
-{
-    // This needs to reach into the render index to work.
-    //
-    for (const SdfPath &taskPath : taskPaths) {
-        if (auto const progressiveTask =
-                std::dynamic_pointer_cast<HdxTask>(
-                    renderIndex->GetTask(taskPath))) {
-            if (!progressiveTask->IsConverged()) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
 // Convert UsdImagingGLCullStyle to a HdCullStyleTokens value.
 static TfToken
 _CullStyleEnumToToken(UsdImagingGLCullStyle cullStyle)
@@ -685,12 +667,12 @@ UsdImagingGLEngine::IsConverged() const
     }
 
     if (_taskControllerSceneIndex) {
-        return _AreTasksConverged(
-            _renderIndex.get(),
+        return HdxTask::AreTasksConverged(
+            _renderIndex.get(), 
             _taskControllerSceneIndex->GetRenderingTaskPaths());
     } else if (_taskController) {
-        return _AreTasksConverged(
-            _renderIndex.get(),
+        return HdxTask::AreTasksConverged(
+            _renderIndex.get(), 
             _taskController->GetRenderingTaskPaths());
     } else {
         TF_CODING_ERROR("No task controller or task controller scene index.");
