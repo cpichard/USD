@@ -1836,6 +1836,59 @@ UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
     _renderDelegate->SetRenderSetting(id, value);
 }
 
+SdfPath
+UsdImagingGLEngine::GetActiveRenderPassPrimPath() const
+{
+    if (ARCH_UNLIKELY(!_renderIndex)) {
+        return SdfPath::EmptyPath();
+    }
+
+    SdfPath activeRenderPassPath;
+    if (HdUtils::HasActiveRenderPassPrim(
+            _renderIndex->GetTerminalSceneIndex(), &activeRenderPassPath)) {
+        return activeRenderPassPath;
+    }
+
+    return SdfPath::EmptyPath();
+}
+
+SdfPath
+UsdImagingGLEngine::GetActiveRenderSettingsPrimPath() const
+{
+    if (ARCH_UNLIKELY(!_renderIndex)) {
+        return SdfPath::EmptyPath();
+    }
+
+    SdfPath activeRenderSettingsPath;
+    if (HdUtils::HasActiveRenderSettingsPrim(
+            _renderIndex->GetTerminalSceneIndex(), &activeRenderSettingsPath)) {
+        return activeRenderSettingsPath;
+    }
+
+    return SdfPath::EmptyPath();
+}
+
+/* static */
+SdfPathVector
+UsdImagingGLEngine::GetAvailableRenderSettingsPrimPaths(UsdPrim const& root)
+{
+    // UsdRender OM uses the convention that all render settings prims must
+    // live under /Render.
+    static const SdfPath renderRoot("/Render");
+
+    const auto stage = root.GetStage();
+
+    SdfPathVector paths;
+    if (UsdPrim render = stage->GetPrimAtPath(renderRoot)) {
+        for (const UsdPrim child : render.GetChildren()) {
+            if (child.IsA<UsdRenderSettings>()) {
+                paths.push_back(child.GetPrimPath());
+            }
+        }
+    }
+    return paths;
+}
+
 void
 UsdImagingGLEngine::SetActiveRenderPassPrimPath(SdfPath const &path)
 {
@@ -1881,27 +1934,6 @@ void UsdImagingGLEngine::_SetSceneGlobalsCurrentFrame(UsdTimeCode const &time)
     }
 
     sgsi->SetCurrentFrame(time.GetValue());
-}
-
-/* static */
-SdfPathVector
-UsdImagingGLEngine::GetAvailableRenderSettingsPrimPaths(UsdPrim const& root)
-{
-    // UsdRender OM uses the convention that all render settings prims must
-    // live under /Render.
-    static const SdfPath renderRoot("/Render");
-
-    const auto stage = root.GetStage();
-
-    SdfPathVector paths;
-    if (UsdPrim render = stage->GetPrimAtPath(renderRoot)) {
-        for (const UsdPrim child : render.GetChildren()) {
-            if (child.IsA<UsdRenderSettings>()) {
-                paths.push_back(child.GetPrimPath());
-            }
-        }
-    }
-    return paths;
 }
 
 void
