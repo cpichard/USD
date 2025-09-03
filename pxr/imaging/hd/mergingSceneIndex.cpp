@@ -213,20 +213,11 @@ HdMergingSceneIndex::InsertInputScenes(
         _inputs.insert(
             _inputs.begin() + std::min(inputScene.pos, _inputs.size()),
             {inputScene.scene, inputScene.activeInputSceneRoot});
+
+        inputScene.scene->AddObserver(HdSceneIndexObserverPtr(&_observer));
     }
 
     _RebuildInputsPathTable();
-
-    for (const InputScene &inputScene : inputScenes) {
-        if (!inputScene.scene) {
-            continue;
-        }
-        if (!inputScene.activeInputSceneRoot.IsAbsoluteRootOrPrimPath()) {
-            // TF_CODING_ERROR already raised.
-            continue;
-        }
-        inputScene.scene->AddObserver(HdSceneIndexObserverPtr(&_observer));
-    }
 
     if (!_IsObserved()) {
         return;
@@ -248,7 +239,7 @@ HdMergingSceneIndex::InsertInputScenes(
         // Old scene indices might have a prim of different type at the given path,
         // so we need to query the merging scene index itself here.
         queue.emplace(inputScene.activeInputSceneRoot,
-                       GetPrim(inputScene.activeInputSceneRoot).primType);
+                      GetPrim(inputScene.activeInputSceneRoot).primType);
 
         WorkDispatcher dispatcher;
         _FillAddedChildEntriesRecursively(
