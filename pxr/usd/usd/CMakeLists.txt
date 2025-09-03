@@ -59,10 +59,6 @@ pxr_library(usd
         stageLoadRules
         stagePopulationMask
         timeCode
-        usdFileFormat
-        usdaFileFormat
-        usdcFileFormat
-        usdzFileFormat
         variantSets
 
     PYTHON_PUBLIC_CLASSES
@@ -82,8 +78,6 @@ pxr_library(usd
 
     PUBLIC_HEADERS
         api.h
-        crateInfo.h
-        zipFile.h
 
     PRIVATE_HEADERS
         listEditImpl.h
@@ -96,7 +90,6 @@ pxr_library(usd
         wrapAttributeQuery.cpp
         wrapCollectionMembershipQuery.cpp
         wrapCommon.cpp
-        wrapCrateInfo.cpp
         wrapEditContext.cpp
         wrapEditTarget.cpp
         wrapFlattenUtils.cpp
@@ -126,11 +119,9 @@ pxr_library(usd
         wrapStageLoadRules.cpp
         wrapStagePopulationMask.cpp
         wrapTimeCode.cpp
-        wrapUsdFileFormat.cpp
         wrapUtils.cpp
         wrapVariantSets.cpp
         wrapVersion.cpp 
-        wrapZipFile.cpp
 
     PYMODULE_FILES
         __init__.py
