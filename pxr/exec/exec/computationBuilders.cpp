@@ -140,6 +140,40 @@ Exec_ComputationBuilderValueSpecifierBase::_GetInputKey(
 }
 
 //
+// Exec_ComputationBuilderConstantValueSpecifier
+//
+
+Exec_ComputationBuilderConstantValueSpecifier::
+Exec_ComputationBuilderConstantValueSpecifier(
+    const TfType resultType,
+    const SdfPath &localTraversal,
+    const TfToken &inputName,
+    VtValue &&constantValue)
+    : Exec_ComputationBuilderValueSpecifierBase(
+        Exec_PrivateBuiltinComputations->computeConstant,
+        resultType,
+        {localTraversal, ExecProviderResolution::DynamicTraversal::Local},
+        inputName,
+        Exec_DefinitionRegistry::ComputationBuilderAccess::
+            _RegisterConstantValue(std::move(constantValue)))
+{
+}
+
+//
+// Exec_ComputationBuilderConstantAccessorBase
+//
+
+Exec_ComputationBuilderConstantAccessorBase::
+Exec_ComputationBuilderConstantAccessorBase(
+    VtValue &&constantValue,
+    const TfType valueType)
+    : Exec_ComputationBuilderAccessorBase(SdfPath::AbsoluteRootPath())
+    , _constantValue(VtValue(std::move(constantValue)))
+    , _valueType(valueType)
+{
+}
+
+//
 // Exec_ComputationBuilderBase
 //
 

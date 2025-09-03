@@ -22,8 +22,10 @@
 #include "pxr/base/tf/hash.h"
 #include "pxr/base/tf/singleton.h"
 #include "pxr/base/tf/token.h"
+#include "pxr/base/tf/pxrTslRobinMap/robin_map.h"
 #include "pxr/base/tf/type.h"
 #include "pxr/base/tf/weakBase.h"
+#include "pxr/base/vt/value.h"
 
 #include <tbb/concurrent_unordered_map.h>
 
@@ -118,6 +120,7 @@ public:
         friend class Exec_ComputationBuilder;
         friend class Exec_PrimComputationBuilder;
         friend class Exec_AttributeComputationBuilder;
+        friend struct Exec_ComputationBuilderConstantValueSpecifier;
 
         inline static void _RegisterPrimComputation(
             TfType schemaType,
@@ -136,11 +139,24 @@ public:
             Exec_InputKeyVectorRefPtr &&inputKeys,
             std::unique_ptr<ExecDispatchesOntoSchemas> &&dispatchesOntoSchemas);
 
+        inline static TfToken _RegisterConstantValue(
+            VtValue &&value);
+
         static void _SetComputationRegistrationComplete(
             const TfType schemaType) {
             _GetInstanceForRegistration()._SetComputationRegistrationComplete(
                 schemaType);
         }
+    };
+
+    // Provides selective access for the constant computation definition to get
+    // access to registered constant values.
+    //
+    class ConstantComputationAccess
+    {
+        friend class Exec_ComputeConstantComputationDefinition;
+
+        inline static VtValue _GetConstantValue(const TfToken &uniqueKey);
     };
 
 private:
@@ -266,6 +282,18 @@ private:
         ExecCallbackFn &&callback,
         Exec_InputKeyVectorRefPtr &&inputKeys,
         std::unique_ptr<ExecDispatchesOntoSchemas> &&dispatchesOntoSchemas);
+
+    // Registers \p value as a value that can be used for constant value inputs.
+    //
+    // Returns a token to be used to identify the constant value and be used as
+    // a disambiguating ID in input and output keys.
+    //
+    TfToken _RegisterConstantValue(VtValue &&value);
+
+    // Given the \p uniqueKey that identifies a constant value (returned by
+    // _RegisterConstantValue), returns the corresponding constant value.
+    //
+    VtValue _GetConstantValue(const TfToken &uniqueKey) const;
 
     void _RegisterBuiltinStageComputation(
         const TfToken &computationName,
@@ -396,6 +424,16 @@ private:
         std::unique_ptr<Exec_ComputationDefinition>,
         TfHash>
     _builtinAttributeComputationDefinitions;
+
+    // Map from constant value to the unique key used to identify it.
+    pxr_tsl::robin_map<VtValue, TfToken, TfHash> _constantValueToToken;
+
+    // Map from constant value unique key to the constant value it identifies.
+    pxr_tsl::robin_map<TfToken, VtValue, TfHash> _tokenToConstantValue;
+
+    // An index that is used to generate unique keys for registered constant
+    // input values.
+    unsigned int _constantValueIndex = 0;
 };
 
 void
@@ -434,6 +472,21 @@ Exec_DefinitionRegistry::ComputationBuilderAccess::_RegisterAttributeComputation
         std::move(callback),
         std::move(inputKeys),
         std::move(dispatchesOntoSchemas));
+}
+
+TfToken
+Exec_DefinitionRegistry::ComputationBuilderAccess::_RegisterConstantValue(
+    VtValue &&value)
+{
+    return _GetInstanceForRegistration()._RegisterConstantValue(
+        std::move(value));
+}
+
+VtValue
+Exec_DefinitionRegistry::ConstantComputationAccess::_GetConstantValue(
+    const TfToken &uniqueKey)
+{
+    return _GetInstanceForRegistration()._GetConstantValue(uniqueKey);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
