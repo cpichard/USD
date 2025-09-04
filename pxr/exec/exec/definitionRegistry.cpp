@@ -527,7 +527,7 @@ Exec_DefinitionRegistry::_ValidateComputationRegistration(
 }
 
 void
-Exec_DefinitionRegistry::_RegisterPrimComputation(
+Exec_DefinitionRegistry::RegisterPrimComputation(
     TfType schemaType,
     const TfToken &computationName,
     TfType resultType,
@@ -571,7 +571,7 @@ Exec_DefinitionRegistry::_RegisterPrimComputation(
 }
 
 void
-Exec_DefinitionRegistry::_RegisterAttributeComputation(
+Exec_DefinitionRegistry::RegisterAttributeComputation(
     const TfToken &attributeName,
     TfType schemaType,
     const TfToken &computationName,
@@ -626,7 +626,7 @@ Exec_DefinitionRegistry::_RegisterAttributeComputation(
 }
 
 TfToken
-Exec_DefinitionRegistry::_RegisterConstantValue(VtValue &&value)
+Exec_DefinitionRegistry::RegisterConstantValue(VtValue &&value)
 {
     auto [it, inserted] = _constantValueToToken.try_emplace(value);
     TfToken &uniqueToken = it.value();
@@ -640,7 +640,7 @@ Exec_DefinitionRegistry::_RegisterConstantValue(VtValue &&value)
 }
 
 VtValue
-Exec_DefinitionRegistry::_GetConstantValue(const TfToken &uniqueKey) const
+Exec_DefinitionRegistry::GetConstantValue(const TfToken &uniqueKey) const
 {
     const auto it = _tokenToConstantValue.find(uniqueKey);
     if (!TF_VERIFY(it != _tokenToConstantValue.end())) {
@@ -824,7 +824,7 @@ Exec_DefinitionRegistry::_IsComputationRegistrationComplete(
 }
 
 void
-Exec_DefinitionRegistry::_SetComputationRegistrationComplete(
+Exec_DefinitionRegistry::SetComputationRegistrationComplete(
     const TfType schemaType)
 {
     _computationsRegisteredForSchema.emplace(schemaType, true);

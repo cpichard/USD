@@ -39,8 +39,8 @@ Exec_ComputeConstantComputationDefinition::GetResultType(
     const TfToken &disambiguatingId,
     EsfJournal *const journal) const
 {
-    return Exec_DefinitionRegistry::ConstantComputationAccess::
-        _GetConstantValue(disambiguatingId).GetType();
+    return Exec_DefinitionRegistry::GetInstance().GetConstantValue(
+        disambiguatingId).GetType();
 }
 
 TfType
@@ -73,8 +73,9 @@ Exec_ComputeConstantComputationDefinition::CompileNode(
         return nullptr;
     }
 
-    const VtValue value = Exec_DefinitionRegistry::ConstantComputationAccess::
-        _GetConstantValue(disambiguatingId);
+    const VtValue value =
+        Exec_DefinitionRegistry::GetInstance().GetConstantValue(
+            disambiguatingId);
 
     return program->CreateNode<Exec_ConstantValueNode>(*nodeJournal, value);
 }

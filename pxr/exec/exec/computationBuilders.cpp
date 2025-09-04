@@ -154,8 +154,9 @@ Exec_ComputationBuilderConstantValueSpecifier(
         resultType,
         {localTraversal, ExecProviderResolution::DynamicTraversal::Local},
         inputName,
-        Exec_DefinitionRegistry::ComputationBuilderAccess::
-            _RegisterConstantValue(std::move(constantValue)))
+        Exec_DefinitionRegistry::RegistrationAccess::
+            _GetInstanceForRegistration().RegisterConstantValue(
+                std::move(constantValue)))
 {
 }
 
@@ -305,13 +306,14 @@ Exec_PrimComputationBuilder::~Exec_PrimComputationBuilder()
 {
     _Data &data = _GetData();
 
-    Exec_DefinitionRegistry::ComputationBuilderAccess::_RegisterPrimComputation(
-        data.schemaType,
-        data.computationName,
-        data.resultType,
-        std::move(data.callback),
-        std::move(data.inputKeys),
-        _GetDispatchesOntoSchemas());
+    Exec_DefinitionRegistry::RegistrationAccess::
+        _GetInstanceForRegistration().RegisterPrimComputation(
+            data.schemaType,
+            data.computationName,
+            data.resultType,
+            std::move(data.callback),
+            std::move(data.inputKeys),
+            _GetDispatchesOntoSchemas());
 }
 
 //
@@ -337,8 +339,8 @@ Exec_AttributeComputationBuilder::~Exec_AttributeComputationBuilder()
 {
     _Data &data = _GetData();
 
-    Exec_DefinitionRegistry::ComputationBuilderAccess::
-        _RegisterAttributeComputation(
+    Exec_DefinitionRegistry::RegistrationAccess::
+        _GetInstanceForRegistration().RegisterAttributeComputation(
             data.attributeName,
             data.schemaType,
             data.computationName,
@@ -360,8 +362,9 @@ Exec_ComputationBuilder::Exec_ComputationBuilder(
 
 Exec_ComputationBuilder::~Exec_ComputationBuilder()
 {
-    Exec_DefinitionRegistry::ComputationBuilderAccess::
-        _SetComputationRegistrationComplete(_schemaType);
+    Exec_DefinitionRegistry::RegistrationAccess::
+        _GetInstanceForRegistration().SetComputationRegistrationComplete(
+            _schemaType);
 }
 
 Exec_PrimComputationBuilder 
