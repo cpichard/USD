@@ -32,6 +32,8 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 // --(BEGIN CUSTOM CODE: Declares)--
+using HdNodeToInputToMaterialNodeParameterSchema = 
+    HdContainerOfSchemasSchema<HdMaterialNodeParameterContainerSchema>;
 // --(END CUSTOM CODE: Declares)--
 
 #define HD_MATERIAL_OVERRIDE_SCHEMA_TOKENS \
@@ -149,7 +151,7 @@ public:
     /// Each parameter within a shader node locator contains overriding data
     /// sources that follow the MaterialNodeParameter schema.
     HD_API
-    HdContainerDataSourceHandle GetParameterValues() const; 
+    HdNodeToInputToMaterialNodeParameterSchema GetParameterValues() const; 
 
     /// @}
 

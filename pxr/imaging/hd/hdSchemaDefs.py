@@ -746,7 +746,7 @@
                 Maps interface names (ie. public UI names) to overriding
                 data sources that follow the MaterialNodeParameter schema.
                 ''')),
-            ('parameterValues', 'HdContainerDataSource',
+            ('parameterValues', 'HdNodeToInputToMaterialNodeParameterSchema',
              dict(DOC = '''
                 Contains names of shader nodes whose parameters values are 
                 overridden. Each parameter within a shader node locator contains

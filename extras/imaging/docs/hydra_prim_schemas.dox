@@ -151,7 +151,7 @@ have these.
         - <name> (HdMaterialNodeParameterSchema)
             - value (HdSampledDataSource)
             - _Optional_ - colorSpace (TfToken)
-    - parameterValues (HdContainerDataSource)
+    - parameterValues (HdNodeToInputToMaterialNodeParameterSchema)
         - <shaderNodeName> (HdContainerDataSource)
             - <name> (HdMaterialNodeParameterSchema)
                 - value (HdSampledDataSource)

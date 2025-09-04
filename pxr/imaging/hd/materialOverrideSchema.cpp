@@ -54,11 +54,11 @@ HdMaterialOverrideSchema::GetInterfaceValues() const
         HdMaterialOverrideSchemaTokens->interfaceValues));
 }
 
-HdContainerDataSourceHandle
+HdNodeToInputToMaterialNodeParameterSchema
 HdMaterialOverrideSchema::GetParameterValues() const
 {
-    return _GetTypedDataSource<HdContainerDataSource>(
-        HdMaterialOverrideSchemaTokens->parameterValues);
+    return HdNodeToInputToMaterialNodeParameterSchema(_GetTypedDataSource<HdContainerDataSource>(
+        HdMaterialOverrideSchemaTokens->parameterValues));
 }
 
 /*static*/
