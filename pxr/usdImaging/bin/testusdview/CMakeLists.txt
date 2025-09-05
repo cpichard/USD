@@ -1191,6 +1191,8 @@ pxr_register_test(testUsdviewInstancingEdits
     IMAGE_DIFF_COMPARE
         instanceWithParent.png
         instanceWithParentDeactivated.png
+        completeResyncWithNativeInstances1.png
+        completeResyncWithNativeInstances2.png
     FAIL 0.04
     FAIL_PERCENT 0.1
     WARN 0.02
@@ -1206,6 +1208,8 @@ pxr_register_test(testUsdviewInstancingEdits_SceneIndex
     IMAGE_DIFF_COMPARE
         instanceWithParent.png
         instanceWithParentDeactivated.png
+        completeResyncWithNativeInstances1.png
+        completeResyncWithNativeInstances2.png
     FAIL 0.04
     FAIL_PERCENT 0.1
     WARN 0.02
