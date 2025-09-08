@@ -335,6 +335,16 @@ pxr_build_test(testHdDataSource
        testenv/testHdDataSource.cpp
 )
 
+pxr_build_test(testHdMergingSceneIndex
+   LIBRARIES
+       hd
+       sdf
+       tf
+
+   CPPFILES
+       testenv/testHdMergingSceneIndex.cpp
+)
+
 pxr_build_test(testHdSceneIndex
    LIBRARIES
        hd
@@ -436,6 +446,10 @@ pxr_register_test(testHdPerfLog
 
 pxr_register_test(testHdDataSource
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdDataSource"
+)
+
+pxr_register_test(testHdMergingSceneIndex
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdMergingSceneIndex"
 )
 
 pxr_register_test(testHdSceneIndex
