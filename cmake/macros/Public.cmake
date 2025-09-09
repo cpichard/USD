@@ -452,7 +452,13 @@ macro(pxr_static_library NAME)
 endmacro(pxr_static_library)
 
 macro(pxr_plugin NAME)
-    pxr_library(${NAME} TYPE "PLUGIN" ${ARGN})
+    if(EMSCRIPTEN)
+        # Dynamic linking is not supported yet in the usd build toolchain
+        message(STATUS "Building ${NAME} plugin as static library for emscripten support")
+        pxr_library(${NAME} TYPE "STATIC" ${ARGN})
+    else()
+        pxr_library(${NAME} TYPE "PLUGIN" ${ARGN})
+    endif()
 endmacro(pxr_plugin)
 
 function(pxr_setup_python)
@@ -660,9 +666,21 @@ function(pxr_build_test TEST_NAME)
     _pxr_install_rpath(rpath ${TEST_NAME})
 
     # XXX -- We shouldn't have to install to run tests.
-    install(TARGETS ${TEST_NAME}
-        RUNTIME DESTINATION "tests"
-    )
+    if(EMSCRIPTEN)
+        target_compile_options(${TEST_NAME} PRIVATE "SHELL:-s MAIN_MODULE=1")
+        install(
+            FILES
+            ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.wasm
+            DESTINATION "tests"
+        )
+        install(CODE " \n
+            file(REMOVE ${CMAKE_INSTALL_PREFIX}/tests/${TEST_NAME}) \n\
+            file(COPY_FILE ${CMAKE_CURRENT_BINARY_DIR}/${TEST_NAME}.js ${CMAKE_INSTALL_PREFIX}/tests/${TEST_NAME})")
+    else()
+        install(TARGETS ${TEST_NAME}
+                RUNTIME DESTINATION "tests"
+        )
+    endif()
 endfunction() # pxr_build_test
 
 function(pxr_test_scripts)
@@ -791,6 +809,14 @@ function(pxr_register_test TEST_NAME)
     # This harness is a filter which allows us to manipulate the test run, 
     # e.g. by changing the environment, changing the expected return code, etc.
     set(testWrapperCmd ${PROJECT_SOURCE_DIR}/cmake/macros/testWrapper.py --verbose)
+
+    # For Emscripten we want to explicitly run the test with node.  The tests
+    # themselves are javascript files which contain a shebang, however if we are
+    # trying to run them on windows this will result in errors when trying to
+    # spawn the test process.
+    if (EMSCRIPTEN)
+        set(testWrapperCmd ${testWrapperCmd} --test-runner node)
+    endif()
 
     if (bt_STDOUT_REDIRECT)
         set(testWrapperCmd ${testWrapperCmd} --stdout-redirect=${bt_STDOUT_REDIRECT})

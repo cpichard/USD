@@ -320,14 +320,26 @@ function(_install_resource_files NAME pluginInstallPrefix pluginToLibraryPath)
                     ${resourceFile} ${plugInfoFile})
             endif()
             set(resourceFile "${plugInfoFile}")
+            set(emscriptenResourceFile ${resourceFile})
+        else()
+            set(emscriptenResourceFile "${CMAKE_CURRENT_SOURCE_DIR}/${resourceFile}")
         endif()
 
+        if (EMSCRIPTEN)
+            string(REGEX REPLACE "^lib\\/" "/" emscriptenLocalPath "${resourcesPath}")
+
+            list(APPEND emscriptenResourceFiles "--preload-file ${emscriptenResourceFile}@${emscriptenLocalPath}/${dirPath}/${destFileName}")
+        endif()
         install(
             FILES ${resourceFile}
             DESTINATION ${resourcesPath}/${dirPath}
             RENAME ${destFileName}
         )
     endforeach()
+
+    if (EMSCRIPTEN)
+        target_link_options(${NAME} PUBLIC ${emscriptenResourceFiles})
+    endif()
 endfunction() # _install_resource_files
 
 function(_install_pyside_ui_files LIBRARY_NAME)
@@ -944,7 +956,7 @@ function(_pxr_target_link_libraries NAME)
                     #
                     list(APPEND final -WHOLEARCHIVE:$<TARGET_FILE:${lib}>)
                     list(APPEND final ${lib})
-                elseif(CMAKE_COMPILER_IS_GNUCXX)
+                elseif(CMAKE_COMPILER_IS_GNUCXX OR EMSCRIPTEN)
                     list(APPEND final -Wl,--whole-archive ${lib} -Wl,--no-whole-archive)
                 elseif("${CMAKE_CXX_COMPILER_ID}" MATCHES "Clang")
                     list(APPEND final -Wl,-force_load ${lib})
