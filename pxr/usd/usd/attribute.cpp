@@ -416,7 +416,7 @@ UsdAttribute::GetLimits(const TfToken& key) const
 int64_t
 UsdAttribute::GetArraySizeConstraint() const
 {
-    int64_t constraint;
+    int64_t constraint = 0;
     GetMetadata(SdfFieldKeys->ArraySizeConstraint, &constraint);
     return constraint;
 }
