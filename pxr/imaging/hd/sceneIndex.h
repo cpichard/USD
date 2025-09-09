@@ -35,6 +35,12 @@ struct HdSceneIndexPrim
 {
     TfToken primType;
     HdContainerDataSourceHandle dataSource;
+
+    /// Does this prim returned by \ref HdSceneIndex::GetPrim exist in the
+    /// scene index?
+    bool IsDefined() const { return bool(dataSource); }
+    /// Same as IsDefined.
+    operator bool() const { return IsDefined(); }
 };
 
 ///
