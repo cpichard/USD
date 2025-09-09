@@ -135,6 +135,15 @@ void wrapUsdAttribute()
         .def("GetSoftLimits", &UsdAttribute::GetSoftLimits)
         .def("GetHardLimits", &UsdAttribute::GetHardLimits)
 
+        .def("GetArraySizeConstraint",
+             &UsdAttribute::GetArraySizeConstraint)
+        .def("SetArraySizeConstraint",
+             &UsdAttribute::SetArraySizeConstraint)
+        .def("HasAuthoredArraySizeConstraint",
+             &UsdAttribute::HasAuthoredArraySizeConstraint)
+        .def("ClearArraySizeConstraint",
+             &UsdAttribute::ClearArraySizeConstraint)
+
         .def("GetTimeSamples", _GetTimeSamples,
              return_value_policy<TfPySequenceToList>())
 

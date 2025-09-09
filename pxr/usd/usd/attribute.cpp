@@ -413,6 +413,32 @@ UsdAttribute::GetLimits(const TfToken& key) const
     return UsdAttributeLimits(*this, key);
 }
 
+int64_t
+UsdAttribute::GetArraySizeConstraint() const
+{
+    int64_t constraint;
+    GetMetadata(SdfFieldKeys->ArraySizeConstraint, &constraint);
+    return constraint;
+}
+
+bool
+UsdAttribute::SetArraySizeConstraint(int64_t constraint) const
+{
+    return SetMetadata(SdfFieldKeys->ArraySizeConstraint, constraint);
+}
+
+bool
+UsdAttribute::HasAuthoredArraySizeConstraint() const
+{
+    return HasMetadata(SdfFieldKeys->ArraySizeConstraint);
+}
+
+bool 
+UsdAttribute::ClearArraySizeConstraint() const
+{
+    return ClearMetadata(SdfFieldKeys->ArraySizeConstraint);
+}
+
 SdfAttributeSpecHandle
 UsdAttribute::_CreateSpec(const SdfValueTypeName& typeName, bool custom,
                           const SdfVariability &variability) const
