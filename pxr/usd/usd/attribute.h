@@ -149,6 +149,14 @@ typedef std::vector<UsdAttribute> UsdAttributeVector;
 /// *true* (because they do not and cannot consider time-varying blocks), but
 /// Get() may yet return *false* over some intervals.
 ///
+/// \subsection Usd_AttributeAnimationBlocking Attribute Animation Blocking
+///
+/// In addition to blocking all authored values, one can block only the 
+/// animation (time samples and spline) on an attribute in the intermediate
+/// layers, allowing default values from the weaker layers to shine through.
+///
+/// One blocks an attribute's animation using UsdAttribute::BlockAnimation(),
+///
 /// \section Usd_AssetPathValuedAttributes Attributes of type SdfAssetPath and UsdAttribute::Get()
 ///
 /// If an attribute's value type is SdfAssetPath or SdfAssetPathArray, Get()
@@ -496,7 +504,8 @@ public:
     bool Set(const T& value, UsdTimeCode time = UsdTimeCode::Default()) const {
         static_assert(!std::is_pointer<T>::value, "");
         static_assert(SdfValueTypeTraits<T>::IsValueType ||
-                      std::is_same<T, SdfValueBlock>::value, "");
+                      std::is_same<T, SdfValueBlock>::value ||
+                      std::is_same<T, SdfAnimationBlock>::value, "");
         return _Set(value, time);
     }
 
@@ -553,7 +562,7 @@ public:
     USD_API
     bool ClearDefault() const;
 
-    /// Remove all time samples on an attribute and author a *block*
+    /// Remove all time samples or spline on an attribute and author a *block*
     /// \c default value. This causes the attribute to resolve as 
     /// if there were no authored value opinions in weaker layers.
     ///
@@ -561,6 +570,17 @@ public:
     /// information on time-varying blocking.
     USD_API
     void Block() const;
+
+    /// Remove any timeSamples or spline on an attribute and authors an
+    /// *AnimationBlock* \c default value.
+    ///
+    /// This causes the attribute to resolve as if there were no authored
+    /// animation (time samples or spline) opinions but still allows default
+    /// values shine through.
+    ///
+    /// See \ref Usd_AttributeAnimationBlocking for more information.
+    USD_API
+    void BlockAnimation() const;
 
     /// @}
 

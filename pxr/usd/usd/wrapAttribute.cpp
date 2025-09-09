@@ -186,6 +186,7 @@ void wrapUsdAttribute()
         .def("ClearDefault", &UsdAttribute::ClearDefault)
 
         .def("Block", &UsdAttribute::Block)
+        .def("BlockAnimation", &UsdAttribute::BlockAnimation)
 
         .def("AddConnection", &UsdAttribute::AddConnection,
              (arg("source"),

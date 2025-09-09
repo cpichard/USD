@@ -174,8 +174,6 @@ def Xform "Human"
         2: 20; post held,
     }
 
-    int c = AnimationBlock
-
     double d = AnimationBlock
 
     double e = AnimationBlock
@@ -192,6 +190,8 @@ def Xform "Human"
 
     # Create the UsdStage from the root layer
     stage = Usd.Stage.Open(rootLayer)
+    attrC = stage.GetAttributeAtPath("/Human.c")
+    attrC.BlockAnimation()
     return stage
 
 def TestAnimationBlock(stage):

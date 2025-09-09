@@ -141,8 +141,6 @@ def Xform "Human"
         2: 20; post held,
     }
 
-    int c = AnimationBlock
-
     double d = AnimationBlock
 
     double e = AnimationBlock
@@ -153,7 +151,11 @@ def Xform "Human"
         {strongerLayer->GetIdentifier(),
          weakLayer->GetIdentifier(),
          weakerLayer->GetIdentifier()});
-    return UsdStage::Open(rootLayer);
+    auto stage = UsdStage::Open(rootLayer);
+    auto attrC = stage->GetAttributeAtPath(SdfPath("/Human.c"));
+    TF_AXIOM(attrC);
+    attrC.BlockAnimation();
+    return stage;
 }
 
 template <typename T>
