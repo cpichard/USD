@@ -1210,6 +1210,8 @@ pxr_register_test(testUsdviewInstancingEdits_SceneIndex
         instanceWithParentDeactivated.png
         completeResyncWithNativeInstances1.png
         completeResyncWithNativeInstances2.png
+        instancerInvisible.png
+        instancerVisible.png
     FAIL 0.04
     FAIL_PERCENT 0.1
     WARN 0.02
