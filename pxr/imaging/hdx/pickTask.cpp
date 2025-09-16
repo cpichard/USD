@@ -563,7 +563,6 @@ HdxPickTask::Sync(HdSceneDelegate* delegate,
                 _contextParams.projectionMatrix,
                 viewport,
                 _contextParams.clipPlanes);
-            extState->SetUseSceneMaterials(_params.enableSceneMaterials);
         }
     }
 
