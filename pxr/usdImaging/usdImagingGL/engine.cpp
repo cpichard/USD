@@ -31,7 +31,7 @@
 #include "pxr/imaging/hdsi/domeLightCameraVisibilitySceneIndex.h"
 #include "pxr/imaging/hdsi/legacyDisplayStyleOverrideSceneIndex.h"
 #include "pxr/imaging/hdsi/prefixPathPruningSceneIndex.h"
-#include "pxr/imaging/hdsi/primTypePruningSceneIndex.h"
+#include "pxr/imaging/hdsi/primTypeAndPathPruningSceneIndex.h"
 #include "pxr/imaging/hdsi/sceneMaterialPruningSceneIndex.h"
 #include "pxr/imaging/hdsi/sceneGlobalsSceneIndex.h"
 #include "pxr/imaging/hdx/pickTask.h"
@@ -381,7 +381,14 @@ UsdImagingGLEngine::PrepareBatch(
             }
         }
         if (_lightPruningSceneIndex) {
-            _lightPruningSceneIndex->SetEnabled(!params.enableSceneLights);
+            _lightPruningSceneIndex->SetPathPredicate(
+                params.enableSceneLights
+                    // Empty predicate means we prune nothing.
+                    ? HdsiPrimTypeAndPathPruningSceneIndex::PathPredicate()
+                    // Predicate matches every path.
+                    // Thus, scene index prunes every prim
+                    // matching the prim types given earlier.
+                    : [](const SdfPath &a) { return true; });
         }
         if (_displayStyleSceneIndex) {
             _displayStyleSceneIndex->SetCullStyleFallback(
@@ -1504,14 +1511,13 @@ UsdImagingGLEngine::_AppendOverridesSceneIndices(
 
     static HdContainerDataSourceHandle const lightPruningInputArgs =
         HdRetainedContainerDataSource::New(
-            HdsiPrimTypePruningSceneIndexTokens->primTypes,
+            HdsiPrimTypeAndPathPruningSceneIndexTokens->primTypes,
             HdRetainedTypedSampledDataSource<TfTokenVector>::New(
-                HdLightPrimTypeTokens()),
-            HdsiPrimTypePruningSceneIndexTokens->doNotPruneNonPrimPaths,
-            HdRetainedTypedSampledDataSource<bool>::New(false));
+                HdLightPrimTypeTokens()));
 
     sceneIndex = _lightPruningSceneIndex =
-        HdsiPrimTypePruningSceneIndex::New(sceneIndex, lightPruningInputArgs);
+        HdsiPrimTypeAndPathPruningSceneIndex::New(
+            sceneIndex, lightPruningInputArgs);
 
     sceneIndex = _rootOverridesSceneIndex =
         UsdImagingRootOverridesSceneIndex::New(sceneIndex);
