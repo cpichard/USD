@@ -15,8 +15,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class HdPrman_RenderPassVisibilityAndMatteSceneIndexPlugin
 ///
-/// Appends a scene index that applies visibility and matte rules of the scene
-/// globals' active render pass.
+/// Appends a scene index that applies visibility and matte rules of the active
+/// render pass specified in the HdSceneGlobalsSchema.
+///
+/// \note This scene index assumes that the active render pass is a
+///       UsdRenderPass for the purposes of collection naming conventions.
 ///
 class HdPrman_RenderPassVisibilityAndMatteSceneIndexPlugin : public HdSceneIndexPlugin
 {

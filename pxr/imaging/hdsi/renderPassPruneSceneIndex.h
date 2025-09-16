@@ -17,7 +17,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DECLARE_WEAK_AND_REF_PTRS(HdsiRenderPassPruneSceneIndex);
 
-/// Applies prune rules of the scene globals' active render pass.
+/// Applies prune rules of the active render pass specified in the
+/// HdSceneGlobalsSchema.
+///
+/// \note This scene index assumes that the active render pass is a
+///       UsdRenderPass for the purposes of collection naming conventions.
 ///
 class HdsiRenderPassPruneSceneIndex : 
     public HdSingleInputFilteringSceneIndexBase
@@ -74,6 +78,9 @@ private:
 
     // Prune state for the active render pass.
     _RenderPassPruneState _activeRenderPass;
+
+    // Flag used to track the first time prims have been added.
+    bool _hasPopulated = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
