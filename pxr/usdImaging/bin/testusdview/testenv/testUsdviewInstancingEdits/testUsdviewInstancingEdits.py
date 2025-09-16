@@ -8,6 +8,7 @@
 
 from pxr.Usdviewq.qt import QtWidgets
 from pxr.Usdviewq.common import SelectionHighlightModes
+from pxr import UsdGeom
 
 def _waitForRefresh():
     import time
@@ -64,7 +65,7 @@ def _testInstancerVisibilityEdits(appController):
     appController._takeShot("instancerInvisible.png")
 
     vis = appController._dataModel.stage.GetPropertyAtPath("/PointInstancer.visibility")
-    vis.Set("")
+    vis.Set(UsdGeom.Tokens.inherited)
     appController._takeShot("instancerVisible.png")
 
 #
