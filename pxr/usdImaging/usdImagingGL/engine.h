@@ -838,7 +838,6 @@ private:
     UsdImagingSelectionSceneIndexRefPtr _selectionSceneIndex;
     UsdImagingRootOverridesSceneIndexRefPtr _rootOverridesSceneIndex;
     HdsiLegacyDisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
-    HdsiPrimTypePruningSceneIndexRefPtr _materialPruningSceneIndex;
     HdsiPrimTypePruningSceneIndexRefPtr _lightPruningSceneIndex;
     HdSceneIndexBaseRefPtr _sceneIndex;
     
