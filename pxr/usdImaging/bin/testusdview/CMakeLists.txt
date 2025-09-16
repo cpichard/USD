@@ -804,7 +804,7 @@ pxr_register_test(testUsdviewSceneMaterials
     COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewSceneMaterials.py test.usda"
     IMAGE_DIFF_COMPARE
         enabledSceneMaterials_Storm.png
-        disabledSceneMaterials_Strom.png
+        disabledSceneMaterials_Storm.png
     FAIL 0.05
     FAIL_PERCENT 0.03
     PERCEPTUAL
