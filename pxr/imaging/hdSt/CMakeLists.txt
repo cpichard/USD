@@ -172,6 +172,7 @@ pxr_library(hdSt
         pointsShaderKey
         quadrangulate
         renderPassPruneSceneIndexPlugin
+        renderPassVisibilitySceneIndexPlugin
         renderPassShaderKey
         resourceBinder
         shaderKey
