@@ -94,13 +94,6 @@ HdMergingSceneIndex::_GetInputEntriesByPath(SdfPath const& primPath) const
     return empty;
 }
 
-static
-bool
-_Contains(const SdfPath &path, const SdfPathVector &v)
-{
-    return std::find(v.begin(), v.end(), path) != v.end();
-}
-
 bool
 HdMergingSceneIndex::_HasPrim(const SdfPath &path)
 {
@@ -110,21 +103,7 @@ HdMergingSceneIndex::_HasPrim(const SdfPath &path)
         return true;
     }
 
-    {
-        const HdSceneIndexPrim prim = GetPrim(path);
-        if (!prim.primType.IsEmpty()) {
-            return true;
-        }
-        if (prim.dataSource) {
-            return true;
-        }
-    }
-
-    if (_Contains(path, GetChildPrimPaths(path.GetParentPath()))) {
-        return true;
-    }
-
-    return false;
+    return GetPrim(path);
 }
 
 void
@@ -318,12 +297,7 @@ HdMergingSceneIndex::RemoveInputScenes(
             removalTestQueue.pop_back();
 
             const HdSceneIndexPrim prim = GetPrim(path);
-            const bool hasPrim =
-                !prim.primType.IsEmpty() ||
-                prim.dataSource ||
-                _Contains(path, GetChildPrimPaths(path.GetParentPath()));
-
-            if (hasPrim) {
+            if (prim) {
                 if (visitedPaths.insert(path).second) {
                     addedEntries.emplace_back(path, prim.primType);
                 }
@@ -555,13 +529,14 @@ HdMergingSceneIndex::_PrimsRemoved(
     HdSceneIndexObserver::AddedPrimEntries addedEntries;
 
     for (const HdSceneIndexObserver::RemovedPrimEntry &entry : entries) {
-        const SdfPathVector childPaths = GetChildPrimPaths(entry.primPath);
         const HdSceneIndexPrim prim = GetPrim(entry.primPath);
-
-        if (!childPaths.empty() || prim.dataSource || !prim.primType.IsEmpty()) {
-            addedEntries.emplace_back(entry.primPath, prim.primType);
+        if (!prim) {
+            continue;
         }
 
+        addedEntries.emplace_back(entry.primPath, prim.primType);
+
+        const SdfPathVector childPaths = GetChildPrimPaths(entry.primPath);
         if (childPaths.empty()) {
             continue;
         }
