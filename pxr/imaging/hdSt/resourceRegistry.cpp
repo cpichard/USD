@@ -790,6 +790,7 @@ HdStResourceRegistry::_CommitTextures()
     for (HdStShaderCodeSharedPtr const & shaderCode : shaderCodes) {
         shaderCode->AddResourcesFromTextures(ctx);
     }
+    _renderBufferPool.Commit();
 }
 
 void
@@ -1322,6 +1323,18 @@ HdStResourceRegistry::_TallyResourceAllocation(VtDictionary *result) const
     }
 
     (*result)[HdPerfTokens->gpuMemoryUsed.GetString()] = gpuMemoryUsed;
+}
+
+HdStPooledRenderBufferUniquePtr
+HdStResourceRegistry::AllocateTempRenderBuffer(
+        const SdfPath& graphPath,
+        HdFormat fmt,
+        GfVec2i dims,
+        bool multiSampled,
+        bool depth)
+{
+    return _renderBufferPool.Allocate(this, graphPath, fmt, dims,
+            multiSampled, depth);
 }
 
 HdStTextureHandleSharedPtr

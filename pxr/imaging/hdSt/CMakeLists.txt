@@ -106,6 +106,7 @@ pxr_library(hdSt
         primUtils
         ptexTextureObject
         renderBuffer
+        renderBufferPool
         renderDelegate
         renderParam
         renderPass
