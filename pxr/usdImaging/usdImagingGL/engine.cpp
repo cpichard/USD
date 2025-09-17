@@ -381,14 +381,19 @@ UsdImagingGLEngine::PrepareBatch(
             }
         }
         if (_lightPruningSceneIndex) {
-            _lightPruningSceneIndex->SetPathPredicate(
-                params.enableSceneLights
-                    // Empty predicate means we prune nothing.
-                    ? HdsiPrimTypeAndPathPruningSceneIndex::PathPredicate()
-                    // Predicate matches every path.
-                    // Thus, scene index prunes every prim
-                    // matching the prim types given earlier.
-                    : [](const SdfPath &a) { return true; });
+            if (_lightPruningSceneIndexEnableSceneLights !=
+                    params.enableSceneLights) {
+                _lightPruningSceneIndex->SetPathPredicate(
+                    params.enableSceneLights
+                        // Empty predicate means we prune nothing.
+                        ? HdsiPrimTypeAndPathPruningSceneIndex::PathPredicate()
+                        // Predicate matches every path.
+                        // Thus, scene index prunes every prim
+                        // matching the prim types given earlier.
+                        : [](const SdfPath &a) { return true; });
+                _lightPruningSceneIndexEnableSceneLights =
+                    params.enableSceneLights;
+            }
         }
         if (_displayStyleSceneIndex) {
             _displayStyleSceneIndex->SetCullStyleFallback(
@@ -1518,7 +1523,10 @@ UsdImagingGLEngine::_AppendOverridesSceneIndices(
     sceneIndex = _lightPruningSceneIndex =
         HdsiPrimTypeAndPathPruningSceneIndex::New(
             sceneIndex, lightPruningInputArgs);
-
+    // _lightPruningSceneIndex comes with empty predicate which corresponds to
+    // enableSceneLights = true.
+    _lightPruningSceneIndexEnableSceneLights = true;
+    
     sceneIndex = _rootOverridesSceneIndex =
         UsdImagingRootOverridesSceneIndex::New(sceneIndex);
 

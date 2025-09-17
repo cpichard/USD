@@ -839,6 +839,8 @@ private:
     UsdImagingRootOverridesSceneIndexRefPtr _rootOverridesSceneIndex;
     HdsiLegacyDisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
     HdsiPrimTypeAndPathPruningSceneIndexRefPtr _lightPruningSceneIndex;
+    // State of the _lightPruningSceneIndex.
+    bool _lightPruningSceneIndexEnableSceneLights;
     HdSceneIndexBaseRefPtr _sceneIndex;
     
     std::unique_ptr<UsdImagingDelegate> _sceneDelegate;
