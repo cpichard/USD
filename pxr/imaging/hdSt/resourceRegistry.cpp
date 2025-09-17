@@ -844,15 +844,18 @@ HdStResourceRegistry::_Commit()
                                 if (req.range && req.range->RequiresStaging()) {
                                     const size_t numElements =
                                         source->GetNumElements();
-                                    // Avoid calling functions on 
+                                    // Avoid calling functions on
                                     // HdNullBufferSources
                                     if (numElements > 0) {
-                                        stagingBufferSize += numElements *
+                                        stagingBufferSize.fetch_add(
+                                            numElements *
                                             HdDataSizeOfTupleType(
-                                                source->GetTupleType());
+                                                source->GetTupleType()),
+                                                std::memory_order_relaxed);
                                     }
-                                    stagingBufferSize += 
-                                        _GetChainedStagingSize(source);
+                                    stagingBufferSize.fetch_add(
+                                        _GetChainedStagingSize(source),
+                                        std::memory_order_relaxed);
                                 }
                             }
                         }
@@ -935,7 +938,8 @@ HdStResourceRegistry::_Commit()
         HD_TRACE_SCOPE("Copy");
         // 4. copy phase:
         //
-        _stagingBuffer->Resize(stagingBufferSize);
+        _stagingBuffer->Resize(
+            stagingBufferSize.load(std::memory_order_relaxed));
 
         for (_PendingSource &pendingSource : _pendingSources) {
             HdBufferArrayRangeSharedPtr &dstRange = pendingSource.range;
