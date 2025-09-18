@@ -37,5 +37,5 @@ Our test machines have the following software versions installed.
 | Doxygen       | 1.9.6                |                              |                                |
 | GraphViz      | 2.40.1               |                              |                                |
 | OpenVDB       | 10.1.0               | 10.1.0                       | 10.1.0                         |
-| Vulkan SDK    | 1.3.296.0            | 1.3.296.0                    | 1.3.296.0                      |
+| Vulkan SDK    | 1.4.321.0            | 1.4.321.0                    | 1.4.321.0                      |
 | Draco         | 1.5.6                | 1.5.6                        | 1.5.6                          |
