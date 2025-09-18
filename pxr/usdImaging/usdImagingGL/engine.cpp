@@ -1349,21 +1349,23 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
     rendererCreateArgs.gpuEnabled = _gpuEnabled;
     rendererCreateArgs.hgi = _hgi.get();
 
-    TfToken resolvedId;
-    if (id.IsEmpty()) {
-        // Special case: id == TfToken() selects the first supported plugin in
-        // the list.
-        resolvedId = registry.GetDefaultPluginId(rendererCreateArgs);
-    } else {
-        HdRendererPluginHandle plugin = registry.GetOrCreateRendererPlugin(id);
-        std::string errorStr;
-        if (plugin && plugin->IsSupported(rendererCreateArgs, &errorStr)) {
-            resolvedId = id;
-        } else {
-            TF_CODING_ERROR("Invalid plugin id or plugin %s is unsupported: %s",
-                            id.GetText(), errorStr.c_str());
-            return false;
-        }
+    const TfToken resolvedId =
+        id.IsEmpty()
+            ? registry.GetDefaultPluginId(rendererCreateArgs)
+            : id;
+
+    HdRendererPluginHandle plugin = registry.GetOrCreateRendererPlugin(resolvedId);
+    if (!plugin) {
+        TF_CODING_ERROR("Invalid plugin id %s", resolvedId.GetText());
+        return false;
+    }
+
+    std::string errorStr;
+    if (!plugin->IsSupported(rendererCreateArgs, &errorStr)) {
+        TF_CODING_ERROR(
+            "Plugin %s is unsupported: %s",
+            resolvedId.GetText(), errorStr.c_str());
+        return false;
     }
 
     if (_renderDelegate && _renderDelegate.GetPluginId() == resolvedId) {
