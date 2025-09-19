@@ -239,6 +239,11 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
+    SRC testenv/testUsdviewInstancingEdits
+    DEST testUsdviewInstancingEdits_SceneIndex_Embree
+)
+
+pxr_install_test_dir(
     SRC testenv/testUsdviewAnimatedBounds
     DEST testUsdviewAnimatedBounds
 )
