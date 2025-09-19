@@ -132,7 +132,6 @@ _GetUseSceneIndices()
     // - HdRenderIndex has scene index emulation enabled (otherwise,
     //     AddInputScene won't work).
     static bool result =
-        HdRenderIndex::IsSceneIndexEmulationEnabled() &&
         TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX);
 
     return result;
@@ -142,7 +141,6 @@ bool
 _GetUseTaskControllerSceneIndex()
 {
     static bool result =
-        HdRenderIndex::IsSceneIndexEmulationEnabled() &&
         TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_TASK_SCENE_INDEX);
 
     return result;
