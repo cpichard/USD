@@ -50,8 +50,9 @@ TF_REGISTRY_FUNCTION(TfType)
 
 TF_REGISTRY_FUNCTION(HdSceneIndexPlugin)
 {
-    // We need an "insertion point" that's *after* general material resolve.
-    const HdSceneIndexPluginRegistry::InsertionPhase insertionPhase = 115;
+    // We need an "insertion point" that's *after* general material resolve, but
+    // before generation of practical lights.
+    const HdSceneIndexPluginRegistry::InsertionPhase insertionPhase = 113;
 
     for (auto const& pluginDisplayName : HdPrman_GetPluginDisplayNames()) {
         HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(

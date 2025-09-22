@@ -239,6 +239,11 @@ pxr_install_test_dir(
 )
 
 pxr_install_test_dir(
+    SRC testenv/testUsdviewInstancingEdits
+    DEST testUsdviewInstancingEdits_SceneIndex_Embree
+)
+
+pxr_install_test_dir(
     SRC testenv/testUsdviewAnimatedBounds
     DEST testUsdviewAnimatedBounds
 )
@@ -803,8 +808,8 @@ pxr_register_test(testUsdviewSceneMaterials
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewSceneMaterials.py test.usda"
     IMAGE_DIFF_COMPARE
-        enabledSceneMaterials.png
-        disabledSceneMaterials.png
+        enabledSceneMaterials_Storm.png
+        disabledSceneMaterials_Storm.png
     FAIL 0.05
     FAIL_PERCENT 0.03
     PERCEPTUAL
@@ -1210,6 +1215,24 @@ pxr_register_test(testUsdviewInstancingEdits_SceneIndex
         instanceWithParentDeactivated.png
         completeResyncWithNativeInstances1.png
         completeResyncWithNativeInstances2.png
+        instancerInvisible.png
+        instancerVisible.png
+    FAIL 0.04
+    FAIL_PERCENT 0.1
+    WARN 0.02
+    WARN_PERCENT 0.2
+    ENV
+        USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true
+)
+
+pxr_register_test(testUsdviewInstancingEdits_SceneIndex_Embree
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --renderer Embree --testScript testUsdviewInstancingEditsEmbree.py test.usda"
+    EXPECTED_RETURN_CODE 0
+    IMAGE_DIFF_COMPARE
+        # Disabling the following baseline because of GitHub #3693 and #3769.
+        # instancerInvisibleEmbree.png
+        instancerVisibleEmbree.png
     FAIL 0.04
     FAIL_PERCENT 0.1
     WARN 0.02

@@ -152,7 +152,6 @@ pxr_plugin(${PXR_PACKAGE}
         debugUtil
         extComputationPrimvarPruningSceneIndexPlugin
         framebuffer
-        generativeProceduralSceneIndexPlugin
         implicitSurfaceSceneIndexPlugin
         materialPrimvarTransferSceneIndexPlugin
         matfiltSceneIndexPlugins
@@ -189,6 +188,7 @@ pxr_plugin(${PXR_PACKAGE}
         rileySampleFilterPrim
         rileyTypes
         sceneIndexObserverApi
+        statsListener
         worldOffsetSceneIndexPlugin
         updateObjectSettingsSceneIndex
         updateObjectSettingsSceneIndexPlugin
