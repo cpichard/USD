@@ -183,28 +183,27 @@ HdRenderIndex::HdRenderIndex(
         legacyGeomSubsetSceneIndex,
         SdfPath::AbsoluteRootPath());
 
-    _terminalSceneIndex =
-        _mergingBatchingCtx->Append(_mergingSceneIndex);
+    HdSceneIndexBaseRefPtr sceneIndex = _mergingSceneIndex;
 
-    _terminalSceneIndex =
-        HdSceneIndexAdapterSceneDelegate::AppendDefaultSceneFilters(
-            _terminalSceneIndex, SdfPath::AbsoluteRootPath());
+    sceneIndex =
+        _mergingBatchingCtx->Append(sceneIndex);
 
     const std::string &rendererDisplayName =
         renderDelegate->GetRendererDisplayName();
 
     if (!rendererDisplayName.empty()) {
-        _terminalSceneIndex =
+        sceneIndex =
             HdSceneIndexPluginRegistry::GetInstance()
                 .AppendSceneIndicesForRenderer(
-                    rendererDisplayName, _terminalSceneIndex,
+                    rendererDisplayName, sceneIndex,
                     instanceName, appName);
     }
 
     if (_IsEnabledTerminalCachingSceneIndex()) {
-        _terminalSceneIndex =
-            HdCachingSceneIndex::New(_terminalSceneIndex);
+        sceneIndex = HdCachingSceneIndex::New(sceneIndex);
     }
+
+    _terminalSceneIndex = sceneIndex;
 
     _siSd = std::make_unique<HdSceneIndexAdapterSceneDelegate>(
         _terminalSceneIndex,
