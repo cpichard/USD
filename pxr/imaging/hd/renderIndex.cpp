@@ -318,6 +318,13 @@ HdRenderIndex::RemoveSubtree(const SdfPath &root,
 {
     HD_TRACE_FUNCTION();
 
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
+    
     // Remove tasks here, since they aren't part of emulation.
     _RemoveTaskSubtree(root, sceneDelegate);
 
@@ -347,6 +354,13 @@ HdRenderIndex::InsertRprim(TfToken const& typeId,
 {
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
+
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
 
     // If we are using emulation, we will need to populate 
     // a data source with the prim information
@@ -396,6 +410,13 @@ void
 HdRenderIndex::RemoveRprim(SdfPath const& id)
 {
     HD_TRACE_FUNCTION();
+
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
 
     // If we are emulating let's remove from the scene index
     // which will trigger render index removals later.
@@ -526,6 +547,13 @@ HdRenderIndex::Clear()
     }
     _taskMap.clear();
 
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
+    
     // If we're using emulation, Clear is routed through scene indices.
     _emulationSceneIndex->RemovePrims({SdfPath::AbsoluteRootPath()});
 }
@@ -582,6 +610,13 @@ HdRenderIndex::_InsertSceneDelegateTask(
         return;
     }
 
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
+
     _emulationSceneIndex->AddLegacyTask(
         taskId, delegate, std::move(factory));
 }
@@ -612,6 +647,13 @@ HdRenderIndex::GetTask(SdfPath const& id) const {
 void
 HdRenderIndex::RemoveTask(SdfPath const& id)
 {
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
+
     _emulationSceneIndex->RemovePrim(id);
 }
 
@@ -666,6 +708,13 @@ HdRenderIndex::InsertSprim(TfToken const& typeId,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
+
     // If we are using emulation, we will need to populate 
     // a data source with the prim information
     _emulationSceneIndex->AddLegacyPrim(sprimId, typeId, sceneDelegate);
@@ -686,6 +735,13 @@ HdRenderIndex::_InsertSprim(TfToken const& typeId,
 void
 HdRenderIndex::RemoveSprim(TfToken const& typeId, SdfPath const& id)
 {
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
+
     _emulationSceneIndex->RemovePrim(id);
 }
 
@@ -729,6 +785,13 @@ HdRenderIndex::InsertBprim(TfToken const& typeId,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
+
     // If we are using emulation, we will need to populate a data source with
     // the prim information
     _emulationSceneIndex->AddLegacyPrim(bprimId, typeId, sceneDelegate);
@@ -749,6 +812,13 @@ HdRenderIndex::_InsertBprim(TfToken const& typeId,
 void
 HdRenderIndex::RemoveBprim(TfToken const& typeId, SdfPath const& id)
 {
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
+
     _emulationSceneIndex->RemovePrim(id);
 }
 
@@ -1785,6 +1855,13 @@ HdRenderIndex::InsertInstancer(HdSceneDelegate* delegate,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
+
     _emulationSceneIndex->AddLegacyPrim(
         id, HdPrimTypeTokens->instancer, delegate);
 }
@@ -1823,6 +1900,13 @@ HdRenderIndex::RemoveInstancer(SdfPath const& id)
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
+    if (!_emulationSceneIndex) {
+        TF_CODING_ERROR(
+            "Method used by scene delegate for "
+            "(de-)population requires emulation.");
+        return;
+    }
+    
     _emulationSceneIndex->RemovePrims({{id}});
 }
 
@@ -1923,6 +2007,10 @@ HdRenderIndex::GetSceneDelegateForRprim(SdfPath const &id) const
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
+    if (!_emulationSceneIndex) {
+        return nullptr;
+    }
+    
     // Applications expect this to return the original scene delegate
     // responsible for inserting the prim at the specified id.
     // Emulation must provide the same value -- even if it could
@@ -1951,6 +2039,10 @@ HdRenderIndex::GetSceneDelegateAndInstancerIds(SdfPath const &id,
     HD_TRACE_FUNCTION();
     HF_MALLOC_TAG_FUNCTION();
 
+    if (!_emulationSceneIndex) {
+        return false;
+    }
+    
     _RprimMap::const_iterator it = _rprimMap.find(id);
     if (it != _rprimMap.end()) {
         const _RprimInfo &rprimInfo = it->second;
