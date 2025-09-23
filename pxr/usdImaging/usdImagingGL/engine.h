@@ -773,6 +773,16 @@ protected:
     USDIMAGINGGL_API
     HdSelectionSharedPtr _GetSelection() const;
 
+    // Application scene index callback registration and
+    // engine-renderInstanceId tracking.
+    void
+    _RegisterRenderInstanceId(
+        const std::string &renderInstanceId);
+
+    // Create UsdImagingStageSceneIndex and subsequent scene indices.
+    void
+    _CreateUsdImagingSceneIndices();
+
 protected:
 
     // Note that any of the fields below might become private

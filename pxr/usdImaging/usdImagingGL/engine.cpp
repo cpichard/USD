@@ -1557,6 +1557,54 @@ UsdImagingGLEngine::_AppendOverridesSceneIndices(
 }
 
 void
+UsdImagingGLEngine::_RegisterRenderInstanceId(
+    const std::string &renderInstanceId)
+{
+    // Register application managed scene indices via the callback
+    // facility which will be invoked during render index construction.
+    static std::once_flag registerOnce;
+    std::call_once(registerOnce, _RegisterApplicationSceneIndices);
+
+    _appSceneIndices =
+        std::make_shared<UsdImagingGLEngine_Impl::_AppSceneIndices>();
+
+    // Register the app scene indices with the render instance id
+    // that is provided to the render index constructor below.
+    s_renderInstanceTracker->RegisterInstance(
+        renderInstanceId, _appSceneIndices);
+}
+    
+
+void
+UsdImagingGLEngine::_CreateUsdImagingSceneIndices()
+{
+    UsdImagingCreateSceneIndicesInfo info;
+    info.addDrawModeSceneIndex = _enableUsdDrawModes;
+    info.displayUnloadedPrimsWithBounds = _displayUnloadedPrimsWithBounds;
+    info.overridesSceneIndexCallback =
+        std::bind(
+            &UsdImagingGLEngine::_AppendOverridesSceneIndices,
+            this, std::placeholders::_1);
+
+    const UsdImagingSceneIndices sceneIndices =
+        UsdImagingCreateSceneIndices(info);
+
+    _stageSceneIndex =
+        sceneIndices.stageSceneIndex;
+    _postInstancingNoticeBatchingSceneIndex =
+        sceneIndices.postInstancingNoticeBatchingSceneIndex;
+    _selectionSceneIndex =
+        sceneIndices.selectionSceneIndex;
+
+    HdSceneIndexBaseRefPtr sceneIndex =
+        sceneIndices.finalSceneIndex;
+    sceneIndex = _displayStyleSceneIndex =
+        HdsiLegacyDisplayStyleOverrideSceneIndex::New(sceneIndex);
+
+    _sceneIndex = sceneIndex;
+}
+
+void
 UsdImagingGLEngine::_SetRenderDelegate(
     HdPluginRenderDelegateUniqueHandle &&renderDelegate)
 {
@@ -1567,60 +1615,28 @@ UsdImagingGLEngine::_SetRenderDelegate(
 
     _isPopulated = false;
 
-    // Use the render delegate ptr (rather than 'this' ptr) for generating
-    // the unique id.
-    const std::string renderInstanceId =
-        TfStringPrintf("UsdImagingGLEngine_%s_%p",
-            renderDelegate.GetPluginId().GetText(),
-            (void *) renderDelegate.Get());
-
-    // Application scene index callback registration and
-    // engine-renderInstanceId tracking.
-    {
-        // Register application managed scene indices via the callback
-        // facility which will be invoked during render index construction.
-        static std::once_flag registerOnce;
-        std::call_once(registerOnce, _RegisterApplicationSceneIndices);
-
-        _appSceneIndices =
-            std::make_shared<UsdImagingGLEngine_Impl::_AppSceneIndices>();
-
-        // Register the app scene indices with the render instance id
-        // that is provided to the render index constructor below.
-        s_renderInstanceTracker->RegisterInstance(
-            renderInstanceId, _appSceneIndices);
-    }
-
     // Creation
     // Use the new render delegate.
     _renderDelegate = std::move(renderDelegate);
 
-    // Recreate the render index
-    _renderIndex.reset(
-        HdRenderIndex::New(
-            _renderDelegate.Get(), {&_hgiDriver}, renderInstanceId));
+    {
+        // Use the render delegate ptr (rather than 'this' ptr) for generating
+        // the unique id.
+        const std::string renderInstanceId =
+            TfStringPrintf("UsdImagingGLEngine_%s_%p",
+                           _renderDelegate.GetPluginId().GetText(),
+                           (void *) _renderDelegate.Get());
+
+        _RegisterRenderInstanceId(renderInstanceId);
+
+        // Recreate the render index
+        _renderIndex.reset(
+            HdRenderIndex::New(
+                _renderDelegate.Get(), {&_hgiDriver}, renderInstanceId));
+    }
 
     if (_GetUseSceneIndices()) {
-        UsdImagingCreateSceneIndicesInfo info;
-        info.addDrawModeSceneIndex = _enableUsdDrawModes;
-        info.displayUnloadedPrimsWithBounds = _displayUnloadedPrimsWithBounds;
-        info.overridesSceneIndexCallback =
-            std::bind(
-                &UsdImagingGLEngine::_AppendOverridesSceneIndices,
-                this, std::placeholders::_1);
-
-        const UsdImagingSceneIndices sceneIndices =
-            UsdImagingCreateSceneIndices(info);
-
-        _stageSceneIndex = sceneIndices.stageSceneIndex;
-        _postInstancingNoticeBatchingSceneIndex =
-            sceneIndices.postInstancingNoticeBatchingSceneIndex;
-        _selectionSceneIndex = sceneIndices.selectionSceneIndex;
-        _sceneIndex = sceneIndices.finalSceneIndex;
-
-        _sceneIndex = _displayStyleSceneIndex =
-            HdsiLegacyDisplayStyleOverrideSceneIndex::New(_sceneIndex);
-
+        _CreateUsdImagingSceneIndices();
         _renderIndex->InsertSceneIndex(_sceneIndex, _sceneDelegateId);
     } else {
         _sceneDelegate = std::make_unique<UsdImagingDelegate>(
