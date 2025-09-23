@@ -171,6 +171,34 @@ _CullStyleEnumToToken(UsdImagingGLCullStyle cullStyle)
     }
 }
 
+struct _RootOverrides
+{
+    GfMatrix4d transform = GfMatrix4d(1.0);
+    bool visibility = true;
+};
+
+template<typename ScenePointer>
+_RootOverrides _GetRootOverrides(
+    const ScenePointer &p)
+{
+    _RootOverrides overrides;
+    if (!p) {
+        return overrides;
+    }
+    overrides.transform = p->GetRootTransform();
+    overrides.visibility = p->GetRootVisibility();
+    return overrides;    
+}
+
+template<typename ScenePointer>
+void _SetRootOverrides(
+    const _RootOverrides &overrides,
+    const ScenePointer &p)
+{
+    p->SetRootTransform(overrides.transform);
+    p->SetRootVisibility(overrides.visibility);
+}
+
 } // anonymous namespace
 
 /// \note
@@ -1390,20 +1418,10 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
     // Pull old scene/task controller state. Note that the scene index/delegate
     // may not have been created, if this is the first time through this
     // function, so we guard for null and use default values for xform/vis.
-    GfMatrix4d rootTransform = GfMatrix4d(1.0);
-    bool rootVisibility = true;
-
-    if (_GetUseSceneIndices()) {
-        if (_rootOverridesSceneIndex) {
-            rootTransform = _rootOverridesSceneIndex->GetRootTransform();
-            rootVisibility = _rootOverridesSceneIndex->GetRootVisibility();
-        }
-    } else {
-        if (_sceneDelegate) {
-            rootTransform = _sceneDelegate->GetRootTransform();
-            rootVisibility = _sceneDelegate->GetRootVisibility();
-        }
-    }
+    const _RootOverrides rootOverrides =
+        _GetUseSceneIndices()
+            ? _GetRootOverrides(_rootOverridesSceneIndex)
+            : _GetRootOverrides(_sceneDelegate);
 
     HdSelectionSharedPtr const selection = _GetSelection();
 
@@ -1412,11 +1430,9 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
 
     // Reload saved state.
     if (_GetUseSceneIndices()) {
-        _rootOverridesSceneIndex->SetRootTransform(rootTransform);
-        _rootOverridesSceneIndex->SetRootVisibility(rootVisibility);
+        _SetRootOverrides(rootOverrides, _rootOverridesSceneIndex);
     } else {
-        _sceneDelegate->SetRootTransform(rootTransform);
-        _sceneDelegate->SetRootVisibility(rootVisibility);
+        _SetRootOverrides(rootOverrides, _sceneDelegate);
     }
     _selTracker->SetSelection(selection);
 
