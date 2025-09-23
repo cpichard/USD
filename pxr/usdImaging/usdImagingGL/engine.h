@@ -748,6 +748,9 @@ protected:
     void _SetRenderDelegate(HdPluginRenderDelegateUniqueHandle &&);
 
     USDIMAGINGGL_API
+    SdfPath _ComputeControllerPath(const TfToken &pluginId);
+
+    USDIMAGINGGL_API
     SdfPath _ComputeControllerPath(const HdPluginRenderDelegateUniqueHandle &);
 
     USDIMAGINGGL_API

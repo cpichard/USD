@@ -1431,14 +1431,21 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
 
 SdfPath
 UsdImagingGLEngine::_ComputeControllerPath(
-    const HdPluginRenderDelegateUniqueHandle &renderDelegate)
+    const TfToken &pluginId)
 {
-    const std::string pluginId =
-        TfMakeValidIdentifier(renderDelegate.GetPluginId().GetText());
+    const std::string pluginIdStr =
+        TfMakeValidIdentifier(pluginId.GetText());
     const TfToken rendererName(
-        TfStringPrintf("_UsdImaging_%s_%p", pluginId.c_str(), this));
+        TfStringPrintf("_UsdImaging_%s_%p", pluginIdStr.c_str(), this));
 
     return _sceneDelegateId.AppendChild(rendererName);
+}
+
+SdfPath
+UsdImagingGLEngine::_ComputeControllerPath(
+    const HdPluginRenderDelegateUniqueHandle &renderDelegate)
+{
+    return _ComputeControllerPath(renderDelegate.GetPluginId());
 }
 
 void
