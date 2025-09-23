@@ -2403,7 +2403,6 @@ UsdImagingGLEngine::_MakeHydraUsdImagingGLRenderParams(
         params.alphaThreshold = renderParams.alphaThreshold;
     }
 
-    params.enableSceneMaterials = renderParams.enableSceneMaterials;
     params.enableSceneLights = renderParams.enableSceneLights;
 
     // We don't provide the following because task controller ignores them:

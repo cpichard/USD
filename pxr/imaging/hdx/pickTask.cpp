@@ -1623,8 +1623,7 @@ operator<<(std::ostream& out, HdxPickHit const& h)
 bool
 operator==(HdxPickTaskParams const& lhs, HdxPickTaskParams const& rhs)
 {
-    return lhs.cullStyle == rhs.cullStyle
-        && lhs.enableSceneMaterials == rhs.enableSceneMaterials;
+    return lhs.cullStyle == rhs.cullStyle;
 }
 
 bool
@@ -1636,9 +1635,7 @@ operator!=(HdxPickTaskParams const& lhs, HdxPickTaskParams const& rhs)
 std::ostream&
 operator<<(std::ostream& out, HdxPickTaskParams const& p)
 {
-    out << "PickTask Params: (...) "
-        << p.cullStyle << " "
-        << p.enableSceneMaterials;
+    out << "PickTask Params: (...) " << p.cullStyle;
     return out;
 }
 
