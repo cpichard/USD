@@ -7,6 +7,7 @@
 #include "pxr/exec/exec/inputResolvingCompilationTask.h"
 
 #include "pxr/exec/exec/compilationState.h"
+#include "pxr/exec/exec/compiledOutputCache.h"
 #include "pxr/exec/exec/inputResolver.h"
 #include "pxr/exec/exec/outputProvidingCompilationTask.h"
 #include "pxr/exec/exec/program.h"
@@ -58,11 +59,16 @@ Exec_InputResolvingCompilationTask::_Compile(
 
             const Exec_OutputKey::Identity outputKeyIdentity =
                 outputKey.MakeIdentity();
-            const auto &[output, hasOutput] =
+            const Exec_CompiledOutputCache::MappedType *const cacheHit =
                 compilationState.GetProgram()->GetCompiledOutput(
                     outputKeyIdentity);
-            if (hasOutput) {
-                *resultOutput = output;
+            if (cacheHit) {
+                *resultOutput = cacheHit->output;
+
+                // TODO: If we found an output is already compiled for the key,
+                // *but* it was added during a prior round of compilation, then
+                // we need to spawn a traversal task to verify that adding the
+                // connection will not introduce a cycle.
                 continue;
             }
 
@@ -80,13 +86,13 @@ Exec_InputResolvingCompilationTask::_Compile(
     },
 
     // Compiled outputs are now all available and can be retrieved from the
-    // compiled outputs cache.
+    // compiled output cache.
     [this, &compilationState](TaskDependencies &deps) {
         TRACE_FUNCTION_SCOPE("populate result");
 
-        // For every output key, check if we still don't have a result and if
-        // so retrieve it from the compiled output. All the task dependencies
-        // should have fulfilled at this point.
+        // For every output key, check if we have a result, and if so, retrieve
+        // it from the compiled output cache. All the task dependencies should
+        // have fulfilled at this point.
         for (size_t i = 0; i < _outputKeys.size(); ++i) {
             const Exec_OutputKey &outputKey = _outputKeys[i];
             VdfMaskedOutput *const resultOutput = &(*_resultOutputs)[i];
@@ -95,15 +101,15 @@ Exec_InputResolvingCompilationTask::_Compile(
                 continue;
             }
 
-            const auto &[output, hasOutput] =
+            const Exec_CompiledOutputCache::MappedType *const cacheHit =
                 compilationState.GetProgram()->GetCompiledOutput(
                     outputKey.MakeIdentity());
-            if (!output) {
+            if (!cacheHit) {
                 TF_VERIFY(_inputKey.optional);
                 continue;
             }
 
-            *resultOutput = output;
+            *resultOutput = cacheHit->output;
         }
     }
     );
