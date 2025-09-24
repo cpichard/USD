@@ -1231,8 +1231,7 @@ if (EMBREE_FOUND AND ${PXR_BUILD_EMBREE_PLUGIN})
         COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --renderer Embree --testScript testUsdviewInstancingEditsEmbree.py test.usda"
         EXPECTED_RETURN_CODE 0
         IMAGE_DIFF_COMPARE
-            # Disabling the following baseline because of GitHub #3693 and #3769.
-            # instancerInvisibleEmbree.png
+            instancerInvisibleEmbree.png
             instancerVisibleEmbree.png
         FAIL 0.04
         FAIL_PERCENT 0.1
