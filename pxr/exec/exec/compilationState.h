@@ -12,6 +12,8 @@
 #include "pxr/exec/exec/compilerTaskSync.h"
 #include "pxr/exec/exec/taskCycleDetector.h"
 
+#include "pxr/base/work/dispatcher.h"
+
 #include <utility>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -35,10 +37,16 @@ public:
         WorkDispatcher &dispatcher,
         const EsfStage &stage,
         Exec_Program *program)
-        : _stage(stage)
+        : _dispatcher(dispatcher)
+        , _stage(stage)
         , _outputTasks(dispatcher)
         , _program(program) {
         TF_VERIFY(_program);
+    }
+
+    /// The dispatcher for running tasks.
+    WorkDispatcher &GetDispatcher() {
+        return _dispatcher;
     }
 
     /// The scene adapter stage.
@@ -70,6 +78,7 @@ public:
     static void NewTask(Exec_CompilationState &state, Args&&... args);
 
 private:
+    WorkDispatcher &_dispatcher;
     const EsfStage &_stage;
     Exec_TaskCycleDetector _taskCycleDetector;
     Exec_CompilerTaskSync _outputTasks;
@@ -83,7 +92,7 @@ Exec_CompilationState::NewTask(Exec_CompilationState &state, Args&&... args)
     // TODO: We need a small-object task allocator.
     // Tasks manage their own lifetime, and delete themselves after completion.
     TaskType *const task = new TaskType(state, std::forward<Args>(args)...);
-    state._outputTasks.Run(task);
+    state._dispatcher.Run(std::ref(*task));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
