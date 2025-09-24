@@ -44,7 +44,6 @@ def _PopulateValidatorAndSuitesByPlugin():
              metadata.doc))
     return validatorsByPlugin
 
-# TODO: any other way of word wrapping? (ask Jason)
 class WordWrapDelegate(QtWidgets.QStyledItemDelegate):
     def initStyleOption(self, option, index):
         super().initStyleOption(option, index)
@@ -73,7 +72,7 @@ class ValidatorPluginsWidget(QtWidgets.QWidget):
         self.tree.setHeaderHidden(False)
         self.tree.setRootIsDecorated(True)
         self.tree.setAlternatingRowColors(True)
-        self.tree.setItemDelegate(WordWrapDelegate(self.tree)) # (TODO: Ask Jason)
+        self.tree.setItemDelegate(WordWrapDelegate(self.tree))
         self.tree.header().setSectionResizeMode(
             QtWidgets.QHeaderView.ResizeToContents)
         self.tree.header().setStretchLastSection(False)
@@ -177,7 +176,7 @@ class SelectedValidatorsWidget(QtWidgets.QWidget):
         self.tree.setHeaderHidden(True)
         self.tree.setRootIsDecorated(True)
         self.tree.setAlternatingRowColors(True)
-        self.tree.setItemDelegate(WordWrapDelegate(self.tree)) # TODO: Ask Jason
+        self.tree.setItemDelegate(WordWrapDelegate(self.tree))
         layout.addWidget(self.tree)
 
     def addValidator(self, pluginName, validatorName, description):
@@ -389,10 +388,13 @@ class ResultWidget(QtWidgets.QWidget):
         self.resultTable.horizontalHeader().setSectionResizeMode(
             QtWidgets.QHeaderView.Stretch)
         self.resultTable.setVisible(False)
+        self.resultTable.selectionModel().selectionChanged.connect(
+            self._onRowsSelected)
         self.resultTable.cellDoubleClicked.connect(self._onCellDoubleClicked)
         groupBoxLayout.addWidget(self.resultTable)
         layout.addWidget(resultsGroupBox)
         self.results = []
+        self.currentSelectedErrors = []
 
     def populateResultsAndUpdateWidget(self, validationErrors):
         self.results.clear()
@@ -473,6 +475,15 @@ class ResultWidget(QtWidgets.QWidget):
                     rowVisible = True
                     break
             self.resultTable.setRowHidden(row, not rowVisible)
+
+    def _onRowsSelected(self, selected, deselected):
+        self.currentSelectedErrors.clear()
+        for index in self.resultTable.selectionModel().selectedRows():
+            row = index.row()
+            if row < 0 or row >= len(self.results):
+                continue
+            error = self.results[row]
+            self.currentSelectedErrors.append(error)
 
     def _onCellDoubleClicked(self, row, column):
         if row < 0 or row >= len(self.results):
@@ -578,6 +589,7 @@ class ValidationWidget(QtWidgets.QWidget):
 
         verticalSplitter.addWidget(topSplitter)
 
+        self.validationErrors = []
         self.resultWidget = ResultWidget(self._appController)
         verticalSplitter.addWidget(self.resultWidget)
 
@@ -641,15 +653,15 @@ class ValidationWidget(QtWidgets.QWidget):
                             timeRangeOptions.endTime),
                 isDefaultTimeIncluded)
 
-        validationErrors = []
         if primsToValidate:
             if includeDescendantPrims:
                 for prim in primsToValidate:
-                    validationErrors.extend(
+                    self.validationErrors.extend(
                         validationContext.Validate(Usd.PrimRange(prim)))
             else:
-                validationErrors = validationContext.Validate(primsToValidate)
+                self.validationErrors = validationContext.Validate(
+                    primsToValidate)
         else:
-            validationErrors = validationContext.Validate(stage)
+            self.validationErrors = validationContext.Validate(stage)
 
-        self.resultWidget.populateResultsAndUpdateWidget(validationErrors)
+        self.resultWidget.populateResultsAndUpdateWidget(self.validationErrors)
