@@ -648,6 +648,7 @@
         SCHEMA_TOKEN = 'material',
         EXTRA_TOKENS = [
             '(universalRenderContext, "")',
+            '(_universalRenderContextToken, "universalRenderContext")',
             '(all, "__all")',
             'terminals',
             'surface',
@@ -772,6 +773,7 @@
         SCHEMA_TOKEN = 'materialBindings',
         EXTRA_TOKENS = [
             '(allPurpose, "")',
+            '(_allPurposeToken, "allPurpose")',
         ],
         SCHEMA_INCLUDES = ['{{LIBRARY_PATH}}/materialBindingSchema'],
         GENERIC_MEMBER = (
