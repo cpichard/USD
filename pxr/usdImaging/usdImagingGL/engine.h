@@ -822,6 +822,8 @@ protected:
     bool _isPopulated;
 
 private:
+    HdSceneIndexBaseRefPtr _GetTerminalSceneIndex() const;
+
     // Registers app-managed scene indices with the scene index plugin registry.
     // This needs to be called once *before* the render index is constructed.
     static void _RegisterApplicationSceneIndices();
@@ -839,7 +841,7 @@ private:
     HdSceneIndexBaseRefPtr
     _AppendOverridesSceneIndices(
         const HdSceneIndexBaseRefPtr &inputScene);
-    
+
     UsdImagingGLEngine_Impl::_AppSceneIndicesSharedPtr _appSceneIndices;
 
     void _DestroyHydraObjects();
@@ -855,7 +857,7 @@ private:
     // State of the _lightPruningSceneIndex.
     bool _lightPruningSceneIndexEnableSceneLights;
     HdSceneIndexBaseRefPtr _sceneIndex;
-    
+
     std::unique_ptr<UsdImagingDelegate> _sceneDelegate;
 
     std::unique_ptr<HdEngine> _engine;

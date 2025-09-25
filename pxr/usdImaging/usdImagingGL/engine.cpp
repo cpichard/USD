@@ -495,14 +495,18 @@ void
 UsdImagingGLEngine::_SetActiveRenderSettingsPrimFromStageMetadata(
     UsdStageWeakPtr stage)
 {
-    if (!TF_VERIFY(_renderIndex) || !TF_VERIFY(stage)) {
+    if (!TF_VERIFY(stage)) {
+        return;
+    }
+
+    HdSceneIndexBaseRefPtr const terminalSceneIndex =
+        _GetTerminalSceneIndex();
+    if (!TF_VERIFY(terminalSceneIndex)) {
         return;
     }
 
     // If we already have an opinion, skip the stage metadata.
-    if (!HdUtils::HasActiveRenderSettingsPrim(
-            _renderIndex->GetTerminalSceneIndex())) {
-
+    if (!HdUtils::HasActiveRenderSettingsPrim(terminalSceneIndex)) {
         std::string pathStr;
         if (stage->HasAuthoredMetadata(
                 UsdRenderTokens->renderSettingsPrimPath)) {
@@ -1647,7 +1651,7 @@ UsdImagingGLEngine::_SetRenderDelegate(
     }
 
     if (_allowAsynchronousSceneProcessing) {
-        if (HdSceneIndexBaseRefPtr si = _renderIndex->GetTerminalSceneIndex()) {
+        if (HdSceneIndexBaseRefPtr const si = _GetTerminalSceneIndex()) {
             si->SystemMessage(HdSystemMessageTokens->asyncAllow, nullptr);
         }
     }
@@ -1864,13 +1868,15 @@ UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
 SdfPath
 UsdImagingGLEngine::GetActiveRenderPassPrimPath() const
 {
-    if (ARCH_UNLIKELY(!_renderIndex)) {
+    HdSceneIndexBaseRefPtr const terminalSceneIndex =
+        _GetTerminalSceneIndex();
+    if (ARCH_UNLIKELY(!terminalSceneIndex)) {
         return SdfPath::EmptyPath();
     }
 
     SdfPath activeRenderPassPath;
     if (HdUtils::HasActiveRenderPassPrim(
-            _renderIndex->GetTerminalSceneIndex(), &activeRenderPassPath)) {
+            terminalSceneIndex, &activeRenderPassPath)) {
         return activeRenderPassPath;
     }
 
@@ -1880,13 +1886,15 @@ UsdImagingGLEngine::GetActiveRenderPassPrimPath() const
 SdfPath
 UsdImagingGLEngine::GetActiveRenderSettingsPrimPath() const
 {
-    if (ARCH_UNLIKELY(!_renderIndex)) {
+    HdSceneIndexBaseRefPtr const terminalSceneIndex =
+        _GetTerminalSceneIndex();
+    if (ARCH_UNLIKELY(!terminalSceneIndex)) {
         return SdfPath::EmptyPath();
     }
 
     SdfPath activeRenderSettingsPath;
     if (HdUtils::HasActiveRenderSettingsPrim(
-            _renderIndex->GetTerminalSceneIndex(), &activeRenderSettingsPath)) {
+            terminalSceneIndex, &activeRenderSettingsPath)) {
         return activeRenderSettingsPath;
     }
 
@@ -2486,6 +2494,15 @@ UsdImagingGLEngine::_GetTaskController() const
     return _taskController.get();
 }
 
+HdSceneIndexBaseRefPtr
+UsdImagingGLEngine::_GetTerminalSceneIndex() const
+{
+    if (!_renderIndex) {
+        return nullptr;
+    }
+    return _renderIndex->GetTerminalSceneIndex();
+}
+
 bool
 UsdImagingGLEngine::PollForAsynchronousUpdates() const
 {
@@ -2527,8 +2544,8 @@ UsdImagingGLEngine::PollForAsynchronousUpdates() const
         bool _changed = false;
     };
 
-    if (_allowAsynchronousSceneProcessing && _renderIndex) {
-        if (HdSceneIndexBaseRefPtr si = _renderIndex->GetTerminalSceneIndex()) {
+    if (_allowAsynchronousSceneProcessing) {
+        if (HdSceneIndexBaseRefPtr si = _GetTerminalSceneIndex()) {
             _Observer ob;
             si->AddObserver(HdSceneIndexObserverPtr(&ob));
             si->SystemMessage(HdSystemMessageTokens->asyncPoll, nullptr);
