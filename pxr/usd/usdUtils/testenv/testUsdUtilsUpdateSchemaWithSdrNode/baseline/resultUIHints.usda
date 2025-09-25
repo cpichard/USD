@@ -28,6 +28,7 @@ class "TestUIHintsAPI" (
         }
     )
     int inputs:displayGroup = 1 (
+        displayGroup = "Hints"
         uiHints = {
             string displayGroup = "Hints"
         }
@@ -37,6 +38,7 @@ class "TestUIHintsAPI" (
             string userDoc = "A Display Name"
             string userDocBrief = "A Display Name"
         }
+        displayName = "A Display Name"
         uiHints = {
             string displayName = "A Display Name"
         }
@@ -48,6 +50,7 @@ class "TestUIHintsAPI" (
         }
     )
     int inputs:hidden = 1 (
+        hidden = true
         uiHints = {
             bool hidden = 1
         }
