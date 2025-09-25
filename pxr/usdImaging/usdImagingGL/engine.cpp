@@ -374,7 +374,7 @@ UsdImagingGLEngine::PrepareBatch(
     const UsdPrim& root,
     const UsdImagingGLRenderParams& params)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -597,7 +597,7 @@ UsdImagingGLEngine::_SetBBoxParams(
     const GfVec4f& bboxLineColor,
     float bboxLineDashSize)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -620,7 +620,7 @@ UsdImagingGLEngine::RenderBatch(
     const SdfPathVector& paths,
     const UsdImagingGLRenderParams& params)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -685,7 +685,7 @@ UsdImagingGLEngine::Render(
     const UsdPrim& root,
     const UsdImagingGLRenderParams &params)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -732,7 +732,7 @@ UsdImagingGLEngine::IsConverged() const
 void
 UsdImagingGLEngine::SetRootTransform(GfMatrix4d const& xf)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -748,7 +748,7 @@ UsdImagingGLEngine::SetRootTransform(GfMatrix4d const& xf)
 void
 UsdImagingGLEngine::SetRootVisibility(const bool isVisible)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -768,7 +768,7 @@ UsdImagingGLEngine::SetRootVisibility(const bool isVisible)
 void
 UsdImagingGLEngine::SetRenderViewport(GfVec4d const& viewport)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -786,7 +786,7 @@ UsdImagingGLEngine::SetRenderViewport(GfVec4d const& viewport)
 void
 UsdImagingGLEngine::SetFraming(CameraUtilFraming const& framing)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -805,7 +805,7 @@ void
 UsdImagingGLEngine::SetOverrideWindowPolicy(
     const std::optional<CameraUtilConformWindowPolicy> &policy)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -823,7 +823,7 @@ UsdImagingGLEngine::SetOverrideWindowPolicy(
 void
 UsdImagingGLEngine::SetRenderBufferSize(GfVec2i const& size)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -841,7 +841,7 @@ UsdImagingGLEngine::SetRenderBufferSize(GfVec2i const& size)
 void
 UsdImagingGLEngine::SetWindowPolicy(CameraUtilConformWindowPolicy policy)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -861,7 +861,7 @@ UsdImagingGLEngine::SetWindowPolicy(CameraUtilConformWindowPolicy policy)
 void
 UsdImagingGLEngine::SetCameraPath(SdfPath const& id)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -894,7 +894,7 @@ void
 UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
                                    const GfMatrix4d& projectionMatrix)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -912,7 +912,7 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
 void
 UsdImagingGLEngine::SetLightingState(GlfSimpleLightingContextPtr const &src)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -933,7 +933,7 @@ UsdImagingGLEngine::SetLightingState(
     GlfSimpleMaterial const &material,
     GfVec4f const &sceneAmbient)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -967,7 +967,7 @@ UsdImagingGLEngine::SetLightingState(
 void
 UsdImagingGLEngine::SetSelected(SdfPathVector const& paths)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1004,7 +1004,7 @@ UsdImagingGLEngine::SetSelected(SdfPathVector const& paths)
 void
 UsdImagingGLEngine::ClearSelected()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1033,7 +1033,7 @@ UsdImagingGLEngine::_GetSelection() const
 void
 UsdImagingGLEngine::AddSelected(SdfPath const &path, int instanceIndex)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1061,7 +1061,7 @@ UsdImagingGLEngine::AddSelected(SdfPath const &path, int instanceIndex)
 void
 UsdImagingGLEngine::SetSelectionColor(GfVec4f const& color)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1138,7 +1138,7 @@ UsdImagingGLEngine::TestIntersection(
     const UsdImagingGLRenderParams& params,
     IntersectionResultVector* outResults)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -1237,7 +1237,7 @@ UsdImagingGLEngine::DecodeIntersection(
     int *outHitInstanceIndex,
     HdInstancerContext *outInstancerContext)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -1345,7 +1345,7 @@ UsdImagingGLEngine::GetGPUEnabled() const
 TfToken
 UsdImagingGLEngine::GetCurrentRendererId() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return TfToken();
     }
 
@@ -1691,7 +1691,7 @@ UsdImagingGLEngine::_SetRenderDelegate(
 TfTokenVector
 UsdImagingGLEngine::GetRendererAovs() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return {};
     }
 
@@ -1719,12 +1719,15 @@ UsdImagingGLEngine::GetRendererAovs() const
 bool
 UsdImagingGLEngine::SetRendererAov(TfToken const &id)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
-    if (!_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
-        return false;
+    if (_renderIndex) {
+        if (!_renderIndex->IsBprimTypeSupported(
+                HdPrimTypeTokens->renderBuffer)) {
+            return false;
+        }
     }
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
@@ -1742,12 +1745,15 @@ UsdImagingGLEngine::SetRendererAov(TfToken const &id)
 bool
 UsdImagingGLEngine::SetRendererAovs(TfTokenVector const &ids)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
-    if (!_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
-        return false;
+    if (_renderIndex) {
+        if (!_renderIndex->IsBprimTypeSupported(
+                HdPrimTypeTokens->renderBuffer)) {
+            return false;
+        }
     }
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
@@ -1766,7 +1772,7 @@ HgiTextureHandle
 UsdImagingGLEngine::GetAovTexture(
     TfToken const& name) const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return HgiTextureHandle();
     }
 
@@ -1785,7 +1791,7 @@ UsdImagingGLEngine::GetAovTexture(
 HdRenderBuffer*
 UsdImagingGLEngine::GetAovRenderBuffer(TfToken const& name) const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return nullptr;
     }
 
@@ -1805,7 +1811,7 @@ UsdImagingGLEngine::GetAovRenderBuffer(TfToken const& name) const
 UsdImagingGLRendererSettingsList
 UsdImagingGLEngine::GetRendererSettingsList() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return {};
     }
 
@@ -1846,7 +1852,7 @@ UsdImagingGLEngine::GetRendererSettingsList() const
 VtValue
 UsdImagingGLEngine::GetRendererSetting(TfToken const& id) const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return VtValue();
     }
 
@@ -1856,7 +1862,7 @@ UsdImagingGLEngine::GetRendererSetting(TfToken const& id) const
 void
 UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1972,7 +1978,7 @@ void UsdImagingGLEngine::_SetSceneGlobalsCurrentFrame(UsdTimeCode const &time)
 void
 UsdImagingGLEngine::SetEnablePresentation(bool enabled)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1993,7 +1999,7 @@ UsdImagingGLEngine::SetPresentationOutput(
     TfToken const &api,
     VtValue const &framebuffer)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -2016,7 +2022,7 @@ UsdImagingGLEngine::SetPresentationOutput(
 HdCommandDescriptors
 UsdImagingGLEngine::GetRendererCommandDescriptors() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return HdCommandDescriptors();
     }
 
@@ -2027,7 +2033,7 @@ bool
 UsdImagingGLEngine::InvokeRendererCommand(
     const TfToken &command, const HdCommandArgs &args) const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2042,7 +2048,7 @@ UsdImagingGLEngine::InvokeRendererCommand(
 bool
 UsdImagingGLEngine::IsPauseRendererSupported() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2052,7 +2058,7 @@ UsdImagingGLEngine::IsPauseRendererSupported() const
 bool
 UsdImagingGLEngine::PauseRenderer()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2064,7 +2070,7 @@ UsdImagingGLEngine::PauseRenderer()
 bool
 UsdImagingGLEngine::ResumeRenderer()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2076,7 +2082,7 @@ UsdImagingGLEngine::ResumeRenderer()
 bool
 UsdImagingGLEngine::IsStopRendererSupported() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2086,7 +2092,7 @@ UsdImagingGLEngine::IsStopRendererSupported() const
 bool
 UsdImagingGLEngine::StopRenderer()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2098,7 +2104,7 @@ UsdImagingGLEngine::StopRenderer()
 bool
 UsdImagingGLEngine::RestartRenderer()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2118,7 +2124,7 @@ UsdImagingGLEngine::SetColorCorrectionSettings(
     TfToken const& ocioColorSpace,
     TfToken const& ocioLook)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate) ||
+    if (ARCH_UNLIKELY(!_HasRenderer()) ||
         !IsColorCorrectionCapable()) {
         return;
     }
@@ -2154,7 +2160,7 @@ UsdImagingGLEngine::IsColorCorrectionCapable()
 VtDictionary
 UsdImagingGLEngine::GetRenderStats() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return VtDictionary();
     }
 
@@ -2164,7 +2170,7 @@ UsdImagingGLEngine::GetRenderStats() const
 Hgi*
 UsdImagingGLEngine::GetHgi()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return nullptr;
     }
 
@@ -2501,6 +2507,12 @@ UsdImagingGLEngine::_GetTerminalSceneIndex() const
         return nullptr;
     }
     return _renderIndex->GetTerminalSceneIndex();
+}
+
+bool
+UsdImagingGLEngine::_HasRenderer() const
+{
+    return bool(_renderDelegate);
 }
 
 bool

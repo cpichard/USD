@@ -822,6 +822,7 @@ protected:
     bool _isPopulated;
 
 private:
+    bool _HasRenderer() const;
     HdSceneIndexBaseRefPtr _GetTerminalSceneIndex() const;
 
     // Registers app-managed scene indices with the scene index plugin registry.
