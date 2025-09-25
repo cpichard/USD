@@ -3,15 +3,15 @@
         {
             "Info": {
                 "Types": {
-                    "Hio_StbImage" : {
+                   "Hio_OpenEXRImage" : {
                         "bases": ["HioImage"],
-                        "imageTypes": ["bmp", "jpg", "jpeg", "png", "tga", "hdr"],
+                        "imageTypes": ["exr"],
                         "precedence": 30
                     }
                 }
             },
             "LibraryPath": "@PLUG_INFO_LIBRARY_PATH@",
-            "Name": "hio",
+            "Name": "hioOpenEXR",
             "ResourcePath": "@PLUG_INFO_RESOURCE_PATH@",
             "Root": "@PLUG_INFO_ROOT@",
             "Type": "library"

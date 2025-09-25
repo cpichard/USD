@@ -29,15 +29,12 @@ pxr_library(hio
         api.h
 
     PRIVATE_HEADERS
-        OpenEXR/openexr-c.h
         rankedTypeMap.h
         stb/stb_image.h
         stb/stb_image_resize2.h
         stb/stb_image_write.h
 
     CPPFILES
-        OpenEXRImage.cpp
-        OpenEXR/openexr-c.c
         stbImage.cpp
 
     RESOURCE_FILES

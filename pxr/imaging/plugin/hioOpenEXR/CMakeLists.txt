@@ -1,0 +1,47 @@
+set(PXR_PREFIX pxr/imaging)
+set(PXR_PACKAGE hioOpenEXR)
+
+pxr_plugin(hioOpenEXR
+    LIBRARIES
+        ar
+        arch
+        gf
+        hio
+        tf
+
+    PRIVATE_HEADERS
+        OpenEXR/openexr-c.h
+        OpenEXR/OpenEXRCoreUnity.h
+
+    CPPFILES
+        OpenEXR/openexr-c.c
+        OpenEXRImage.cpp
+
+    RESOURCE_FILES
+        plugInfo.json
+)
+
+if (CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    if (TARGET hioOpenEXR)
+        # Hide symbols and inlines in the C code
+        target_compile_options(hioOpenEXR PRIVATE
+             $<$<COMPILE_LANGUAGE:C>:-fvisibility=hidden>)
+    endif()
+endif()
+
+pxr_install_test_dir(
+    SRC testenv/testHioOpenEXR
+    DEST testHioOpenEXR
+)
+
+pxr_build_test(testHioOpenEXR
+    LIBRARIES
+        hio
+    CPPFILES
+        testenv/testHioOpenEXR.cpp
+)
+
+pxr_register_test(testHioOpenEXR
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHioOpenEXR"
+    EXPECTED_RETURN_CODE 0
+)
