@@ -70,16 +70,114 @@ namespace UsdImagingGLEngine_Impl
 
 // Struct that holds application scene indices created via the
 // scene index plugin registration callback facility.
-struct _AppSceneIndices {
-    HdsiSceneGlobalsSceneIndexRefPtr sceneGlobalsSceneIndex;
+//
+// It is also in charge of registering the callback with the scene index
+// plugin registration and tracking itself so that it can populate itself
+// during the callback.
+//    
+struct _AppSceneIndices : std::enable_shared_from_this<_AppSceneIndices>
+{
+    HdsiSceneGlobalsSceneIndexRefPtr
+        sceneGlobalsSceneIndex;
     HdsiDomeLightCameraVisibilitySceneIndexRefPtr
-                    domeLightCameraVisibilitySceneIndex;
-    HdsiSceneMaterialPruningSceneIndexRefPtr sceneMaterialPruningSceneIndex;
+        domeLightCameraVisibilitySceneIndex;
+    HdsiSceneMaterialPruningSceneIndexRefPtr
+        sceneMaterialPruningSceneIndex;
+
+    _AppSceneIndicesSharedPtr
+    static New(const TfToken &renderInstanceId)
+    {
+        // Register application managed scene indices via the callback
+        // facility which will be invoked during render index construction.
+        static std::once_flag registerOnce;
+        std::call_once(registerOnce, _Register);
+
+        auto result = std::make_shared<_AppSceneIndices>(renderInstanceId);
+        _GetTracker().RegisterInstance(renderInstanceId, result);
+        return result;
+    }
+
+    _AppSceneIndices(const TfToken &renderInstanceId)
+     : _renderInstanceId(renderInstanceId) { }
+
+    ~_AppSceneIndices()
+    {
+        _GetTracker().UnregisterInstance(_renderInstanceId);
+    }
+    
+private:
+    const TfToken _renderInstanceId;
+
+    using _Tracker = HdUtils::RenderInstanceTracker<_AppSceneIndices>;
+    static _Tracker &_GetTracker()
+    {
+        static _Tracker tracker;
+        return tracker;
+    }
+
+    HdSceneIndexBaseRefPtr _Append(
+        const HdSceneIndexBaseRefPtr &inputScene)
+    {
+        HdSceneIndexBaseRefPtr sceneIndex = inputScene;
+
+        sceneIndex =
+            sceneGlobalsSceneIndex =
+                HdsiSceneGlobalsSceneIndex::New(sceneIndex);
+
+        sceneIndex =
+            domeLightCameraVisibilitySceneIndex =
+                HdsiDomeLightCameraVisibilitySceneIndex::New(sceneIndex);
+
+        sceneIndex =
+            sceneMaterialPruningSceneIndex = 
+                HdsiSceneMaterialPruningSceneIndex::New(sceneIndex);
+
+        return sceneIndex;
+    }
+
+    static HdSceneIndexBaseRefPtr _AppendCallback(
+        const std::string &renderInstanceId,
+        const HdSceneIndexBaseRefPtr &inputScene,
+        const HdContainerDataSourceHandle &inputArgs)
+    {
+        _AppSceneIndicesSharedPtr const instance =
+            _GetTracker().GetInstance(renderInstanceId);
+        if (!instance) {
+            TF_CODING_ERROR("Did not find appSceneIndices instance for %s,",
+                            renderInstanceId.c_str());
+            return inputScene;
+        }
+        return instance->_Append(inputScene);
+    }
+
+    static void _Register()
+    {
+        // Insert earlier so downstream scene indices can query and be notified
+        // of changes and also declare their dependencies (e.g., to support
+        // rendering color spaces).
+        const HdSceneIndexPluginRegistry::InsertionPhase insertionPhase = 0;
+
+        // Note:
+        // The pattern used below registers the static member fn as a callback,
+        // which retreives the scene index instance using the
+        // renderInstanceId argument of the callback.
+
+        HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
+            std::string(), // empty string implies all renderers
+            &_AppendCallback,
+            /* inputArgs = */ nullptr,
+            insertionPhase,
+            HdSceneIndexPluginRegistry::InsertionOrderAtStart
+        );
+    }
+    
+    
 };
 
-};
+}
 
-namespace {
+namespace
+{
 
 // RAII helper to enable and disable notice batching when using the stage scene
 // index.
@@ -105,13 +203,6 @@ public:
 private:
     HdNoticeBatchingSceneIndexRefPtr _noticeBatchingSceneIndex;
 };
-
-// Use a static tracker to accommodate the use-case where an application spawns
-// multiple engines.
-using _RenderInstanceAppSceneIndicesTracker =
-    HdUtils::RenderInstanceTracker<UsdImagingGLEngine_Impl::_AppSceneIndices>;
-TfStaticData<_RenderInstanceAppSceneIndicesTracker>
-    s_renderInstanceTracker;
 
 // ----------------------------------------------------------------------------
 
@@ -303,30 +394,28 @@ UsdImagingGLEngine::_DestroyHydraObjects()
     }
     if (_GetUseSceneIndices()) {
         if (_renderIndex && _sceneIndex) {
-            {
-                TRACE_SCOPE("Remove terminal UsdImaging scene index");
-                // Remove the terminal scene index of the UsdImaging scene
-                // index graph from the render index's merging scene index.
-                // This should result in removed/added notices that are
-                // processed by downstream scene index plugins.
-                _renderIndex->RemoveSceneIndex(_sceneIndex);
-            }
+            TRACE_SCOPE("Remove terminal UsdImaging scene index");
+            // Remove the terminal scene index of the UsdImaging scene
+            // index graph from the render index's merging scene index.
+            // This should result in removed/added notices that are
+            // processed by downstream scene index plugins.
+            _renderIndex->RemoveSceneIndex(_sceneIndex);
+        }
 
-            {
-                TRACE_SCOPE("Destroy UsdImaging scene indices");
+        {
+            TRACE_SCOPE("Destroy UsdImaging scene indices");
     
-                // The destruction order below is the reverse of the creation 
-                // order.
-                _sceneIndex = nullptr;
-                _displayStyleSceneIndex = nullptr;
-                _selectionSceneIndex = nullptr;
+            // The destruction order below is the reverse of the creation 
+            // order.
+            _sceneIndex = nullptr;
+            _displayStyleSceneIndex = nullptr;
+            _selectionSceneIndex = nullptr;
                 
-                // "Override" scene indices.
-                _rootOverridesSceneIndex = nullptr;
-                _lightPruningSceneIndex = nullptr;
+            // "Override" scene indices.
+            _rootOverridesSceneIndex = nullptr;
+            _lightPruningSceneIndex = nullptr;
                 
-                _stageSceneIndex = nullptr;
-            }
+            _stageSceneIndex = nullptr;
         }
     } else {
         TRACE_SCOPE("Destroy UsdImaging delegate");
@@ -337,10 +426,6 @@ UsdImagingGLEngine::_DestroyHydraObjects()
     // during render index destruction.
     {
         _appSceneIndices = nullptr;
-        if (_renderIndex) {
-            s_renderInstanceTracker->UnregisterInstance(
-                _renderIndex->GetInstanceName());
-        }
     }
 
     {
@@ -1468,64 +1553,6 @@ UsdImagingGLEngine::_ComputeControllerPath(
     return _ComputeControllerPath(renderDelegate.GetPluginId());
 }
 
-void
-UsdImagingGLEngine::_RegisterApplicationSceneIndices()
-{
-    // SGSI
-    {
-        // Insert earlier so downstream scene indices can query and be notified
-        // of changes and also declare their dependencies (e.g., to support
-        // rendering color spaces).
-        const HdSceneIndexPluginRegistry::InsertionPhase insertionPhase = 0;
-
-        // Note:
-        // The pattern used below registers the static member fn as a callback,
-        // which retreives the scene index instance using the
-        // renderInstanceId argument of the callback.
-
-        HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-            std::string(), // empty string implies all renderers
-            &UsdImagingGLEngine::_AppendSceneGlobalsSceneIndexCallback,
-            /* inputArgs = */ nullptr,
-            insertionPhase,
-            HdSceneIndexPluginRegistry::InsertionOrderAtStart
-        );
-    }
-}
-
-/* static */
-HdSceneIndexBaseRefPtr
-UsdImagingGLEngine::_AppendSceneGlobalsSceneIndexCallback(
-        const std::string &renderInstanceId,
-        const HdSceneIndexBaseRefPtr &inputScene,
-        const HdContainerDataSourceHandle &inputArgs)
-{
-    UsdImagingGLEngine_Impl::_AppSceneIndicesSharedPtr appSceneIndices =
-        s_renderInstanceTracker->GetInstance(renderInstanceId);
-
-    if (appSceneIndices) {
-        HdSceneIndexBaseRefPtr sceneIndex = inputScene;
-
-        sceneIndex =
-            appSceneIndices->sceneGlobalsSceneIndex =
-                HdsiSceneGlobalsSceneIndex::New(sceneIndex);
-
-        sceneIndex =
-            appSceneIndices->domeLightCameraVisibilitySceneIndex =
-                HdsiDomeLightCameraVisibilitySceneIndex::New(sceneIndex);
-
-        sceneIndex =
-            appSceneIndices->sceneMaterialPruningSceneIndex = 
-                HdsiSceneMaterialPruningSceneIndex::New(sceneIndex);
-
-        return sceneIndex;
-    }
-
-    TF_CODING_ERROR("Did not find appSceneIndices instance for %s,",
-                    renderInstanceId.c_str());
-    return inputScene;
-}
-
 HdSceneIndexBaseRefPtr
 UsdImagingGLEngine::_AppendOverridesSceneIndices(
     HdSceneIndexBaseRefPtr const &inputScene)
@@ -1559,25 +1586,6 @@ UsdImagingGLEngine::_AppendOverridesSceneIndices(
 
     return sceneIndex;
 }
-
-void
-UsdImagingGLEngine::_RegisterRenderInstanceId(
-    const std::string &renderInstanceId)
-{
-    // Register application managed scene indices via the callback
-    // facility which will be invoked during render index construction.
-    static std::once_flag registerOnce;
-    std::call_once(registerOnce, _RegisterApplicationSceneIndices);
-
-    _appSceneIndices =
-        std::make_shared<UsdImagingGLEngine_Impl::_AppSceneIndices>();
-
-    // Register the app scene indices with the render instance id
-    // that is provided to the render index constructor below.
-    s_renderInstanceTracker->RegisterInstance(
-        renderInstanceId, _appSceneIndices);
-}
-    
 
 void
 UsdImagingGLEngine::_CreateUsdImagingSceneIndices()
@@ -1631,7 +1639,9 @@ UsdImagingGLEngine::_SetRenderDelegate(
                            _renderDelegate.GetPluginId().GetText(),
                            (void *) _renderDelegate.Get());
 
-        _RegisterRenderInstanceId(renderInstanceId);
+        _appSceneIndices =
+            UsdImagingGLEngine_Impl::_AppSceneIndices::New(
+                TfToken(renderInstanceId));
 
         // Recreate the render index
         _renderIndex.reset(
