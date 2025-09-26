@@ -1035,7 +1035,7 @@
         SCHEMA_INCLUDES = ['{{LIBRARY_PATH}}/schemaTypeDefs'],
         MEMBERS = [
             ('ALL_MEMBERS', '', dict(ADD_LOCATOR = True)),
-            ('namespacedSettings', T_CONTAINER, {}),
+            ('namespacedSettings', 'HdSampledDataSourceContainerSchema', {}),
             ('active', T_BOOL, {}),
             ('renderProducts', 'HdRenderProductVectorSchema', {}),
             ('includedPurposes', T_TOKENARRAY, {}),
