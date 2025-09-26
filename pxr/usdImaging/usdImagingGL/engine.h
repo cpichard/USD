@@ -686,12 +686,6 @@ protected:
     USDIMAGINGGL_API
     HdRenderIndex *_GetRenderIndex() const;
 
-    /// \deprecated.
-    /// Use _Execute(const UsdImaginGLRenderParams &, const SdfPathVector &).
-    USDIMAGINGGL_API
-    void _Execute(const UsdImagingGLRenderParams &params,
-                  const HdTaskSharedPtrVector tasks);
-
     USDIMAGINGGL_API
     void _Execute(const UsdImagingGLRenderParams &params,
                   const SdfPathVector &taskPaths);

@@ -2199,18 +2199,6 @@ UsdImagingGLEngine::_GetRenderIndex() const
 
 void
 UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
-                             HdTaskSharedPtrVector tasks)
-{
-    {
-        // Release the GIL before calling into hydra, in case any hydra plugins
-        // call into python.
-        TF_PY_ALLOW_THREADS_IN_SCOPE();
-        _engine->Execute(_renderIndex.get(), &tasks);
-    }
-}
-
-void
-UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
                              const SdfPathVector &taskPaths)
 {
     {
