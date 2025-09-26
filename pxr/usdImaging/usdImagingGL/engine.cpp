@@ -1278,7 +1278,7 @@ UsdImagingGLEngine::TestIntersection(
                     hit.instancerId).GetAbsoluteRootOrPrimPath();
         } else {
             const HdxPrimOriginInfo info = HdxPrimOriginInfo::FromPickHit(
-                _renderIndex.get(), hit);
+                _GetTerminalSceneIndex(), hit);
             res.hitPrimPath = info.GetFullPath();
             res.hitInstancerPath = hit.instancerId.ReplacePrefix(
                 _sceneDelegateId, SdfPath::AbsoluteRootPath());
