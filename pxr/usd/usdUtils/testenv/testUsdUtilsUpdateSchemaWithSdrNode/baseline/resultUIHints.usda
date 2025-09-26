@@ -47,7 +47,7 @@ class "TestUIHintsAPI" (
         }
     )
     int inputs:displayGroup = 1 (
-        displayGroup = "Hints"
+        displayGroup = "A Display Group"
         uiHints = {
             string displayGroup = "A Display Group"
         }
@@ -114,16 +114,19 @@ class "TestUIHintsAPI" (
         }
     )
     int inputs:inClosedGroup = 1 (
+        displayGroup = "ClosedGroup"
         uiHints = {
             string displayGroup = "ClosedGroup"
         }
     )
     int inputs:inOpenGroup = 1 (
+        displayGroup = "OpenGroup"
         uiHints = {
             string displayGroup = "OpenGroup"
         }
     )
     int inputs:inOpenNestedGroup = 1 (
+        displayGroup = "OpenGroup:Nested"
         uiHints = {
             string displayGroup = "OpenGroup:Nested"
         }
