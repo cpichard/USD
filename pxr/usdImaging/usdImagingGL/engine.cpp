@@ -797,11 +797,11 @@ UsdImagingGLEngine::IsConverged() const
     }
 
     if (_taskControllerSceneIndex) {
-        return HdxTask::AreTasksConverged(
+        return _engine->AreTasksConverged(
             _renderIndex.get(), 
             _taskControllerSceneIndex->GetRenderingTaskPaths());
     } else if (_taskController) {
-        return HdxTask::AreTasksConverged(
+        return _engine->AreTasksConverged(
             _renderIndex.get(), 
             _taskController->GetRenderingTaskPaths());
     } else {
