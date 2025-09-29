@@ -41,7 +41,11 @@ pxr_build_test(testHioOpenEXR
         testenv/testHioOpenEXR.cpp
 )
 
-pxr_register_test(testHioOpenEXR
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHioOpenEXR"
-    EXPECTED_RETURN_CODE 0
-)
+# Tests relying on plugins don't run in static builds
+if (BUILD_SHARED_LIBS)
+    pxr_register_test(testHioOpenEXR
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHioOpenEXR"
+        EXPECTED_RETURN_CODE 0
+    )
+endif()
+

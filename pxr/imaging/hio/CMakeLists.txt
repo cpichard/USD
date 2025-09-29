@@ -55,6 +55,11 @@ pxr_build_test(testHioImage
         testenv/testHioImage.cpp
 )
 
-pxr_register_test(testHioImage
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHioImage"
-)
+# Tests that use plugins are not supported in static builds
+if (BUILD_SHARED_LIBS)
+    pxr_register_test(testHioImage
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHioImage"
+        EXPECTED_RETURN_CODE 0
+    )
+endif()
+
