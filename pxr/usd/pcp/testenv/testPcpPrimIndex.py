@@ -536,6 +536,106 @@ class TestPcpPrimIndex(unittest.TestCase):
                 ]
             ])
 
+    def test_ContributionRestrictedDepth_InertAndCulled(self):
+        """Verify contribution restriction depth is maintained at the
+        original value when a node is marked as inert and then marked
+        as culled one level down in namespace."""
+        
+        refLayer = Sdf.Layer.CreateAnonymous()
+        refLayer.ImportFromString('''
+        #usda 1.0
+
+        def "Class"
+        {
+        }
+
+        def "LocalRef" (
+            inherits = </Class>
+        )
+        {
+            def "Child"
+            {
+            }
+        }
+
+        def "Ref" (
+            references = </LocalRef>
+        )
+        {
+            def "Child"
+            {
+            }
+        }        
+        ''')
+
+        rootLayer = Sdf.Layer.CreateAnonymous()
+        rootLayer.ImportFromString('''
+        #usda 1.0
+
+        over "Class"
+        {
+            over "Child"
+            {
+            }
+        }
+
+        def "Root" (
+            references = @{refLayer}@</Ref>
+        )
+        {
+        }
+        '''.replace("{refLayer}", refLayer.identifier))
+
+        pcpCache = LoadPcpCache(rootLayer)
+
+        self.AssertRestrictedDepth(
+            pcpCache, "/Root",
+            [
+                (Pcp.ArcTypeRoot, "/Root", 0), [
+                    (Pcp.ArcTypeInherit, "/Class", 0), [],
+                    (Pcp.ArcTypeReference, "/Ref", 0), [
+                        # This is an implied inherit node that is an inert
+                        # placeholder because implying the original inherit
+                        # to /Class across the local reference /LocalRef
+                        # yielded a duplicate site. Since it was marked
+                        # inert at this level of namespace, its restriction
+                        # depth is 1.
+                        (Pcp.ArcTypeInherit, "/Class", 1), [],
+                        (Pcp.ArcTypeReference, "/LocalRef", 0), [
+                            (Pcp.ArcTypeInherit, "/Class", 0), []
+                        ]
+                    ]
+                ]
+            ])
+
+        self.AssertRestrictedDepth(
+            pcpCache, "/Root/Child",
+            [
+                (Pcp.ArcTypeRoot, "/Root/Child", 0), [
+                    (Pcp.ArcTypeInherit, "/Class/Child", 0), [],
+                    (Pcp.ArcTypeReference, "/Ref/Child", 0), [
+
+                        # This implied inherit node is now culled because
+                        # it provides no opinions to the prim index, but
+                        # is not removed from the prim index because it
+                        # is the origin for the /Class/Child inherit
+                        # above, which does have opinions. However, note
+                        # that the restriction depth remains at 1 since
+                        # that's the depth where it was originally marked
+                        # inert.
+                        (Pcp.ArcTypeInherit, "/Class/Child", 1), [],
+
+                        (Pcp.ArcTypeReference, "/LocalRef/Child", 0), [
+                            # This inherit node is also culled because it
+                            # provides no opinions, but it is not removed
+                            # because it is the origin for the implied inherit
+                            # above.
+                            (Pcp.ArcTypeInherit, "/Class/Child", 2), []
+                        ]
+                    ]
+                ]
+            ])
+
     @unittest.skipIf(not Tf.GetEnvSetting("PCP_CULLING"), "Culling is disabled")
     def test_PrimIndexCulling_Specializes(self):
         """Tests node culling optimization with specializes arcs"""
