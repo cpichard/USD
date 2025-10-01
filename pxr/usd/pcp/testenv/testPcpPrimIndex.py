@@ -269,7 +269,6 @@ class TestPcpPrimIndex(unittest.TestCase):
                 ]
             ])
 
-    @unittest.skip("currently fails due to bug with specializes")
     def test_ContributionRestrictedDepth_SpecializesAndPermissions(self):
         """Verify contribution restriction depth with specializes and
         permission restrictions."""
@@ -315,9 +314,7 @@ class TestPcpPrimIndex(unittest.TestCase):
             [
                 (Pcp.ArcTypeRoot, "/Root/Child", 2), [
                     (Pcp.ArcTypeReference, "/Ref/Child", 2), [
-                        (Pcp.ArcTypeSpecialize, "/Specialize/Child", 0), [
-                            (Pcp.ArcTypeReference, "/ChildRef", 0), [
-                            ]
+                        (Pcp.ArcTypeSpecialize, "/Specialize/Child", 1), [
                         ]
                     ],
                     (Pcp.ArcTypeSpecialize, "/Specialize/Child", 0), [
