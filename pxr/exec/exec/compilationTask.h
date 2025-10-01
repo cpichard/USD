@@ -12,7 +12,7 @@
 #include "pxr/exec/exec/api.h"
 
 #include "pxr/exec/exec/compilationState.h"
-#include "pxr/exec/exec/compilerTaskSync.h"
+#include "pxr/exec/exec/compilerTaskSyncBase.h"
 
 #include "pxr/base/work/dispatcher.h"
 
@@ -112,7 +112,7 @@ public:
     /// method will automatically be re-executed once all dependencies have been
     /// fulfilled.
     /// 
-    Exec_CompilerTaskSync::ClaimResult ClaimSubtask(
+    Exec_CompilerTaskSyncBase::ClaimResult ClaimSubtask(
         const Exec_OutputKey::Identity &key);
 
 private:

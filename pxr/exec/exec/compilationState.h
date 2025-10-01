@@ -64,11 +64,12 @@ public:
         return _taskCycleDetector;
     }
 
-    /// Extends access to the Exec_CompilerTaskSync member.
-    class OutputTasksAccess {
+    /// Extends access to the various Exec_CompilerTaskSync<T> members.
+    class TaskSyncAccess {
         friend class Exec_CompilationTask;
 
-        static Exec_CompilerTaskSync &_Get(Exec_CompilationState *state) {
+        static Exec_OutputProvidingTaskSync &
+        _GetOutputProvidingTaskSync(Exec_CompilationState *state) {
             return state->_outputTasks;
         }
     };
@@ -81,7 +82,7 @@ private:
     WorkDispatcher &_dispatcher;
     const EsfStage &_stage;
     Exec_TaskCycleDetector _taskCycleDetector;
-    Exec_CompilerTaskSync _outputTasks;
+    Exec_OutputProvidingTaskSync _outputTasks;
     Exec_Program *_program;
 };
 
