@@ -2290,8 +2290,7 @@ void _FinalizeArticulations(const UsdStageWeakPtr stage,
                     RigidBodyMap::const_iterator fit = 
                         rigidBodyMap.find(desc->body0);
                     if (fit != rigidBodyMap.end() && 
-                        fit->second->rigidBodyEnabled &&
-                        !fit->second->kinematicBody)
+                        fit->second->rigidBodyEnabled)
                     {
                         bodyJointMap[desc->body0].push_back(desc);
                     }
@@ -2301,8 +2300,7 @@ void _FinalizeArticulations(const UsdStageWeakPtr stage,
                     RigidBodyMap::const_iterator fit = 
                         rigidBodyMap.find(desc->body1);
                     if (fit != rigidBodyMap.end() && 
-                        fit->second->rigidBodyEnabled &&
-                        !fit->second->kinematicBody)
+                        fit->second->rigidBodyEnabled)
                     {
                         bodyJointMap[desc->body1].push_back(desc);
                     }
