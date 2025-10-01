@@ -1672,6 +1672,11 @@ def InstallUSD(context, force, buildArgs):
         extraArgs.append('-DPXR_PREFER_SAFETY_OVER_SPEED={}'
                          .format('ON' if context.safetyFirst else 'OFF'))
 
+        if context.buildOneTBB:
+            extraArgs.append('-DPXR_FIND_TBB_IN_CONFIG=ON')
+        else:
+            extraArgs.append('-DPXR_FIND_TBB_IN_CONFIG=OFF')
+
         if context.buildPython:
             extraArgs.append('-DPXR_ENABLE_PYTHON_SUPPORT=ON')
 

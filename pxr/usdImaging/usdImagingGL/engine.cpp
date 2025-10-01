@@ -70,16 +70,114 @@ namespace UsdImagingGLEngine_Impl
 
 // Struct that holds application scene indices created via the
 // scene index plugin registration callback facility.
-struct _AppSceneIndices {
-    HdsiSceneGlobalsSceneIndexRefPtr sceneGlobalsSceneIndex;
+//
+// It is also in charge of registering the callback with the scene index
+// plugin registration and tracking itself so that it can populate itself
+// during the callback.
+//    
+struct _AppSceneIndices : std::enable_shared_from_this<_AppSceneIndices>
+{
+    HdsiSceneGlobalsSceneIndexRefPtr
+        sceneGlobalsSceneIndex;
     HdsiDomeLightCameraVisibilitySceneIndexRefPtr
-                    domeLightCameraVisibilitySceneIndex;
-    HdsiSceneMaterialPruningSceneIndexRefPtr sceneMaterialPruningSceneIndex;
+        domeLightCameraVisibilitySceneIndex;
+    HdsiSceneMaterialPruningSceneIndexRefPtr
+        sceneMaterialPruningSceneIndex;
+
+    _AppSceneIndicesSharedPtr
+    static New(const TfToken &renderInstanceId)
+    {
+        // Register application managed scene indices via the callback
+        // facility which will be invoked during render index construction.
+        static std::once_flag registerOnce;
+        std::call_once(registerOnce, _Register);
+
+        auto result = std::make_shared<_AppSceneIndices>(renderInstanceId);
+        _GetTracker().RegisterInstance(renderInstanceId, result);
+        return result;
+    }
+
+    _AppSceneIndices(const TfToken &renderInstanceId)
+     : _renderInstanceId(renderInstanceId) { }
+
+    ~_AppSceneIndices()
+    {
+        _GetTracker().UnregisterInstance(_renderInstanceId);
+    }
+    
+private:
+    const TfToken _renderInstanceId;
+
+    using _Tracker = HdUtils::RenderInstanceTracker<_AppSceneIndices>;
+    static _Tracker &_GetTracker()
+    {
+        static _Tracker tracker;
+        return tracker;
+    }
+
+    HdSceneIndexBaseRefPtr _Append(
+        const HdSceneIndexBaseRefPtr &inputScene)
+    {
+        HdSceneIndexBaseRefPtr sceneIndex = inputScene;
+
+        sceneIndex =
+            sceneGlobalsSceneIndex =
+                HdsiSceneGlobalsSceneIndex::New(sceneIndex);
+
+        sceneIndex =
+            domeLightCameraVisibilitySceneIndex =
+                HdsiDomeLightCameraVisibilitySceneIndex::New(sceneIndex);
+
+        sceneIndex =
+            sceneMaterialPruningSceneIndex = 
+                HdsiSceneMaterialPruningSceneIndex::New(sceneIndex);
+
+        return sceneIndex;
+    }
+
+    static HdSceneIndexBaseRefPtr _AppendCallback(
+        const std::string &renderInstanceId,
+        const HdSceneIndexBaseRefPtr &inputScene,
+        const HdContainerDataSourceHandle &inputArgs)
+    {
+        _AppSceneIndicesSharedPtr const instance =
+            _GetTracker().GetInstance(renderInstanceId);
+        if (!instance) {
+            TF_CODING_ERROR("Did not find appSceneIndices instance for %s,",
+                            renderInstanceId.c_str());
+            return inputScene;
+        }
+        return instance->_Append(inputScene);
+    }
+
+    static void _Register()
+    {
+        // Insert earlier so downstream scene indices can query and be notified
+        // of changes and also declare their dependencies (e.g., to support
+        // rendering color spaces).
+        const HdSceneIndexPluginRegistry::InsertionPhase insertionPhase = 0;
+
+        // Note:
+        // The pattern used below registers the static member fn as a callback,
+        // which retreives the scene index instance using the
+        // renderInstanceId argument of the callback.
+
+        HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
+            std::string(), // empty string implies all renderers
+            &_AppendCallback,
+            /* inputArgs = */ nullptr,
+            insertionPhase,
+            HdSceneIndexPluginRegistry::InsertionOrderAtStart
+        );
+    }
+    
+    
 };
 
-};
+}
 
-namespace {
+namespace
+{
 
 // RAII helper to enable and disable notice batching when using the stage scene
 // index.
@@ -105,13 +203,6 @@ public:
 private:
     HdNoticeBatchingSceneIndexRefPtr _noticeBatchingSceneIndex;
 };
-
-// Use a static tracker to accommodate the use-case where an application spawns
-// multiple engines.
-using _RenderInstanceAppSceneIndicesTracker =
-    HdUtils::RenderInstanceTracker<UsdImagingGLEngine_Impl::_AppSceneIndices>;
-TfStaticData<_RenderInstanceAppSceneIndicesTracker>
-    s_renderInstanceTracker;
 
 // ----------------------------------------------------------------------------
 
@@ -169,6 +260,34 @@ _CullStyleEnumToToken(UsdImagingGLCullStyle cullStyle)
                         int(cullStyle));
         return TfToken();
     }
+}
+
+struct _RootOverrides
+{
+    GfMatrix4d transform = GfMatrix4d(1.0);
+    bool visibility = true;
+};
+
+template<typename ScenePointer>
+_RootOverrides _GetRootOverrides(
+    const ScenePointer &p)
+{
+    _RootOverrides overrides;
+    if (!p) {
+        return overrides;
+    }
+    overrides.transform = p->GetRootTransform();
+    overrides.visibility = p->GetRootVisibility();
+    return overrides;    
+}
+
+template<typename ScenePointer>
+void _SetRootOverrides(
+    const _RootOverrides &overrides,
+    const ScenePointer &p)
+{
+    p->SetRootTransform(overrides.transform);
+    p->SetRootVisibility(overrides.visibility);
 }
 
 } // anonymous namespace
@@ -275,30 +394,28 @@ UsdImagingGLEngine::_DestroyHydraObjects()
     }
     if (_GetUseSceneIndices()) {
         if (_renderIndex && _sceneIndex) {
-            {
-                TRACE_SCOPE("Remove terminal UsdImaging scene index");
-                // Remove the terminal scene index of the UsdImaging scene
-                // index graph from the render index's merging scene index.
-                // This should result in removed/added notices that are
-                // processed by downstream scene index plugins.
-                _renderIndex->RemoveSceneIndex(_sceneIndex);
-            }
+            TRACE_SCOPE("Remove terminal UsdImaging scene index");
+            // Remove the terminal scene index of the UsdImaging scene
+            // index graph from the render index's merging scene index.
+            // This should result in removed/added notices that are
+            // processed by downstream scene index plugins.
+            _renderIndex->RemoveSceneIndex(_sceneIndex);
+        }
 
-            {
-                TRACE_SCOPE("Destroy UsdImaging scene indices");
+        {
+            TRACE_SCOPE("Destroy UsdImaging scene indices");
     
-                // The destruction order below is the reverse of the creation 
-                // order.
-                _sceneIndex = nullptr;
-                _displayStyleSceneIndex = nullptr;
-                _selectionSceneIndex = nullptr;
+            // The destruction order below is the reverse of the creation 
+            // order.
+            _sceneIndex = nullptr;
+            _displayStyleSceneIndex = nullptr;
+            _selectionSceneIndex = nullptr;
                 
-                // "Override" scene indices.
-                _rootOverridesSceneIndex = nullptr;
-                _lightPruningSceneIndex = nullptr;
+            // "Override" scene indices.
+            _rootOverridesSceneIndex = nullptr;
+            _lightPruningSceneIndex = nullptr;
                 
-                _stageSceneIndex = nullptr;
-            }
+            _stageSceneIndex = nullptr;
         }
     } else {
         TRACE_SCOPE("Destroy UsdImaging delegate");
@@ -309,10 +426,6 @@ UsdImagingGLEngine::_DestroyHydraObjects()
     // during render index destruction.
     {
         _appSceneIndices = nullptr;
-        if (_renderIndex) {
-            s_renderInstanceTracker->UnregisterInstance(
-                _renderIndex->GetInstanceName());
-        }
     }
 
     {
@@ -346,7 +459,7 @@ UsdImagingGLEngine::PrepareBatch(
     const UsdPrim& root,
     const UsdImagingGLRenderParams& params)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -467,14 +580,18 @@ void
 UsdImagingGLEngine::_SetActiveRenderSettingsPrimFromStageMetadata(
     UsdStageWeakPtr stage)
 {
-    if (!TF_VERIFY(_renderIndex) || !TF_VERIFY(stage)) {
+    if (!TF_VERIFY(stage)) {
+        return;
+    }
+
+    HdSceneIndexBaseRefPtr const terminalSceneIndex =
+        _GetTerminalSceneIndex();
+    if (!TF_VERIFY(terminalSceneIndex)) {
         return;
     }
 
     // If we already have an opinion, skip the stage metadata.
-    if (!HdUtils::HasActiveRenderSettingsPrim(
-            _renderIndex->GetTerminalSceneIndex())) {
-
+    if (!HdUtils::HasActiveRenderSettingsPrim(terminalSceneIndex)) {
         std::string pathStr;
         if (stage->HasAuthoredMetadata(
                 UsdRenderTokens->renderSettingsPrimPath)) {
@@ -565,7 +682,7 @@ UsdImagingGLEngine::_SetBBoxParams(
     const GfVec4f& bboxLineColor,
     float bboxLineDashSize)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -588,7 +705,7 @@ UsdImagingGLEngine::RenderBatch(
     const SdfPathVector& paths,
     const UsdImagingGLRenderParams& params)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -653,7 +770,7 @@ UsdImagingGLEngine::Render(
     const UsdPrim& root,
     const UsdImagingGLRenderParams &params)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -680,11 +797,11 @@ UsdImagingGLEngine::IsConverged() const
     }
 
     if (_taskControllerSceneIndex) {
-        return HdxTask::AreTasksConverged(
+        return _engine->AreTasksConverged(
             _renderIndex.get(), 
             _taskControllerSceneIndex->GetRenderingTaskPaths());
     } else if (_taskController) {
-        return HdxTask::AreTasksConverged(
+        return _engine->AreTasksConverged(
             _renderIndex.get(), 
             _taskController->GetRenderingTaskPaths());
     } else {
@@ -700,7 +817,7 @@ UsdImagingGLEngine::IsConverged() const
 void
 UsdImagingGLEngine::SetRootTransform(GfMatrix4d const& xf)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -716,7 +833,7 @@ UsdImagingGLEngine::SetRootTransform(GfMatrix4d const& xf)
 void
 UsdImagingGLEngine::SetRootVisibility(const bool isVisible)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -736,7 +853,7 @@ UsdImagingGLEngine::SetRootVisibility(const bool isVisible)
 void
 UsdImagingGLEngine::SetRenderViewport(GfVec4d const& viewport)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -754,7 +871,7 @@ UsdImagingGLEngine::SetRenderViewport(GfVec4d const& viewport)
 void
 UsdImagingGLEngine::SetFraming(CameraUtilFraming const& framing)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -773,7 +890,7 @@ void
 UsdImagingGLEngine::SetOverrideWindowPolicy(
     const std::optional<CameraUtilConformWindowPolicy> &policy)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -791,7 +908,7 @@ UsdImagingGLEngine::SetOverrideWindowPolicy(
 void
 UsdImagingGLEngine::SetRenderBufferSize(GfVec2i const& size)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -809,7 +926,7 @@ UsdImagingGLEngine::SetRenderBufferSize(GfVec2i const& size)
 void
 UsdImagingGLEngine::SetWindowPolicy(CameraUtilConformWindowPolicy policy)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -829,7 +946,7 @@ UsdImagingGLEngine::SetWindowPolicy(CameraUtilConformWindowPolicy policy)
 void
 UsdImagingGLEngine::SetCameraPath(SdfPath const& id)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -862,7 +979,7 @@ void
 UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
                                    const GfMatrix4d& projectionMatrix)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -880,7 +997,7 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
 void
 UsdImagingGLEngine::SetLightingState(GlfSimpleLightingContextPtr const &src)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -901,7 +1018,7 @@ UsdImagingGLEngine::SetLightingState(
     GlfSimpleMaterial const &material,
     GfVec4f const &sceneAmbient)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -935,7 +1052,7 @@ UsdImagingGLEngine::SetLightingState(
 void
 UsdImagingGLEngine::SetSelected(SdfPathVector const& paths)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -972,7 +1089,7 @@ UsdImagingGLEngine::SetSelected(SdfPathVector const& paths)
 void
 UsdImagingGLEngine::ClearSelected()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1001,7 +1118,7 @@ UsdImagingGLEngine::_GetSelection() const
 void
 UsdImagingGLEngine::AddSelected(SdfPath const &path, int instanceIndex)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1029,7 +1146,7 @@ UsdImagingGLEngine::AddSelected(SdfPath const &path, int instanceIndex)
 void
 UsdImagingGLEngine::SetSelectionColor(GfVec4f const& color)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1106,7 +1223,7 @@ UsdImagingGLEngine::TestIntersection(
     const UsdImagingGLRenderParams& params,
     IntersectionResultVector* outResults)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -1161,7 +1278,7 @@ UsdImagingGLEngine::TestIntersection(
                     hit.instancerId).GetAbsoluteRootOrPrimPath();
         } else {
             const HdxPrimOriginInfo info = HdxPrimOriginInfo::FromPickHit(
-                _renderIndex.get(), hit);
+                _GetTerminalSceneIndex(), hit);
             res.hitPrimPath = info.GetFullPath();
             res.hitInstancerPath = hit.instancerId.ReplacePrefix(
                 _sceneDelegateId, SdfPath::AbsoluteRootPath());
@@ -1205,7 +1322,7 @@ UsdImagingGLEngine::DecodeIntersection(
     int *outHitInstanceIndex,
     HdInstancerContext *outInstancerContext)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -1313,7 +1430,7 @@ UsdImagingGLEngine::GetGPUEnabled() const
 TfToken
 UsdImagingGLEngine::GetCurrentRendererId() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return TfToken();
     }
 
@@ -1390,20 +1507,10 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
     // Pull old scene/task controller state. Note that the scene index/delegate
     // may not have been created, if this is the first time through this
     // function, so we guard for null and use default values for xform/vis.
-    GfMatrix4d rootTransform = GfMatrix4d(1.0);
-    bool rootVisibility = true;
-
-    if (_GetUseSceneIndices()) {
-        if (_rootOverridesSceneIndex) {
-            rootTransform = _rootOverridesSceneIndex->GetRootTransform();
-            rootVisibility = _rootOverridesSceneIndex->GetRootVisibility();
-        }
-    } else {
-        if (_sceneDelegate) {
-            rootTransform = _sceneDelegate->GetRootTransform();
-            rootVisibility = _sceneDelegate->GetRootVisibility();
-        }
-    }
+    const _RootOverrides rootOverrides =
+        _GetUseSceneIndices()
+            ? _GetRootOverrides(_rootOverridesSceneIndex)
+            : _GetRootOverrides(_sceneDelegate);
 
     HdSelectionSharedPtr const selection = _GetSelection();
 
@@ -1412,11 +1519,9 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
 
     // Reload saved state.
     if (_GetUseSceneIndices()) {
-        _rootOverridesSceneIndex->SetRootTransform(rootTransform);
-        _rootOverridesSceneIndex->SetRootVisibility(rootVisibility);
+        _SetRootOverrides(rootOverrides, _rootOverridesSceneIndex);
     } else {
-        _sceneDelegate->SetRootTransform(rootTransform);
-        _sceneDelegate->SetRootVisibility(rootVisibility);
+        _SetRootOverrides(rootOverrides, _sceneDelegate);
     }
     _selTracker->SetSelection(selection);
 
@@ -1431,72 +1536,21 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
 
 SdfPath
 UsdImagingGLEngine::_ComputeControllerPath(
-    const HdPluginRenderDelegateUniqueHandle &renderDelegate)
+    const TfToken &pluginId)
 {
-    const std::string pluginId =
-        TfMakeValidIdentifier(renderDelegate.GetPluginId().GetText());
+    const std::string pluginIdStr =
+        TfMakeValidIdentifier(pluginId.GetText());
     const TfToken rendererName(
-        TfStringPrintf("_UsdImaging_%s_%p", pluginId.c_str(), this));
+        TfStringPrintf("_UsdImaging_%s_%p", pluginIdStr.c_str(), this));
 
     return _sceneDelegateId.AppendChild(rendererName);
 }
 
-void
-UsdImagingGLEngine::_RegisterApplicationSceneIndices()
+SdfPath
+UsdImagingGLEngine::_ComputeControllerPath(
+    const HdPluginRenderDelegateUniqueHandle &renderDelegate)
 {
-    // SGSI
-    {
-        // Insert earlier so downstream scene indices can query and be notified
-        // of changes and also declare their dependencies (e.g., to support
-        // rendering color spaces).
-        const HdSceneIndexPluginRegistry::InsertionPhase insertionPhase = 0;
-
-        // Note:
-        // The pattern used below registers the static member fn as a callback,
-        // which retreives the scene index instance using the
-        // renderInstanceId argument of the callback.
-
-        HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-            std::string(), // empty string implies all renderers
-            &UsdImagingGLEngine::_AppendSceneGlobalsSceneIndexCallback,
-            /* inputArgs = */ nullptr,
-            insertionPhase,
-            HdSceneIndexPluginRegistry::InsertionOrderAtStart
-        );
-    }
-}
-
-/* static */
-HdSceneIndexBaseRefPtr
-UsdImagingGLEngine::_AppendSceneGlobalsSceneIndexCallback(
-        const std::string &renderInstanceId,
-        const HdSceneIndexBaseRefPtr &inputScene,
-        const HdContainerDataSourceHandle &inputArgs)
-{
-    UsdImagingGLEngine_Impl::_AppSceneIndicesSharedPtr appSceneIndices =
-        s_renderInstanceTracker->GetInstance(renderInstanceId);
-
-    if (appSceneIndices) {
-        HdSceneIndexBaseRefPtr sceneIndex = inputScene;
-
-        sceneIndex =
-            appSceneIndices->sceneGlobalsSceneIndex =
-                HdsiSceneGlobalsSceneIndex::New(sceneIndex);
-
-        sceneIndex =
-            appSceneIndices->domeLightCameraVisibilitySceneIndex =
-                HdsiDomeLightCameraVisibilitySceneIndex::New(sceneIndex);
-
-        sceneIndex =
-            appSceneIndices->sceneMaterialPruningSceneIndex = 
-                HdsiSceneMaterialPruningSceneIndex::New(sceneIndex);
-
-        return sceneIndex;
-    }
-
-    TF_CODING_ERROR("Did not find appSceneIndices instance for %s,",
-                    renderInstanceId.c_str());
-    return inputScene;
+    return _ComputeControllerPath(renderDelegate.GetPluginId());
 }
 
 HdSceneIndexBaseRefPtr
@@ -1534,6 +1588,35 @@ UsdImagingGLEngine::_AppendOverridesSceneIndices(
 }
 
 void
+UsdImagingGLEngine::_CreateUsdImagingSceneIndices()
+{
+    UsdImagingCreateSceneIndicesInfo info;
+    info.addDrawModeSceneIndex = _enableUsdDrawModes;
+    info.displayUnloadedPrimsWithBounds = _displayUnloadedPrimsWithBounds;
+    info.overridesSceneIndexCallback =
+        std::bind(
+            &UsdImagingGLEngine::_AppendOverridesSceneIndices,
+            this, std::placeholders::_1);
+
+    const UsdImagingSceneIndices sceneIndices =
+        UsdImagingCreateSceneIndices(info);
+
+    _stageSceneIndex =
+        sceneIndices.stageSceneIndex;
+    _postInstancingNoticeBatchingSceneIndex =
+        sceneIndices.postInstancingNoticeBatchingSceneIndex;
+    _selectionSceneIndex =
+        sceneIndices.selectionSceneIndex;
+
+    HdSceneIndexBaseRefPtr sceneIndex =
+        sceneIndices.finalSceneIndex;
+    sceneIndex = _displayStyleSceneIndex =
+        HdsiLegacyDisplayStyleOverrideSceneIndex::New(sceneIndex);
+
+    _sceneIndex = sceneIndex;
+}
+
+void
 UsdImagingGLEngine::_SetRenderDelegate(
     HdPluginRenderDelegateUniqueHandle &&renderDelegate)
 {
@@ -1544,60 +1627,30 @@ UsdImagingGLEngine::_SetRenderDelegate(
 
     _isPopulated = false;
 
-    // Use the render delegate ptr (rather than 'this' ptr) for generating
-    // the unique id.
-    const std::string renderInstanceId =
-        TfStringPrintf("UsdImagingGLEngine_%s_%p",
-            renderDelegate.GetPluginId().GetText(),
-            (void *) renderDelegate.Get());
-
-    // Application scene index callback registration and
-    // engine-renderInstanceId tracking.
-    {
-        // Register application managed scene indices via the callback
-        // facility which will be invoked during render index construction.
-        static std::once_flag registerOnce;
-        std::call_once(registerOnce, _RegisterApplicationSceneIndices);
-
-        _appSceneIndices =
-            std::make_shared<UsdImagingGLEngine_Impl::_AppSceneIndices>();
-
-        // Register the app scene indices with the render instance id
-        // that is provided to the render index constructor below.
-        s_renderInstanceTracker->RegisterInstance(
-            renderInstanceId, _appSceneIndices);
-    }
-
     // Creation
     // Use the new render delegate.
     _renderDelegate = std::move(renderDelegate);
 
-    // Recreate the render index
-    _renderIndex.reset(
-        HdRenderIndex::New(
-            _renderDelegate.Get(), {&_hgiDriver}, renderInstanceId));
+    {
+        // Use the render delegate ptr (rather than 'this' ptr) for generating
+        // the unique id.
+        const std::string renderInstanceId =
+            TfStringPrintf("UsdImagingGLEngine_%s_%p",
+                           _renderDelegate.GetPluginId().GetText(),
+                           (void *) _renderDelegate.Get());
+
+        _appSceneIndices =
+            UsdImagingGLEngine_Impl::_AppSceneIndices::New(
+                TfToken(renderInstanceId));
+
+        // Recreate the render index
+        _renderIndex.reset(
+            HdRenderIndex::New(
+                _renderDelegate.Get(), {&_hgiDriver}, renderInstanceId));
+    }
 
     if (_GetUseSceneIndices()) {
-        UsdImagingCreateSceneIndicesInfo info;
-        info.addDrawModeSceneIndex = _enableUsdDrawModes;
-        info.displayUnloadedPrimsWithBounds = _displayUnloadedPrimsWithBounds;
-        info.overridesSceneIndexCallback =
-            std::bind(
-                &UsdImagingGLEngine::_AppendOverridesSceneIndices,
-                this, std::placeholders::_1);
-
-        const UsdImagingSceneIndices sceneIndices =
-            UsdImagingCreateSceneIndices(info);
-
-        _stageSceneIndex = sceneIndices.stageSceneIndex;
-        _postInstancingNoticeBatchingSceneIndex =
-            sceneIndices.postInstancingNoticeBatchingSceneIndex;
-        _selectionSceneIndex = sceneIndices.selectionSceneIndex;
-        _sceneIndex = sceneIndices.finalSceneIndex;
-
-        _sceneIndex = _displayStyleSceneIndex =
-            HdsiLegacyDisplayStyleOverrideSceneIndex::New(_sceneIndex);
-
+        _CreateUsdImagingSceneIndices();
         _renderIndex->InsertSceneIndex(_sceneIndex, _sceneDelegateId);
     } else {
         _sceneDelegate = std::make_unique<UsdImagingDelegate>(
@@ -1608,7 +1661,7 @@ UsdImagingGLEngine::_SetRenderDelegate(
     }
 
     if (_allowAsynchronousSceneProcessing) {
-        if (HdSceneIndexBaseRefPtr si = _renderIndex->GetTerminalSceneIndex()) {
+        if (HdSceneIndexBaseRefPtr const si = _GetTerminalSceneIndex()) {
             si->SystemMessage(HdSystemMessageTokens->asyncAllow, nullptr);
         }
     }
@@ -1648,7 +1701,7 @@ UsdImagingGLEngine::_SetRenderDelegate(
 TfTokenVector
 UsdImagingGLEngine::GetRendererAovs() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return {};
     }
 
@@ -1676,12 +1729,15 @@ UsdImagingGLEngine::GetRendererAovs() const
 bool
 UsdImagingGLEngine::SetRendererAov(TfToken const &id)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
-    if (!_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
-        return false;
+    if (_renderIndex) {
+        if (!_renderIndex->IsBprimTypeSupported(
+                HdPrimTypeTokens->renderBuffer)) {
+            return false;
+        }
     }
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
@@ -1699,12 +1755,15 @@ UsdImagingGLEngine::SetRendererAov(TfToken const &id)
 bool
 UsdImagingGLEngine::SetRendererAovs(TfTokenVector const &ids)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
-    if (!_renderIndex->IsBprimTypeSupported(HdPrimTypeTokens->renderBuffer)) {
-        return false;
+    if (_renderIndex) {
+        if (!_renderIndex->IsBprimTypeSupported(
+                HdPrimTypeTokens->renderBuffer)) {
+            return false;
+        }
     }
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
@@ -1723,7 +1782,7 @@ HgiTextureHandle
 UsdImagingGLEngine::GetAovTexture(
     TfToken const& name) const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return HgiTextureHandle();
     }
 
@@ -1742,7 +1801,7 @@ UsdImagingGLEngine::GetAovTexture(
 HdRenderBuffer*
 UsdImagingGLEngine::GetAovRenderBuffer(TfToken const& name) const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return nullptr;
     }
 
@@ -1762,7 +1821,7 @@ UsdImagingGLEngine::GetAovRenderBuffer(TfToken const& name) const
 UsdImagingGLRendererSettingsList
 UsdImagingGLEngine::GetRendererSettingsList() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return {};
     }
 
@@ -1803,7 +1862,7 @@ UsdImagingGLEngine::GetRendererSettingsList() const
 VtValue
 UsdImagingGLEngine::GetRendererSetting(TfToken const& id) const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return VtValue();
     }
 
@@ -1813,7 +1872,7 @@ UsdImagingGLEngine::GetRendererSetting(TfToken const& id) const
 void
 UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1825,13 +1884,15 @@ UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
 SdfPath
 UsdImagingGLEngine::GetActiveRenderPassPrimPath() const
 {
-    if (ARCH_UNLIKELY(!_renderIndex)) {
+    HdSceneIndexBaseRefPtr const terminalSceneIndex =
+        _GetTerminalSceneIndex();
+    if (ARCH_UNLIKELY(!terminalSceneIndex)) {
         return SdfPath::EmptyPath();
     }
 
     SdfPath activeRenderPassPath;
     if (HdUtils::HasActiveRenderPassPrim(
-            _renderIndex->GetTerminalSceneIndex(), &activeRenderPassPath)) {
+            terminalSceneIndex, &activeRenderPassPath)) {
         return activeRenderPassPath;
     }
 
@@ -1841,13 +1902,15 @@ UsdImagingGLEngine::GetActiveRenderPassPrimPath() const
 SdfPath
 UsdImagingGLEngine::GetActiveRenderSettingsPrimPath() const
 {
-    if (ARCH_UNLIKELY(!_renderIndex)) {
+    HdSceneIndexBaseRefPtr const terminalSceneIndex =
+        _GetTerminalSceneIndex();
+    if (ARCH_UNLIKELY(!terminalSceneIndex)) {
         return SdfPath::EmptyPath();
     }
 
     SdfPath activeRenderSettingsPath;
     if (HdUtils::HasActiveRenderSettingsPrim(
-            _renderIndex->GetTerminalSceneIndex(), &activeRenderSettingsPath)) {
+            terminalSceneIndex, &activeRenderSettingsPath)) {
         return activeRenderSettingsPath;
     }
 
@@ -1925,7 +1988,7 @@ void UsdImagingGLEngine::_SetSceneGlobalsCurrentFrame(UsdTimeCode const &time)
 void
 UsdImagingGLEngine::SetEnablePresentation(bool enabled)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1946,7 +2009,7 @@ UsdImagingGLEngine::SetPresentationOutput(
     TfToken const &api,
     VtValue const &framebuffer)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return;
     }
 
@@ -1969,7 +2032,7 @@ UsdImagingGLEngine::SetPresentationOutput(
 HdCommandDescriptors
 UsdImagingGLEngine::GetRendererCommandDescriptors() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return HdCommandDescriptors();
     }
 
@@ -1980,7 +2043,7 @@ bool
 UsdImagingGLEngine::InvokeRendererCommand(
     const TfToken &command, const HdCommandArgs &args) const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -1995,7 +2058,7 @@ UsdImagingGLEngine::InvokeRendererCommand(
 bool
 UsdImagingGLEngine::IsPauseRendererSupported() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2005,7 +2068,7 @@ UsdImagingGLEngine::IsPauseRendererSupported() const
 bool
 UsdImagingGLEngine::PauseRenderer()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2017,7 +2080,7 @@ UsdImagingGLEngine::PauseRenderer()
 bool
 UsdImagingGLEngine::ResumeRenderer()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2029,7 +2092,7 @@ UsdImagingGLEngine::ResumeRenderer()
 bool
 UsdImagingGLEngine::IsStopRendererSupported() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2039,7 +2102,7 @@ UsdImagingGLEngine::IsStopRendererSupported() const
 bool
 UsdImagingGLEngine::StopRenderer()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2051,7 +2114,7 @@ UsdImagingGLEngine::StopRenderer()
 bool
 UsdImagingGLEngine::RestartRenderer()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
@@ -2071,7 +2134,7 @@ UsdImagingGLEngine::SetColorCorrectionSettings(
     TfToken const& ocioColorSpace,
     TfToken const& ocioLook)
 {
-    if (ARCH_UNLIKELY(!_renderDelegate) ||
+    if (ARCH_UNLIKELY(!_HasRenderer()) ||
         !IsColorCorrectionCapable()) {
         return;
     }
@@ -2107,7 +2170,7 @@ UsdImagingGLEngine::IsColorCorrectionCapable()
 VtDictionary
 UsdImagingGLEngine::GetRenderStats() const
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return VtDictionary();
     }
 
@@ -2117,7 +2180,7 @@ UsdImagingGLEngine::GetRenderStats() const
 Hgi*
 UsdImagingGLEngine::GetHgi()
 {
-    if (ARCH_UNLIKELY(!_renderDelegate)) {
+    if (ARCH_UNLIKELY(!_HasRenderer())) {
         return nullptr;
     }
 
@@ -2132,18 +2195,6 @@ HdRenderIndex *
 UsdImagingGLEngine::_GetRenderIndex() const
 {
     return _renderIndex.get();
-}
-
-void
-UsdImagingGLEngine::_Execute(const UsdImagingGLRenderParams &params,
-                             HdTaskSharedPtrVector tasks)
-{
-    {
-        // Release the GIL before calling into hydra, in case any hydra plugins
-        // call into python.
-        TF_PY_ALLOW_THREADS_IN_SCOPE();
-        _engine->Execute(_renderIndex.get(), &tasks);
-    }
 }
 
 void
@@ -2364,7 +2415,6 @@ UsdImagingGLEngine::_MakeHydraUsdImagingGLRenderParams(
         params.alphaThreshold = renderParams.alphaThreshold;
     }
 
-    params.enableSceneMaterials = renderParams.enableSceneMaterials;
     params.enableSceneLights = renderParams.enableSceneLights;
 
     // We don't provide the following because task controller ignores them:
@@ -2448,6 +2498,21 @@ UsdImagingGLEngine::_GetTaskController() const
     return _taskController.get();
 }
 
+HdSceneIndexBaseRefPtr
+UsdImagingGLEngine::_GetTerminalSceneIndex() const
+{
+    if (!_renderIndex) {
+        return nullptr;
+    }
+    return _renderIndex->GetTerminalSceneIndex();
+}
+
+bool
+UsdImagingGLEngine::_HasRenderer() const
+{
+    return bool(_renderDelegate);
+}
+
 bool
 UsdImagingGLEngine::PollForAsynchronousUpdates() const
 {
@@ -2489,8 +2554,8 @@ UsdImagingGLEngine::PollForAsynchronousUpdates() const
         bool _changed = false;
     };
 
-    if (_allowAsynchronousSceneProcessing && _renderIndex) {
-        if (HdSceneIndexBaseRefPtr si = _renderIndex->GetTerminalSceneIndex()) {
+    if (_allowAsynchronousSceneProcessing) {
+        if (HdSceneIndexBaseRefPtr si = _GetTerminalSceneIndex()) {
             _Observer ob;
             si->AddObserver(HdSceneIndexObserverPtr(&ob));
             si->SystemMessage(HdSystemMessageTokens->asyncPoll, nullptr);

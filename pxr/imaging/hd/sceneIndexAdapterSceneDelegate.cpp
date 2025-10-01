@@ -139,24 +139,6 @@ TF_DEFINE_PRIVATE_TOKENS(
 constexpr float _fallbackStartTime = 0.0f;
 constexpr float _fallbackEndTime   = 0.0f;
 
-/* static */
-HdSceneIndexBaseRefPtr
-HdSceneIndexAdapterSceneDelegate::AppendDefaultSceneFilters(
-    HdSceneIndexBaseRefPtr inputSceneIndex, SdfPath const &delegateID)
-{
-    HdSceneIndexBaseRefPtr result = inputSceneIndex;
-
-    // if no prefix, don't add HdPrefixingSceneIndex
-    if (!delegateID.IsEmpty() && delegateID != SdfPath::AbsoluteRootPath()) {
-        result = HdPrefixingSceneIndex::New(result, delegateID);
-    }
-
-    // disabling flattening as it's not yet needed for pure emulation
-    //result = HdFlatteningSceneIndex::New(result);
-
-    return result;
-}
-
 // ----------------------------------------------------------------------------
 
 HdSceneIndexAdapterSceneDelegate::HdSceneIndexAdapterSceneDelegate(
@@ -1243,17 +1225,11 @@ _ToDictionary(HdSampledDataSourceContainerSchema schema)
 {
     VtDictionary dict;
     for (const TfToken& name : schema.GetNames()) {
-        if (HdSampledDataSourceHandle valueDs = schema.Get(name)) {
+        if (HdSampledDataSourceHandle const valueDs = schema.Get(name)) {
             dict[name.GetString()] = valueDs->GetValue(0);
         }
     }
     return dict;
-}
-
-VtDictionary
-_ToDictionary(HdContainerDataSourceHandle const &cds)
-{
-    return _ToDictionary(HdSampledDataSourceContainerSchema(cds));
 }
 
 static
@@ -1625,22 +1601,13 @@ _ToRenderProducts(HdRenderProductVectorSchema productsSchema)
 VtValue
 _GetRenderSettings(HdSceneIndexPrim prim, TfToken const &key)
 {
-    HdContainerDataSourceHandle renderSettingsDs =
-            HdContainerDataSource::Cast(prim.dataSource->Get(
-                HdRenderSettingsSchemaTokens->renderSettings));
-
-    HdRenderSettingsSchema rsSchema = HdRenderSettingsSchema(renderSettingsDs);
+    const auto rsSchema = HdRenderSettingsSchema::GetFromParent(prim.dataSource);
     if (!rsSchema.IsDefined()) {
         return VtValue();
     }
 
     if (key == HdRenderSettingsPrimTokens->namespacedSettings) {
-        VtDictionary settings;
-        if (HdContainerDataSourceHandle namespacedSettingsDs =
-                rsSchema.GetNamespacedSettings()) {
-
-            return VtValue(_ToDictionary(namespacedSettingsDs));
-        }
+        return VtValue(_ToDictionary(rsSchema.GetNamespacedSettings()));
     }
 
     if (key == HdRenderSettingsPrimTokens->active) {

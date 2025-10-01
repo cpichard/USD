@@ -117,7 +117,7 @@ private:
 
     void _Run(const UsdStageRefPtr &stage) {
         WorkWithScopedParallelism([this, &stage]() {
-            const auto range = stage->GetPseudoRoot().GetDescendants();
+            const auto range = stage->GetPseudoRoot().GetAllDescendants();
             WorkParallelForEach(range.begin(), range.end(),
                 [this](UsdPrim const &prim) { _VisitPrim(prim);});
             _dispatcher.Wait();

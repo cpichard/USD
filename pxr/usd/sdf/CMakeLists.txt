@@ -82,6 +82,7 @@ pxr_library(sdf
         usdzFileFormat
         valueTypeName
         variableExpression
+        variableExpressionAST
         variantSetSpec
         variantSpec
         zipFile
@@ -174,6 +175,7 @@ pxr_library(sdf
         wrapReference.cpp
         wrapSpec.cpp
         wrapVariableExpression.cpp
+        wrapVariableExpressionAST.cpp
         wrapTimeCode.cpp
         wrapTypes.cpp
         wrapUsdFileFormat.cpp
@@ -225,6 +227,7 @@ pxr_test_scripts(
     testenv/testSdfTimeCode.py
     testenv/testSdfTypes.py
     testenv/testSdfVariableExpression.py
+    testenv/testSdfVariableExpressionAST.py
     testenv/testSdfVariants.py
     testenv/testSdfZipFile.py
     testenv/testSdfZipFileLimits.py
@@ -422,6 +425,14 @@ pxr_build_test(testSdfVariableExpression_Cpp
         testenv/testSdfVariableExpression.cpp
 )
 
+pxr_build_test(testSdfVariableExpressionAST_Cpp
+    LIBRARIES
+        tf
+        sdf
+    CPPFILES
+        testenv/testSdfVariableExpressionAST.cpp
+)
+
 pxr_build_test(testSdfFileVersion_Cpp
     LIBRARIES
         tf
@@ -438,6 +449,16 @@ pxr_build_test(testSdfZipFile_CPP
         sdf
     CPPFILES
         testenv/testSdfZipFile.cpp
+)
+
+pxr_build_test(testSdfUsdcInvalidPrimChildren
+    LIBRARIES
+        ar
+        arch
+        tf
+        sdf
+    CPPFILES
+        testenv/testSdfUsdcInvalidPrimChildren.cpp
 )
 
 pxr_install_test_dir(
@@ -488,6 +509,11 @@ pxr_install_test_dir(
 pxr_install_test_dir(
     SRC testenv/testSdfUsdzResolver
     DEST testSdfUsdzResolver
+)
+    
+pxr_install_test_dir(
+    SRC testenv/testSdfUsdcInvalidPrimChildren.testenv
+    DEST testSdfUsdcInvalidPrimChildren
 )
 
 pxr_register_test(testSdfAbstractData_Cpp
@@ -739,7 +765,18 @@ pxr_register_test(testSdfVariableExpression
 pxr_register_test(testSdfVariableExpression_Cpp
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfVariableExpression_Cpp"
 )
+pxr_register_test(testSdfVariableExpressionAST
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfVariableExpressionAST"
+)
+pxr_register_test(testSdfVariableExpressionAST_Cpp
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfVariableExpressionAST_Cpp"
+)
 pxr_register_test(testSdfVariants
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfVariants"
+)
+pxr_register_test(testSdfUsdcInvalidPrimChildren
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdfUsdcInvalidPrimChildren"
+    EXPECTED_RETURN_CODE 0
 )

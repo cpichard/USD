@@ -48,9 +48,6 @@ public:
 
     struct WaitlistNode;
 
-    /// Run a concurrent compilation task on the work dispatcher.
-    void Run(Exec_CompilationTask *task) const;
-
     /// The different results claiming an output key can return.
     enum class ClaimResult {
         Done,       /// The task is already done.

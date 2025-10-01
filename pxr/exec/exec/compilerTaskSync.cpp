@@ -7,13 +7,13 @@
 #include "pxr/exec/exec/compilerTaskSync.h"
 
 #include "pxr/exec/exec/compilationTask.h"
-#include "pxr/exec/exec/compiledOutputCache.h"
 
 #include "pxr/base/arch/threads.h"
 #include "pxr/base/work/dispatcher.h"
 
 #include <functional>
 #include <thread>
+#include <utility>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -73,12 +73,6 @@ Exec_CompilerTaskSync::Exec_CompilerTaskSync(WorkDispatcher &dispatcher)
 {}
 
 Exec_CompilerTaskSync::~Exec_CompilerTaskSync() = default;
-
-void
-Exec_CompilerTaskSync::Run(Exec_CompilationTask *const task) const
-{
-    _dispatcher.Run(std::ref(*task));
-}
 
 Exec_CompilerTaskSync::ClaimResult
 Exec_CompilerTaskSync::Claim(
@@ -207,7 +201,7 @@ Exec_CompilerTaskSync::_CloseAndNotify(std::atomic<WaitlistNode*> *headPtr)
         // dependencies and will be spawn later when the last dependency has
         // been fulfilled.
         if (headNode->task->RemoveDependency() == 0) {
-            Run(headNode->task);
+            _dispatcher.Run(std::ref(*headNode->task));
         }
 
         // Move on to the next entry in the queue.

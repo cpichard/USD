@@ -1225,21 +1225,22 @@ pxr_register_test(testUsdviewInstancingEdits_SceneIndex
         USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true
 )
 
-pxr_register_test(testUsdviewInstancingEdits_SceneIndex_Embree
-    PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --renderer Embree --testScript testUsdviewInstancingEditsEmbree.py test.usda"
-    EXPECTED_RETURN_CODE 0
-    IMAGE_DIFF_COMPARE
-        # Disabling the following baseline because of GitHub #3693 and #3769.
-        # instancerInvisibleEmbree.png
-        instancerVisibleEmbree.png
-    FAIL 0.04
-    FAIL_PERCENT 0.1
-    WARN 0.02
-    WARN_PERCENT 0.2
-    ENV
-        USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true
-)
+if (EMBREE_FOUND AND ${PXR_BUILD_EMBREE_PLUGIN})
+    pxr_register_test(testUsdviewInstancingEdits_SceneIndex_Embree
+        PYTHON
+        COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --renderer Embree --testScript testUsdviewInstancingEditsEmbree.py test.usda"
+        EXPECTED_RETURN_CODE 0
+        IMAGE_DIFF_COMPARE
+            instancerInvisibleEmbree.png
+            instancerVisibleEmbree.png
+        FAIL 0.04
+        FAIL_PERCENT 0.1
+        WARN 0.02
+        WARN_PERCENT 0.2
+        ENV
+            USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=true
+    )
+endif()
 
 if(OPENCOLORIO_FOUND AND ${PXR_BUILD_OPENCOLORIO_PLUGIN})
     pxr_register_test(testUsdviewColorManagement
