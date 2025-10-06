@@ -385,6 +385,8 @@ def RunCMake(context, force, extraArgs = None, installDir = None):
 
     instDir = installDir if installDir else context.instDir
 
+    extraArgs.append("-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
+
     if context.cmakeBuildArgs:
         extraArgs.insert(0, context.cmakeBuildArgs)
     srcDir = os.getcwd()
