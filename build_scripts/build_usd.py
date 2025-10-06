@@ -1864,6 +1864,13 @@ def InstallUSD(context, force, buildArgs):
 
         # Wasm target buils tbb and osd static library above
         if context.targetWasm:
+            # The emscripten toolchain file sets up cmake to search its own
+            # locations when performing "find" operations.  In order to
+            # locate packages which we have built ourselves we need to
+            # explicitly set CMAKE_FIND_ROOT_PATH.
+            # https://github.com/emscripten-core/emscripten/issues/13310
+            extraArgs.append('-DCMAKE_FIND_ROOT_PATH="{}"'
+                .format(context.usdInstDir))
             extraArgs.append('-DTBB_INCLUDE_DIRS="{}"'
                 .format(os.path.join(context.usdInstDir, 'include')))
             extraArgs.append('-DTBB_tbb_LIBRARY_DEBUG="{}"'
