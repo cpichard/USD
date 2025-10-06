@@ -84,9 +84,6 @@ namespace
 /// on volumeField of that given prim.
 /// So, if the volume field's file path was modified, the volumeFieldBinding
 /// would be invalidated to have the volume prim pick up the new asset.
-/// Note: HdPrman_Field currently invalidates *all* Rprims backed by the render
-///       index if DirtyParams is set on the field. We should be able to remove
-///       that workaround with this scene index plugin in play.
 ///
 HdDataSourceBaseHandle
 _ComputeVolumeFieldDependency(const HdDataSourceBaseHandle &src)
@@ -245,6 +242,50 @@ _ComputeLightFilterDependencies(
     return nullptr;
 }
 
+class _VolumePrimContainerDataSource final : public HdContainerDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(_VolumePrimContainerDataSource);
+
+    _VolumePrimContainerDataSource(
+        const SdfPath &primPath,
+        const HdContainerDataSourceHandle &primContainer)
+      : _primPath(primPath)
+      , _primContainer(primContainer)
+    {
+        TF_VERIFY(primContainer);
+    }
+
+    TfTokenVector GetNames() override
+    {
+        TfTokenVector names = _primContainer->GetNames();
+        if (std::find(names.begin(), names.end(),
+                HdDependenciesSchema::GetSchemaToken()) == names.end()) {
+            names.push_back(HdDependenciesSchema::GetSchemaToken());
+        }
+        return names;
+    }
+
+    HdDataSourceBaseHandle Get(const TfToken &name) override
+    {
+        HdDataSourceBaseHandle result = _primContainer->Get(name);
+
+        if (name == HdDependenciesSchema::GetSchemaToken()) {
+            return HdOverlayContainerDataSource::OverlayedContainerDataSources(
+                _ComputeVolumeFieldBindingDependencies(
+                    _primPath, _primContainer),
+                HdContainerDataSource::Cast(result));
+        }
+
+        return result;
+    }
+
+private:
+    const SdfPath _primPath;
+    const HdContainerDataSourceHandle _primContainer;
+};
+
+
 class _LightPrimContainerDataSource final : public HdContainerDataSource
 {
 public:
@@ -307,23 +348,31 @@ public:
     {
         HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
         
-        // XXX The use of HdContainerDataSourceEditor here with a lazy
-        //     container that caches the computed data source means that this
-        //     scene index needs to invalidate the prim container handle
-        //     when the computed dependencies may be different.
-        //     We should update this to use a lazy container that computes
-        //     the dependencies on each Get() call instead.
-        //
         if (prim.primType == HdPrimTypeTokens->volume) {
-            return
-                { prim.primType,
-                  HdContainerDataSourceEditor(prim.dataSource)
-                      .Overlay(
-                          HdDependenciesSchema::GetDefaultLocator(),
-                          HdLazyContainerDataSource::New(
-                              std::bind(_ComputeVolumeFieldBindingDependencies,
-                                        primPath, prim.dataSource)))
-                      .Finish() };
+            // Override prim data source in a lazy manner instead of using
+            // a lazy container data source override for the dependencies, like:
+            //
+            //  return
+            //     { prim.primType,
+            //       HdContainerDataSourceEditor(prim.dataSource)
+            //           .Overlay(
+            //               HdDependenciesSchema::GetDefaultLocator(),
+            //               HdLazyContainerDataSource::New(
+            //                   std::bind(_ComputeVolumeFieldBindingDependencies,
+            //                             primPath, prim.dataSource)))
+            //           .Finish() };
+            //
+            // Reason: If the prim container contents or handle is invalidated,
+            // the cached dependencies data source above would be based on the
+            // the old prim container. This scene index would need to provide
+            // explicit invalidation processing during _PrimsDirtied to
+            // invalidate the overriden prim container handle for volume prims.
+            // We avoid the unnnecessary complexity by overriding the entire
+            // prim container such that the dependencies are always computed
+            // when queried.
+            //
+            prim.dataSource =
+                _VolumePrimContainerDataSource::New(primPath, prim.dataSource);
         }
 
         if (HdPrimTypeIsLight(prim.primType) && prim.dataSource) {
