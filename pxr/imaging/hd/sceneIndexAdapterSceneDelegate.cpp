@@ -31,6 +31,7 @@
 #include "pxr/imaging/hd/sceneDelegate.h"
 #include "pxr/imaging/hd/sceneIndex.h"
 #include "pxr/imaging/hd/sceneIndexObserver.h"
+#include "pxr/imaging/hd/sceneIndexPrimView.h"
 #include "pxr/imaging/hd/schemaTypeDefs.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/topology.h"
@@ -164,6 +165,11 @@ HdSceneIndexAdapterSceneDelegate::HdSceneIndexAdapterSceneDelegate(
     // XXX: note that we will likely want to move this to the Has-A observer
     // pattern we're using now...
     _inputSceneIndex->AddObserver(HdSceneIndexObserverPtr(this));
+
+
+    for (const SdfPath &primPath : HdSceneIndexPrimView(inputSceneIndex)) {
+        _PrimAdded(primPath, inputSceneIndex->GetPrim(primPath).primType);
+    }
 }
 
 HdSceneIndexAdapterSceneDelegate::~HdSceneIndexAdapterSceneDelegate()
