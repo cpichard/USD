@@ -145,6 +145,17 @@ public:
         HdDriverVector const& drivers,
         HdSceneIndexBaseRefPtr const &terminalSceneIndex);
 
+    /// Create a render index for "front-end" emulation. That is,
+    /// the render index can be populated from an HdSceneDelegate and
+    /// populates the returned emulation scene index.
+    ///
+    /// The HdRenderDelegate is not populated. It is just used by the
+    /// HdSceneDelegate for queries such as
+    /// HdRenderDelegate::GetMaterialBindingPurpose().
+    ///
+    static HdRenderIndex *
+    New(HdRenderDelegate *renderDelegate);
+
     HD_API
     ~HdRenderIndex();
 
@@ -396,6 +407,9 @@ public:
     HD_API
     HdSceneIndexBaseRefPtr GetTerminalSceneIndex() const;
 
+    HD_API
+    HdSceneIndexBaseRefPtr GetEmulationSceneIndex() const;
+    
     // ---------------------------------------------------------------------- //
     /// \name Render Delegate
     // ---------------------------------------------------------------------- //
@@ -466,8 +480,9 @@ private:
         HdDriverVector const& drivers,
         const std::string &instanceName,
         const std::string &appName,
-        HdSceneIndexBaseRefPtr const &terminalSceneIndex);
-    
+        HdSceneIndexBaseRefPtr const &terminalSceneIndex = nullptr,
+        bool createFrontEndEmulationOnly = false);
+
     // ---------------------------------------------------------------------- //
     // Private Helper methods 
     // ---------------------------------------------------------------------- //
@@ -594,6 +609,7 @@ private:
     HdRenderDelegate *_renderDelegate;
     HdDriverVector _drivers;
 
+    HdSceneIndexBaseRefPtr _finalEmulationSceneIndex;
 
     std::string _instanceName;
 

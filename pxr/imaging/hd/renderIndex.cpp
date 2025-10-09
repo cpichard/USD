@@ -155,7 +155,8 @@ HdRenderIndex::HdRenderIndex(
     HdDriverVector const& drivers,
     const std::string &instanceName,
     const std::string &appName,
-    HdSceneIndexBaseRefPtr const &terminalSceneIndex)
+    HdSceneIndexBaseRefPtr const &terminalSceneIndex,
+    const bool createFrontEndEmulationOnly)
     : _emulationBatchingCtx(std::make_unique<_NoticeBatchingContext>(
         _noticeBatchingTokens->postEmulation))
     , _mergingBatchingCtx(std::make_unique<_NoticeBatchingContext>(
@@ -190,60 +191,61 @@ HdRenderIndex::HdRenderIndex(
         _terminalSceneIndex = terminalSceneIndex;
 
         _tracker._SetDisableEmulationAPI(true);
-    } else{
-        // If we need to emulate a scene index we create the 
-        // data structures now.
-        if (_IsEnabledSceneIndexEmulation()) {
-            _emulationSceneIndex = HdLegacyPrimSceneIndex::New();
+    } else {
+        _emulationSceneIndex = HdLegacyPrimSceneIndex::New();
 
-            // The legacy prim scene index holds prims contributed from
-            // upstream scene delegates.  Convert any legacy subsets
-            // to HdGeomSubsetSchema.  Since legacy prims are typically
-            // populated iteratively, use notice batching upstream from
-            // scanning for geom subsets.
-            HdLegacyGeomSubsetSceneIndexRefPtr legacyGeomSubsetSceneIndex =
-                HdLegacyGeomSubsetSceneIndex::New(
-                        _emulationBatchingCtx->Append(_emulationSceneIndex));
+        _tracker._SetTargetSceneIndex(get_pointer(_emulationSceneIndex));
 
-            _mergingSceneIndex = HdMergingSceneIndex::New();
-            _mergingSceneIndex->AddInputScene(
-                    legacyGeomSubsetSceneIndex,
-                    SdfPath::AbsoluteRootPath());
+        // The legacy prim scene index holds prims contributed from
+        // upstream scene delegates.  Convert any legacy subsets
+        // to HdGeomSubsetSchema.  Since legacy prims are typically
+        // populated iteratively, use notice batching upstream from
+        // scanning for geom subsets.
+        _finalEmulationSceneIndex =
+            HdLegacyGeomSubsetSceneIndex::New(
+                _emulationBatchingCtx->Append(_emulationSceneIndex));
 
-            HdSceneIndexBaseRefPtr sceneIndex = _mergingSceneIndex;
-
-            sceneIndex =
-                _mergingBatchingCtx->Append(sceneIndex);
-
-            const std::string &rendererDisplayName =
-                renderDelegate->GetRendererDisplayName();
-
-            if (!rendererDisplayName.empty()) {
-                sceneIndex =
-                    HdSceneIndexPluginRegistry::GetInstance()
-                        .AppendSceneIndicesForRenderer(
-                            rendererDisplayName, sceneIndex,
-                            instanceName, appName);
-            }
-
-            if (_IsEnabledTerminalCachingSceneIndex()) {
-                sceneIndex = HdCachingSceneIndex::New(sceneIndex);
-            }
-
-            _terminalSceneIndex = sceneIndex;
-
-            _tracker._SetTargetSceneIndex(get_pointer(_emulationSceneIndex));
+        if (createFrontEndEmulationOnly) {
+            return;
         }
+
+        _mergingSceneIndex = HdMergingSceneIndex::New();
+        
+        if (_finalEmulationSceneIndex) {
+            _mergingSceneIndex->AddInputScene(
+                _finalEmulationSceneIndex,
+                SdfPath::AbsoluteRootPath());
+        }
+
+        HdSceneIndexBaseRefPtr sceneIndex = _mergingSceneIndex;
+
+        sceneIndex =
+            _mergingBatchingCtx->Append(sceneIndex);
+
+        const std::string &rendererDisplayName =
+            renderDelegate->GetRendererDisplayName();
+
+        if (!rendererDisplayName.empty()) {
+            sceneIndex =
+                HdSceneIndexPluginRegistry::GetInstance()
+                    .AppendSceneIndicesForRenderer(
+                        rendererDisplayName, sceneIndex,
+                        instanceName, appName);
+        }
+
+        if (_IsEnabledTerminalCachingSceneIndex()) {
+            sceneIndex = HdCachingSceneIndex::New(sceneIndex);
+        }
+
+        _terminalSceneIndex = sceneIndex;
     }
 
-    if (_terminalSceneIndex) {
-        _siSd = std::make_unique<HdSceneIndexAdapterSceneDelegate>(
-            _terminalSceneIndex,
-            this,
-            SdfPath::AbsoluteRootPath());
+    _siSd = std::make_unique<HdSceneIndexAdapterSceneDelegate>(
+        _terminalSceneIndex,
+        this,
+        SdfPath::AbsoluteRootPath());
 
-        renderDelegate->SetTerminalSceneIndex(_terminalSceneIndex);
-    }
+    renderDelegate->SetTerminalSceneIndex(_terminalSceneIndex);
 }
 
 HdRenderIndex::~HdRenderIndex()
@@ -278,8 +280,7 @@ HdRenderIndex::New(
     // the merging scene index and all the filtering scene indices following
     // the merging scene index.
     return new HdRenderIndex(
-        renderDelegate, drivers, instanceName, appName,
-        /* terminalSceneIndex = */ nullptr);
+        renderDelegate, drivers, instanceName, appName);
 }
 
 HdRenderIndex*
@@ -303,6 +304,28 @@ HdRenderIndex::New(
         /* instanceName = */ TfToken(),
         /* appName = */ TfToken(),
         terminalSceneIndex);
+}
+
+HdRenderIndex*
+HdRenderIndex::New(
+    HdRenderDelegate *renderDelegate)
+{
+    if (renderDelegate == nullptr) {
+        TF_CODING_ERROR(
+            "Null Render Delegate provided to create render index");
+        return nullptr;
+    }
+
+    // Call c'tor so that we construct the emulation scene index,
+    // the merging scene index and all the filtering scene indices following
+    // the merging scene index.
+    return new HdRenderIndex(
+        renderDelegate,
+        /* drivers = */ {},
+        /* instanceName = */ TfToken(),
+        /* appName = */ TfToken(),
+        /* terminalSceneIndex = */ nullptr,
+        /* createFrontEndEmulationSceneIndex = */ true);
 }
 
 void
@@ -384,6 +407,12 @@ HdSceneIndexBaseRefPtr
 HdRenderIndex::GetTerminalSceneIndex() const
 {
     return _terminalSceneIndex;
+}
+
+HdSceneIndexBaseRefPtr
+HdRenderIndex::GetEmulationSceneIndex() const
+{
+    return _finalEmulationSceneIndex;
 }
 
 void
