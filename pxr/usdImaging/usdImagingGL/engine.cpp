@@ -1318,54 +1318,65 @@ UsdImagingGLEngine::DecodeIntersection(
 
 bool
 UsdImagingGLEngine::DecodeIntersection(
-    int primIdx,
-    int instanceIdx,
-    SdfPath *outHitPrimPath,
-    SdfPath *outHitInstancerPath,
-    int *outHitInstanceIndex,
-    HdInstancerContext *outInstancerContext)
+    const int primIdx,
+    const int instanceIdx,
+    SdfPath * const outHitPrimPath,
+    SdfPath * const outHitInstancerPath,
+    int * const outHitInstanceIndex,
+    HdInstancerContext *const outInstancerContext)
 {
     if (ARCH_UNLIKELY(!_HasRenderer())) {
         return false;
     }
 
-    SdfPath primPath = _renderIndex->GetRprimPathFromPrimId(primIdx);
-    if (primPath.IsEmpty()) {
+    const SdfPath sceneIndexPath = _renderIndex->GetRprimPathFromPrimId(primIdx);
+    if (sceneIndexPath.IsEmpty()) {
         return false;
     }
 
-    SdfPath delegateId, instancerId;
-    _renderIndex->GetSceneDelegateAndInstancerIds(
-        primPath, &delegateId, &instancerId);
-
     if (_sceneDelegate) {
-        primPath = _sceneDelegate->GetScenePrimPath(
-            primPath, instanceIdx, outInstancerContext);
-        instancerId = _sceneDelegate->ConvertIndexPathToCachePath(instancerId)
-            .GetAbsoluteRootOrPrimPath();
+        SdfPath delegateId, instancerId;
+        _renderIndex->GetSceneDelegateAndInstancerIds(
+            sceneIndexPath, &delegateId, &instancerId);
+
+        if (outHitPrimPath) {
+            *outHitPrimPath =
+                _sceneDelegate->GetScenePrimPath(
+                    sceneIndexPath, instanceIdx, outInstancerContext);
+        }
+        if (outHitInstancerPath) {
+            *outHitInstancerPath =
+                _sceneDelegate
+                    ->ConvertIndexPathToCachePath(instancerId)
+                    .GetAbsoluteRootOrPrimPath();
+        }
+
     } else {
         HdxPickHit hit;
-        hit.delegateId = delegateId;
-        hit.objectId = primPath;
-        hit.instancerId = instancerId;
+        hit.objectId = sceneIndexPath;
         hit.instanceIndex = instanceIdx;
 
-        const HdxPrimOriginInfo info = HdxPrimOriginInfo::FromPickHit(
-            _renderIndex.get(), hit);
-        primPath = info.GetFullPath();
-        instancerId = instancerId.ReplacePrefix(_sceneDelegateId,
-            SdfPath::AbsoluteRootPath());
+        const HdxPrimOriginInfo info =
+            HdxPrimOriginInfo::FromPickHit(
+                _GetTerminalSceneIndex(), hit);
+        if (outHitPrimPath) {
+            *outHitPrimPath = info.GetFullPath();
+        }
+        
         if (outInstancerContext) {
             *outInstancerContext = info.ComputeInstancerContext();
         }
+        if (outHitInstancerPath) {
+            const HdInstancerContext &ctx =
+                outInstancerContext
+                    ? *outInstancerContext
+                    : info.ComputeInstancerContext();
+            if (!ctx.empty()) {
+                *outHitInstancerPath = ctx.back().first;
+            }
+        }
     }
 
-    if (outHitPrimPath) {
-        *outHitPrimPath = primPath;
-    }
-    if (outHitInstancerPath) {
-        *outHitInstancerPath = instancerId;
-    }
     if (outHitInstanceIndex) {
         *outHitInstanceIndex = instanceIdx;
     }
