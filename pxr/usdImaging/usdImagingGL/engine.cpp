@@ -1675,7 +1675,7 @@ UsdImagingGLEngine::_SetRenderDelegate(
             taskControllerPath,
             [renderDelegate = _renderDelegate.Get()](const TfToken &name) {
                 return renderDelegate->GetDefaultAovDescriptor(name); },
-            HdxIsStorm(_renderIndex.get()->GetRenderDelegate()),
+            _renderIndex.get()->GetRenderDelegate()->RequiresStormTasks(),
             _gpuEnabled
         };
         _taskControllerSceneIndex = HdxTaskControllerSceneIndex::New(params);
