@@ -106,7 +106,11 @@ _ComputeWorldOffset(
         return worldOffset;
     }
     HdContainerDataSourceHandle namespacedSettingsDS =
+#if HD_API_VERSION >= 89
         rsSchema.GetNamespacedSettings().GetContainer();
+#else
+        rsSchema.GetNamespacedSettings();
+#endif
     if (!namespacedSettingsDS) {
         return worldOffset;
     }
