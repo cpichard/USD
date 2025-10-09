@@ -1200,7 +1200,7 @@ public:
     }
 
     TfToken
-    GetTypedValue(Time /* shutterOffset */) override
+    GetTypedValue(Time shutterOffset) override
     {
         static const HdDataSourceLocator vblurLocator =
             HdPrimvarsSchema::GetDefaultLocator()
@@ -1208,7 +1208,7 @@ public:
                 .Append(HdPrimvarSchemaTokens->primvarValue);
         if (const auto& vblurDs = HdSampledDataSource::Cast(
             HdContainerDataSource::Get(_primSource, vblurLocator))) {
-            const TfToken& vblur = vblurDs->GetValue(0.f)
+            const TfToken& vblur = vblurDs->GetValue(shutterOffset)
                 .GetWithDefault<TfToken>(_tokens->vblur_enable);
             if (vblur == _tokens->vblur_ignore) {
                 return HdsiVelocityMotionResolvingSceneIndexTokens->ignore;
@@ -1216,7 +1216,12 @@ public:
             if (vblur == _tokens->vblur_noAcceleration) {
                 return HdsiVelocityMotionResolvingSceneIndexTokens->noAcceleration;
             }
-        } else {
+        }
+        static const auto modeLocator = HdDataSourceLocator(
+            HdsiVelocityMotionResolvingSceneIndexTokens->velocityMotionMode);
+        if (const auto modeDS = HdTokenDataSource::Cast(
+            HdContainerDataSource::Get(_primSource, modeLocator))) {
+            return modeDS->GetTypedValue(shutterOffset);
         }
         return HdsiVelocityMotionResolvingSceneIndexTokens->enable;
     }
