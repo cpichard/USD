@@ -12,8 +12,21 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_PRIVATE_TOKENS(
+    _extraBprimTypeTokens,
+    (openvdbAsset)
+    (field3dAsset)
+);
+
 namespace
 {
+
+TfTokenVector _Concat(const TfTokenVector &a, const TfTokenVector &b)
+{
+    TfTokenVector result = a;
+    result.insert(result.end(), b.begin(), b.end());
+    return result;
+}
 
 class _NullRenderDelegateForAdapter : public HdRenderDelegate
 {
@@ -51,7 +64,10 @@ public:
         return HdSprimTypeTokens->allTokens;
     }
     const TfTokenVector &GetSupportedBprimTypes() const override {
-        return HdBprimTypeTokens->allTokens;
+        static TfTokenVector result = _Concat(
+            HdBprimTypeTokens->allTokens,
+            _extraBprimTypeTokens->allTokens);
+        return result;
     }
     HdResourceRegistrySharedPtr GetResourceRegistry() const override {
         return nullptr;
