@@ -109,10 +109,13 @@ pxr_plugin(${PXR_PACKAGE}
         matfiltConvertPreviewMaterial
         matfiltResolveVstructs
         mesh
-        renderTerminalOutputInvalidatingSceneIndexPlugin
+        meshLightResolvingSceneIndex
+        meshLightResolvingSceneIndexPlugin
         points
+        portalLightResolvingSceneIndexPlugin
         renderDelegate
         renderSettings
+        renderTerminalOutputInvalidatingSceneIndexPlugin
         rileyCameraSchema
         rileyClippingPlaneSchema
         rileyConversionSceneIndexPlugin
