@@ -385,8 +385,6 @@ def RunCMake(context, force, extraArgs = None, installDir = None):
 
     instDir = installDir if installDir else context.instDir
 
-    extraArgs.append("-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
-
     if context.cmakeBuildArgs:
         extraArgs.insert(0, context.cmakeBuildArgs)
     srcDir = os.getcwd()
@@ -1198,6 +1196,9 @@ def InstallJPEG(context, force, buildArgs):
         extraJPEGArgs = buildArgs
         if not which("nasm"):
             extraJPEGArgs.append("-DWITH_SIMD=FALSE")
+        
+        # For compatibility with CMake 4+
+        extraJPEGArgs.append("-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
 
         RunCMake(context, force, extraJPEGArgs)
         return os.getcwd()
@@ -1232,6 +1233,10 @@ def InstallTIFF(context, force, buildArgs):
         else:
             extraArgs = []
         extraArgs += buildArgs
+
+        # For compatibility with CMake 4+
+        extraArgs.append("-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
+
         RunCMake(context, force, extraArgs)
 
 TIFF = Dependency("TIFF", InstallTIFF, "include/tiff.h")
