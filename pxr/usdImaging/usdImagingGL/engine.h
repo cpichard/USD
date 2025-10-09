@@ -832,7 +832,7 @@ private:
     HdsiPrimTypeAndPathPruningSceneIndexRefPtr _lightPruningSceneIndex;
     // State of the _lightPruningSceneIndex.
     bool _lightPruningSceneIndexEnableSceneLights;
-    HdSceneIndexBaseRefPtr _sceneIndex;
+    HdSceneIndexBaseRefPtr _usdImagingFinalSceneIndex;
 
     std::unique_ptr<UsdImagingDelegate> _sceneDelegate;
 

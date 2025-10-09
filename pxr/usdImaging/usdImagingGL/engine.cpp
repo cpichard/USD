@@ -385,61 +385,62 @@ void
 UsdImagingGLEngine::_DestroyHydraObjects()
 {
     TRACE_FUNCTION();
-    
+
     // Destroy objects in opposite order of construction.
 
     {
-        TRACE_SCOPE("Engine and task controller");
+        TRACE_SCOPE("Destroying engine and task controller");
+
         _engine = nullptr;
         _taskController = nullptr;
-        _taskControllerSceneIndex = TfNullPtr;
     }
-    if (_GetUseSceneIndices()) {
-        if (_renderIndex && _sceneIndex) {
-            TRACE_SCOPE("Remove terminal UsdImaging scene index");
-            // Remove the terminal scene index of the UsdImaging scene
-            // index graph from the render index's merging scene index.
-            // This should result in removed/added notices that are
-            // processed by downstream scene index plugins.
-            _renderIndex->RemoveSceneIndex(_sceneIndex);
-        }
 
-        {
-            TRACE_SCOPE("Destroy UsdImaging scene indices");
-    
-            // The destruction order below is the reverse of the creation 
-            // order.
-            _sceneIndex = nullptr;
-            _displayStyleSceneIndex = nullptr;
-            _selectionSceneIndex = nullptr;
-                
-            // "Override" scene indices.
-            _rootOverridesSceneIndex = nullptr;
-            _lightPruningSceneIndex = nullptr;
-                
-            _stageSceneIndex = nullptr;
-        }
-    } else {
+    {
         TRACE_SCOPE("Destroy UsdImaging delegate");
+
         _sceneDelegate = nullptr;
     }
 
-    // Drop the reference to application scene indices so they are destroyed
-    // during render index destruction.
-    {
-        _appSceneIndices = nullptr;
-    }
+    // We are not removing _usdImagingFinalSceneIndex from _renderIndex here.
+    //
+    // This is not necessary since we destory _renderIndex and
+    // ~HdRenderIndex calls ~HdSceneIndexAdapterSceneDelegate which
+    // calls HdRenderIndex::_RemoveSubtree.
 
     {
-        // This should trigger the destruction of registered scene index
-        // plugins that were added to the scene index graph.
-        TRACE_SCOPE("Destroy scene index plugins and render index.");
+        TRACE_SCOPE("Destroy plugin scene indices and render index.");
+
         _renderIndex = nullptr;
     }
 
     {
         TRACE_SCOPE("Destroy render delegate");
+
         _renderDelegate = nullptr;
+    }
+
+    {
+        TRACE_SCOPE("Destroy application scene indices");
+
+        _appSceneIndices = nullptr;
+    }
+
+    {
+        TRACE_SCOPE("Destroy UsdImaging scene indices");
+
+        _usdImagingFinalSceneIndex = nullptr;
+        _displayStyleSceneIndex = nullptr;
+        _selectionSceneIndex = nullptr;
+        _postInstancingNoticeBatchingSceneIndex = nullptr;
+        _rootOverridesSceneIndex = nullptr;
+        _lightPruningSceneIndex = nullptr;
+        _stageSceneIndex = nullptr;
+    }
+
+    {
+        TRACE_SCOPE("Task controller scene index");
+
+        _taskControllerSceneIndex = TfNullPtr;
     }
 }
 
@@ -1615,7 +1616,7 @@ UsdImagingGLEngine::_CreateUsdImagingSceneIndices()
     sceneIndex = _displayStyleSceneIndex =
         HdsiLegacyDisplayStyleOverrideSceneIndex::New(sceneIndex);
 
-    _sceneIndex = sceneIndex;
+    _usdImagingFinalSceneIndex = sceneIndex;
 }
 
 void
@@ -1653,7 +1654,8 @@ UsdImagingGLEngine::_SetRenderDelegate(
 
     if (_GetUseSceneIndices()) {
         _CreateUsdImagingSceneIndices();
-        _renderIndex->InsertSceneIndex(_sceneIndex, _sceneDelegateId);
+        _renderIndex->InsertSceneIndex(
+            _usdImagingFinalSceneIndex, _sceneDelegateId);
     } else {
         _sceneDelegate = std::make_unique<UsdImagingDelegate>(
                 _renderIndex.get(), _sceneDelegateId);
