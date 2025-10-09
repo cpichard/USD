@@ -1038,8 +1038,7 @@ PcpCache::Apply(const PcpCacheChanges& changes, PcpLifeboat* lifeboat)
                 // we may have blown the prim index so check that it exists.
                 if (PcpPrimIndex* primIndex = _GetPrimIndex(path)) {
                     Pcp_RescanForSpecs(primIndex, IsUsd(),
-                                       /* updateHasSpecs */ true,
-                                       &changes);
+                                       /* updateHasSpecs */ true);
 
                     // If there are no specs left then we can discard the
                     // prim index.
@@ -1081,8 +1080,7 @@ PcpCache::Apply(const PcpCacheChanges& changes, PcpLifeboat* lifeboat)
             for (auto i = range.first; i != range.second; ++i) {
                 if (PcpPrimIndex* primIndex = _GetPrimIndex(i->first)) {
                     Pcp_RescanForSpecs(primIndex, IsUsd(),
-                                       /* updateHasSpecs */ true,
-                                       &changes);
+                                       /* updateHasSpecs */ true);
                 }
             }
         }
