@@ -66,14 +66,14 @@ Exec_CompilationTask::RemoveDependency()
     return numDependents;
 }
 
-Exec_CompilerTaskSync::ClaimResult
+Exec_CompilerTaskSyncBase::ClaimResult
 Exec_CompilationTask::TaskDependencies::ClaimSubtask(
     const Exec_OutputKey::Identity &key)
 {
-    const Exec_CompilerTaskSync::ClaimResult result =
-        Exec_CompilationState::OutputTasksAccess::_Get(&_compilationState)
-            .Claim(key, _task);
-    if (result == Exec_CompilerTaskSync::ClaimResult::Wait) {
+    const Exec_CompilerTaskSyncBase::ClaimResult result =
+        Exec_CompilationState::TaskSyncAccess::_GetOutputProvidingTaskSync(
+            &_compilationState).Claim(key, _task);
+    if (result == Exec_CompilerTaskSyncBase::ClaimResult::Wait) {
         _hasDependencies = true;
     }
     return result;
@@ -168,8 +168,8 @@ Exec_CompilationTask::operator()(const int depth) const
 void
 Exec_CompilationTask::_MarkDone(const Exec_OutputKey::Identity &key)
 {
-    Exec_CompilationState::OutputTasksAccess::_Get(&_compilationState)
-        .MarkDone(key);
+    Exec_CompilationState::TaskSyncAccess::_GetOutputProvidingTaskSync(
+        &_compilationState).MarkDone(key);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

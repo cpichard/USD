@@ -15,8 +15,8 @@ flow network, where many uniquely identifiable elements may flow along a single
 connection. This architecture lends itself to opportunities for parallelism. 
 
 Guiding principles in the design of the execution system include:
-- Fast evaluation for interactive use cases (e.g. munging an avar), enabling
-  users to iterate quickly.
+- Fast evaluation for interactive use cases (e.g. continuously modifying an
+  attribute value), enabling users to iterate quickly.
 - Reliable cached computation, which facilitates efficient multithreading.
 - Abstraction of execution representation away from authoring intent. This is
   an important separation of concerns that allows targeted optimization of the
@@ -29,25 +29,27 @@ system relative to the primitive objects that make up an interactive scene.
 Any object that can hold a value is an **attribute**, which can be assigned a 
 value by the user, modified by computations, and/or be used to extract computed 
 values. Attributes are the inputs and outputs of execution. Attributes are 
-owned by high-level containers called **prims**. Users express relationships 
+owned by high-level containers called **prims**, the behaviors of which are
+determined by typed and applied **schemas**. Users express relationships 
 and data flow between the prims in the scene and their associated attributes, 
 which can be consumed by **computations** to ascribe executional behaviors to 
-objects in the scene. Extending prims and computations is the primary mechanism 
-for clients to evolve the capabilities of the interactive environment. 
+objects in the scene. Extending schemas and computations is the primary
+mechanism for clients to evolve the capabilities of the interactive environment.
 
 ## Computations {#Mf_Execution_System_Design_Computations}
 OpenExec provides some 
-[built-in computations](#group_Exec_Builtin_Computations), such as the default 
+[built-in computations](#group_Exec_Builtin_Computations), such as the
 'computeValue' computation to request the computed value of an attribute. 
 [Plugin computations](#group_Exec_ComputationDefinitionLanguage) can also be 
 published by schemas to define the set of supported behaviors.
 
-> **Note:** Computations are implemented via stateless callbacks, and a
-> fundamental requirement is that all inputs to the callback must be
-> explicitly supplied as a part of the computation's definition. The stateless 
-> nature of the callbacks captured by the execution network enables important 
-> optimizations, discussed in the section on the 
-> [execution network](#Mf_Execution_System_Design_Network).
+> **Note:**  
+> Computations are implemented via stateless callbacks, and a fundamental
+> requirement is that all inputs to the callback must be explicitly declared as
+> a part of the computation's definition. The stateless nature of the callbacks
+> captured by the execution network enables important optimizations, discussed
+> in the section on the [execution
+> network](#Mf_Execution_System_Design_Network).
 
 ## Phases of Execution
 Execution is broken up into three separate phases, where each phase amortizes
@@ -90,9 +92,9 @@ Scheduling is the next phase of execution, which uses the compiled network and
 the client's **execution request** consisting of a set of desired outputs (e.g. 
 the posed point positions of a character). A common client is a viewport, which 
 generates a request for all the visible objects in the scene. Execution uses 
-the client's request to build a schedule that encodes the nodes in the network 
-that need to run in order to compute the requested values. This schedule is an 
-acceleration structure that serves to mitigate the costs of traversing the  
+the client's request to build a schedule that identifies the nodes in the
+network that need to run in order to compute the requested values. This schedule
+is an acceleration structure that serves to mitigate the costs of traversing the
 network. It is especially beneficial for performance because it amortizes the 
 cost of dependency analysis that would otherwise have to be incurred during 
 each network evaluation. Schedules also impose guidelines on memory access, by 
@@ -125,7 +127,7 @@ disabled via the env setting:
 
 ## Engine Architecture
 The execution engine is composed of a network, scheduler, data managers, and 
-executors, which facilitate efficient multithreading and separation of concerns.  
+executors, which facilitate efficient multithreading and separation of concerns.
 
 ![Execution Engine](images/executionSystemDesignEngineArchitecture.drawio.svg 
 "Execution Engine Architecture")
@@ -135,8 +137,8 @@ The execution network is generated from authored scene objects to statically
 represent computations and the dependencies among them. The network consists of 
 nodes and connections between them. For example, an EfLeafNode is a simple type 
 of node with no outputs that functions purely as a recipient of **invalidation**,
-which is the mechanism for tracking and broadcasting changes to attribute values. 
-Clients request values of computations via an execution request consisting of 
+which is the mechanism for tracking and broadcasting changes to attribute values.
+Clients request values of computations via an execution request consisting of
 desired leaf node outputs.
 
 ### Schedulers
@@ -151,13 +153,12 @@ advantage of, e.g. task dependencies that inform multithreaded evaluation.
 
 ### Data Managers
 Data managers are responsible for storing the computed data that corresponds 
-to nodes in the network. Each executor has a single data manager that 
+to outputs in the network. Each executor has a single data manager that 
 encapsulates the computed values for all the nodes in the network. In its 
 simplest representation, the data manager is a map from network output to 
 computed value. Data managers also store validity masks that track the dirty 
-state of outputs, which drives invalidation in response to network changes. 
-Data managers provide a location to store any per-node or per-output 
-information that is required by the executor. 
+state of outputs, which are updated by invalidation in response to network
+changes.
 
 ### Executors
 Given a compiled network and a schedule representing a set of requested 

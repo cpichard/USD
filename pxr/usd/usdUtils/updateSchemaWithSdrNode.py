@@ -396,6 +396,13 @@ def _PopulateOptions(attrHints, attrSpec, sdrProp, propName, attrType):
         elif namesProvided:
             attrSpec.allowedTokens = names
 
+        if populateLabels:
+            # If we also populated valueLabels, then this is a "legacy"
+            # allowedTokens write. Log a warning so users understand they'll
+            # need to update their assets and/or UI code at some point.
+            Tf.Warn("Wrote both valueLabels and allowedTokens for attribute " \
+                    "(%s) on schema (%s). " % (propName, attrSpec.owner.name))
+
     # Complain if allowed tokens were provided for a non-token-valued param
     if not isTokenValued and not populateLabels:
         Tf.Warn("Ignoring allowedTokens provided for non-token (%s) " \

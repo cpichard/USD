@@ -1864,17 +1864,24 @@ def InstallUSD(context, force, buildArgs):
 
         # Wasm target buils tbb and osd static library above
         if context.targetWasm:
+            # The emscripten toolchain file sets up cmake to search its own
+            # locations when performing "find" operations.  In order to
+            # locate packages which we have built ourselves we need to
+            # explicitly set CMAKE_FIND_ROOT_PATH.
+            # https://github.com/emscripten-core/emscripten/issues/13310
+            extraArgs.append('-DCMAKE_FIND_ROOT_PATH="{}"'
+                .format(context.instDir))
             extraArgs.append('-DTBB_INCLUDE_DIRS="{}"'
-                .format(os.path.join(context.usdInstDir, 'include')))
+                .format(os.path.join(context.instDir, 'include')))
             extraArgs.append('-DTBB_tbb_LIBRARY_DEBUG="{}"'
-                .format(os.path.join(context.usdInstDir, 'lib/libtbb_debug.a')))
+                .format(os.path.join(context.instDir, 'lib/libtbb_debug.a')))
             extraArgs.append('-DTBB_tbb_LIBRARY_RELEASE="{}"'
-                .format(os.path.join(context.usdInstDir, 'lib/libtbb.a')))
+                .format(os.path.join(context.instDir, 'lib/libtbb.a')))
 
             extraArgs.append('-DOPENSUBDIV_INCLUDE_DIR="{}"'
-                .format(os.path.join(context.usdInstDir, 'include')))
+                .format(os.path.join(context.instDir, 'include')))
             extraArgs.append('-DOPENSUBDIV_OSDCPU_LIBRARY="{}"'
-                .format(os.path.join(context.usdInstDir, 'lib/libosdCPU.a')))
+                .format(os.path.join(context.instDir, 'lib/libosdCPU.a')))
 
             extraArgs.append('-DBUILD_SHARED_LIBS=OFF')
 
