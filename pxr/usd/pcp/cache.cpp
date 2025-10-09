@@ -1640,12 +1640,6 @@ PcpCache::_ComputePrimIndexesInParallel(
     const char *mallocTag1,
     const char *mallocTag2)
 {
-    if (!IsUsd()) {
-        TF_CODING_ERROR("Computing prim indexes in parallel only supported "
-                        "for USD caches.");
-        return;
-    }
-
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     ArResolverScopedCache parentCache;
