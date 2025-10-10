@@ -75,21 +75,34 @@ def MacOS():
 if MacOS():
     import apple_utils
 
+# WASM specific defines and helpers
+TARGET_WASM='wasm'
+TARGET_WASM64='wasm64'
+
+# determines flags based on 32 / 64 bit wasm build target
+def GetWasmCompilerFlags(buildTarget):
+    compileFlags = '-pthread --use-port=zlib'
+    linkerFlags = '-pthread'
+
+    if buildTarget == TARGET_WASM64:
+        compileFlags += ' -sMEMORY64=1'
+        linkerFlags += ' -sMEMORY64=1'
+    
+    return (compileFlags, linkerFlags)
+
 def GetBuildTargetDefault():
     if MacOS():
         return apple_utils.GetBuildTargetDefault()
     else:
         return ''
 
-TARGET_WASM='wasm'
-
 def GetBuildTargets():
     if MacOS():
-        return apple_utils.GetBuildTargets() + [TARGET_WASM]
+        return apple_utils.GetBuildTargets() + [TARGET_WASM, TARGET_WASM64]
     elif Linux():
-        return [TARGET_WASM]
+        return [TARGET_WASM, TARGET_WASM64]
     elif Windows():
-        return [TARGET_WASM]        
+        return [TARGET_WASM, TARGET_WASM64]
     else:
         return []
 
@@ -1007,7 +1020,16 @@ def InstallOneTBB(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(ONETBB_URL, context, force)):
         cmakeOptions = ['-DTBB_TEST=OFF', '-DTBB_STRICT=OFF']
         if context.targetWasm:
-            cmakeOptions += ['-DBUILD_SHARED_LIBS=OFF', '-DCMAKE_CXX_FLAGS="-pthread"']
+            compileFlags, _ = GetWasmCompilerFlags(context.buildTarget)
+
+            # Note: Emscripten toolchain file will check presence of
+            # '-sMEMORY64=1' in 'CMAKE_C_FLAGS' to determine if a
+            # 64 bit build is to be performed
+            cmakeOptions += [
+                '-DBUILD_SHARED_LIBS=OFF',
+                '-DCMAKE_CXX_FLAGS="{}"'.format(compileFlags),
+                '-DCMAKE_C_FLAGS="{}"'.format(compileFlags)
+            ]
 
         cmakeOptions += buildArgs
         RunCMake(context, force, cmakeOptions)
@@ -1474,10 +1496,15 @@ def InstallOpenSubdiv(context, force, buildArgs):
             '-DNO_PTEX=ON',
             '-DNO_TBB=ON',
         ]
+        # Note: Emscripten toolchain file will check presence of
+        # '-sMEMORY64=1' in 'CMAKE_C_FLAGS' to determine if a
+        # 64 bit build is to be performed
         if context.targetWasm:
+            compileFlags, _ = GetWasmCompilerFlags(context.buildTarget)
+
             extraArgs.append('-DBUILD_SHARED_LIB=OFF')
-            extraArgs.append('-DCMAKE_CXX_FLAGS="-pthread"')
-            extraArgs.append('-DCMAKE_C_FLAGS="-pthread"')
+            extraArgs.append('-DCMAKE_CXX_FLAGS="{}"'.format(compileFlags))
+            extraArgs.append('-DCMAKE_C_FLAGS="{}"'.format(compileFlags))
             extraArgs.append('-DNO_METAL=ON')
 
         # Use Metal for macOS and all Apple embedded systems.
@@ -1891,6 +1918,12 @@ def InstallUSD(context, force, buildArgs):
                 .format(os.path.join(context.instDir, 'lib/libosdCPU.a')))
 
             extraArgs.append('-DBUILD_SHARED_LIBS=OFF')
+
+            compileFlags, linkFlags = GetWasmCompilerFlags(context.buildTarget)
+
+            extraArgs.append('-DCMAKE_CXX_FLAGS="{}"'.format(compileFlags))
+            extraArgs.append('-DCMAKE_C_FLAGS="{}"'.format(compileFlags))
+            extraArgs.append('-DCMAKE_EXE_LINKER_FLAGS="{}"'.format(linkFlags))
 
         RunCMake(context, force, extraArgs, context.usdInstDir)
 
@@ -2353,7 +2386,8 @@ class InstallContext:
 
         self.ignorePaths = args.ignore_paths or []
         # Build target and code signing
-        self.targetWasm = (args.build_target == TARGET_WASM)
+        self.targetWasm = (args.build_target == TARGET_WASM or 
+                           args.build_target == TARGET_WASM64)
         self.buildTarget = args.build_target
         if MacOS():
             apple_utils.SetTarget(self, self.buildTarget)
