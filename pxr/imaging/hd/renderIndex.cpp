@@ -192,60 +192,64 @@ HdRenderIndex::HdRenderIndex(
 
         _tracker._SetDisableEmulationAPI(true);
     } else {
-        _emulationSceneIndex = HdLegacyPrimSceneIndex::New();
+        // If we need to emulate a scene index we create the 
+        // data structures now.
+        if (_IsEnabledSceneIndexEmulation()) {
+            _emulationSceneIndex = HdLegacyPrimSceneIndex::New();
 
-        _tracker._SetTargetSceneIndex(get_pointer(_emulationSceneIndex));
+            _tracker._SetTargetSceneIndex(get_pointer(_emulationSceneIndex));
 
-        // The legacy prim scene index holds prims contributed from
-        // upstream scene delegates.  Convert any legacy subsets
-        // to HdGeomSubsetSchema.  Since legacy prims are typically
-        // populated iteratively, use notice batching upstream from
-        // scanning for geom subsets.
-        _finalEmulationSceneIndex =
-            HdLegacyGeomSubsetSceneIndex::New(
-                _emulationBatchingCtx->Append(_emulationSceneIndex));
+            // The legacy prim scene index holds prims contributed from
+            // upstream scene delegates.  Convert any legacy subsets
+            // to HdGeomSubsetSchema.  Since legacy prims are typically
+            // populated iteratively, use notice batching upstream from
+            // scanning for geom subsets.
+            _finalEmulationSceneIndex =
+                HdLegacyGeomSubsetSceneIndex::New(
+                    _emulationBatchingCtx->Append(_emulationSceneIndex));
 
-        if (createFrontEndEmulationOnly) {
-            return;
-        }
+            if (createFrontEndEmulationOnly) {
+                return;
+            }
 
-        _mergingSceneIndex = HdMergingSceneIndex::New();
-        
-        if (_finalEmulationSceneIndex) {
+            _mergingSceneIndex = HdMergingSceneIndex::New();
+
             _mergingSceneIndex->AddInputScene(
                 _finalEmulationSceneIndex,
                 SdfPath::AbsoluteRootPath());
-        }
 
-        HdSceneIndexBaseRefPtr sceneIndex = _mergingSceneIndex;
+            HdSceneIndexBaseRefPtr sceneIndex = _mergingSceneIndex;
 
-        sceneIndex =
-            _mergingBatchingCtx->Append(sceneIndex);
-
-        const std::string &rendererDisplayName =
-            renderDelegate->GetRendererDisplayName();
-
-        if (!rendererDisplayName.empty()) {
             sceneIndex =
-                HdSceneIndexPluginRegistry::GetInstance()
-                    .AppendSceneIndicesForRenderer(
-                        rendererDisplayName, sceneIndex,
-                        instanceName, appName);
-        }
+                _mergingBatchingCtx->Append(sceneIndex);
 
-        if (_IsEnabledTerminalCachingSceneIndex()) {
-            sceneIndex = HdCachingSceneIndex::New(sceneIndex);
-        }
+            const std::string &rendererDisplayName =
+                renderDelegate->GetRendererDisplayName();
 
-        _terminalSceneIndex = sceneIndex;
+            if (!rendererDisplayName.empty()) {
+                sceneIndex =
+                    HdSceneIndexPluginRegistry::GetInstance()
+                        .AppendSceneIndicesForRenderer(
+                            rendererDisplayName, sceneIndex,
+                            instanceName, appName);
+            }
+
+            if (_IsEnabledTerminalCachingSceneIndex()) {
+                sceneIndex = HdCachingSceneIndex::New(sceneIndex);
+            }
+
+            _terminalSceneIndex = sceneIndex;
+        }
     }
 
-    _siSd = std::make_unique<HdSceneIndexAdapterSceneDelegate>(
-        _terminalSceneIndex,
-        this,
-        SdfPath::AbsoluteRootPath());
+    if (_terminalSceneIndex) {
+        _siSd = std::make_unique<HdSceneIndexAdapterSceneDelegate>(
+            _terminalSceneIndex,
+            this,
+            SdfPath::AbsoluteRootPath());
 
-    renderDelegate->SetTerminalSceneIndex(_terminalSceneIndex);
+        renderDelegate->SetTerminalSceneIndex(_terminalSceneIndex);
+    }
 }
 
 HdRenderIndex::~HdRenderIndex()
