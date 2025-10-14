@@ -101,13 +101,9 @@ HdChangeTracker::MarkRprimDirty(SdfPath const& id, HdDirtyBits bits)
 
     if (_emulationSceneIndex) {
 
-        // There's a set of dirty bits that are used as internal signalling
-        // in hydra, and aren't related to scene data.  These, we need to
-        // pass through directly.
+        // Bits not going through dirty bits translation.
+        // We need to pass these through directly.
         const HdDirtyBits internalDirtyBits =
-            HdChangeTracker::InitRepr |
-            HdChangeTracker::Varying |
-            HdChangeTracker::NewRepr |
             HdChangeTracker::CustomBitsMask;
 
         if (bits & internalDirtyBits) {
