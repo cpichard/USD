@@ -658,7 +658,7 @@ HdChangeTracker::_MarkSprimDirty(SdfPath const& id, HdDirtyBits bits)
     _DependencyMap::const_accessor aIR;
     if (_sprimSprimTargetDependencies.find(aIR, id)) {
         for (SdfPath const& dep : aIR->second) {
-            MarkSprimDirty(dep, ~Clean);
+            _MarkSprimDirty(dep, ~Clean);
         }
     }
 
