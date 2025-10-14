@@ -112,18 +112,15 @@ The following graphs show the time (in seconds) to open and close
 Windows platforms (as described in :ref:`perf_environments`). Performance
 data from the four most recent releases is reported on a rolling basis.
 
-.. warning::
+.. note::
 
-    Interpret the metrics on this page with caution. A full historical rerun of
-    all metrics on this page was performed for the 25.11 release because of a
-    change in "create first image" timing methodology. This has revealed what
-    appears to be a major slowdown in ALab performance on linux.
+    A full historical rerun of all metrics on this page was performed for the
+    25.11 release because of a change in "create first image" timing methodology.
 
-    We suspect this outlier datapoint is due to performance measurement
-    variation rather than the result of anything that has specifically changed
-    in USD. The same applies to any other trend shown on this page.
-
-    Investigation is ongoing.
+    Interpret the metrics on this page with caution. Variation may arise from
+    a variety of sources, including run-to-run inconsistency in how the GL
+    driver schedules its flushes against our requests. Investigation on these
+    is ongoing.
 
 .. image:: performance/linux.svg
     :width: 500
