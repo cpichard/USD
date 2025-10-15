@@ -1368,7 +1368,8 @@ MatfiltMaterialX(
             // (since we need to use PxrSurface as the closure instead of the 
             // MaterialX surfaceshader node)
             SdfPath materialPath = netInterface->GetMaterialPrimPath();
-            mxDoc->removeNode("SR_" + materialPath.GetName());  // Shader Node
+            mxDoc->removeNode(                                  // Shader Node
+                HdMtlxGetMxTerminalName(netInterface, terminalNodeName));
             mxDoc->removeNode(materialPath.GetName());          // Material Node
 
             // Update nodes directly connected to the terminal node with 

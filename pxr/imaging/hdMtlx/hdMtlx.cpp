@@ -639,6 +639,31 @@ _CreateNodeGraphFromTerminalNodeConnections(
     }
 }
 
+std::string
+HdMtlxGetMxTerminalName(
+    HdMaterialNetworkInterface *netInterface,
+    TfToken const& hdTerminalNodeName)
+{
+    const mx::NodeDefPtr terminalNodeDef =
+        HdMtlxGetNodeDef(netInterface->GetNodeType(hdTerminalNodeName));
+    if (!terminalNodeDef) {
+        return HdMtlxTokens->surfaceshaderName;
+    }
+    return HdMtlxGetMxTerminalName(terminalNodeDef->getType());
+}
+
+std::string
+HdMtlxGetMxTerminalName(std::string const& terminalType)
+{
+    if (terminalType == mx::SURFACE_SHADER_TYPE_STRING) {
+        return HdMtlxTokens->surfaceshaderName;
+    } else if (terminalType == mx::DISPLACEMENT_SHADER_TYPE_STRING) {
+        return HdMtlxTokens->displacementshaderName;
+    }
+    // default to Surface
+    return HdMtlxTokens->surfaceshaderName;
+}
+
 // Create a MaterialX Document from the given HdMaterialNetwork2
 mx::DocumentPtr 
 HdMtlxCreateMtlxDocumentFromHdNetwork(
@@ -707,11 +732,14 @@ HdMtlxCreateMtlxDocumentFromHdMaterialNetworkInterface(
         TF_WARN("Unsupported terminal node type '%s' cannot find the "
                 "associated NodeDef.", hdTerminalType.GetText());
     }
-    const std::string mxTerminalType = 
+
+    const std::string mxTerminalCategory = 
         (terminalNodeDef) ? _GetMxNodeString(terminalNodeDef) : "";
-    mx::NodePtr mxShaderNode = mxDoc->addNode(
-        mxTerminalType,
-        HdMtlxTokens->surfaceshaderName, mx::SURFACE_SHADER_TYPE_STRING);
+    const std::string mxTerminalType = (terminalNodeDef) 
+        ? terminalNodeDef->getType() : mx::SURFACE_SHADER_TYPE_STRING;
+    const std::string mxTerminalName = HdMtlxGetMxTerminalName(mxTerminalType);
+    const mx::NodePtr mxShaderNode = mxDoc->addNode(
+        mxTerminalCategory, mxTerminalName, mxTerminalType);
 
     const std::string &materialName =
         netInterface->GetMaterialPrimPath().GetName();
@@ -728,7 +756,8 @@ HdMtlxCreateMtlxDocumentFromHdMaterialNetworkInterface(
         netInterface, terminalNodeName, terminalNodeDef, mxShaderNode);
 
     if (TfDebug::IsEnabled(HDMTLX_VERSION_UPGRADE)) {
-        const std::string filename = mxMaterial->getName() + "_before.mtlx";
+        const std::string filename =
+            mxMaterial->getName() + "_" + mxTerminalName + "_before.mtlx";
         TF_DEBUG(HDMTLX_VERSION_UPGRADE).Msg(
             "[%s] : MaterialX document before upgrade: '%s'\n",
             TF_FUNC_NAME().c_str(), filename.c_str());
@@ -740,14 +769,16 @@ HdMtlxCreateMtlxDocumentFromHdMaterialNetworkInterface(
     mxDoc->upgradeVersion();
 
     if (TfDebug::IsEnabled(HDMTLX_VERSION_UPGRADE)) {
-        const std::string filename = mxMaterial->getName() + "_after.mtlx";
+        const std::string filename =
+            mxMaterial->getName() + "_" + mxTerminalName + "_after.mtlx";
         TF_DEBUG(HDMTLX_VERSION_UPGRADE).Msg(
             "[%s] : MaterialX document after upgrade: '%s'\n",
             TF_FUNC_NAME().c_str(), filename.c_str());
         mx::writeToXmlFile(mxDoc, mx::FilePath(filename));
     } 
     else if (TfDebug::IsEnabled(HDMTLX_WRITE_DOCUMENT)) {
-        const std::string filename = mxMaterial->getName() + ".mtlx";
+        const std::string filename =
+            mxMaterial->getName() + "_" + mxTerminalName + ".mtlx";
         TF_DEBUG(HDMTLX_WRITE_DOCUMENT).Msg(
             "[%s] : MaterialX document: '%s'\n",
             TF_FUNC_NAME().c_str(), filename.c_str());
