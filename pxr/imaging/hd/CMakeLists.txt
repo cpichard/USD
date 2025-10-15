@@ -222,6 +222,7 @@ pxr_library(hd
         driver.h
         invalidatableContainerDataSource.h
         materialNetworkInterface.h
+        legacyRenderControlInterface.h
         rendererCreateArgs.h
         schemaTypeDefs.h
         vectorSchemaTypeDefs.h
