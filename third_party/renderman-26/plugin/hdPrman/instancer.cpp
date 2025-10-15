@@ -351,21 +351,23 @@ HdPrmanInstancer::Finalize(HdRenderParam *renderParam)
     param->ReleaseCoordSysBindings(GetId());
     
     // Delete all my riley instances
-    _protoMap.citerate([riley](const SdfPath& /* path */,
-        const _ProtoMapEntry& entry) {
-        for (const auto& rp : entry.map) {
-            const _InstanceIdVec& ids = rp.second;
-            _ParallelFor(ids.size(), [&](size_t i) {
-                const _RileyInstanceId& ri = ids[i];
-                if (ri.lightInstanceId != riley::LightInstanceId::InvalidId()) {
-                    riley->DeleteLightInstance(ri.groupId, ri.lightInstanceId);
-                } else if (ri.geoInstanceId !=
-                    riley::GeometryInstanceId::InvalidId()) {
-                    riley->DeleteGeometryInstance(ri.groupId, ri.geoInstanceId);
-                }
-            });
-        }
-    });
+    if (riley) {
+        _protoMap.citerate([riley](const SdfPath& /* path */,
+            const _ProtoMapEntry& entry) {
+            for (const auto& rp : entry.map) {
+                const _InstanceIdVec& ids = rp.second;
+                _ParallelFor(ids.size(), [&](size_t i) {
+                    const _RileyInstanceId& ri = ids[i];
+                    if (ri.lightInstanceId != riley::LightInstanceId::InvalidId()) {
+                        riley->DeleteLightInstance(ri.groupId, ri.lightInstanceId);
+                    } else if (ri.geoInstanceId !=
+                        riley::GeometryInstanceId::InvalidId()) {
+                        riley->DeleteGeometryInstance(ri.groupId, ri.geoInstanceId);
+                    }
+                });
+            }
+        });
+    }
 
     // Clear my proto map
     _protoMap.clear();
@@ -377,12 +379,14 @@ HdPrmanInstancer::Finalize(HdRenderParam *renderParam)
     }
 
     // Delete my prototype groups
-    _groupMap.citerate([&](const _FlattenData& /* fd */,
-        const riley::GeometryPrototypeId& gp) {
-        if (gp != riley::GeometryPrototypeId::InvalidId()) {
-            riley->DeleteGeometryPrototype(gp);
-        }
-    });
+    if (riley) {
+        _groupMap.citerate([&](const _FlattenData& /* fd */,
+            const riley::GeometryPrototypeId& gp) {
+            if (gp != riley::GeometryPrototypeId::InvalidId()) {
+                riley->DeleteGeometryPrototype(gp);
+            }
+        });
+    }
     
     // Clear my group map
     _groupMap.clear();
