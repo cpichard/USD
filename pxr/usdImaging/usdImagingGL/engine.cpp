@@ -704,7 +704,8 @@ UsdImagingGLEngine::_UpdateDomeLightCameraVisibility()
         // as dirty to ensure they have the proper state on all backends.
         _domeLightCameraVisibility = domeLightCamVisSetting;
 
-        if (_renderIndex) {
+        if (_renderIndex &&
+            _renderIndex->IsSprimTypeSupported(HdPrimTypeTokens->domeLight)) {
             // For old implementation where hdPrman would read the dome light
             // camera visibility render setting in HdPrman_Light::Sync and thus
             // required invalidation for each dome light.
