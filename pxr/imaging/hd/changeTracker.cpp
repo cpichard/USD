@@ -100,21 +100,6 @@ HdChangeTracker::MarkRprimDirty(SdfPath const& id, HdDirtyBits bits)
     }
 
     if (_emulationSceneIndex) {
-
-        // Bits not going through dirty bits translation.
-        // We need to pass these through directly.
-        const HdDirtyBits internalDirtyBits =
-            HdChangeTracker::CustomBitsMask;
-
-        if (bits & internalDirtyBits) {
-            _MarkRprimDirty(id, bits & internalDirtyBits);
-        }
-
-         // If we're only processing internal bits, skip calling DirtyPrims.
-        if ((bits & ~internalDirtyBits) == 0) {
-            return;
-        }
-
         // We need to dispatch based on prim type.
         HdSceneIndexPrim prim = _emulationSceneIndex->GetPrim(id);
         HdDataSourceLocatorSet locators;
