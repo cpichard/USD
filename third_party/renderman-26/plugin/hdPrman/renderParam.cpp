@@ -3120,7 +3120,8 @@ HdPrman_RenderParam::Begin(HdPrmanRenderDelegate *renderDelegate)
     // Force initialization of Riley scene options.
     // (see related comments in SetRileyOptions)
 #if PXR_VERSION >= 2311 // avoid deferring for now because can cause crash
-    if (!TfGetEnvSetting(HD_PRMAN_DEFER_SET_OPTIONS))
+    if (!HdRenderIndex::IsSceneIndexEmulationEnabled() ||
+        !TfGetEnvSetting(HD_PRMAN_DEFER_SET_OPTIONS))
 #endif
     {
         SetRileyOptions();
@@ -4524,6 +4525,12 @@ HdPrman_RenderParam::SetRenderSettingsIntegratorPath(
     SdfPath const &renderSettingsIntegratorPath)
 {
     if (_renderSettingsIntegratorPath != renderSettingsIntegratorPath) {
+        if (! HdRenderIndex::IsSceneIndexEmulationEnabled()) {
+            // Mark the Integrator Prim Dirty
+            sceneDelegate->GetRenderIndex().GetChangeTracker()
+                .MarkSprimDirty(renderSettingsIntegratorPath,
+                                HdChangeTracker::DirtyParams);
+        }
         _renderSettingsIntegratorPath = renderSettingsIntegratorPath;
 
         // Update the Integrator back to the default when the path is empty
@@ -4555,6 +4562,14 @@ HdPrman_RenderParam::SetSampleFilterPaths(
         // Reset the Filter Shading Nodes and update the paths
         _sampleFilterNodes.clear();
         _sampleFilterPaths = sampleFilterPaths;
+
+        if (! HdRenderIndex::IsSceneIndexEmulationEnabled()) {
+            // Mark the SampleFilter Prims Dirty
+            for (const SdfPath &path : sampleFilterPaths) {
+                sceneDelegate->GetRenderIndex().GetChangeTracker()
+                    .MarkSprimDirty(path, HdChangeTracker::DirtyParams);
+            }
+        }
     }
 
     // If there are no SampleFilters, delete the riley SampleFilter
@@ -4575,6 +4590,14 @@ HdPrman_RenderParam::SetDisplayFilterPaths(
         // Reset the Filter Shading Nodes and update the paths
         _displayFilterNodes.clear();
         _displayFilterPaths = displayFilterPaths;
+
+        if (! HdRenderIndex::IsSceneIndexEmulationEnabled()) {
+            // Mark the DisplayFilter prims Dirty
+            for (const SdfPath &path : displayFilterPaths) {
+                sceneDelegate->GetRenderIndex().GetChangeTracker()
+                    .MarkSprimDirty(path, HdChangeTracker::DirtyParams);
+            }
+        }
     }
 
     // If there are no DisplayFilters, delete the riley DisplayFilter

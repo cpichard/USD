@@ -752,10 +752,8 @@ HdPrman_RenderPass::_Execute(
                 projection,
                 projectionParams);
 
-            if (projectionParams.GetNumParams() != 0) {
-                cameraContext.SetProjectionOverride(
-                    RtUString(projection.c_str()), projectionParams);
-            }
+            cameraContext.SetProjectionOverride(
+                RtUString(projection.c_str()), projectionParams);
         }
 
         // Set Resolution, Crop Window, Pixel Aspect Ratio,
