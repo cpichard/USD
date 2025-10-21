@@ -1737,6 +1737,8 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const 
                 renderControl->IsPrimvarFilteringNeeded();
             info.shaderSourceTypes =
                 renderControl->GetShaderSourceTypes();
+            info.isCoordSysSupported =
+                renderControl->IsCoordSysSupported();
         }
 
         auto const adapter =

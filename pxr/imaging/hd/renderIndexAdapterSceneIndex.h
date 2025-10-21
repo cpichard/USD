@@ -33,6 +33,7 @@ public:
         TfTokenVector renderSettingsNamespaces;
         bool isPrimvarFilteringNeeded;
         TfTokenVector shaderSourceTypes;
+        bool isCoordSysSupported;
     };
 
     static HdRenderIndexAdapterSceneIndexRefPtr New(

@@ -160,6 +160,11 @@ public:
         return _renderDelegate->GetShaderSourceTypes();
     }
 
+    bool IsCoordSysSupported() const override {
+        return _renderIndex->IsSprimTypeSupported(
+            HdPrimTypeTokens->coordSys);
+    }
+
     bool RequiresStormTasks() const override {
         return _renderDelegate->RequiresStormTasks();
     }

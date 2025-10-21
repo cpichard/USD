@@ -28,6 +28,17 @@ TfTokenVector _Concat(const TfTokenVector &a, const TfTokenVector &b)
     return result;
 }
 
+TfTokenVector _Remove(const TfTokenVector &vec, const TfToken &t)
+{
+    TfTokenVector result;
+    for (const TfToken &token : vec) {
+        if (token != t) {
+            result.push_back(token);
+        }
+    }
+    return result;
+}
+
 class _NullRenderDelegateForAdapter : public HdRenderDelegate
 {
 public:
@@ -61,7 +72,14 @@ public:
         return HdRprimTypeTokens->allTokens;
     }
     const TfTokenVector &GetSupportedSprimTypes() const override {
-        return HdSprimTypeTokens->allTokens;
+        if (_info.isCoordSysSupported) {
+            return HdSprimTypeTokens->allTokens;
+        } else {
+            static TfTokenVector result = _Remove(
+                HdSprimTypeTokens->allTokens,
+                HdSprimTypeTokens->coordSys);
+            return result;
+        }
     }
     const TfTokenVector &GetSupportedBprimTypes() const override {
         static TfTokenVector result = _Concat(

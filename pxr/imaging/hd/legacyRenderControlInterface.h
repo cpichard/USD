@@ -107,6 +107,10 @@ public:
     virtual bool IsPrimvarFilteringNeeded() const = 0;
     virtual TfTokenVector GetShaderSourceTypes() const = 0;
 
+    /// This is for UsdImagingDelegate::_coordSysEnabled that has a
+    /// surprising performance impact.
+    virtual bool IsCoordSysSupported() const = 0;
+
     /// @}
     
     /// \name Misc
