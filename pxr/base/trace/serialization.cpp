@@ -57,7 +57,8 @@ TraceSerialization::Read(std::istream& istr, std::string* errorStr)
         }
         return nullptr;
     }
-    return Trace_JSONSerialization::CollectionFromJSON(value);
+
+    return Trace_JSONSerialization::CollectionFromJSON(std::move(value));
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
