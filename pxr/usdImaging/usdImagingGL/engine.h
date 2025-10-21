@@ -832,6 +832,8 @@ private:
 
     void _DestroyHydraObjects();
 
+    SdfPath _GetInstancerForPrim(const SdfPath &sceneIndexPath) const;
+        
     // Note that we'll only ever use one of _sceneIndex/_sceneDelegate
     // at a time.
     UsdImagingStageSceneIndexRefPtr _stageSceneIndex;

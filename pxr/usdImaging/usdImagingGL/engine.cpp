@@ -1,5 +1,3 @@
-#include <iostream>
-
 //
 // Copyright 2016 Pixar
 //
@@ -21,6 +19,7 @@
 #include "pxr/usd/usdRender/settings.h"
 
 #include "pxr/imaging/hd/cachingSceneIndex.h"
+#include "pxr/imaging/hd/instancedBySchema.h"
 #include "pxr/imaging/hd/materialBindingsSchema.h"
 #include "pxr/imaging/hd/legacyRenderControlInterface.h"
 #include "pxr/imaging/hd/light.h"
@@ -1290,6 +1289,31 @@ UsdImagingGLEngine::TestIntersection(
     return false;
 }
 
+SdfPath
+UsdImagingGLEngine::_GetInstancerForPrim(const SdfPath &sceneIndexPath) const
+{
+    if (_GetTerminalSceneIndex()) {
+        const auto schema = HdInstancedBySchema::GetFromParent(
+            _GetTerminalSceneIndex()->GetPrim(sceneIndexPath).dataSource);
+        HdPathArrayDataSourceHandle const ds = schema.GetPaths();
+        if (!ds) {
+            return SdfPath();
+        }
+        const VtArray<SdfPath> &paths = ds->GetTypedValue(0.0f);
+        if (paths.empty()) {
+            return SdfPath();
+        }
+        return paths[0];
+    }
+    if (_renderIndex) {
+        SdfPath delegateId, instancerId;
+        _renderIndex->GetSceneDelegateAndInstancerIds(
+            sceneIndexPath, &delegateId, &instancerId);
+        return instancerId;
+    }
+    return SdfPath();
+}
+
 bool
 UsdImagingGLEngine::TestIntersection(
     const PickParams& pickParams,
@@ -1359,15 +1383,19 @@ UsdImagingGLEngine::TestIntersection(
         if (_sceneDelegate) {
             res.hitPrimPath = _sceneDelegate->GetScenePrimPath(
                     hit.objectId, hit.instanceIndex, &(res.instancerContext));
-            res.hitInstancerPath = _sceneDelegate->ConvertIndexPathToCachePath(
-                    hit.instancerId).GetAbsoluteRootOrPrimPath();
+            res.hitInstancerPath =
+                _sceneDelegate
+                    ->ConvertIndexPathToCachePath(
+                        _GetInstancerForPrim(hit.objectId))
+                    .GetAbsoluteRootOrPrimPath();
         } else {
             const HdxPrimOriginInfo info = HdxPrimOriginInfo::FromPickHit(
                 _GetTerminalSceneIndex(), hit);
             res.hitPrimPath = info.GetFullPath();
-            res.hitInstancerPath = hit.instancerId.ReplacePrefix(
-                _sceneDelegateId, SdfPath::AbsoluteRootPath());
             res.instancerContext = info.ComputeInstancerContext();
+            if (!res.instancerContext.empty()) {
+                res.hitInstancerPath = res.instancerContext.back().first;
+            }
         }
 
         res.hitPoint = hit.worldSpaceHitPoint;
@@ -1423,10 +1451,6 @@ UsdImagingGLEngine::DecodeIntersection(
     }
 
     if (_sceneDelegate) {
-        SdfPath delegateId, instancerId;
-        _renderIndex->GetSceneDelegateAndInstancerIds(
-            sceneIndexPath, &delegateId, &instancerId);
-
         if (outHitPrimPath) {
             *outHitPrimPath =
                 _sceneDelegate->GetScenePrimPath(
@@ -1435,7 +1459,8 @@ UsdImagingGLEngine::DecodeIntersection(
         if (outHitInstancerPath) {
             *outHitInstancerPath =
                 _sceneDelegate
-                    ->ConvertIndexPathToCachePath(instancerId)
+                    ->ConvertIndexPathToCachePath(
+                        _GetInstancerForPrim(sceneIndexPath))
                     .GetAbsoluteRootOrPrimPath();
         }
 
