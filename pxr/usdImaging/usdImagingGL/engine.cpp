@@ -1686,8 +1686,10 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const 
         _CreateUsdImagingSceneIndices();
         _SetRootOverrides(rootOverrides, _rootOverridesSceneIndex);
 
-        _usdImagingFinalSceneIndex = HdPrefixingSceneIndex::New(
-            _usdImagingFinalSceneIndex, _sceneDelegateId);
+        if (!_sceneDelegateId.IsAbsoluteRootPath()) {
+            _usdImagingFinalSceneIndex = HdPrefixingSceneIndex::New(
+                _usdImagingFinalSceneIndex, _sceneDelegateId);
+        }
         _mergingSceneIndex->InsertInputScenes(
             {{ _usdImagingFinalSceneIndex, _sceneDelegateId }});
     } else {
