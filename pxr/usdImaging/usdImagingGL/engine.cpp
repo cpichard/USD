@@ -1,3 +1,5 @@
+#include <iostream>
+
 //
 // Copyright 2016 Pixar
 //
@@ -1671,7 +1673,7 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const 
                     HdRetainedContainerDataSource::New(
                         HdRendererCreateArgsSchemaTokens->hgi,
                         HdRetainedTypedSampledDataSource<Hgi*>::New(
-                            _hgi.get())))
+                            _hgiDriver.driver.GetWithDefault<Hgi*>(nullptr))))
                 .Build());
 
     if (!_renderer) {
