@@ -11,6 +11,8 @@
 #include "pxr/base/js/json.h"
 
 #include "pxr/base/tf/diagnostic.h"
+#include "pxr/base/tf/hash.h"
+#include "pxr/base/tf/pxrTslRobinMap/robin_set.h"
 #include "pxr/base/tf/stringUtils.h"
 
 #include <istream>
@@ -75,10 +77,19 @@ struct _InputHandler : public rj::BaseReaderHandler<rj::UTF8<>, _InputHandler>
         return true;
     }
     bool String(const char* str, rj::SizeType length, bool /* copy */) {
-        values.emplace_back(std::string(str, length));
+        // Deduplicate strings in the input.
+        //
+        // JsValue holds reference-counted immutable strings so we store
+        // copies of a single JsValue holding the relevant string rather than
+        // independently allocated strings.  This greatly reduces memory
+        // overhead for JSON-serialized libTrace data.
+        auto it = _internedStrings.emplace(std::string(str, length)).first;
+        values.push_back(*it);
         return true;
     }
     bool Key(const char* str, rj::SizeType length, bool /* copy */) {
+        // Note that, while duplicate keys are very common, the structure of
+        // JsObject does not allow us to share common keys between JsObjects.
         keys.emplace_back(str, length);
         return true;
     }
@@ -117,6 +128,19 @@ struct _InputHandler : public rj::BaseReaderHandler<rj::UTF8<>, _InputHandler>
 public:
     std::vector<JsObject::key_type> keys;
     std::vector<JsObject::mapped_type> values;
+
+private:
+    struct _StrHash
+    {
+        size_t operator()(const JsValue &v) const {
+            // This assumes that the held values contain strings because
+            // _internedStrings is only used for strings.
+            return TfHash()(v.GetString());
+        }
+    };
+
+    // Table for deduplicating parsed strings (but not keys.)
+    pxr_tsl::robin_set<JsValue, _StrHash> _internedStrings;
 };
 
 // This class is needed to override writing out doubles. There is a bug in 
