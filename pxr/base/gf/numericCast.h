@@ -31,12 +31,13 @@ constexpr bool
 GfIntegerCompareLess(T t, U u) noexcept
 {
     // XXX: 
-    // On Visual Studio warning C4018 (signed/unsigned mismatch) is emitted
-    // when this function is used with boolean values. Just disable this
-    // for now.
+    // On Visual Studio warnings C4018 (signed/unsigned mismatch) and
+    // C4804 (unsafe use of bool in operation) are emitted when this
+    // function is used with boolean values. Just disable this for now.
 #if defined(ARCH_COMPILER_MSVC)
     ARCH_PRAGMA_PUSH
     ARCH_PRAGMA(warning(disable:4018))
+    ARCH_PRAGMA(warning(disable:4804))
 #endif    
 
     static_assert(std::is_integral_v<T> && std::is_integral_v<U>);
