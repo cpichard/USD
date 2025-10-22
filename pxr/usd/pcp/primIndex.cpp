@@ -1953,7 +1953,11 @@ _AddArc(
         newNodeError->rootSite = indexer->rootSite;
         indexer->RecordError(newNodeError);
     }
-    if (!newNode) {
+
+    if (newNode) {
+        indexer->outputs->primIndex.GetGraph()->SetHasNewNodes(true);
+    }
+    else {
         TF_VERIFY(newNodeError, "Failed to create a node, but did not "
                   "specify the error.");
         return PcpNodeRef();
@@ -5018,6 +5022,10 @@ _BuildInitialPrimIndexFromAncestor(
     // answer.
     graph->SetHasPayloads(false);
     outputs->payloadState = PcpPrimIndexOutputs::NoPayload;
+
+    // Reset the 'has new nodes' flag on this prim index since we haven't
+    // yet added any nodes at this level of namespace.
+    graph->SetHasNewNodes(false);
 
     PcpNodeRef rootNode = outputs->primIndex.GetRootNode();
     _ConvertNodeForChild(rootNode, inputs);

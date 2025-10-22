@@ -51,6 +51,16 @@ Pcp_Dependencies::~Pcp_Dependencies()
     // Do nothing
 }
 
+// Return true if the given prim index might have additional dependencies
+// to record, false otherwise.
+inline static bool
+_PrimIndexCanIntroduceDependencies(const PcpPrimIndex& primIndex)
+{
+    // If this prim index does not introduce new nodes it can't
+    // introduce any additional dependencies.
+    return primIndex.GetGraph()->HasNewNodes();
+}
+
 // Determine if Pcp_Dependencies should store an entry
 // for the arc represented by the given node.
 //
@@ -106,7 +116,15 @@ Pcp_Dependencies::Add(
     if (!primIndex.GetRootNode()) {
         return;
     }
+
     const SdfPath& primIndexPath = primIndex.GetRootNode().GetPath();
+    if (!_PrimIndexCanIntroduceDependencies(primIndex)) {
+        TF_DEBUG(PCP_DEPENDENCIES)
+            .Msg("Pcp_Dependencies: Skip adding deps for index <%s>:\n",
+                primIndexPath.GetText());
+        return;
+    }
+
     TF_DEBUG(PCP_DEPENDENCIES)
         .Msg("Pcp_Dependencies: Adding deps for index <%s>:\n",
              primIndexPath.GetText());
@@ -277,7 +295,16 @@ Pcp_Dependencies::Remove(const PcpPrimIndex &primIndex, PcpLifeboat *lifeboat)
     if (!primIndex.GetRootNode()) {
         return;
     }
+
     const SdfPath& primIndexPath = primIndex.GetRootNode().GetPath();
+
+    if (!_PrimIndexCanIntroduceDependencies(primIndex)) {
+        TF_DEBUG(PCP_DEPENDENCIES)
+            .Msg("Pcp_Dependencies: Skip removing deps for index <%s>\n",
+                primIndexPath.GetText());
+        return;
+    }
+
     TF_DEBUG(PCP_DEPENDENCIES)
         .Msg("Pcp_Dependencies: Removing deps for index <%s>\n",
              primIndexPath.GetText());
@@ -650,6 +677,10 @@ Pcp_AddCulledDependencies(
     const PcpPrimIndex& primIndex,
     PcpCulledDependencyVector* culledDeps)
 {
+    if (!_PrimIndexCanIntroduceDependencies(primIndex)) {
+        return;
+    }
+
     // This function may be called on a prim index that is not yet finalized,
     // so we cannot use the various node range API on PcpPrimIndex.
     auto allNodesRange = Pcp_GetSubtreeRange(primIndex.GetRootNode());
