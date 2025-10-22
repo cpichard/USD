@@ -26,6 +26,7 @@
 #include "pxr/imaging/hd/noticeBatchingSceneIndex.h"
 #include "pxr/imaging/hd/prefixingSceneIndex.h"
 #include "pxr/imaging/hd/renderBuffer.h"
+#include "pxr/imaging/hd/renderDelegateInfo.h"
 #include "pxr/imaging/hd/renderIndexAdapterSceneIndex.h"
 #include "pxr/imaging/hd/renderer.h"
 #include "pxr/imaging/hd/rendererCreateArgsSchema.h"
@@ -1723,22 +1724,11 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const 
     } else {
         TRACE_SCOPE("UsdImaging scene delegate");
 
-        HdRenderIndexAdapterSceneIndex::RenderDelegateInfo info;
+        HdRenderDelegateInfo info;
 
         if (HdLegacyRenderControlInterface * const renderControl =
                 _renderer->GetLegacyRenderControl()) {
-            info.materialBindingPurpose =
-                renderControl->GetMaterialBindingPurpose();
-            info.materialRenderContexts =
-                renderControl->GetMaterialRenderContexts();
-            info.renderSettingsNamespaces =
-                renderControl->GetRenderSettingsNamespaces();
-            info.isPrimvarFilteringNeeded =
-                renderControl->IsPrimvarFilteringNeeded();
-            info.shaderSourceTypes =
-                renderControl->GetShaderSourceTypes();
-            info.isCoordSysSupported =
-                renderControl->IsCoordSysSupported();
+            info = renderControl->GetRenderDelegateInfo();
         }
 
         auto const adapter =

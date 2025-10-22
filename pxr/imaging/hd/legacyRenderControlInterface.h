@@ -9,11 +9,15 @@
 
 #include "pxr/pxr.h"
 
+#include "pxr/imaging/hd/api.h"
+
 #include "pxr/imaging/hd/aov.h"
+#include "pxr/imaging/hd/command.h"
 #include "pxr/usd/sdf/path.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+struct HdRenderDelegateInfo;
 class HdRenderBuffer;
 using HdRenderSettingDescriptorList =
     std::vector<struct HdRenderSettingDescriptor>;
@@ -106,11 +110,12 @@ public:
     virtual TfTokenVector GetRenderSettingsNamespaces() const = 0;
     virtual bool IsPrimvarFilteringNeeded() const = 0;
     virtual TfTokenVector GetShaderSourceTypes() const = 0;
-
     /// This is for UsdImagingDelegate::_coordSysEnabled that has a
     /// surprising performance impact.
     virtual bool IsCoordSysSupported() const = 0;
 
+    HD_API
+    HdRenderDelegateInfo GetRenderDelegateInfo() const;
     /// @}
     
     /// \name Misc

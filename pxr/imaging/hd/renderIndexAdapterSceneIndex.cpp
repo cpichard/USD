@@ -8,6 +8,7 @@
 #include "pxr/imaging/hd/renderIndexAdapterSceneIndex.h"
 
 #include "pxr/imaging/hd/renderDelegate.h"
+#include "pxr/imaging/hd/renderDelegateInfo.h"
 #include "pxr/imaging/hd/renderIndex.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -43,7 +44,7 @@ class _NullRenderDelegateForAdapter : public HdRenderDelegate
 {
 public:
     _NullRenderDelegateForAdapter(
-        const HdRenderIndexAdapterSceneIndex::RenderDelegateInfo &info)
+        const HdRenderDelegateInfo &info)
      : _info(info)
     {
     }
@@ -119,13 +120,13 @@ public:
     void CommitResources(HdChangeTracker*) override {}
 
 private:
-    const HdRenderIndexAdapterSceneIndex::RenderDelegateInfo _info;
+    const HdRenderDelegateInfo _info;
 };
 
 }
 
 HdRenderIndexAdapterSceneIndex::HdRenderIndexAdapterSceneIndex(
-    const RenderDelegateInfo &info)
+    const HdRenderDelegateInfo &info)
  : _renderDelegate(std::make_unique<_NullRenderDelegateForAdapter>(info))
  , _renderIndex(HdRenderIndex::New(_renderDelegate.get()))
  , _observer(this)

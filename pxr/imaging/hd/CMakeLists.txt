@@ -103,6 +103,7 @@ pxr_library(hd
         legacyDisplayStyleSchema
         legacyGeomSubsetSceneIndex
         legacyPrimSceneIndex
+        legacyRenderControlInterface
         legacyTaskFactory
         legacyTaskSchema
         lensDistortionSchema
@@ -222,7 +223,7 @@ pxr_library(hd
         driver.h
         invalidatableContainerDataSource.h
         materialNetworkInterface.h
-        legacyRenderControlInterface.h
+        renderDelegateInfo.h
         rendererCreateArgs.h
         schemaTypeDefs.h
         vectorSchemaTypeDefs.h
