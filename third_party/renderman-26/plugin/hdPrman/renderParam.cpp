@@ -22,7 +22,11 @@
 #include "hdPrman/statsListener.h"
 #include "hdPrman/tokens.h"
 #include "hdPrman/utils.h"
+
+// See note below about HdPrman_WorldOffsetSceneIndexPlugin.
+#if PXR_VERSION < 2505
 #include "hdPrman/worldOffsetSceneIndexPlugin.h"
+#endif
 
 #include "pxr/imaging/hd/aov.h"
 #include "pxr/imaging/hd/dataSourceLocator.h"
@@ -3331,6 +3335,10 @@ HdPrman_RenderParam::SetRileyOptions()
             prunedOptions = HdPrman_Utils::PruneBatchOnlyOptions(prunedOptions);
         }
 
+        // HdPrman_WorldOffsetSceneIndexPlugin now handles trace:worldorigin
+        // and trace:worldoffset internally, by pulling the relevant information
+        // from scene globals.  The below code is for backwards compatbility.
+#if PXR_VERSION < 2505
         // Set the world origin as "world offset" and the world offset as our camera/offset.
         // Geometry/Lights/Camera all enter into riley in "world offset" space.
         // This is handled by the world offset scene index plugin.
@@ -3339,20 +3347,13 @@ HdPrman_RenderParam::SetRileyOptions()
         // We always set this as "world offset" and set it with the exact offset the scene index
         // is using. If we set to camera it may use all the time samples where as the scene index is
         // only transforming around time zero for simplicity.
-        // TODO: This task should be moved into the scene index itself. However we cannot do this
-        // yet as there is a dependency on knowing  which rendersetting/camera is being used in
-        // the scene which is not known until after the scene index. If we change the rendersetting
-        // in the scene index it would be pushed forward to the render delegate, which would pass
-        // it back to the scene index, which would be pushed forward to the render delegate,
-        // creating a feedback loop.
-        // Once the SceneGlobals is properly supported we can move everything into the scene index
-        // plugin.
         const GfVec3f worldOffset = GfVec3f(
             HdPrman_WorldOffsetSceneIndexPlugin::GetCameraOffset() +
             HdPrman_WorldOffsetSceneIndexPlugin::GetWorldOffset()
         );
         prunedOptions.SetFloatArray(RixStr.k_trace_worldoffset, worldOffset.GetArray(), 3);
         prunedOptions.SetString(RixStr.k_trace_worldorigin, RixStr.k_worldoffset);
+#endif
 
         for(const auto& cb: *_rileyOptionsCallbacks) {
             cb(prunedOptions);

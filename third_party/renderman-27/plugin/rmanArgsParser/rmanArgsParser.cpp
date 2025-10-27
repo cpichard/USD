@@ -138,6 +138,7 @@ struct SdrShaderRepresentation
     NdrPropertyUniquePtrVec properties;
 #endif
     SdrTokenMap metadata;
+    std::map<std::string, SdrTokenMap> pageMetadata;
 
     // This is the type that the shader declares itself as; this is NOT the
     // source type
@@ -341,6 +342,28 @@ RmanArgsParserPlugin::Parse(const NdrNodeDiscoveryResult& discoveryResult)
     if (!shaderRepresentation.openPages.empty()) {
         metadata[SdrNodeMetadata->OpenPages] =
             CreateStringFromStringVec(shaderRepresentation.openPages);
+    }
+#endif
+
+#if PXR_VERSION >= 2602
+    // Compute shownIf expressions for pages that have conditional vis metadata.
+    for (std::pair<std::string, SdrTokenMap> it : shaderRepresentation.pageMetadata) {
+        const std::string& page = it.first;
+        const SdrTokenMap& pageMetadata = it.second;
+
+        const std::string shownIf =
+            ShaderMetadataHelpers::ComputeShownIfFromMetadata(pageMetadata,
+                page, shaderRepresentation.properties,
+                discoveryResult.resolvedUri);
+        if (!shownIf.empty()) {
+            // Encode the page name with a prefix that SdrShaderNode will
+            // recognize as representing a page-level shownIf epxression.
+            const std::string& prefix
+                = SdrNodeMetadataPrefix->PageShownIf.GetString();
+            const std::vector<std::string> parts{prefix, page};
+            const TfToken key{TfStringJoin(parts, "|")};
+            metadata[key] = shownIf;
+        }
     }
 #endif
 
@@ -697,7 +720,36 @@ _Parse(
                 shaderRep.openPages.push_back(pageFullName);
             }
 
+            SdrTokenMap& pageMetadata = shaderRep.pageMetadata[pageFullName];
+            xml_attribute attribute = childElement.first_attribute();
+            while (attribute) {
+                pageMetadata.emplace(TfToken(attribute.name()),
+                    attribute.value());
+                attribute = attribute.next_attribute();
+            }
+
             _Parse(shaderRep, childElement, pageFullName);
+        }
+
+        // Hint dictionary (page-level)
+        // <hintdict name="...">
+        // -------------------
+        else if (EQUALS(hintdictStr, childElement.name())) {
+            xml_attribute nameAttr = childElement.attribute(nameStr);
+            bool hasPage = !parentPage.empty();
+
+            if (hasPage && EQUALS(conditionalVisOpsStr, nameAttr.value())) {
+                SdrTokenMap& pageMetadata = shaderRep.pageMetadata[parentPage];
+                xml_node visChild = childElement.first_child();
+
+                while (visChild) {
+                    const TfToken name(visChild.attribute(nameStr).value());
+                    const TfToken value(visChild.attribute(valueStr).value());
+                    pageMetadata.insert(std::make_pair(name, value));
+
+                    visChild = visChild.next_sibling();
+                }
+            }
         }
 
         // Help

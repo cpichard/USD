@@ -1,6 +1,6 @@
 # Change Log
 
-## [25.11] - 2025-10-23
+## [25.11] - 2025-10-24
 
 UsdImaging now defaults to using the Hydra 2 scene index code path.
 `USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX` is now enabled by default.  
@@ -658,6 +658,10 @@ UsdImaging now defaults to using the Hydra 2 scene index code path.
   save out the generated Storm MaterialX glslfx shader. 
 
 ### Documentation
+
+- Fixed a broken link in UsdGeom documentation for handling of left handed 
+  coordinate systems.
+  (PR: [#3564](https://github.com/PixarAnimationStudios/OpenUSD/pull/3564))
 
 - Updated work API developer documentation to describe in more detail how the 
   granularity of a granular thread limiting implementation is determined by the 

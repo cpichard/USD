@@ -32,7 +32,11 @@
 
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/token.h"
+
+// See note below about HdPrman_WorldOffsetSceneIndexPlugin.
+#if PXR_VERSION < 2505
 #include "hdPrman/worldOffsetSceneIndexPlugin.h"
+#endif
 
 #include <Riley.h>
 
@@ -586,6 +590,10 @@ HdPrman_RenderPass::_Execute(
     const bool frameChanged = _renderParam->frame != frame;
     _renderParam->frame = frame;
 
+    // HdPrman_WorldOffsetSceneIndexPlugin now handles trace:worldorigin
+    // and trace:worldoffset internally, by pulling the relevant information
+    // from scene globals.  The below code is for backwards compatbility.
+#if PXR_VERSION < 2505
     // Update World Offset
     {
         // Although it's incorrect we are defaulting to world origin as world
@@ -613,6 +621,7 @@ HdPrman_RenderPass::_Execute(
                 HdChangeTracker::DirtyTransform);
         }
     }
+#endif
 
     //
     // ------------------------------------------------------------------------
