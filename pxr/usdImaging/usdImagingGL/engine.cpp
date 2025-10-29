@@ -235,16 +235,6 @@ _GetUsdImagingDelegateId()
 }
 
 bool
-_GetUseSceneIndices()
-{
-    static bool result =
-        HdRenderIndex::IsSceneIndexEmulationEnabled() &&
-        TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX);
-
-    return result;
-}
-
-bool
 _GetSceneIndexObserverRenderer()
 {
     static bool result =
@@ -497,6 +487,7 @@ UsdImagingGLEngine::~UsdImagingGLEngine()
     _DestroyHydraObjects();
 }
 
+
 //----------------------------------------------------------------------------
 // Rendering
 //----------------------------------------------------------------------------
@@ -521,7 +512,7 @@ UsdImagingGLEngine::PrepareBatch(
     {
         _PreSetTime(params);
         // SetTime will only react if time actually changes.
-        if (_GetUseSceneIndices()) {
+        if (UseUsdImagingSceneIndex()) {
             _stageSceneIndex->SetTime(params.frame);
         } else {
             _sceneDelegate->SetTime(params.frame);
@@ -531,7 +522,7 @@ UsdImagingGLEngine::PrepareBatch(
     }
 
     // Miscellaneous scene render configuration parameters.
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         if (_appSceneIndices) {
             if (HdsiSceneMaterialPruningSceneIndexRefPtr const &si =
                     _appSceneIndices->sceneMaterialPruningSceneIndex) {
@@ -566,7 +557,7 @@ UsdImagingGLEngine::PrepareBatch(
     // to avoid extra unforced rounds of invalidation after population.
     if (!_isPopulated) {
         auto stage = root.GetStage();
-        if (_GetUseSceneIndices()) {
+        if (UseUsdImagingSceneIndex()) {
             _ScopedHydraNoticeBatch noticeBatch(
                 _postInstancingNoticeBatchingSceneIndex);
 
@@ -900,7 +891,7 @@ UsdImagingGLEngine::SetRootTransform(GfMatrix4d const& xf)
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         _rootOverridesSceneIndex->SetRootTransform(xf);
     } else {
         _sceneDelegate->SetRootTransform(xf);
@@ -916,7 +907,7 @@ UsdImagingGLEngine::SetRootVisibility(const bool isVisible)
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         _rootOverridesSceneIndex->SetRootVisibility(isVisible);
     } else {
         _sceneDelegate->SetRootVisibility(isVisible);
@@ -1012,7 +1003,7 @@ UsdImagingGLEngine::SetWindowPolicy(CameraUtilConformWindowPolicy policy)
     // Note: Free cam uses SetCameraState, which expects the frustum to be
     // pre-adjusted for the viewport size.
 
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         // XXX(USD-7115): window policy
     } else {
         // The usdImagingDelegate manages the window policy for scene cameras.
@@ -1040,7 +1031,7 @@ UsdImagingGLEngine::SetCameraPath(SdfPath const& id)
     // The camera that is set for viewing will also be used for
     // time sampling.
     // XXX(HYD-2304): motion blur shutter window.
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         // Set camera path on HdsiSceneGlobalsSceneIndex.
         if (_appSceneIndices) {
             if (auto &sgsi = _appSceneIndices->sceneGlobalsSceneIndex) {
@@ -1135,7 +1126,7 @@ UsdImagingGLEngine::SetSelected(SdfPathVector const& paths)
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         _selectionSceneIndex->ClearSelection();
 
         for (const SdfPath &path : paths) {
@@ -1172,7 +1163,7 @@ UsdImagingGLEngine::ClearSelected()
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         _selectionSceneIndex->ClearSelection();
         return;
     }
@@ -1201,7 +1192,7 @@ UsdImagingGLEngine::AddSelected(SdfPath const &path, int instanceIndex)
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         _selectionSceneIndex->AddSelection(path);
         return;
     }
@@ -1645,7 +1636,7 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const 
     TRACE_FUNCTION();
 
     const _RootOverrides rootOverrides =
-        _GetUseSceneIndices()
+        UseUsdImagingSceneIndex()
             ? _GetRootOverrides(_rootOverridesSceneIndex)
             : _GetRootOverrides(_sceneDelegate);
 
@@ -1707,7 +1698,7 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const 
         return false;
     }
 
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         TRACE_SCOPE("UsdImaging scene indices");
         
         // Setup Usd imaging scene indices.
@@ -1787,7 +1778,7 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
     // may not have been created, if this is the first time through this
     // function, so we guard for null and use default values for xform/vis.
     const _RootOverrides rootOverrides =
-        _GetUseSceneIndices()
+        UseUsdImagingSceneIndex()
             ? _GetRootOverrides(_rootOverridesSceneIndex)
             : _GetRootOverrides(_sceneDelegate);
 
@@ -1797,7 +1788,7 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
     _SetRenderDelegate(std::move(renderDelegate));
 
     // Reload saved state.
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         _SetRootOverrides(rootOverrides, _rootOverridesSceneIndex);
     } else {
         _SetRootOverrides(rootOverrides, _sceneDelegate);
@@ -1928,7 +1919,7 @@ UsdImagingGLEngine::_SetRenderDelegate(
                 _renderDelegate.Get(), {&_hgiDriver}, renderInstanceId));
     }
 
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         _CreateUsdImagingSceneIndices();
         _renderIndex->InsertSceneIndex(
             _usdImagingFinalSceneIndex, _sceneDelegateId);
@@ -2653,7 +2644,7 @@ UsdImagingGLEngine::_PreSetTime(const UsdImagingGLRenderParams& params)
 
     const int refineLevel = _GetRefineLevel(params.complexity);
 
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         // The UsdImagingStageSceneIndex has no complexity opinion.
         // We force the value here upon all prims.
         _displayStyleSceneIndex->SetRefineLevel({true, refineLevel});
@@ -2858,7 +2849,7 @@ UsdImagingGLEngine::_GetDefaultRendererPluginId()
 UsdImagingDelegate *
 UsdImagingGLEngine::_GetSceneDelegate() const
 {
-    if (_GetUseSceneIndices()) {
+    if (UseUsdImagingSceneIndex()) {
         // XXX(USD-7118): this API needs to be removed for full
         // scene index support.
         TF_CODING_ERROR("_GetSceneDelegate API is unsupported");
@@ -2952,6 +2943,16 @@ UsdImagingGLEngine::PollForAsynchronousUpdates() const
     }
 
     return false;
+}
+
+bool
+UsdImagingGLEngine::UseUsdImagingSceneIndex()
+{
+    static bool result =
+        HdRenderIndex::IsSceneIndexEmulationEnabled() &&
+        TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX);
+
+    return result;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
