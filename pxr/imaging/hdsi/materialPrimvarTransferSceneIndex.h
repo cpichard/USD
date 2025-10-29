@@ -51,6 +51,7 @@ public:
             TfToken const&)>;
 
     // The default compose function used if none is provided.
+    HDSI_API
     static HdDataSourceBaseHandle
     DefaultComposeFn(
         HdContainerDataSourceHandle const& dsStrong,
