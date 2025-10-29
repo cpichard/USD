@@ -82,6 +82,10 @@ static TestCase simpleInnerLoop;
 static TestCase twoKnotBezier;
 static TestCase simpleSpline;
 static TestCase longLoop;
+static TestCase extrapValueBlock;
+static TestCase extrapHeld;
+static TestCase extrapLinear;
+static TestCase extrapSloped;
 static TestCase extrapReset;
 static TestCase extrapRepeat;
 static TestCase extrapOscillate;
@@ -213,6 +217,8 @@ static
 void InitTestCases()
 {
     // In all the cases below, the segments array is hand calculated.
+
+    const TsExtrapolation linearEx(TsExtrapLinear);
 
     // ================ TwoKnotBezier ================
     // Test a spline without any inner looping. This is a clone of
@@ -434,17 +440,60 @@ void InitTestCases()
 
     testSplineNames.insert(longLoop.name);
 
+    // ================ ExtrapValueBlock ================
+    // Clone longLoop but add value-block extrapolation.
+    extrapValueBlock = longLoop;
+    extrapValueBlock.name = "ExtrapValueBlock";
+    extrapValueBlock.segments.front().interp = Ts_SegmentInterp::ValueBlock;
+    extrapValueBlock.segments.back().interp = Ts_SegmentInterp::ValueBlock;
+
+    extrapValueBlock.spline.SetPreExtrapolation(TsExtrapValueBlock);
+    extrapValueBlock.spline.SetPostExtrapolation(TsExtrapValueBlock);
+
+    testSplineNames.insert(extrapValueBlock.name);
+
+    // ================ ExtrapHeld ================
+    // Clone longLoop but add held extrapolation
+    extrapHeld = longLoop;
+    extrapHeld.name = "ExtrapHeld";
+
+    extrapHeld.spline.SetPreExtrapolation(TsExtrapHeld);
+    extrapHeld.spline.SetPostExtrapolation(TsExtrapHeld);
+
+    testSplineNames.insert(extrapHeld.name);
+
+    // ================ ExtrapLinear ================
+    // Clone longLoop but add linear extrapolation
+    extrapLinear = longLoop;
+    extrapLinear.name = "ExtrapLinear";
+    extrapLinear.segments.front().p0[1] = 2.0;  // pre-extrap slope
+    extrapLinear.segments.back().p1[1] = 0.0;  // post-extrap slope
+
+    extrapLinear.spline.SetPreExtrapolation(TsExtrapLinear);
+    extrapLinear.spline.SetPostExtrapolation(TsExtrapLinear);
+
+    testSplineNames.insert(extrapLinear.name);
+
+    // ================ ExtrapSloped ================
+    // Clone longLoop but add sloped extrapolation
+    extrapSloped = longLoop;
+    extrapSloped.name = "ExtrapSloped";
+    extrapSloped.segments.front().p0[1] = 1.0;  // pre-extrap slope
+    extrapSloped.segments.back().p1[1] = 1.0;  // post-extrap slope
+
+    TsExtrapolation sloped(TsExtrapSloped, 1.0);
+
+    extrapSloped.spline.SetPreExtrapolation(sloped);
+    extrapSloped.spline.SetPostExtrapolation(sloped);
+
+    testSplineNames.insert(extrapSloped.name);
+
     // ================ ExtrapReset ================
     // Clone longLoop but add extrapolation reset looping.
     extrapReset = longLoop;
     extrapReset.name = "ExtrapReset";
-    extrapReset.segments[0] = Ts_Segment{{-inf, 0.0},
-                                         {0.0, 0.0},
-                                         {0.0, 0.0},
-                                         {-3.0, -3.0},
-                                         Ts_SegmentInterp::ValueBlock};
-    extrapReset.spline.SetPreExtrapolation(TsExtrapolation(TsExtrapValueBlock));
-    extrapReset.spline.SetPostExtrapolation(TsExtrapolation(TsExtrapLoopReset));
+    extrapReset.spline.SetPreExtrapolation(TsExtrapLoopReset);
+    extrapReset.spline.SetPostExtrapolation(TsExtrapLoopReset);
 
     testSplineNames.insert(extrapReset.name);
 
@@ -452,14 +501,8 @@ void InitTestCases()
     // Same but change extrapolation to repeat looping.
     extrapRepeat = extrapReset;
     extrapRepeat.name = "ExtrapRepeat";
-    extrapRepeat.segments[0] = Ts_Segment{{-inf, 2.0},
-                                         {0.0, 0.0},
-                                         {0.0, 0.0},
-                                         {-3.0, -3.0},
-                                         Ts_SegmentInterp::PreExtrap};
-    extrapRepeat.spline.SetPreExtrapolation(TsExtrapolation(TsExtrapLinear));
-    extrapRepeat.spline.SetPostExtrapolation(
-        TsExtrapolation(TsExtrapLoopRepeat));
+    extrapRepeat.spline.SetPreExtrapolation(TsExtrapLoopRepeat);
+    extrapRepeat.spline.SetPostExtrapolation(TsExtrapLoopRepeat);
     extrapRepeat.preExtrapValueOffset = 10.0;
     extrapRepeat.postExtrapValueOffset = 10.0;
 
@@ -469,16 +512,8 @@ void InitTestCases()
     // Same but change to oscillation looping.
     extrapOscillate = extrapReset;
     extrapOscillate.name = "ExtrapOscillate";
-    extrapOscillate.segments[0] = Ts_Segment{{-inf, 1.0},
-                                             {0.0, 0.0},
-                                             {0.0, 0.0},
-                                             {-3.0, -3.0},
-                                             Ts_SegmentInterp::PreExtrap};
-    TsExtrapolation slopedExtrapolation(TsExtrapSloped);
-    slopedExtrapolation.slope = 1.0;
-    extrapOscillate.spline.SetPreExtrapolation(slopedExtrapolation);
-    extrapOscillate.spline.SetPostExtrapolation(
-        TsExtrapolation(TsExtrapLoopOscillate));
+    extrapOscillate.spline.SetPreExtrapolation(TsExtrapLoopOscillate);
+    extrapOscillate.spline.SetPostExtrapolation(TsExtrapLoopOscillate);
 
     testSplineNames.insert(extrapOscillate.name);
 }
@@ -749,7 +784,10 @@ bool TestIterators()
         FullTest(simpleSpline, -5, 10, Fwd) &&
         FullTest(longLoop, -5, 10, Fwd) &&
         FullTest(longLoop, 0, 999, Fwd) &&
-        FullTest(extrapReset, -10, 10, Fwd) &&
+        FullTest(extrapValueBlock, -10, 10, Fwd) &&
+        FullTest(extrapHeld, -10, 10, Fwd) &&
+        FullTest(extrapLinear, -10, 10, Fwd) &&
+        FullTest(extrapSloped, -10, 10, Fwd) &&
         FullTest(extrapRepeat, -10, 10, Fwd) &&
         FullTest(extrapRepeat, 0, 999, Fwd) &&
         FullTest(extrapOscillate, -10, 10, Fwd) &&
