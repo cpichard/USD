@@ -256,6 +256,15 @@ HdStUvTextureObject::GetTextureType() const
     return HdStTextureType::Uv;
 }
 
+size_t
+HdStUvTextureObject::GetCommittedSize() const
+{
+    if (!_cpuData) {
+        return 0;
+    }
+    return _cpuData->GetTextureDesc().pixelsByteSize;
+}
+
 HdStUvTextureObject::~HdStUvTextureObject()
 {
     _DestroyTexture();
@@ -594,6 +603,15 @@ HdStFieldTextureObject::GetTextureType() const
     return HdStTextureType::Field;
 }
 
+size_t
+HdStFieldTextureObject::GetCommittedSize() const
+{
+    if (!_cpuData) {
+        return 0;
+    }
+    return _cpuData->GetTextureDesc().pixelsByteSize;
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // Cubemap texture
 
@@ -608,6 +626,15 @@ HdStTextureType
 HdStCubemapTextureObject::GetTextureType() const
 {
     return HdStTextureType::Cubemap;
+}
+
+size_t
+HdStCubemapTextureObject::GetCommittedSize() const
+{
+    if (!_cpuData) {
+        return 0;
+    }
+    return _cpuData->GetTextureDesc().pixelsByteSize;
 }
 
 HdStCubemapTextureObject::~HdStCubemapTextureObject()
