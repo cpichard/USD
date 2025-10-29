@@ -78,6 +78,12 @@ public:
 
     HdDataSourceBaseHandle Get(const TfToken& name) override
     {
+        // Use the compose function if provided.
+        // If not provided, we use the code path below, which avoids
+        // calling _GetPrimvarsFromMaterial() until necessary.
+        if (_composeFn) {
+            return _composeFn(_primvarsDs, _GetPrimvarsFromMaterial(), name);
+        }
         if (HdDataSourceBaseHandle primvar = 
                 _primvarsDs ? _primvarsDs->Get(name) : nullptr) {
             return primvar;
@@ -92,10 +98,12 @@ private:
     _PrimvarsDataSource(
         const HdSceneIndexBaseRefPtr &inputScene,
         const HdContainerDataSourceHandle &primDs,
-        const HdContainerDataSourceHandle &primvarsDs)
+        const HdContainerDataSourceHandle &primvarsDs,
+        const HdsiMaterialPrimvarTransferSceneIndex::ComposeFn &composeFn)
     : _inputScene(inputScene)
     , _primDs(primDs)
     , _primvarsDs(primvarsDs)
+    , _composeFn(composeFn)
     {
     }
 
@@ -124,6 +132,7 @@ private:
     HdContainerDataSourceHandle const _primDs;
     HdContainerDataSourceHandle const _primvarsDs;
     HdContainerDataSourceAtomicHandle _materialPrimvarsDs;
+    HdsiMaterialPrimvarTransferSceneIndex::ComposeFn _composeFn;
 };
 
 class _PrimDataSource final : public HdContainerDataSource
@@ -151,7 +160,7 @@ public:
         if (name == HdPrimvarsSchema::GetSchemaToken()) {
             // Note that the "primvars" container we pass in might be null...
             return _PrimvarsDataSource::New(_inputScene, _inputDs,
-                HdContainerDataSource::Cast(ds));
+                HdContainerDataSource::Cast(ds), _composeFn);
         }
         if (name == HdDependenciesSchema::GetSchemaToken()) {
             return
@@ -165,9 +174,11 @@ public:
 private:
     _PrimDataSource(
         const HdSceneIndexBaseRefPtr &inputScene,
-        const HdContainerDataSourceHandle &inputDs)
+        const HdContainerDataSourceHandle &inputDs,
+        const HdsiMaterialPrimvarTransferSceneIndex::ComposeFn &composeFn)
     : _inputScene(inputScene)
     , _inputDs(inputDs)
+    , _composeFn(composeFn)
     {
     }
 
@@ -260,26 +271,51 @@ private:
 
     HdSceneIndexBaseRefPtr const _inputScene;
     HdContainerDataSourceHandle const _inputDs;
+    HdsiMaterialPrimvarTransferSceneIndex::ComposeFn _composeFn;
 };
 
 } // anonymous namespace
 
 // ----------------------------------------------------------------------------
 
+
+
 HdsiMaterialPrimvarTransferSceneIndex::HdsiMaterialPrimvarTransferSceneIndex(
-    const HdSceneIndexBaseRefPtr& inputSceneIndex)
+    const HdSceneIndexBaseRefPtr& inputSceneIndex,
+    const ComposeFn& composeFn)
 : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
+, _composeFn(composeFn)
 {}
 
 HdsiMaterialPrimvarTransferSceneIndex::~HdsiMaterialPrimvarTransferSceneIndex()
     = default;
 
+HdDataSourceBaseHandle
+HdsiMaterialPrimvarTransferSceneIndex::DefaultComposeFn(
+    HdContainerDataSourceHandle const& geometryPrimvarDs,
+    HdContainerDataSourceHandle const& materialPrimvarDs,
+    const TfToken& name)
+{
+    if (geometryPrimvarDs) {
+        if (HdDataSourceBaseHandle v = geometryPrimvarDs->Get(name)) {
+            return v;
+        }
+    }
+    if (materialPrimvarDs) {
+        if (HdDataSourceBaseHandle v = materialPrimvarDs->Get(name)) {
+            return v;
+        }
+    }
+    return nullptr;
+}
+
 HdsiMaterialPrimvarTransferSceneIndexRefPtr
 HdsiMaterialPrimvarTransferSceneIndex::New(
-    const HdSceneIndexBaseRefPtr& inputSceneIndex)
+    const HdSceneIndexBaseRefPtr& inputSceneIndex,
+    const ComposeFn& composeFn)
 {
     return TfCreateRefPtr(new HdsiMaterialPrimvarTransferSceneIndex(
-        inputSceneIndex));
+        inputSceneIndex, composeFn));
 }
 
 HdSceneIndexPrim
@@ -287,9 +323,10 @@ HdsiMaterialPrimvarTransferSceneIndex::GetPrim(const SdfPath& primPath) const
 {
     HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
     // won't have any bindings if we don't have a data source
-    if (prim.dataSource) {
+    if (prim) {
         prim.dataSource =
-            _PrimDataSource::New(_GetInputSceneIndex(), prim.dataSource);
+            _PrimDataSource::New(_GetInputSceneIndex(), prim.dataSource,
+                                 _composeFn);
     }
     return prim;
 }
@@ -324,5 +361,6 @@ HdsiMaterialPrimvarTransferSceneIndex::_PrimsDirtied(
 {
     _SendPrimsDirtied(entries);
 }
+
 
 PXR_NAMESPACE_CLOSE_SCOPE
