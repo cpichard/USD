@@ -27,13 +27,25 @@ class Exec_CompilerTaskSyncBase
 public:
     /// The different results for claiming a key.
     enum class ClaimResult {
-        Done,       ///< The task is already done.
+        /// The task is already done.
+        Done,
 
-        Wait,       ///< Another task is currently processing the key and
-                    ///  the claimant will be notified once it is done.
+        /// Another task is currently processing the key and the claimant will
+        /// be notified once it is done.
+        Wait,
 
-        Claimed     ///< The key has been successfully claimed, and the claimant
-                    ///  is on the hook for completing the work.
+        /// The key has been successfully claimed, and the claimant is on the
+        /// hook for completing the work.
+        Claimed,
+    };
+
+    /// The different results for waiting on a key.
+    enum class WaitResult {
+        /// The task is already done.
+        Done,
+
+        /// The task is not yet marked done.
+        Wait,
     };
 
 protected:
@@ -77,9 +89,18 @@ protected:
     /// 
     /// This method will notify any tasks depending on \p entry by decrementing
     /// their dependency counts, and spawning them if their dependency count
-    /// reaches 0.
+    /// reaches 0. The entry need not already be claimed.
     ///
     void _MarkDone(_Entry *entry);
+
+    /// Establishes that \p task depends on the task associated with \p entry.
+    ///
+    /// Unlike Claim, if the task for \p entry has not been claimed, the caller
+    /// is *not* responsible for creating that task. In that case, a new
+    /// waitlist is created for \p entry if necessary, and the \p task is added
+    /// to it.
+    ///
+    WaitResult _WaitOn(_Entry *entry, Exec_CompilationTask *task);
 
 private:
     // Registers \p task as waiting on the list denoted by \p headPtr. The
