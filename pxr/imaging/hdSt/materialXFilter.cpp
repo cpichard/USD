@@ -269,6 +269,24 @@ HdSt_GenMaterialXShader(
 ////////////////////////////////////////////////////////////////////////////////
 // Helper Functions to convert MX texture node parameters to Hd parameters
 
+// Strip any leading underscores from the parameter name before joinging with 
+// the nodeName, as Mx does the same
+static 
+std::string
+_CreateNodeParamName(std::string const& nodeName, std::string const& paramName)
+{
+    // if nodeName is empty then we do not need to concatenate anything
+    if (nodeName.empty()) {
+        return paramName;
+    }
+    if (TfStringStartsWith(paramName, "_")) {
+        return nodeName + paramName;
+    }
+    else {
+        return nodeName + "_" + paramName;
+    }
+}
+
 // Get the Hydra VtValue for the given MaterialX input value
 static VtValue
 _GetHdFilterValue(std::string const& mxInputValue)
@@ -432,9 +450,8 @@ _UpdateMxHdTextureNames(
                 // Note these connections were made in _UpdateTextureNode()
                 // and use the mtlx paramName which follows the pattern:
                 // 'nodeName_paramName'
-                const std::string newConnName =
-                    texturePath.GetName() + "_" + fileInputName;
-                mxHdTextureNames->push_back(newConnName);
+                mxHdTextureNames->push_back(
+                    _CreateNodeParamName(texturePath.GetName(), fileInputName));
             }
         }
     }
@@ -1119,7 +1136,7 @@ _AddMaterialXParams(
         if (nodePath != terminalNodePath) {
             const auto anonNodePathIt = hdToAnonNodePathMap.find(nodePath);
             if (anonNodePathIt != hdToAnonNodePathMap.end()) {
-                anonNodeNamePrefix = anonNodePathIt->second.GetName() + "_";
+                anonNodeNamePrefix = anonNodePathIt->second.GetName();
             }
         }
         for (auto const& [paramName, paramValue] : hdNode.parameters) {
@@ -1128,7 +1145,8 @@ _AddMaterialXParams(
                 continue;
             }
             mxParamNameToValue.emplace(
-                anonNodeNamePrefix + paramName.GetString(), paramValue);
+                _CreateNodeParamName(
+                    anonNodeNamePrefix, paramName.GetString()), paramValue);
         }
     }
 

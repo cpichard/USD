@@ -143,6 +143,17 @@ _IsHardcodedPublicUniform(const mx::TypeDesc& varType)
     return false;
 }
 
+static std::string
+_GetSamplerName(std::string const& textureName)
+{
+    // Make sure we don't have double '_' in the HdGet call.
+    std::string samplerName = textureName;
+    if (TfStringStartsWith(samplerName, "_")) {
+        samplerName.erase(0,1);
+    }
+    return samplerName;
+}
+
 
 template<typename Base>
 void
@@ -434,8 +445,13 @@ HdStMaterialXShaderGen<Base>::_EmitMxInitFunction(
         const mx::TypeDesc variableType =
             HdStMaterialXHelpers::GetMxTypeDesc(variable);
         if (!_IsHardcodedPublicUniform(variableType)) {
+            // Make sure we don't have double '_' in the HdGet call.
+            std::string variableName = variable->getVariable();
+            if (TfStringStartsWith(variableName, "_")) {
+                variableName.erase(0,1);
+            }
             emitLine(variable->getVariable() + " = HdGet_" +
-                variable->getVariable() + "()", mxStage);
+                variableName + "()", mxStage);
         }
     }
     Base::emitLineBreak(mxStage);
@@ -465,7 +481,7 @@ HdStMaterialXShaderGen<Base>::_EmitMxInitFunction(
                 continue;
             }
             emitLine(TfStringPrintf("%s = HdGetSampler_%s()",
-                        textureName.c_str(), textureName.c_str()),
+                    textureName.c_str(), _GetSamplerName(textureName).c_str()),
                 mxStage);
         }
         Base::emitLineBreak(mxStage);
@@ -982,7 +998,7 @@ HdStMaterialXShaderGenGlsl::_EmitMxFunctions(
                     continue;
                 }
                 emitLine(TfStringPrintf("#define %s HdGetSampler_%s()",
-                        textureName.c_str(), textureName.c_str()),
+                    textureName.c_str(), _GetSamplerName(textureName).c_str()),
                     mxStage, false);
             }
             emitLineBreak(mxStage);
@@ -1136,7 +1152,7 @@ HdStMaterialXShaderGenVkGlsl::_EmitMxFunctions(
                     continue;
                 }
                 emitLine(TfStringPrintf("#define %s HdGetSampler_%s()",
-                        textureName.c_str(), textureName.c_str()),
+                        textureName.c_str(), _GetSamplerName(textureName).c_str()),
                     mxStage, false);
             }
             emitLineBreak(mxStage);
@@ -1352,7 +1368,7 @@ HdStMaterialXShaderGenMsl::_EmitMxFunctions(
                 emitLine(TfStringPrintf(
                     "#define %s MetalTexture{HdGetSampler_%s(), samplerBind_%s}",
                         textureName.c_str(),
-                        textureName.c_str(),
+                        _GetSamplerName(textureName).c_str(),
                         textureName.c_str()),
                     mxStage, false);
             }
