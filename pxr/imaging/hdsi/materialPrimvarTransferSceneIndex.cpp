@@ -42,10 +42,93 @@ SdfPath _GetMaterialPath(const HdMaterialBindingsSchema &materialBindings)
     return ds->GetTypedValue(0.0f);
 }
 
+class _PrimvarsDataSource final : public HdContainerDataSource
+{
+public:
+    HD_DECLARE_DATASOURCE(_PrimvarsDataSource);
+
+    TfTokenVector GetNames() override
+    {
+        HdContainerDataSourceHandle mpds = _GetPrimvarsFromMaterial();
+        // Null checks.
+        if (!_primvarsDs && !mpds) {
+            return TfTokenVector();
+        } else if (!mpds) {
+            return _primvarsDs->GetNames();
+        } else if (!_primvarsDs) {
+            return mpds->GetNames();
+        }
+
+        TfTokenVector primvarsNames = _primvarsDs->GetNames();
+        TfTokenVector mpdsNames = mpds->GetNames();
+
+        // If one or the other is empty.
+        if (mpdsNames.empty()) {
+            return primvarsNames;
+        } else if (primvarsNames.empty()) {
+            return mpdsNames;
+        }
+
+        // Otherwise, union them.
+        TfDenseHashSet<TfToken, TfToken::HashFunctor> names;
+        names.insert(primvarsNames.begin(), primvarsNames.end());
+        names.insert(mpdsNames.begin(), mpdsNames.end());
+        return TfTokenVector(names.begin(), names.end());
+    }
+
+    HdDataSourceBaseHandle Get(const TfToken& name) override
+    {
+        if (HdDataSourceBaseHandle primvar = 
+                _primvarsDs ? _primvarsDs->Get(name) : nullptr) {
+            return primvar;
+        }
+        if (HdContainerDataSourceHandle mpds = _GetPrimvarsFromMaterial()) {
+            return mpds->Get(name);
+        }
+        return nullptr;
+    }
+
+private:
+    _PrimvarsDataSource(
+        const HdSceneIndexBaseRefPtr &inputScene,
+        const HdContainerDataSourceHandle &primDs,
+        const HdContainerDataSourceHandle &primvarsDs)
+    : _inputScene(inputScene)
+    , _primDs(primDs)
+    , _primvarsDs(primvarsDs)
+    {
+    }
+
+    HdContainerDataSourceHandle _GetPrimvarsFromMaterial() {
+        HdContainerDataSourceHandle mpds =
+            HdContainerDataSource::AtomicLoad(_materialPrimvarsDs);
+        if (mpds) {
+            return mpds;
+        }
+
+        const SdfPath materialPath = _GetMaterialPath(
+            HdMaterialBindingsSchema::GetFromParent(_primDs));
+        if (materialPath.IsEmpty()) {
+            return nullptr;
+        }
+        const HdSceneIndexPrim materialPrim =
+            _inputScene->GetPrim(materialPath);
+        mpds = HdPrimvarsSchema::GetFromParent(materialPrim.dataSource)
+                .GetContainer();
+
+        HdContainerDataSource::AtomicStore(_materialPrimvarsDs, mpds);
+        return mpds;
+    }
+
+    HdSceneIndexBaseRefPtr const _inputScene;
+    HdContainerDataSourceHandle const _primDs;
+    HdContainerDataSourceHandle const _primvarsDs;
+    HdContainerDataSourceAtomicHandle _materialPrimvarsDs;
+};
+
 class _PrimDataSource final : public HdContainerDataSource
 {
 public:
-
     HD_DECLARE_DATASOURCE(_PrimDataSource);
 
     TfTokenVector GetNames() override
@@ -66,11 +149,9 @@ public:
         HdDataSourceBaseHandle const ds = _inputDs->Get(name);
 
         if (name == HdPrimvarsSchema::GetSchemaToken()) {
-            return
-                HdOverlayContainerDataSource::OverlayedContainerDataSources(
-                    // local primvars have stronger opinion
-                    HdContainerDataSource::Cast(ds),
-                    _GetPrimvarsFromMaterial());
+            // Note that the "primvars" container we pass in might be null...
+            return _PrimvarsDataSource::New(_inputScene, _inputDs,
+                HdContainerDataSource::Cast(ds));
         }
         if (name == HdDependenciesSchema::GetSchemaToken()) {
             return
@@ -88,19 +169,6 @@ private:
     : _inputScene(inputScene)
     , _inputDs(inputDs)
     {
-    }
-
-    HdContainerDataSourceHandle _GetPrimvarsFromMaterial() const {
-        const SdfPath materialPath = _GetMaterialPath(
-            HdMaterialBindingsSchema::GetFromParent(_inputDs));
-        if (materialPath.IsEmpty()) {
-            return nullptr;
-        }
-        const HdSceneIndexPrim materialPrim =
-            _inputScene->GetPrim(materialPath);
-        return
-            HdPrimvarsSchema::GetFromParent(materialPrim.dataSource)
-                .GetContainer();
     }
 
     HdContainerDataSourceHandle _GetDependencies() const {
