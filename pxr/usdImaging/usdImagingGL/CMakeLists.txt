@@ -5072,7 +5072,7 @@ pxr_register_test(testUsdImagingGLMaterialsAndInstancers_materialAsNiInstance
 
 pxr_register_test(testUsdImagingGLUsdRenderPass_prune
     PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --disableCameraLight --renderPassPrimPath /Render/Passes/nospheres input.usda nospheres.exr"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --renderPassPrimPath /Render/Passes/nospheres input.usda nospheres.exr"
     IMAGE_DIFF_COMPARE
         nospheres.exr
     FAIL 1
@@ -5085,7 +5085,7 @@ pxr_register_test(testUsdImagingGLUsdRenderPass_prune
 
 pxr_register_test(testUsdImagingGLUsdRenderPass_visibility
     PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --disableCameraLight --renderPassPrimPath /Render/Passes/onlyspheres input.usda onlyspheres.exr"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --renderPassPrimPath /Render/Passes/onlyspheres input.usda onlyspheres.exr"
     IMAGE_DIFF_COMPARE
         onlyspheres.exr
     FAIL 1
