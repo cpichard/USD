@@ -566,8 +566,10 @@ HdPrman_RenderPass::_Execute(
 
     // Data flow for resolution is a bit convoluted.
     const GfVec2i resolution =
+#if !defined(DISPLAY_INTERFACE_VERSION) || DISPLAY_INTERFACE_VERSION < 3
         _renderParam->IsXpu() ? // Remove once XPU handles under/overscan.
         cameraContext.GetResolutionFromDataWindow() :
+#endif
         _ResolveResolution(
             aovBindings, GetRenderIndex(), cameraContext, hasLegacyProducts);
 
@@ -770,6 +772,7 @@ HdPrman_RenderPass::_Execute(
         // For valid framing this was handled above.
         if(!framingValid) {
             riley::Riley * const riley = _renderParam->AcquireRiley();
+#if !defined(DISPLAY_INTERFACE_VERSION) || DISPLAY_INTERFACE_VERSION < 3
             if (_renderParam->IsXpu()) {
                 // This can be removed once XPU handles under/overscan correctly.
                 cameraContext.SetRileyOptionsInteractive(
@@ -782,6 +785,10 @@ HdPrman_RenderPass::_Execute(
                 cameraContext.UpdateRileyCameraAndClipPlanes(
                     riley, GetRenderIndex());
             }
+#else
+            cameraContext.SetRileyOptions(&(_renderParam->GetLegacyOptions()));
+            cameraContext.UpdateRileyCameraAndClipPlanes(riley, GetRenderIndex());
+#endif
         }
 
         cameraContext.SetDisableDepthOfField(
