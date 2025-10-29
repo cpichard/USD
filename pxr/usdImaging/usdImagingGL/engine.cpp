@@ -73,11 +73,11 @@ TF_DEFINE_ENV_SETTING(USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX, true,
 TF_DEFINE_ENV_SETTING(USDIMAGINGGL_ENGINE_ENABLE_TASK_SCENE_INDEX, true,
                       "Use Scene Index API for task controller");
 
+/// \deprecated. Will always use HdRenderer in the future.
 TF_DEFINE_ENV_SETTING(
     USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_OBSERVER_RENDERER, true,
-    "Use API to instantiate the renderer as a scene index observer "
-    "(also requires USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX and "
-    "USDIMAGINGGL_ENGINE_ENABLE_TASK_SCENE_INDEX).");
+    "Use API to instantiate the Hydra 2.0 HdRenderer instead of the "
+    "Hydra 1.0 HdRenderDelegate.");
 
 TF_DEFINE_ENV_SETTING(
     USDIMAGINGGL_ENGINE_ENABLE_CACHING_SCENE_INDEX, false,
