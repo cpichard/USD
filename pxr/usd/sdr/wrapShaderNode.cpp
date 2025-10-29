@@ -48,6 +48,10 @@ void wrapShaderNode()
         "NodeRole", SdrNodeRole, SDR_NODE_ROLE_TOKENS
     );
 
+    TF_PY_WRAP_PUBLIC_TOKENS(
+        "NodeFieldKey", SdrNodeFieldKey, SDR_NODE_FIELD_KEY_TOKENS
+    );
+
     return_value_policy<copy_const_reference> copyRefPolicy;
     to_python_converter<SdrShaderNodeConstPtr,
                         SdrShaderNodeConstPtrToPythonConverter>();
@@ -97,5 +101,6 @@ void wrapShaderNode()
         .def("GetRole", &This::GetRole)
         .def("GetPropertyNamesForPage", &This::GetPropertyNamesForPage)
         .def("GetAllVstructNames", &This::GetAllVstructNames)
+        .def("GetDataForKey", &This::GetDataForKey)
         ;
 }

@@ -17,6 +17,7 @@
 #include "pxr/usd/sdr/discoveryPlugin.h"
 #include "pxr/usd/sdr/parserPlugin.h"
 #include "pxr/usd/sdr/shaderNode.h"
+#include "pxr/usd/sdr/shaderNodeQuery.h"
 #include "pxr/usd/sdr/shaderNodeDiscoveryResult.h"
 #include "pxr/usd/sdf/assetPath.h"
 #include <map>
@@ -284,6 +285,14 @@ public:
     /// `SdrShaderNode::GetSourceType()` for more information.
     SDR_API
     SdrTokenVec GetAllShaderNodeSourceTypes() const;
+
+    /// Run an SdrShaderNodeQuery.
+    ///
+    /// Note that SdrRegistry::RunQuery will cause all nodes in the registry
+    /// to be parsed in order to examine data on these nodes in their
+    /// final form.
+    SDR_API
+    SdrShaderNodeQueryResult RunQuery(const SdrShaderNodeQuery& query);
 
 protected:
     // Allow TF to construct the class
