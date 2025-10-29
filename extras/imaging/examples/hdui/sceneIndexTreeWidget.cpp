@@ -81,8 +81,12 @@ public:
             return;
         }
 
-        for (const SdfPath &childPath :
-                treeWidget->_inputSceneIndex->GetChildPrimPaths(_primPath)) {
+        // Put child prim paths into a set to put them in order and ensure uniqueness.
+        const auto childPathVec =
+            treeWidget->_inputSceneIndex->GetChildPrimPaths(_primPath);
+        const SdfPathSet sortedChildPaths(childPathVec.begin(), childPathVec.end());
+
+        for (const SdfPath &childPath : sortedChildPaths) {
 
             HdSceneIndexPrim prim =
                 treeWidget->_inputSceneIndex->GetPrim(childPath);

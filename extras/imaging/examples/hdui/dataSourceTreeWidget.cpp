@@ -26,6 +26,14 @@ PXR_NAMESPACE_OPEN_SCOPE
 namespace
 {
 
+// Helper function to sort and uniquie-ify container data source names.
+static std::set<TfToken, TfDictionaryLessThan>
+Hdui_GetSortedNames(HdContainerDataSourceHandle const& container)
+{
+    const auto names = container->GetNames();
+    return std::set<TfToken, TfDictionaryLessThan>(names.begin(), names.end());
+}
+
 class Hdui_DataSourceTreeWidgetItem : public QTreeWidgetItem
 {
 public:
@@ -128,7 +136,7 @@ public:
 
                 // add any new items
                 for (const TfToken &childName :
-                        containerDataSource->GetNames()) {
+                     Hdui_GetSortedNames(containerDataSource)) {
                     if (usedNames.find(childName) == usedNames.end()) {
                         
                         if (HdDataSourceBaseHandle childDs =
@@ -228,7 +236,7 @@ private:
                 HdContainerDataSource::Cast(_dataSource)) {
             TfDenseHashSet<TfToken, TfHash> usedNames;
 
-            for (const TfToken &childName : container->GetNames()) {
+            for (const TfToken &childName : Hdui_GetSortedNames(container)) {
                 if (usedNames.find(childName) != usedNames.end()) {
                     continue;
                 }
@@ -332,7 +340,7 @@ HduiDataSourceTreeWidget::SetPrimDataSource(const SdfPath &primPath,
             HdContainerDataSource::Cast(dataSource)) {
             // add all container children as roots
             TfDenseHashSet<TfToken, TfHash> usedNames;
-            for (TfToken const& childName: container->GetNames()) {
+            for (TfToken const& childName: Hdui_GetSortedNames(container)) {
                 if (usedNames.find(childName) != usedNames.end()) {
                     continue;
                 }
