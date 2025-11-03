@@ -373,7 +373,7 @@ HduiDataSourceTreeWidget::PrimDirtied(
     // loop over existing items to determine which require data source updates
 
     std::vector<QTreeWidgetItem *> taskQueue = {
-        topLevelItem(0),
+        invisibleRootItem(),
     };
 
     while (!taskQueue.empty()) {
@@ -389,26 +389,24 @@ HduiDataSourceTreeWidget::PrimDirtied(
 
             HdDataSourceLocator loc = dsItem->GetLocator();
             
-            bool addChildren = false;
             if (!loc.IsEmpty()) {
                 if (locators.Contains(loc)) {
                     // dirty here, we'll need a new data source
                     // no need to add children as SetDirty will handle that
                     dsItem->SetDirty(
                         HdContainerDataSource::Get(primDataSource, loc));
-                } else if (locators.Intersects(loc)) {
-                    addChildren = true;
+                    continue;
                 }
-            } else {
-                addChildren = true;
+                if (!locators.Intersects(loc)) {
+                    // Nothing under this item is dirty.
+                    continue;
+                }
             }
+        }
 
-            if (addChildren) {
-                // add children for possible dirtying
-                for (int i = 0, e = dsItem->childCount(); i < e; ++i) {
-                    taskQueue.push_back(dsItem->child(i));
-                }
-            }
+        // add children for possible dirtying
+        for (int i = 0, e = item->childCount(); i < e; ++i) {
+            taskQueue.push_back(item->child(i));
         }
     }
 
