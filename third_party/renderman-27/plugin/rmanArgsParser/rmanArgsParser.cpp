@@ -82,7 +82,7 @@ namespace {
     const char* apiSchemaCanOnlyApplyToStr = "apiSchemaCanOnlyApplyTo";
     const char* apiSchemasForAttrPruningStr = "apiSchemasForAttrPruning";
     const char* sdrGlobalConfigStr = "sdrGlobalConfig";
-    const char* sdrIgnoreStr = "sdrIgnore";
+    const char* sdrSuppressPropertyStr = "sdrSuppressProperty";
 
     // Helper to make comparisons of `const char*` easier to read; there are
     // lots of these comparisons
@@ -643,7 +643,7 @@ _Parse(
             // If we have an ignore flag skip this property. Certain settings like 
             // CropWindow and FormatResolution exist already in USD.
             bool ignore = false;
-            if (xml_attribute ignoreAttr = childElement.attribute(sdrIgnoreStr)) {
+            if (xml_attribute ignoreAttr = childElement.attribute(sdrSuppressPropertyStr)) {
                 ignore = EQUALS(ignoreAttr.value(), "True");
             }
 
