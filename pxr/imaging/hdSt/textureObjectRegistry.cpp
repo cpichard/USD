@@ -195,26 +195,14 @@ HdSt_TextureObjectRegistry::Commit()
         }
     }
 
-    std::vector<HdStTextureObjectSharedPtr> toCommit;
-    {
-        TRACE_FUNCTION_SCOPE("Sorting textures for commit");
-        toCommit.assign(result.begin(), result.end());
-        std::sort(toCommit.begin(), toCommit.end(),
-            [](HdStTextureObjectSharedPtr const& x,
-               HdStTextureObjectSharedPtr const& y) {
-                // Submit textures biggest to smallest.
-                return x->GetCommittedSize() > y->GetCommittedSize();
-            });
-    }
-
     {
         TRACE_FUNCTION_SCOPE("Commiting textures");
+        HF_TRACE_FUNCTION_SCOPE("Committing textures");
 
         // Commit loaded files to GPU.
         size_t i = 1;
-        for (const HdStTextureObjectSharedPtr &texture : toCommit) {
-            TF_DESCRIBE_SCOPE("Comitting texture %zu / %zu",
-                i++, toCommit.size());
+        for (const HdStTextureObjectSharedPtr &texture : result) {
+            TF_DESCRIBE_SCOPE("Comitting texture %zu / %zu", i++, result.size());
             texture->_Commit();
         }
     }
