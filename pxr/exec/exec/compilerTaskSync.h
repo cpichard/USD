@@ -71,10 +71,10 @@ public:
     void MarkDone(const KeyType &key);
 
 private:
-    // A unique entry (containing a waitlist and status) is maintained for each
-    // key.
-    using _Entries = tbb::concurrent_unordered_map<KeyType, _Entry, TfHash>;
-    _Entries _entries;
+    // A unique waitlist is maintained for each key.
+    using _Waitlists =
+        tbb::concurrent_unordered_map<KeyType, _Waitlist, TfHash>;
+    _Waitlists _waitlists;
 };
 
 /// Synchronizes Exec_OutputProvidingCompilationTasks.

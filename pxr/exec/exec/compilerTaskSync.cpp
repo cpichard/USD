@@ -29,14 +29,14 @@ Exec_CompilerTaskSync<KeyType>::Claim(
     Exec_CompilationTask *task)
 {
     // Add the key to the map. If another task got to claiming it first, it's
-    // expected and safe for the key to already have an entry.
-    const auto &[iterator, inserted] = _entries.emplace(
+    // expected and safe for the key to already have an waitlist.
+    const auto &[iterator, inserted] = _waitlists.emplace(
         std::piecewise_construct, 
             std::forward_as_tuple(key),
             std::forward_as_tuple());
-    _Entry *const entry = &iterator->second;
+    _Waitlist *const waitlist = &iterator->second;
 
-    return _Claim(entry, task);
+    return _Claim(waitlist, task);
 }
 
 template <class KeyType>
@@ -46,30 +46,30 @@ Exec_CompilerTaskSync<KeyType>::WaitOn(
     Exec_CompilationTask *task)
 {
     // Add the key to the map. If another task got to claiming it first, it's
-    // expected and safe for the key to already have an entry.
-    const auto &[iterator, inserted] = _entries.emplace(
+    // expected and safe for the key to already have an waitlist.
+    const auto &[iterator, inserted] = _waitlists.emplace(
         std::piecewise_construct, 
             std::forward_as_tuple(key),
             std::forward_as_tuple());
-    _Entry *const entry = &iterator->second;
+    _Waitlist *const waitlist = &iterator->second;
 
-    return _WaitOn(entry, task);
+    return _WaitOn(waitlist, task);
 }
 
 template <class KeyType>
 void
 Exec_CompilerTaskSync<KeyType>::MarkDone(const KeyType &key)
 {
-    // Get the entry for the key. If previously claimed or waited on, the entry
-    // will exist. If not, we create a new entry in case a future caller
-    // attempts to wait on this key.
-    const auto &[iterator, inserted] = _entries.emplace(
+    // Get the waitlist for the key. If previously claimed or waited on, the
+    // waitlist will exist. If not, we create a new waitlist in case a future
+    // caller attempts to wait on this key.
+    const auto &[iterator, inserted] = _waitlists.emplace(
         std::piecewise_construct, 
             std::forward_as_tuple(key),
             std::forward_as_tuple());
-    _Entry *const entry = &iterator->second;
+    _Waitlist *const waitlist = &iterator->second;
  
-    _MarkDone(entry);
+    _MarkDone(waitlist);
 }
 
 // Explicit template instantiations.

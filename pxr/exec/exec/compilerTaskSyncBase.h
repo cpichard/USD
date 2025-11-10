@@ -66,41 +66,43 @@ protected:
     /// nodes on their waitlist.
     ///
     /// Derived classes should not concern themselves with the contents of the
-    /// _Entry structure, but its contents must be known to be stored in a map.
+    /// _Waitlist structure, but its contents must be known to be stored in a
+    /// map.
     ///
-    struct _Entry {
-        _Entry() : state(_TaskStateUnclaimed), waiting(nullptr) {}
+    struct _Waitlist {
+        _Waitlist() : state(_TaskStateUnclaimed), waiting(nullptr) {}
         std::atomic<uint8_t> state;
         std::atomic<_WaitlistNode*> waiting;
     };
 
-    /// Attempts to claim the \p entry, and returns whether the attempt was
+    /// Attempts to claim the \p waitlist, and returns whether the attempt was
     /// successful.
     ///
     /// This method will increment the dependency count of the \p task, if the
-    /// entry has already been claimed and \p task needs to wait for the
+    /// waitlist has already been claimed and \p task needs to wait for the
     /// results. Once the dependency is fulfilled, the \p task will be notified
     /// by decrementing its dependency count, and if it reaches zero the \p task
     /// will automatically be spawned.
     ///
-    ClaimResult _Claim(_Entry *entry, Exec_CompilationTask *task);
+    ClaimResult _Claim(_Waitlist *waitlist, Exec_CompilationTask *task);
 
-    /// Marks the task associated with \p entry as done.
+    /// Marks the task associated with \p waitlist as done.
     /// 
-    /// This method will notify any tasks depending on \p entry by decrementing
-    /// their dependency counts, and spawning them if their dependency count
-    /// reaches 0. The entry need not already be claimed.
+    /// This method will notify any tasks depending on \p waitlist by
+    /// decrementing their dependency counts, and spawning them if their
+    /// dependency count reaches 0. The waitlist need not already be claimed.
     ///
-    void _MarkDone(_Entry *entry);
+    void _MarkDone(_Waitlist *waitlist);
 
-    /// Establishes that \p task depends on the task associated with \p entry.
+    /// Establishes that \p task depends on the task associated with
+    /// \p waitlist.
     ///
-    /// Unlike Claim, if the task for \p entry has not been claimed, the caller
-    /// is *not* responsible for creating that task. In that case, a new
-    /// waitlist is created for \p entry if necessary, and the \p task is added
-    /// to it.
+    /// Unlike Claim, if the task for \p waitlist has not been claimed, the
+    /// caller is *not* responsible for creating that task. In that case, a new
+    /// waitlist is created for \p waitlist if necessary, and the \p task is
+    /// added to it.
     ///
-    WaitResult _WaitOn(_Entry *entry, Exec_CompilationTask *task);
+    WaitResult _WaitOn(_Waitlist *waitlist, Exec_CompilationTask *task);
 
 private:
     // Registers \p task as waiting on the list denoted by \p headPtr. The
@@ -119,7 +121,9 @@ private:
     bool _CloseAndNotify(std::atomic<_WaitlistNode*> *headPtr);
 
     // Allocate a new node for a waiting queue.
-    _WaitlistNode *_AllocateNode(Exec_CompilationTask *task, _WaitlistNode *next);
+    _WaitlistNode *_AllocateNode(
+        Exec_CompilationTask *task,
+        _WaitlistNode *next);
 
 private:
     // The various states a task can be in.
