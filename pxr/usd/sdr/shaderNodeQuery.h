@@ -88,6 +88,10 @@ public:
     ///    - math, abs
     ///    - math, abs
     ///
+    /// If a data item requested by `SelectDistinct` doesn't exist for a node
+    /// that otherwise satisfies all constraints of this query, an empty
+    /// VtValue is used to represent the nonexistent item.
+    ///
     /// SdrShaderNodes from which these entries have been extracted will
     /// be returned alongside them in the query result.
     /// \sa SdrShaderNodeQueryResult 
