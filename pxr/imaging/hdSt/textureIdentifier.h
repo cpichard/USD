@@ -102,7 +102,7 @@ public:
 private:
     TfToken _filePath;
     VtValue _fallback;
-    bool _defaultToFallback;
+    bool _defaultToFallback = false;
     std::unique_ptr<const HdStSubtextureIdentifier> _subtextureId;
 };
 
