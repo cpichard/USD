@@ -341,7 +341,8 @@ private:
     mutable std::mutex _discoveryResultMutex;
 
     // The node map is not a concurrent data structure, thus it needs some
-    // locking infrastructure.
+    // locking infrastructure. Ensure that _discoveryResultMutex is not
+    // acquired after _nodeMapMutex is acquired, to avoid deadlock.
     mutable std::mutex _nodeMapMutex;
 
     // Runs each discovery plugin provided and adds the results to the
