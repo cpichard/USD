@@ -982,6 +982,14 @@ _UpdateTextureNode(
         "HdSt - Connecting texture node <%s> to terminal node <%s> through '%s'"
         ".\n", textureNodePath.GetAsString().c_str(),
         terminalNodePath.GetAsString().c_str(), mtlxParamName.GetText());
+
+    if (hdTextureNode.inputConnections.find(_tokens->defaultInput)
+        != hdTextureNode.inputConnections.end()) {
+        TF_WARN("Texture node <%s> has the default value provided through"
+            " a connection. This is not supported in Storm. Only default values"
+            " directly authored are supported.",
+            textureNodePath.GetText());
+    }
 }
 
 static void
