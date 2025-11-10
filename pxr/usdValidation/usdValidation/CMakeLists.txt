@@ -39,6 +39,9 @@ pxr_library(usdValidation
 
     RESOURCE_FILES
         plugInfo.json
+
+    DOXYGEN_FILES
+        README.md        
 )
 
 pxr_test_scripts(
