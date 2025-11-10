@@ -70,14 +70,10 @@ pxr_register_test(testSdrFilesystemDiscovery
     EXPECTED_RETURN_CODE 0
 )
 
-pxr_install_test_dir(
-    SRC testenv/testSdrShaderNodeQuery.testenv
-    DEST testSdrShaderNodeQuery
-)
-
 pxr_register_test(testSdrShaderNodeQuery
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdrShaderNodeQuery"
+    TESTENV testenv/testSdrShaderNodeQuery.testenv
     ENV
         PXR_SDR_SKIP_DISCOVERY_PLUGIN_DISCOVERY=1
         PXR_SDR_SKIP_PARSER_PLUGIN_DISCOVERY=1
