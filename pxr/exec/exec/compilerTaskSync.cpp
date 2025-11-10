@@ -74,5 +74,7 @@ Exec_CompilerTaskSync<KeyType>::MarkDone(const KeyType &key)
 
 // Explicit template instantiations.
 template class Exec_CompilerTaskSync<Exec_OutputKey::Identity>;
+template class Exec_CompilerTaskSync<const VdfInput *>;
+template class Exec_CompilerTaskSync<const VdfNode *>;
 
 PXR_NAMESPACE_CLOSE_SCOPE

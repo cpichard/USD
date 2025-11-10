@@ -18,6 +18,9 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class VdfInput;
+class VdfNode;
+
 /// Instances of this class are used to synchronize compilation task graphs.
 /// 
 /// Tasks can claim dependent tasks, where each dependent task is identified by
@@ -80,6 +83,18 @@ private:
 ///
 using Exec_OutputProvidingTaskSync =
     Exec_CompilerTaskSync<Exec_OutputKey::Identity>;
+
+/// Synchronizes Exec_InputRecompilationTasks.
+///
+/// Tasks are identified by the VdfInput to be recompiled.
+///
+using Exec_InputRecompilationTaskSync = Exec_CompilerTaskSync<const VdfInput *>;
+
+/// Synchronizes Exec_CycleDetectingTasks.
+///
+/// Tasks are identified by the VdfNode for which the task will traverse.
+///
+using Exec_CycleDetectingTaskSync = Exec_CompilerTaskSync<const VdfNode *>;
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
