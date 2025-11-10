@@ -936,6 +936,18 @@ SdrRegistry::RunQuery(const SdrShaderNodeQuery& query)
             continue;
         }
 
+        // Only keep nodes that pass all custom filters.
+        keep = std::all_of(
+            query._customFilters.begin(),
+            query._customFilters.end(),
+            [node](SdrShaderNodeQuery::FilterFn fn) {
+                return fn(node);
+            }
+        );
+        if (!keep) {
+            continue;
+        }
+
         if (query._selectKeys.empty()) {
             result._nodes.front().push_back(node);
         } else {

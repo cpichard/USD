@@ -78,6 +78,13 @@ SdrShaderNodeQuery::NodeHasNoValueFor(const TfToken& key)
     return *this;
 }
 
+SdrShaderNodeQuery&
+SdrShaderNodeQuery::CustomFilter(FilterFn fn)
+{
+    _customFilters.push_back(fn);
+    return *this;
+}
+
 SdrShaderNodeQueryResult
 SdrShaderNodeQuery::Run()
 {

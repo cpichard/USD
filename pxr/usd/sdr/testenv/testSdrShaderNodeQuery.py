@@ -142,5 +142,65 @@ class TestSdrShaderNodeQuery(unittest.TestCase):
         self.assertEqual(len(nodes), 1)
         self.assertEqual(nodes[0].GetIdentifier(), "SimpleNodeA")
 
+    def test_SdrQueryCustomFilter(self):
+        # Test query with a simple custom filter
+        def filterFn(node):
+            return "SimpleNode" in node.GetIdentifier()
+
+        query = Sdr.ShaderNodeQuery() \
+                   .SelectDistinct("testMetadataDifferent") \
+                   .CustomFilter(filterFn)
+        queryResult = query.Run()
+        values = queryResult.GetValues()
+        assert len(values) == 2
+        assert ["barA"] in values
+        assert ["barB"] in values
+
+        # Test query with multiple custom filters
+        def anotherFilterFn(node):
+            return "inputA" in node.GetShaderInputNames()
+
+        query = Sdr.ShaderNodeQuery() \
+                   .SelectDistinct(Sdr.NodeFieldKey.Identifier) \
+                   .CustomFilter(filterFn) \
+                   .CustomFilter(anotherFilterFn)
+        queryResult = query.Run()
+        values = queryResult.GetValues()
+        assert len(values) == 1
+        nodes = queryResult.GetAllShaderNodes()
+        assert values[0][0] == nodes[0].GetIdentifier()
+
+        # Test query with an illegal custom filter, no node arg
+        def malformedFn():
+            print("hi!")
+
+        query = Sdr.ShaderNodeQuery() \
+                   .CustomFilter(malformedFn)
+        with self.assertRaises(TypeError):
+            query.Run()
+
+        # Test query with deleted custom filter. "del" decreases
+        # the reference count on the object, but query still holds
+        # a reference to the object, so the query runs successfully.
+        def deleteFn(node):
+            return False
+
+        query = Sdr.ShaderNodeQuery() \
+                   .CustomFilter(deleteFn)
+        del deleteFn
+        queryResult = query.Run()
+        self.assertEqual(len(queryResult.GetAllShaderNodes()), 0)
+
+        # Test query with a filter returning a non-bool
+        def weirdReturnFn(node):
+            return node
+
+        query = Sdr.ShaderNodeQuery() \
+                   .CustomFilter(weirdReturnFn)
+    
+        with self.assertRaises(TypeError):
+            query.Run()
+
+
 if __name__ == '__main__':
     unittest.main()

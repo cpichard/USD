@@ -6,9 +6,10 @@
 //
 
 #include "pxr/pxr.h"
+#include "pxr/base/tf/pyFunction.h"
+#include "pxr/base/tf/pyResultConversions.h"
 #include "pxr/usd/sdr/shaderNode.h"
 #include "pxr/usd/sdr/shaderNodeQuery.h"
-#include "pxr/base/tf/pyResultConversions.h"
 
 #include "pxr/external/boost/python/class.hpp"
 #include "pxr/external/boost/python/return_arg.hpp"
@@ -17,13 +18,6 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 using namespace pxr_boost::python;
-
-struct SdrShaderNodeConstPtrToPythonConverter {
-    static PyObject* convert(SdrShaderNodeConstPtr node)
-    {
-        return incref(object(ptr(node)).ptr());
-    } 
-};
 
 namespace {
 
@@ -37,10 +31,31 @@ GetValues(const SdrShaderNodeQueryResult& result) {
     return result.GetValues();
 }
 
+/// Without this wrapper to call `ptr(node)`, Boost Python will attempt to
+/// copy the SdrShaderNodeConstPtr argument by-value as a SdrShaderNode.
+/// The same by-value copy attempt happens if we declare the `customFn`
+/// argument as type `SdrShaderNodeQuery::FilterFn` (same as
+/// `std::function<bool (SdrShaderNodeConstPtr)>`) directly. Declaring this
+/// argument as a std::function allows TfPyFunctionFromPython to handle
+/// function lifetimes and error translation.
+SdrShaderNodeQuery&
+CustomFilterWrapper(
+    SdrShaderNodeQuery& query,
+    std::function<bool (object)> customFn)
+{
+    SdrShaderNodeQuery::FilterFn fn = [customFn](SdrShaderNodeConstPtr node) {
+        TfPyLock lock;
+        return customFn(object(ptr(node)));
+    };
+    return query.CustomFilter(fn);
+}
+
 } // anonymous namespace
 
 void wrapShaderNodeQuery()
 {
+    TfPyFunctionFromPython<bool (object)>();
+
     class_<SdrShaderNodeQuery>("ShaderNodeQuery")
         .def("SelectDistinct", (SdrShaderNodeQuery&
                 (SdrShaderNodeQuery::*) (const TfToken&))
@@ -62,6 +77,7 @@ void wrapShaderNodeQuery()
              return_self<>{})
         .def("NodeHasNoValueFor", &SdrShaderNodeQuery::NodeHasNoValueFor,
              return_self<>{})
+        .def("CustomFilter", &CustomFilterWrapper, return_self<>{})
         .def("Run", &SdrShaderNodeQuery::Run);
 
     class_<SdrShaderNodeQueryResult>("ShaderNodeQueryResult", no_init)
