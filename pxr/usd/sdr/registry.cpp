@@ -836,6 +836,126 @@ SdrRegistry::GetAllShaderNodeSourceTypes() const
     return SdrTokenVec(_allSourceTypes.begin(), _allSourceTypes.end());
 }
 
+SdrShaderNodeQueryResult
+SdrRegistry::RunQuery(const SdrShaderNodeQuery& query)
+{
+    // Parse all discovery results to nodes
+    for (auto& it : _discoveryResultsByIdentifier) {
+        _FindOrParseNodeInCache(it.second);
+    }
+
+    SdrShaderNodeQueryResult result;
+    if (query._selectKeys.empty()) {
+        // Initialize nodes vector for queries with no other data requested
+        result._nodes.push_back({});
+    } else {
+        // Otherwise initialize result keys
+        for (auto& key: query._selectKeys) {
+            result._keys.push_back(key);
+        }
+    }
+
+    auto nodeMatchesFn = [](SdrShaderNodeConstPtr node, const TfToken& key,
+                            const VtValue& value) {
+        // Values match if they are both empty
+        const VtValue nodeValue = node->GetDataForKey(key);
+        if (nodeValue.IsEmpty() && value.IsEmpty()) {
+            return true;
+        }
+
+        const VtValue castValue = VtValue::CastToTypeOf(nodeValue, value);
+        if (castValue.IsEmpty()) {
+            // Cast failed, indicating the types don't match
+            return false;
+        }
+        return castValue == value;
+    };
+
+    for (const auto& kv : _nodeMap) {
+        SdrShaderNodeConstPtr node = kv.second.get();
+
+        // Only keep nodes with values that match each value
+        bool keep = std::all_of(
+            query._hasValues.begin(),
+            query._hasValues.end(),
+            [node, nodeMatchesFn](const std::pair<TfToken, VtValue>& it) {
+                return nodeMatchesFn(node, it.first, it.second);
+            });
+        if (!keep) {
+            continue;
+        }
+
+        // Only keep nodes with values that match one of the values
+        // for each key-values pair.
+        keep = std::all_of(
+            query._hasOneOfValues.begin(),
+            query._hasOneOfValues.end(),
+            [node, nodeMatchesFn](const std::pair<TfToken, std::vector<VtValue>>& it) {
+                const TfToken& key = it.first;
+                return std::any_of(it.second.begin(), it.second.end(),
+                    [node, key, nodeMatchesFn](const VtValue& value) {
+                        return nodeMatchesFn(node, key, value);
+                    });
+            });
+        if (!keep) {
+            continue;
+        }
+
+        // Discard nodes with values that match an excluded value
+        keep = std::none_of(
+            query._lacksValues.begin(),
+            query._lacksValues.end(),
+            [node, nodeMatchesFn](const std::pair<TfToken, VtValue>& it) {
+                return nodeMatchesFn(node, it.first, it.second);
+            });
+        if (!keep) {
+            continue;
+        }
+
+        // Discard nodes with values that match one of the values
+        // for any key-values pair.
+        keep = std::all_of(
+            query._lacksAllOfValues.begin(),
+            query._lacksAllOfValues.end(),
+            [node, nodeMatchesFn](const std::pair<TfToken, std::vector<VtValue>>& it) {
+                const TfToken& key = it.first;
+                return std::none_of(it.second.begin(), it.second.end(),
+                    [node, key, nodeMatchesFn](const VtValue& value) {
+                        return nodeMatchesFn(node, key, value);
+                    }); 
+            });
+        if (!keep) {
+            continue;
+        }
+
+        if (query._selectKeys.empty()) {
+            result._nodes.front().push_back(node);
+        } else {
+            // Aggregate the information requested from this node into the result
+            std::vector<VtValue> nodeValues;
+            nodeValues.reserve(query._selectKeys.size());
+            for (const auto& key: query._selectKeys) {
+                nodeValues.push_back(node->GetDataForKey(key));
+            }
+
+            // "Select distinct" behavior dictates that duplicate node values
+            // shouldn't be added.
+            bool found = false;
+            for (size_t i = 0; i < result._values.size(); ++i) {
+                if (result._values[i] == nodeValues) {
+                    result._nodes[i].push_back(node);
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                result._values.push_back(std::move(nodeValues));
+                result._nodes.push_back({ node });
+            }
+        }
+    }
+    return result;
+}
 
 void
 SdrRegistry::_FindAndInstantiateDiscoveryPlugins()

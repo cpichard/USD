@@ -30,7 +30,7 @@ Exec_CompilerTaskSync<KeyType>::Claim(
 {
     // Add the key to the map. If another task got to claiming it first, it's
     // expected and safe for the key to already have an entry.
-    const auto &[iterator, inserted] = _claimedTasks.emplace(
+    const auto &[iterator, inserted] = _entries.emplace(
         std::piecewise_construct, 
             std::forward_as_tuple(key),
             std::forward_as_tuple());
@@ -40,20 +40,35 @@ Exec_CompilerTaskSync<KeyType>::Claim(
 }
 
 template <class KeyType>
+Exec_CompilerTaskSyncBase::WaitResult
+Exec_CompilerTaskSync<KeyType>::WaitOn(
+    const KeyType &key,
+    Exec_CompilationTask *task)
+{
+    // Add the key to the map. If another task got to claiming it first, it's
+    // expected and safe for the key to already have an entry.
+    const auto &[iterator, inserted] = _entries.emplace(
+        std::piecewise_construct, 
+            std::forward_as_tuple(key),
+            std::forward_as_tuple());
+    _Entry *const entry = &iterator->second;
+
+    return _WaitOn(entry, task);
+}
+
+template <class KeyType>
 void
 Exec_CompilerTaskSync<KeyType>::MarkDone(const KeyType &key)
 {
-    // Note, some of these TF_VERIFYs can be safely relaxed if we later
-    // want to mark tasks done from tasks that aren't the original claimaints.
-
-    // We expect the publishing task to have previously claimed this key, so
-    // there should already be an entry in the map.
-    const auto iterator = _claimedTasks.find(key);
-    if (!TF_VERIFY(iterator != _claimedTasks.end())) {
-        return;
-    }
+    // Get the entry for the key. If previously claimed or waited on, the entry
+    // will exist. If not, we create a new entry in case a future caller
+    // attempts to wait on this key.
+    const auto &[iterator, inserted] = _entries.emplace(
+        std::piecewise_construct, 
+            std::forward_as_tuple(key),
+            std::forward_as_tuple());
     _Entry *const entry = &iterator->second;
-
+ 
     _MarkDone(entry);
 }
 

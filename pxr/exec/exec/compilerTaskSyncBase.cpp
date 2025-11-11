@@ -83,7 +83,8 @@ Exec_CompilerTaskSyncBase::_Claim(
     }
 
     // If the task has not been claimed yet, attempt to claim it by CAS and
-    // return the result.
+    // return the result. Note if the caller claims this key, then the provided
+    // task is *not* added to the waitlist.
     if (state == _TaskStateUnclaimed &&
         entry->state.compare_exchange_strong(state, _TaskStateClaimed)) {
         return ClaimResult::Claimed;
@@ -93,27 +94,43 @@ Exec_CompilerTaskSyncBase::_Claim(
     // another task got to claim it just before we did. In this case, wait on
     // the task completion. If we fail to wait on the task, it completed just
     // as we were about to wait and we can consider it done!
-    const ClaimResult claimResult = _WaitOn(&entry->waiting, task)
+    return _WaitOn(&entry->waiting, task)
         ? ClaimResult::Wait
         : ClaimResult::Done;
-    return claimResult;
+}
+
+Exec_CompilerTaskSyncBase::WaitResult
+Exec_CompilerTaskSyncBase::_WaitOn(
+    _Entry *const entry,
+    Exec_CompilationTask *task)
+{
+    // If the task associated with this entry is already done, return here.
+    const uint8_t state = entry->state.load(std::memory_order_acquire);
+    if (state == _TaskStateDone) {
+        return WaitResult::Done;
+    }
+
+    // Atomically add task to the waitlist, or return Done if the waitlist has
+    // been closed.
+    return _WaitOn(&entry->waiting, task)
+        ? WaitResult::Wait
+        : WaitResult::Done;
 }
 
 void
 Exec_CompilerTaskSyncBase::_MarkDone(_Entry *const entry)
 {
-    // Note, some of these TF_VERIFYs can be safely relaxed if we later
-    // want to mark tasks done from tasks that aren't the original claimaints.
-
-    // Set the state to done. We expect this to transition from the claimed
-    // state.
+    // Set the state to done. We expect the entry to not already be marked
+    // done.
     const uint8_t previousState = entry->state.exchange(_TaskStateDone);
-    TF_VERIFY(previousState == _TaskStateClaimed);
+    if (!TF_VERIFY(previousState != _TaskStateDone)) {
+        return;
+    }
 
     // Close the waiting queue and notify all waiting tasks. We expect to be
     // the first to close the queue.
     const bool closed = _CloseAndNotify(&entry->waiting);
-    TF_VERIFY(closed);   
+    TF_VERIFY(closed);
 }
 
 bool

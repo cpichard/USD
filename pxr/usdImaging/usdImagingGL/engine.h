@@ -679,6 +679,17 @@ public:
 
     /// @}
 
+
+    // ---------------------------------------------------------------------
+    /// \name Miscellaneous
+    /// @{
+    // ---------------------------------------------------------------------
+
+    /// Returns true if using the UsdImaging scene index.
+    USDIMAGINGGL_API
+    static bool UseUsdImagingSceneIndex();
+    /// @}
+
 protected:
 
     /// Open some protected methods for whitebox testing.
@@ -857,7 +868,6 @@ private:
     bool _allowAsynchronousSceneProcessing = false;
     bool _enableUsdDrawModes = true;
 };
-
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

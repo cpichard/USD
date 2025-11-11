@@ -12,6 +12,7 @@ set(include
 )
 
 set(privateClasses
+    iterator
     sample
 )
 
@@ -161,6 +162,16 @@ pxr_build_test(
 )
 
 pxr_build_test(
+    testTsSegmentIterator
+    CPPFILES
+        testenv/testTsSegmentIterator.cpp
+    LIBRARIES
+        gf
+        tf
+        ts
+)
+
+pxr_build_test(
     testTsSplineAPI
     CPPFILES
         testenv/testTsSplineAPI.cpp
@@ -293,6 +304,11 @@ pxr_register_test(
 pxr_register_test(
     testTsThreadedCOW
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTsThreadedCOW"
+)
+
+pxr_register_test(
+    testTsSegmentIterator
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTsSegmentIterator"
 )
 
 pxr_register_test(

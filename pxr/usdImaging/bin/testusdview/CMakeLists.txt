@@ -85,6 +85,11 @@ pxr_install_test_dir(
 
 pxr_install_test_dir(
     SRC testenv/testUsdviewWrapper
+    DEST testUsdviewWrapper0
+)
+
+pxr_install_test_dir(
+    SRC testenv/testUsdviewWrapper
     DEST testUsdviewWrapper1
 )
 
@@ -489,10 +494,22 @@ pxr_register_test(testUsdviewFileArguments7
         PXR_USDVIEW_SUPPRESS_STATE_SAVING=1
 )
 
-pxr_register_test(testUsdviewWrapper1
+pxr_register_test(testUsdviewWrapper0
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testCallback.py"
-    EXPECTED_RETURN_CODE 2
+    STDOUT_REDIRECT valid_output_no_file
+    DIFF_COMPARE valid_output_no_file
+    EXPECTED_RETURN_CODE 0
+    ENV
+        PXR_USDVIEW_SUPPRESS_STATE_SAVING=1
+)
+
+pxr_register_test(testUsdviewWrapper1
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testCallback.py test.usda"
+    STDOUT_REDIRECT valid_output
+    DIFF_COMPARE valid_output
+    EXPECTED_RETURN_CODE 0
     ENV
         PXR_USDVIEW_SUPPRESS_STATE_SAVING=1
 )

@@ -580,7 +580,11 @@ public:
                 const void* srfaddr, const size_t /*srfsizebytes*/, const size_t* srfoffsets,
                 const size_t* /*sampleoffsets*/, const display::RenderOutput* outputs,
 #endif
+#if !defined(DISPLAY_INTERFACE_VERSION) || DISPLAY_INTERFACE_VERSION < 3
                 const size_t noutputs) override
+#else
+                const size_t noutputs, const pxrcore::ParamList& /*metadata*/) override
+#endif
     {
         m_surface = static_cast<const uint8_t*>(srfaddr);
         m_width = width;

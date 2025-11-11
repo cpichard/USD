@@ -225,4 +225,16 @@ def Shader "TestUIHintsAPI" (
             token shownIf = "hidden >= 1"
         }
     )
+
+    # Regression test case (USD-11606) - if a shownIf expression references a
+    # param name that has another param name as a substring, the "inputs"
+    # namespace would get prepended multiple times (for example here,
+    # "inputs:inputs:some_param_also")
+    int inputs:some_param = 1
+    int inputs:some_param_also = 1
+    int inputs:shownIfParamNameSubStrings = 1 (
+        sdrMetadata = {
+            token shownIf = "some_param >= some_param_also"
+        }
+    )
 }

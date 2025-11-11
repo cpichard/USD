@@ -216,7 +216,6 @@ pxr_build_test(testUsdImagingMaterialBinding
         usdShade
         usd
         hd
-        glf
         garch
         tf
         gf
