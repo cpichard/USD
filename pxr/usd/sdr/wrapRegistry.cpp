@@ -72,13 +72,6 @@ _SetExtraDiscoveryPlugins(SdrRegistry& self, const list& pylist)
     self.SetExtraDiscoveryPlugins(types);
 }
 
-struct ConstNodePtrToPython {
-    static PyObject* convert(SdrShaderNodeConstPtr node)
-    {
-        return incref(object(ptr(node)).ptr());
-    } 
-};
-
 void wrapRegistry()
 {
     typedef SdrRegistry This;

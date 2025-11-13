@@ -767,7 +767,7 @@ SdrRegistry::GetShaderNodesByFamily(
 {
     // Locking the discovery results for the entire duration of the parse is a
     // bit heavy-handed, but it needs to be 100% guaranteed that the results
-    // atr not modified while they are being iterated over.
+    // are not modified while they are being iterated over.
     std::lock_guard<std::mutex> drLock(_discoveryResultMutex);
 
     // The node map needs to be locked too while we generate a vector from its
@@ -839,9 +839,13 @@ SdrRegistry::GetAllShaderNodeSourceTypes() const
 SdrShaderNodeQueryResult
 SdrRegistry::RunQuery(const SdrShaderNodeQuery& query)
 {
-    // Parse all discovery results to nodes
-    for (auto& it : _discoveryResultsByIdentifier) {
-        _FindOrParseNodeInCache(it.second);
+    {
+        std::lock_guard<std::mutex> drLock(_discoveryResultMutex);
+
+        // Parse all discovery results to nodes
+        for (auto& it : _discoveryResultsByIdentifier) {
+            _FindOrParseNodeInCache(it.second);
+        }
     }
 
     SdrShaderNodeQueryResult result;
@@ -870,6 +874,10 @@ SdrRegistry::RunQuery(const SdrShaderNodeQuery& query)
         }
         return castValue == value;
     };
+
+    // The node map needs to be locked while we generate a vector from its
+    // contents.
+    std::lock_guard<std::mutex> nmLock(_nodeMapMutex);
 
     for (const auto& kv : _nodeMap) {
         SdrShaderNodeConstPtr node = kv.second.get();
@@ -924,6 +932,18 @@ SdrRegistry::RunQuery(const SdrShaderNodeQuery& query)
                         return nodeMatchesFn(node, key, value);
                     }); 
             });
+        if (!keep) {
+            continue;
+        }
+
+        // Only keep nodes that pass all custom filters.
+        keep = std::all_of(
+            query._customFilters.begin(),
+            query._customFilters.end(),
+            [node](SdrShaderNodeQuery::FilterFn fn) {
+                return fn(node);
+            }
+        );
         if (!keep) {
             continue;
         }

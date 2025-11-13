@@ -61,6 +61,8 @@ class SdrShaderNodeQueryResult;
 /// final form.
 class SdrShaderNodeQuery {
 public:
+    typedef std::function<bool (SdrShaderNodeConstPtr)> FilterFn;
+
     /// SelectDistinct asks for distinct information from SdrShaderNodes via
     /// the SdrShaderNode::GetDataForKey method.
     ///
@@ -85,6 +87,10 @@ public:
     /// coalesced into a single item instead.
     ///    - math, abs
     ///    - math, abs
+    ///
+    /// If a data item requested by `SelectDistinct` doesn't exist for a node
+    /// that otherwise satisfies all constraints of this query, an empty
+    /// VtValue is used to represent the nonexistent item.
     ///
     /// SdrShaderNodes from which these entries have been extracted will
     /// be returned alongside them in the query result.
@@ -165,6 +171,14 @@ public:
 
     /// @}
 
+    /// Supply a custom filter to this query. This custom filter function will
+    /// run on every considered SdrShaderNode. When this function evaluates to
+    /// true, the node will be kept for further consideration. When the
+    /// function evaluates to false, the node will be discarded from further
+    /// consideration.
+    SDR_API
+    SdrShaderNodeQuery& CustomFilter(FilterFn fn);
+
     /// Convenience to run this query on the SdrRegistry.
     ///
     /// Equivalent to SdrRegistry::RunQuery(query)
@@ -179,6 +193,7 @@ private:
     std::vector<std::pair<TfToken, VtValue>> _lacksValues;
     std::vector<std::pair<TfToken, std::vector<VtValue>>> _lacksAllOfValues;
     std::vector<TfToken> _selectKeys;
+    std::vector<FilterFn> _customFilters;
 };
 
 /// SdrShaderNodeQueryResult stores the results of an SdrShaderNodeQuery.

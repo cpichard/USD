@@ -63,25 +63,17 @@ pxr_test_scripts(
     testenv/testSdrVersion.py
 )
 
-pxr_install_test_dir(
-    SRC testenv/testSdrFilesystemDiscovery.testenv
-    DEST testSdrFilesystemDiscovery
-)
-
 pxr_register_test(testSdrFilesystemDiscovery
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdrFilesystemDiscovery"
+    TESTENV testenv/testSdrFilesystemDiscovery.testenv
     EXPECTED_RETURN_CODE 0
-)
-
-pxr_install_test_dir(
-    SRC testenv/testSdrShaderNodeQuery.testenv
-    DEST testSdrShaderNodeQuery
 )
 
 pxr_register_test(testSdrShaderNodeQuery
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdrShaderNodeQuery"
+    TESTENV testenv/testSdrShaderNodeQuery.testenv
     ENV
         PXR_SDR_SKIP_DISCOVERY_PLUGIN_DISCOVERY=1
         PXR_SDR_SKIP_PARSER_PLUGIN_DISCOVERY=1
@@ -124,14 +116,10 @@ pxr_register_test(testSdrRegistry
         PXR_SDR_SKIP_PARSER_PLUGIN_DISCOVERY=1
 )
 
-pxr_install_test_dir(
-    SRC testenv/testSdrShownIfConversion.testenv
-    DEST testSdrShownIfConversion
-)
-
 pxr_register_test(testSdrShownIfConversion
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdrShownIfConversion"
+    TESTENV testenv/testSdrShownIfConversion.testenv
     EXPECTED_RETURN_CODE 0
 )
 
