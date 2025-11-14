@@ -447,7 +447,8 @@ void HgiVulkanBlitCmds::CopyBufferCpuToGpu(
     // Schedule copy data from staging buffer to device-local buffer if needed.
     // With UMA/ReBAR, the staging address is already the device buffer, so no
     // additional copy is necessary.
-    if (!_hgi->GetCapabilities()->IsSet(HgiDeviceCapabilitiesBitsUnifiedMemory)) {
+    if (!_hgi->GetCapabilities()->IsSet(HgiDeviceCapabilitiesBitsUnifiedMemory)
+        && !(buffer->GetDescriptor().usage & HgiBufferUsageUpload)) {
         HgiVulkanBuffer* stagingBuffer = buffer->GetStagingBuffer();
         TF_VERIFY(stagingBuffer);
 
