@@ -54,6 +54,11 @@ using std::vector;
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_ENV_SETTING(
+    PCP_ENABLE_CONSISTENCY_CHECKS, false,
+    "Enable self-consistency checks when composing prim indexes. "
+    "This is for testing and debugging only.");
+
 static inline PcpPrimIndex const *
 _GetOriginatingIndex(PcpPrimIndex_StackFrame *previousFrame,
                      PcpPrimIndexOutputs *outputs) {
@@ -5360,6 +5365,11 @@ PcpComputePrimIndex(
     // finalization will cause outstanding PcpNodeRefs to be invalidated.
     Pcp_RescanForSpecs(&outputs->primIndex, inputs.usd,
                        /* updateHasSpecs */false );
+
+    // Run final self-consistency checks if specified.
+    if (ARCH_UNLIKELY(TfGetEnvSetting(PCP_ENABLE_CONSISTENCY_CHECKS))) {
+        Pcp_CheckConsistency(outputs->primIndex);
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////
