@@ -805,6 +805,7 @@ _UsdChecker(const Args& args)
 
 int 
 main(int argc, char const *argv[]) {
+    const std::string progName = TfGetBaseName(argv[0]);
     CLI::App app(
         "Utility for checking the compliance of a given USD stage or a USDZ "
         "package.  Only the first sample of any relevant time-sampled "
@@ -812,7 +813,7 @@ main(int argc, char const *argv[]) {
         "performed, and more restrictive checks targeted at distributable "
         "consumer content are also applied when the \"--arkit\" option is "
         "specified. In order to use the old compliance checker (deprecated) "
-        "provide the '--useOldComplianceCheckerInterface' option.");
+        "provide the '--useOldComplianceCheckerInterface' option.", progName);
 
     Args args;
     _Configure(&app, args);
