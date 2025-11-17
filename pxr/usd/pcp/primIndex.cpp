@@ -1859,7 +1859,7 @@ _AddArc(
 
             // Compose the existence of primSpecs and update the HasSpecs field 
             // accordingly.
-            newNode.SetHasSpecs(PcpComposeSiteHasPrimSpecs(newNode));
+            newNode.SetHasSpecs(PcpComposeSiteHasSpecs(newNode));
 
             if (!newNode.IsInert() && newNode.HasSpecs()) {
                 if (indexer->inputs.usd) {
@@ -2663,7 +2663,7 @@ _PrimSpecExistsUnderNodeAtIntroduction(
             [](const PcpNodeRef& node) { return node.HasSpecs(); }) :
         _PrimSpecExistsUnderNode(node,
             [](const PcpNodeRef& node) { 
-                return PcpComposeSiteHasPrimSpecs(
+                return PcpComposeSiteHasSpecs(
                     node.GetLayerStack(), node.GetPathAtIntroduction());
             });
 }
@@ -4548,7 +4548,7 @@ Pcp_RescanForSpecs(
         if (updateHasSpecs) {
             TF_FOR_ALL(nodeIt, index->GetNodeRange()) {
                 auto node = *nodeIt;
-                nodeIt->SetHasSpecs(PcpComposeSiteHasPrimSpecs(
+                nodeIt->SetHasSpecs(PcpComposeSiteHasSpecs(
                     node.GetLayerStack(), node.GetPath()));
             }
         }
@@ -4734,7 +4734,7 @@ _ConvertNodeForChild(
     // Because the child site is at a deeper level of namespace than
     // the parent, there may no longer be any specs.
     if (node.HasSpecs()) {
-        node.SetHasSpecs(PcpComposeSiteHasPrimSpecs(node));
+        node.SetHasSpecs(PcpComposeSiteHasSpecs(node));
     }
 
     // Inert nodes are just placeholders, so we can skip computing these
@@ -5156,7 +5156,7 @@ Pcp_BuildPrimIndex(
         // Even though the pseudo root spec exists implicitly, don't
         // assume that here.
         PcpNodeRef node = outputs->primIndex.GetGraph()->GetRootNode();
-        node.SetHasSpecs(PcpComposeSiteHasPrimSpecs(node));
+        node.SetHasSpecs(PcpComposeSiteHasSpecs(node));
         // Optimization: Since no composition arcs can live on the
         // pseudo-root, we can return early.
         return;
@@ -5175,7 +5175,7 @@ Pcp_BuildPrimIndex(
         outputs->primIndex.SetGraph(PcpPrimIndex_Graph::New(site, inputs.usd));
 
         PcpNodeRef node = outputs->primIndex.GetGraph()->GetRootNode();
-        node.SetHasSpecs(PcpComposeSiteHasPrimSpecs(node));
+        node.SetHasSpecs(PcpComposeSiteHasSpecs(node));
         node.SetInert(!rootNodeShouldContributeSpecs);
     } else {
         // Start by building and cloning the namespace parent's index.

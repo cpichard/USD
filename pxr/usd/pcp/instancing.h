@@ -115,7 +115,7 @@ Pcp_ChildNodeInstanceableChanged(
     const PcpNodeRef& node)
 {
     return Pcp_ChildNodeIsDirectOrInDirectArcSubtree(node) &&
-        (PcpComposeSiteHasPrimSpecs(node) != node.HasSpecs());
+        (PcpComposeSiteHasSpecs(node) != node.HasSpecs());
 }
 
 template <class Visitor>
