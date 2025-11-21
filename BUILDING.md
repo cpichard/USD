@@ -466,6 +466,26 @@ pxrusdGeom.dylib on Mac for the usdGeom component.
 
 > Note: This prefix does not apply to shared objects used for Python bindings.
 
+##### Address Sanitizer
+
+Address Sanitizer's memory leak detection will trigger many assertions that
+are more the responsibility of Leak Sanitizer than Address Sanitizer. To get an
+address sanitized build of OpenUSD without leak detection, build with 
+the flag `-fsanitize=address` and set the following option:
+
+```bash
+export ASAN_OPTIONS=detect_leaks=0
+```
+
+This can also be defaulted within code by defining the following function
+(see [ASAN runtime flags](https://github.com/google/sanitizers/wiki/AddressSanitizerFlags#run-time-flags))
+
+```cpp
+const char *__asan_default_options() {
+  return "detect_leaks=0";
+}
+```
+
 ## USD Developer Options
 
 ##### C++ Namespace Configuration
