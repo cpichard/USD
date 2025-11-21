@@ -377,3 +377,56 @@ pxr_register_test(testExecUsdUncompilation
     DIFF_COMPARE TestUncompileRecursiveResync-compiled.out
     DIFF_COMPARE TestUncompileRecursiveResync-uncompiled.out
 )
+
+pxr_build_test(testExecUsdRecompilation_Perf
+    LIBRARIES
+        arch
+        tf
+        trace
+        plug
+        exec
+        execUsd
+        sdf
+        usd
+    CPPFILES
+        testenv/testExecUsdRecompilation_Perf.cpp
+)
+
+pxr_register_test(testExecUsdRecompilation_Perf_TouchRel
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdRecompilation_Perf       \
+            TouchRel --branchingFactor 5 --treeDepth 7 --rel /Root/Prim1.rel"
+    TESTENV testenv/testExecUsdRecompilation_Perf
+    EXPECTED_RETURN_CODE 0
+    ENV TF_FATAL_VERIFY=1
+    RUN_SERIAL
+)
+
+pxr_register_test(testExecUsdRecompilation_Perf_AddTarget
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdRecompilation_Perf       \
+            AddTarget --branchingFactor 5 --treeDepth 7 --rel /Root/Prim1.rel  \
+            --target /Root/Prim2"
+    TESTENV testenv/testExecUsdRecompilation_Perf
+    EXPECTED_RETURN_CODE 0
+    ENV TF_FATAL_VERIFY=1
+    RUN_SERIAL
+)
+
+pxr_register_test(testExecUsdRecompilation_Perf_AddTargetToNewHierarchy
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdRecompilation_Perf       \
+            AddTargetToNewHierarchy --branchingFactor 5 --treeDepth 7          \
+            --rel /Root/Prim1.rel"
+    TESTENV testenv/testExecUsdRecompilation_Perf
+    EXPECTED_RETURN_CODE 0
+    ENV TF_FATAL_VERIFY=1
+    RUN_SERIAL
+)
+
+pxr_register_test(testExecUsdRecompilation_Perf_AddTargetToConnectedHierarchy
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdRecompilation_Perf       \
+            AddTargetToConnectedHierarchy --branchingFactor 5 --treeDepth 7    \
+            --rel /Root/Prim1.rel --target /Root/Prim2"
+    TESTENV testenv/testExecUsdRecompilation_Perf
+    EXPECTED_RETURN_CODE 0
+    ENV TF_FATAL_VERIFY=1
+    RUN_SERIAL
+)
