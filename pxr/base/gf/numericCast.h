@@ -10,7 +10,6 @@
 #include "pxr/pxr.h"
 
 #include "pxr/base/gf/traits.h"
-#include "pxr/base/arch/pragmas.h"
 
 #include <cmath>
 #include <limits>
@@ -42,10 +41,6 @@ GfIntegerCompareLess(T t, U u) noexcept
     else {
         return u >= 0 && t < std::make_unsigned_t<U>(u);
     }
-
-#if defined(ARCH_COMPILER_MSVC)
-    ARCH_PRAGMA_POP
-#endif
 }
 
 enum GfNumericCastFailureType {
