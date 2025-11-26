@@ -595,6 +595,17 @@ static void testArray() {
     }
 }
 
+// When compiling with address sanitizer, disable `testArrayBadAlloc`.
+// With an address sanitized build the following test won't throw the
+// expected std::bad_alloc, so only run the test for non-sanitized builds.
+// Note that annotating the test function with ARCH_NO_SANITIZE_ADDRESS
+// won't work since the assertion occurs within VtArray and not the test.
+//
+// When compiling for wasm, disable `testArrayBadAlloc`. The way the resize
+// is handled does not trigger a std::bad_alloc exception but instead
+// triggers a native exception from the host that bubbles up to the JS
+// runtime environment.
+#if !defined(ARCH_SANITIZE_ADDRESS) && !defined(ARCH_OS_WASM_VM)
 static void testArrayBadAlloc()
 {
     // Test that attempts to create overly large arrays throw
@@ -618,6 +629,7 @@ static void testArrayBadAlloc()
         // pass
     }
 }
+#endif
 
 static void testRecursiveDictionaries()
 {
@@ -2274,16 +2286,6 @@ int main(int argc, char *argv[])
 {
     testArray();
 
-    // When compiling with address sanitizer, disable `testArrayBadAlloc`.
-    // With an address sanitized build the following test won't throw the
-    // expected std::bad_alloc, so only run the test for non-sanitized builds.
-    // Note that annotating the test function with ARCH_NO_SANITIZE_ADDRESS
-    // won't work since the assertion occurs within VtArray and not the test.
-    //
-    // When compiling for wasm, disable `testArrayBadAlloc`. The way the resize
-    // is handled does not trigger a std::bad_alloc exception but instead
-    // triggers a native exception from the host that bubbles up to the JS
-    // runtime environment.
 #if !defined(ARCH_SANITIZE_ADDRESS) && !defined(ARCH_OS_WASM_VM)
     testArrayBadAlloc();
 #endif
