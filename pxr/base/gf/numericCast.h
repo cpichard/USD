@@ -10,6 +10,7 @@
 #include "pxr/pxr.h"
 
 #include "pxr/base/gf/traits.h"
+#include "pxr/base/arch/pragmas.h"
 
 #include <cmath>
 #include <limits>
@@ -82,6 +83,16 @@ template <class To, class From>
 std::optional<To>
 GfNumericCast(From from, GfNumericCastFailureType *failType = nullptr)
 {
+    // Visual Studio emits warning C4756 (overflow in constant arithmetic)
+    // in certain cases. This appears to be a compiler bug, see:
+    // https://developercommunity.visualstudio.com/t/Warning-4756-when-casting-constant-doubl/10845906
+    // 
+    // For now, just disable this warning.
+#if defined(ARCH_COMPILER_MSVC)
+    ARCH_PRAGMA_PUSH;
+    ARCH_PRAGMA(warning(disable:4756))
+#endif
+
     static_assert(GfIsArithmetic<From>::value &&
                   GfIsArithmetic<To>::value);
 
@@ -161,6 +172,10 @@ GfNumericCast(From from, GfNumericCastFailureType *failType = nullptr)
         // No range checking, following boost::numeric_cast.
         return static_cast<To>(from);
     }
+
+#if defined(ARCH_COMPILER_MSVC)
+    ARCH_PRAGMA_POP;
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
