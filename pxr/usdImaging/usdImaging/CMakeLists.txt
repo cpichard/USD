@@ -277,6 +277,13 @@ pxr_build_test(testUsdImagingStageSceneIndexContents
     CPPFILES
         testenv/testUsdImagingStageSceneIndexContents.cpp
 )
+pxr_build_test(testUsdImagingColorSpace
+    LIBRARIES
+        usdImaging
+        hd
+    CPPFILES
+        testenv/testUsdImagingColorSpace.cpp
+)
 
 # Register tests to be run
 pxr_register_test(testUsdImagingDataSourceAttribute
@@ -337,6 +344,11 @@ pxr_register_test(testUsdImagingStageSceneIndexContents
     EXPECTED_RETURN_CODE 0
     DIFF_COMPARE 
         basic.txt
+)
+pxr_register_test(testUsdImagingColorSpace
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingColorSpace"
+    TESTENV testenv/testUsdImagingColorSpace
+    EXPECTED_RETURN_CODE 0
 )
 
 # This test requires MaterialX support and is not currently supported on static 
