@@ -313,6 +313,11 @@ if (BUILD_SHARED_LIBS)
         ENV
             USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX=1
     )
+    pxr_register_test(testUsdImagingColorSpace
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingColorSpace"
+        TESTENV testenv/testUsdImagingColorSpace
+        EXPECTED_RETURN_CODE 0
+    )
 endif()
 pxr_register_test(testUsdImagingNestedInstancingCategories
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingNestedInstancingCategories"
@@ -344,11 +349,6 @@ pxr_register_test(testUsdImagingStageSceneIndexContents
     EXPECTED_RETURN_CODE 0
     DIFF_COMPARE 
         basic.txt
-)
-pxr_register_test(testUsdImagingColorSpace
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingColorSpace"
-    TESTENV testenv/testUsdImagingColorSpace
-    EXPECTED_RETURN_CODE 0
 )
 
 # This test requires MaterialX support and is not currently supported on static 
