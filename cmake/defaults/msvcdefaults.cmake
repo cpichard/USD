@@ -91,6 +91,10 @@ _add_define("_CRT_SECURE_NO_WARNINGS")
 # std::copy, std::equal, et al.
 _add_define("_SCL_SECURE_NO_WARNINGS")
 
+# Disable warning C4996 regarding use of std::iterator as a base class.
+# This warning is emitted from legacy TBB's containers/iterators.
+_add_define("_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING")
+
 # Make sure WinDef.h does not define min and max macros which
 # will conflict with std::min() and std::max().
 _add_define("NOMINMAX")
