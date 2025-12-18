@@ -1454,6 +1454,9 @@ HdStMesh::_PopulateVertexPrimvars(HdSceneDelegate *sceneDelegate,
                 }
 
             } else if ((int)source->GetNumElements() > numPoints) {
+                // HYD-3510
+                // we need to support tensor valued vertex primvars properly
+                // (with elementSize > 1)
                 HF_VALIDATION_WARN(id,
                     "Vertex primvar %s has %d elements, while"
                     " its topology references only up to element index %d.",
