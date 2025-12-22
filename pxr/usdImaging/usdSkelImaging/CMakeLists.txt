@@ -39,6 +39,9 @@ pxr_library(usdSkelImaging
         tokens
         utils
         xformResolver
+    
+    PRIVATE_CLASSES
+        dataSourcePrimvar
 
     PUBLIC_HEADERS
         api.h
