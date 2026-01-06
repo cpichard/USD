@@ -18,6 +18,7 @@
 #include "pxr/usd/usdShade/tokens.h"
 
 #include "pxr/usdValidation/usdValidation/error.h"
+#include "pxr/usdValidation/usdValidation/fixer.h"
 #include "pxr/usdValidation/usdValidation/registry.h"
 #include "pxr/usdValidation/usdValidation/timeRange.h"
 #include "rmanUsdValidators/validatorTokens.h"
@@ -32,11 +33,84 @@ TF_DEFINE_PRIVATE_TOKENS(
     _terminalsTokens,
     (PxrRenderTerminalsAPI)
     (RenderSettings)
-    ((RiIntegratorRel, "ri:integrator"))
     ((OutputsRiIntegratorAttr, "outputs:ri:integrator"))
     ((OutputsRiDisplayFiltersAttr, "outputs:ri:displayFilters"))
     ((OutputsRiSampleFiltersAttr, "outputs:ri:sampleFilters"))
 );
+
+const std::vector<UsdValidationFixer>
+_PxrRenderTerminalsApiRelationshipsFixers() 
+{
+    std::vector<UsdValidationFixer> fixers;
+
+    FixerCanApplyFn fixerCanApplyFn = 
+        [](const UsdValidationError &error, const UsdEditTarget &editTarget,
+           const UsdTimeCode &/*timeCode*/) -> bool {
+            if (!editTarget.IsValid() || !editTarget.GetLayer()) {
+                return false;
+            }
+            if (error.GetSites().size() != 1) {
+                // Must have one and only one error site to fix
+                return false;
+            }
+            const UsdValidationErrorSite &site = error.GetSites().front();
+            if (!site.IsValid() || !site.IsPrim()) {
+                return false;
+            }
+            UsdPrim prim = site.GetPrim();
+            return prim.IsA<UsdRenderSettings>()
+                && prim.HasAPI(_terminalsTokens->PxrRenderTerminalsAPI);
+        };
+
+    FixerImplFn fixerImplFn = 
+        [](const UsdValidationError &error, const UsdEditTarget &editTarget,
+           const UsdTimeCode &/*timeCode*/) -> bool {
+            if (!editTarget.IsValid() || !editTarget.GetLayer()) {
+                return false;
+            }
+            if (error.GetSites().size() != 1) {
+                // Must have one and only one error site to fix
+                return false;
+            }
+            const UsdValidationErrorSite &site = error.GetSites()[0];
+            if (!site.IsValid() || !site.IsPrim()) {
+                return false;
+            }
+            UsdPrim prim = site.GetPrim();
+
+            const std::vector<TfToken> unsupportedTerminalsAttrs = {
+                _terminalsTokens->OutputsRiIntegratorAttr,
+                _terminalsTokens->OutputsRiDisplayFiltersAttr,
+                _terminalsTokens->OutputsRiSampleFiltersAttr};
+
+            for (const TfToken& attrName : unsupportedTerminalsAttrs) {
+                UsdAttribute attr = prim.GetAttribute(attrName);
+                if (!attr || !attr.HasAuthoredConnections()) {
+                    continue;
+                }
+                const TfToken relName = 
+                    TfToken(SdfPath::StripPrefixNamespace(
+                        attrName.GetString(),
+                        UsdShadeTokens->outputs.GetString()).first);
+                prim.CreateRelationship(relName);
+                std::vector<SdfPath> targets;
+                attr.GetConnections(&targets);
+                UsdRelationship rel = prim.GetRelationship(relName);
+                rel.SetTargets(targets);
+                attr.ClearConnections();
+            }
+
+            return true;
+        };
+
+    fixers.emplace_back(
+        TfToken("ConvertRenderTerminalsAttrsToRels"),
+        "Converts PxrRenderTerminalsAPI unsupported attributes to relationships.",
+        fixerImplFn, fixerCanApplyFn, TfTokenVector{}, 
+        RmanUsdValidatorsErrorNameTokens->invalidRenderTerminalsAttr);
+
+    return fixers;
+}
 
 static UsdValidationErrorVector
 _PxrRenderTerminalsApiRelationships(
@@ -45,19 +119,6 @@ _PxrRenderTerminalsApiRelationships(
 {
     if (!usdPrim.IsA<UsdRenderSettings>()
         || !usdPrim.HasAPI(_terminalsTokens->PxrRenderTerminalsAPI)) {
-        return {};
-    }
-
-    // Only produce errors if the registered schema has the updated
-    // relationships.
-    const UsdSchemaRegistry& reg = UsdSchemaRegistry::GetInstance();
-    const UsdPrimDefinition* rsDef = reg.FindConcretePrimDefinition(
-        _terminalsTokens->RenderSettings);
-    const TfTokenVector& rsPropNames = rsDef->GetPropertyNames();
-    const bool rsSchemaHasRelationships = std::find(rsPropNames.begin(),
-        rsPropNames.end(), _terminalsTokens->RiIntegratorRel)
-        != rsPropNames.end();
-    if (!rsSchemaHasRelationships) {
         return {};
     }
 
@@ -106,7 +167,8 @@ TF_REGISTRY_FUNCTION(UsdValidationRegistry)
 
     registry.RegisterPluginValidator(
         RmanUsdValidatorsNameTokens->PxrRenderTerminalsAPIRelationships,
-        _PxrRenderTerminalsApiRelationships);
+        _PxrRenderTerminalsApiRelationships,
+        _PxrRenderTerminalsApiRelationshipsFixers());
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
