@@ -204,12 +204,12 @@ pxr_build_test(testExecUsdCycleDetection
 function(pxr_register_test_ExecUsdCycleDetection TESTNAME)
     pxr_register_test(testExecUsdCycleDetection_${TESTNAME}
         COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdCycleDetection ${TESTNAME}"
-        EXPECTED_RETURN_CODE 134
+        EXPECTED_RETURN_CODE 0
         TESTENV testenv/testExecUsdCycleDetection
-        ENV TF_FATAL_VERIFY=0
     )
 endfunction()
 
+pxr_register_test_ExecUsdCycleDetection(CycleDetectionRequiresRecompilation)
 pxr_register_test_ExecUsdCycleDetection(CyclicComputation)
 pxr_register_test_ExecUsdCycleDetection(CyclicComputationPair)
 pxr_register_test_ExecUsdCycleDetection(CyclicRelationshipComputation)
