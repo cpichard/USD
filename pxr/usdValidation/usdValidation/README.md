@@ -164,7 +164,7 @@ suite, might look something like the following.
                             "UsdGeomImageable",
                             "keyword1"
                         ]                        
-                    }
+                    },
                     "ValidatorSuite1": {
                         "doc": "Suite of validators",
                         "keywords": ["suite"],
