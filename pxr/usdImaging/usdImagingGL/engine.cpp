@@ -84,6 +84,11 @@ TF_DEFINE_ENV_SETTING(
     "Use caching scene index (also requires "
     "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_OBSERVER_RENDERER)");
 
+TF_DEFINE_ENV_SETTING(
+    USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_INPUT_ARGS, false,
+    "Use HdRendererPlugin::GetSceneIndexInputArgs to configure scene indices. "
+    "Requires a renderer such as Storm to implement the new API.");
+
 namespace UsdImagingGLEngine_Impl
 {
 
@@ -259,6 +264,15 @@ _IsEnabledTerminalCachingSceneIndex()
 {
     static bool result =
         TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_CACHING_SCENE_INDEX);
+
+    return result;
+}
+
+bool
+_IsEnabledSceneIndexInputArgs()
+{
+    static bool result =
+        TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_INPUT_ARGS);
 
     return result;
 }
@@ -1715,15 +1729,19 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const 
     } else {
         TRACE_SCOPE("UsdImaging scene delegate");
 
-        HdRenderDelegateInfo info;
+        HdRenderIndexAdapterSceneIndexRefPtr adapter;
 
-        if (HdLegacyRenderControlInterface * const renderControl =
-                _renderer->GetLegacyRenderControl()) {
-            info = renderControl->GetRenderDelegateInfo();
+        if (_IsEnabledSceneIndexInputArgs()) {
+            adapter = HdRenderIndexAdapterSceneIndex::New(
+                plugin->GetSceneIndexInputArgs());
+        } else {
+            HdRenderDelegateInfo info;
+            if (HdLegacyRenderControlInterface * const renderControl =
+                    _renderer->GetLegacyRenderControl()) {
+                info = renderControl->GetRenderDelegateInfo();
+            }
+            adapter = HdRenderIndexAdapterSceneIndex::New(info);
         }
-
-        auto const adapter =
-            HdRenderIndexAdapterSceneIndex::New(info);
 
         _mergingSceneIndex->InsertInputScenes(
             {{adapter, SdfPath::AbsoluteRootPath()}});

@@ -169,6 +169,12 @@ HdRendererPlugin::IsSupported(
         reasonWhyNot);
 }
 
+HdContainerDataSourceHandle
+HdRendererPlugin::GetSceneIndexInputArgs() const
+{
+    return {};
+}
+
 std::unique_ptr<HdRenderer>
 HdRendererPlugin::_CreateRenderer(
     HdSceneIndexBaseRefPtr const &sceneIndex,
