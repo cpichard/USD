@@ -1165,10 +1165,14 @@ HdsiMaterialOverrideResolvingSceneIndex::_DirtyGeneratedMaterials(
             for (const auto& [primType, primPath] : primsToProcess) {
                 const SdfPath newGeneratedMaterialPath = 
                     _AddGeneratedMaterial(primType, primPath);
+                // Adding primPath to the dirty pool to express
+                // that its material bindings have changed (either because they
+                // reverted to the original material or because a new generated
+                // material is needed)
+                dirtiedEntriesSet.insert(primPath);
                 if (!newGeneratedMaterialPath.IsEmpty()) {
-                    // Adding primPath to the dirty pool to express
-                    // that its material bindings have changed
-                    dirtiedEntriesSet.insert(primPath);
+                    // If a new generated material is needed, mark it as being
+                    // added
                     addedEntriesSet.insert(newGeneratedMaterialPath);
                 }
             }
