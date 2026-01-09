@@ -67,7 +67,17 @@ TF_DECLARE_PUBLIC_TOKENS(SdrPropertyRole, SDR_API,
                          SDR_PROPERTY_ROLE_TOKENS);
 TF_DECLARE_PUBLIC_TOKENS(SdrPropertyTokens, SDR_API, SDR_PROPERTY_TOKENS);
 
-
+/// SdrShaderPropertyMetadata contains generic and named metadata for
+/// SdrShaderProperty.
+///
+/// Named metadata are key-value items that are standardized and
+/// documented for interchange. Named metadata items are defined to
+/// have certain types that expect certain encodings.
+/// The Has/Set/Get methods for named key-value items provide views
+/// into the requested metadata item's unpacked VtValues.
+///
+/// NOTE: This metadata is retrievable from SdrShaderProperty with
+/// SdrShaderProperty::GetMetadataObject
 class SdrShaderPropertyMetadata
 {
 public:

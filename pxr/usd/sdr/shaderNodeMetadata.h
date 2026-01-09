@@ -72,6 +72,9 @@ TF_DECLARE_PUBLIC_TOKENS(SdrNodeRole, SDR_API, SDR_NODE_ROLE_TOKENS);
 /// have certain types that expect certain encodings.
 /// The Has/Set/Get methods for named key-value items provide views
 /// into the requested metadata item's unpacked VtValues.
+///
+/// NOTE: This metadata is retrievable from SdrShaderNode with
+/// SdrShaderNode::GetMetadataObject
 class SdrShaderNodeMetadata
 {
 public:
