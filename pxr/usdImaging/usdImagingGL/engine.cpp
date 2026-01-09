@@ -12,6 +12,7 @@
 #include "pxr/usdImaging/usdImaging/stageSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/rootOverridesSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/sceneIndices.h"
+#include "pxr/usdImaging/usdImaging/usdSceneIndexInputArgsSchema.h"
 
 #include "pxr/usd/usdGeom/tokens.h"
 #include "pxr/usd/usdGeom/camera.h"
@@ -24,6 +25,7 @@
 #include "pxr/imaging/hd/legacyRenderControlInterface.h"
 #include "pxr/imaging/hd/light.h"
 #include "pxr/imaging/hd/noticeBatchingSceneIndex.h"
+#include "pxr/imaging/hd/overlayContainerDataSource.h"
 #include "pxr/imaging/hd/prefixingSceneIndex.h"
 #include "pxr/imaging/hd/renderBuffer.h"
 #include "pxr/imaging/hd/renderDelegateInfo.h"
@@ -1618,6 +1620,20 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
         return false;
     }
 
+    HdContainerDataSourceHandle const sceneIndexInputArgs =
+        HdOverlayContainerDataSource::OverlayedContainerDataSources(
+            plugin->GetSceneIndexInputArgs(),
+            HdRetainedContainerDataSource::New(
+                UsdImagingUsdSceneIndexInputArgsSchema::GetSchemaToken(),
+                UsdImagingUsdSceneIndexInputArgsSchema::Builder()
+                    .SetAddDrawModeSceneIndex(
+                        HdRetainedTypedSampledDataSource<bool>::New(
+                            _enableUsdDrawModes))
+                    .SetDisplayUnloadedPrimsWithBounds(
+                        HdRetainedTypedSampledDataSource<bool>::New(
+                            _displayUnloadedPrimsWithBounds))
+                    .Build()));
+    
     if (_GetSceneIndexObserverRenderer()) {
         if (_renderer && _renderer.GetPluginId() == resolvedId) {
             return true;
@@ -1625,7 +1641,7 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
 
         TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-        return _CreateSceneIndicesAndRenderer(plugin);
+        return _CreateSceneIndicesAndRenderer(plugin, sceneIndexInputArgs);
     } else {
         if (_renderDelegate && _renderDelegate.GetPluginId() == resolvedId) {
             return true;
@@ -1638,14 +1654,17 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
         if (!renderDelegate) {
             return false;
         }
-        _SetRenderDelegateAndRestoreState(std::move(renderDelegate));
+        _SetRenderDelegateAndRestoreState(
+            std::move(renderDelegate), sceneIndexInputArgs);
     }
 
     return true;
 }
 
 bool
-UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const &plugin)
+UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(
+    HdRendererPluginHandle const &plugin,
+    HdContainerDataSourceHandle const &sceneIndexInputArgs)
 {
     TRACE_FUNCTION();
 
@@ -1717,7 +1736,7 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const 
         
         // Setup Usd imaging scene indices.
 
-        _CreateUsdImagingSceneIndices();
+        _CreateUsdImagingSceneIndices(sceneIndexInputArgs);
         _SetRootOverrides(rootOverrides, _rootOverridesSceneIndex);
 
         if (!_sceneDelegateId.IsAbsoluteRootPath()) {
@@ -1733,7 +1752,7 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const 
 
         if (_IsEnabledSceneIndexInputArgs()) {
             adapter = HdRenderIndexAdapterSceneIndex::New(
-                plugin->GetSceneIndexInputArgs());
+                sceneIndexInputArgs);
         } else {
             HdRenderDelegateInfo info;
             if (HdLegacyRenderControlInterface * const renderControl =
@@ -1790,7 +1809,8 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(HdRendererPluginHandle const 
 
 void
 UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
-    HdPluginRenderDelegateUniqueHandle &&renderDelegate)
+    HdPluginRenderDelegateUniqueHandle &&renderDelegate,
+    HdContainerDataSourceHandle const &sceneIndexInputArgs)
 {
     // Pull old scene/task controller state. Note that the scene index/delegate
     // may not have been created, if this is the first time through this
@@ -1803,7 +1823,7 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
     HdSelectionSharedPtr const selection = _GetSelection();
 
     // Rebuild the imaging stack
-    _SetRenderDelegate(std::move(renderDelegate));
+    _SetRenderDelegate(std::move(renderDelegate), sceneIndexInputArgs);
 
     // Reload saved state.
     if (UseUsdImagingSceneIndex()) {
@@ -1876,18 +1896,15 @@ UsdImagingGLEngine::_AppendOverridesSceneIndices(
 }
 
 void
-UsdImagingGLEngine::_CreateUsdImagingSceneIndices()
+UsdImagingGLEngine::_CreateUsdImagingSceneIndices(
+    HdContainerDataSourceHandle const &sceneIndexInputArgs)
 {
-    UsdImagingCreateSceneIndicesInfo info;
-    info.addDrawModeSceneIndex = _enableUsdDrawModes;
-    info.displayUnloadedPrimsWithBounds = _displayUnloadedPrimsWithBounds;
-    info.overridesSceneIndexCallback =
-        std::bind(
-            &UsdImagingGLEngine::_AppendOverridesSceneIndices,
-            this, std::placeholders::_1);
-
     const UsdImagingSceneIndices sceneIndices =
-        UsdImagingCreateSceneIndices(info);
+        UsdImagingCreateSceneIndices(
+            sceneIndexInputArgs,
+            std::bind(
+                &UsdImagingGLEngine::_AppendOverridesSceneIndices,
+                this, std::placeholders::_1));
 
     _stageSceneIndex =
         sceneIndices.stageSceneIndex;
@@ -1906,7 +1923,8 @@ UsdImagingGLEngine::_CreateUsdImagingSceneIndices()
 
 void
 UsdImagingGLEngine::_SetRenderDelegate(
-    HdPluginRenderDelegateUniqueHandle &&renderDelegate)
+    HdPluginRenderDelegateUniqueHandle &&renderDelegate,
+    HdContainerDataSourceHandle const &sceneIndexInputArgs)
 {
     // This relies on SetRendererPlugin to release the GIL...
 
@@ -1938,7 +1956,7 @@ UsdImagingGLEngine::_SetRenderDelegate(
     }
 
     if (UseUsdImagingSceneIndex()) {
-        _CreateUsdImagingSceneIndices();
+        _CreateUsdImagingSceneIndices(sceneIndexInputArgs);
         _renderIndex->InsertSceneIndex(
             _usdImagingFinalSceneIndex, _sceneDelegateId);
     } else {
