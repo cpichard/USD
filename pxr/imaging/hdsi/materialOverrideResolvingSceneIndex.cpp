@@ -785,11 +785,10 @@ HdsiMaterialOverrideResolvingSceneIndex::
 HdSceneIndexPrim
 HdsiMaterialOverrideResolvingSceneIndex::GetPrim(const SdfPath &primPath) const
 {
-    TRACE_FUNCTION();
+    HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
 
-    const HdSceneIndexBaseRefPtr inputScene = _GetInputSceneIndex();
-    HdSceneIndexPrim prim = inputScene->GetPrim(primPath);
-
+    // XXX Do we need to query the input scene for a generated material?
+    //     Likely not, which means that we can delay the above query...
     // Cannot early return based on prim.dataSource until after this block since
     // generated materials won't have a data source until after
     // _CreateGeneratedMaterialDataSource is called.
@@ -1251,6 +1250,8 @@ HdsiMaterialOverrideResolvingSceneIndex::_CreateGeneratedMaterialDataSource(
     HdSceneIndexPrim& prim,
     const SdfPath& primPath) const
 {
+    TRACE_FUNCTION();
+
     static const HdContainerDataSourceHandle emptyHandle;
 
     // AddedPrimEntries will have already populated _materialData in the case
