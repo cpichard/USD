@@ -225,10 +225,10 @@ SdrShaderNode::GetImplementationName() const
         _metadata.GetImplementationName() : GetName();
 }
 
-std::string
+TfToken
 SdrShaderNode::GetRole() const
 {
-    return _metadata.HasRole() ? _metadata.GetRole() : GetName();
+    return _metadata.HasRole() ? _metadata.GetRole() : TfToken(GetName());
 }
 
 SdrTokenVec

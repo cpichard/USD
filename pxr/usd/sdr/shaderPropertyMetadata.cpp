@@ -219,7 +219,7 @@ SdrShaderPropertyMetadata::SetItem(
                             "to the registered type for key %s, "
                             "item not set", key.GetText());
         } else {
-            _items[key] = value;
+            _items[key] = cast;
         }
     }
 }
