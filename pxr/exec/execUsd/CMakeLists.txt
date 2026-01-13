@@ -190,13 +190,14 @@ pxr_register_test(testExecUsdMetadataInput
 
 pxr_build_test(testExecUsdCycleDetection
     LIBRARIES
-        tf
-        plug
+        ef
         exec
         execUsd
-        vdf
+        plug
         sdf
+        tf
         usd
+        vdf
     CPPFILES
         testenv/testExecUsdCycleDetection.cpp
 )
@@ -217,6 +218,7 @@ pxr_register_test_ExecUsdCycleDetection(LargeCyclicRelationshipComputation)
 pxr_register_test_ExecUsdCycleDetection(CyclicAncestorComputation)
 pxr_register_test_ExecUsdCycleDetection(CyclicRelationshipComputationAfterRecompile)
 pxr_register_test_ExecUsdCycleDetection(CyclicRelationshipComputationFigure8)
+pxr_register_test_ExecUsdCycleDetection(CycleDetectionRequestInvalidation)
 
 pxr_build_test(testExecUsdRecompilation
     LIBRARIES
