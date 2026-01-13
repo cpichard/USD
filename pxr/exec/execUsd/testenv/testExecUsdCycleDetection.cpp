@@ -6,6 +6,7 @@
 //
 #include "pxr/pxr.h"
 
+#include "pxr/exec/execUsd/cacheView.h"
 #include "pxr/exec/execUsd/system.h"
 #include "pxr/exec/execUsd/request.h"
 #include "pxr/exec/execUsd/valueKey.h"
@@ -13,19 +14,27 @@
 #include "pxr/base/plug/notice.h"
 #include "pxr/base/plug/registry.h"
 #include "pxr/base/plug/plugin.h"
+#include "pxr/base/tf/callContext.h"
 #include "pxr/base/tf/diagnosticLite.h"
+#include "pxr/base/tf/enum.h"
+#include "pxr/base/tf/errorMark.h"
 #include "pxr/base/tf/pathUtils.h"
 #include "pxr/base/tf/regTest.h"
 #include "pxr/base/tf/staticTokens.h"
+#include "pxr/base/tf/stringUtils.h"
 #include "pxr/exec/exec/computationBuilders.h"
 #include "pxr/exec/exec/registerSchema.h"
+#include "pxr/exec/exec/validationError.h"
 #include "pxr/exec/vdf/context.h"
-#include "pxr/exec/vdf/readIterator.h"
+#include "pxr/exec/vdf/readIteratorRange.h"
 #include "pxr/usd/sdf/layer.h"
+#include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/relationship.h"
 #include "pxr/usd/usd/stage.h"
 
+#include <algorithm>
+#include <numeric>
 #include <sstream>
 #include <vector>
 
@@ -80,12 +89,9 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(TestExecUsdCycleDetectionCustomSchema)
     // targets, then compiling this computation will result in a cycle.
     self.PrimComputation(_tokens->cyclicRelComputation)
         .Callback<int>(+[](const VdfContext &ctx) {
-            VdfReadIterator<int> readIter(ctx, _tokens->cyclicRelComputation);
-            int result = 0;
-            for (; !readIter.IsAtEnd(); ++readIter) {
-                result += *readIter;
-            }
-            return result;
+            const VdfReadIteratorRange<int> range(
+                ctx, _tokens->cyclicRelComputation);
+            return std::accumulate(range.begin(), range.end(), 1);
         })
         .Inputs(
             Relationship(_tokens->customRel)
@@ -141,10 +147,144 @@ public:
         return _stage->GetPrimAtPath(SdfPath(pathStr));
     }
 
+    UsdAttribute GetAttributeAtPath(const char *const pathStr) const {
+        return _stage->GetAttributeAtPath(SdfPath(pathStr));
+    }
+
+    void AddRelationshipTarget(
+        const char *const relPathStr,
+        const char *const targetPathStr) const {
+        UsdRelationship rel =
+            _stage->GetRelationshipAtPath(SdfPath(relPathStr));
+        TF_AXIOM(rel);
+        rel.AddTarget(SdfPath(targetPathStr));
+    }
+
 private:
     UsdStageRefPtr _stage;
     std::optional<ExecUsdSystem> _system;
 };
+
+// An RAII helper that checks for expected validation errors.
+class ExpectedValidationErrors
+{
+public:
+    ExpectedValidationErrors(
+        const TfCallContext &callContext,
+        std::vector<ExecValidationErrorType> expectedErrorTypes)
+        : _callContext(callContext)
+        , _expectedErrorTypes(std::move(expectedErrorTypes))
+    {}
+
+    ~ExpectedValidationErrors() {
+        std::string foundExpectedErrors;
+        std::string missingExpectedErrors;
+        std::string unexpectedErrors;
+        
+        for (const TfError &error : _errorMark) {
+            const auto it = std::find(
+                _expectedErrorTypes.begin(),
+                _expectedErrorTypes.end(),
+                error.GetErrorCode());
+            if (it != _expectedErrorTypes.end()) {
+                // This error was expected. Strike it from the list of expected
+                // errors.
+                _expectedErrorTypes.erase(it);
+                foundExpectedErrors += "- " + _GetErrorString(error) + '\n';
+                continue;
+            }
+
+            // The error is not expected.
+            unexpectedErrors += "- " + _GetErrorString(error) + '\n';
+        }
+
+        // These expected errors were never found.
+        for (const auto &expectedErrorType : _expectedErrorTypes) {
+            missingExpectedErrors +=
+                "- " + TfEnum::GetDisplayName(expectedErrorType) + '\n';
+        }
+        _errorMark.Clear();
+
+        // Build a final error message.
+        std::string message = TfStringPrintf(
+            "In %s at %s:%zu:\n",
+            _callContext.GetPrettyFunction(),
+            _callContext.GetFile(),
+            _callContext.GetLine());
+        if (!foundExpectedErrors.empty()) {
+            message += "The following expected errors were found:\n";
+            message += foundExpectedErrors;
+        }
+        if (!missingExpectedErrors.empty()) {
+            message += "The following expected errors were not found:\n";
+            message += missingExpectedErrors;
+        }
+        if (!unexpectedErrors.empty()) {
+            message += "The following errors were unexpected:\n";
+            message += unexpectedErrors;
+        }
+
+        // We require that all expected errors were found, and that there were
+        // no unexpected errors.
+        if (!missingExpectedErrors.empty() || !unexpectedErrors.empty()) {
+            TF_FATAL_ERROR(message);
+        }
+    }
+
+private:
+    static std::string _GetErrorString(const TfError &error) {
+        return TfStringPrintf("[%s] %s (in function '%s' at %s:%zu)",
+            error.GetErrorCodeAsString().c_str(),
+            error.GetCommentary().c_str(),
+            error.GetSourceFunction().c_str(),
+            error.GetSourceFileName().c_str(),
+            error.GetSourceLineNumber());
+    }
+
+    TfErrorMark _errorMark;
+    TfCallContext _callContext;
+    std::vector<ExecValidationErrorType> _expectedErrorTypes;
+};
+
+#define EXPECT_VALIDATION_ERRORS(...)                                          \
+    const ExpectedValidationErrors _expectedErrors(                            \
+        TF_CALL_CONTEXT, {__VA_ARGS__});
+
+static bool
+Test_CycleDetectionRequiresRecompilation()
+{
+    Fixture fixture;
+    ExecUsdSystem &system = fixture.NewSystemFromLayer(R"usd(#usda 1.0
+        def CustomSchema "Prim" {
+        }
+    )usd");
+
+    ExecUsdRequest request = fixture.BuildRequest({
+        {fixture.GetPrimAtPath("/Prim"), _tokens->cyclicComputation}
+    });
+
+    {
+        // Compiling the request should detect a cycle.
+        EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
+        system.PrepareRequest(request);
+    }
+    {
+        // Even though we just compiled the request, the network requires
+        // recompilation since the previous round was interrupted. This should
+        // find a cycle again.
+        EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
+        system.PrepareRequest(request);
+    }
+    {
+        // Computing the request will compile the request again, since the
+        // previous round was interrupted due to a cycle.
+        EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
+        const ExecUsdCacheView cacheView = system.Compute(request);
+        TF_AXIOM(cacheView.Get(0).IsEmpty());
+    }
+
+    return true;
+}
 
 // Test that we detect a cycle when a computation sources itself as an input.
 static bool
@@ -160,10 +300,14 @@ Test_CyclicComputation()
         {fixture.GetPrimAtPath("/Prim"), _tokens->cyclicComputation}
     });
 
-    system.PrepareRequest(request);
-    
-    // Cycle detection should abort the process before reaching the end.
-    return false;
+    // Compiling the request should detect a cycle.
+    EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
+
+    // Should extract an empty value because the leaf node was not compiled.
+    const ExecUsdCacheView cacheView = system.Compute(request);
+    TF_AXIOM(cacheView.Get(0).IsEmpty());
+
+    return true;
 }
 
 // Test that we detect a cycle when a pair of computations source eachother as
@@ -182,10 +326,14 @@ Test_CyclicComputationPair()
         {fixture.GetPrimAtPath("/Prim"), _tokens->cyclicComputationPairA}
     });
 
-    system.PrepareRequest(request);
+    // Compiling the request should detect a cycle.
+    EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
 
-    // Cycle detection should abort the process before reaching the end.
-    return false;
+    // Should extract an empty value because the leaf node was not compiled.
+    const ExecUsdCacheView cacheView = system.Compute(request);
+    TF_AXIOM(cacheView.Get(0).IsEmpty());
+
+    return true;
 }
 
 // Test that we detect a cycle when a computation sources its input from a
@@ -211,10 +359,14 @@ Test_CyclicRelationshipComputation()
         {fixture.GetPrimAtPath("/Prim2"), _tokens->cyclicRelComputation}
     });
 
-    system.PrepareRequest(request);
+    // Compiling the request should detect a cycle.
+    EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
 
-    // Cycle detection should abort the process before reaching the end.
-    return false;
+    // Should extract an empty value because the leaf node was not compiled.
+    const ExecUsdCacheView cacheView = system.Compute(request);
+    TF_AXIOM(cacheView.Get(0).IsEmpty());
+
+    return true;
 }
 
 // Test that we detect a cycle when a computation sources its input from a
@@ -252,10 +404,16 @@ Test_LargeCyclicRelationshipComputation()
         {fixture.GetPrimAtPath("/Prim400"), _tokens->cyclicRelComputation},
     });
 
-    system.PrepareRequest(request);
+    // Compiling the request should detect a cycle.
+    EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
+    
+    // Unable to compile the leaf node. Should extract a empty VtValues.
+    const ExecUsdCacheView cacheView = system.Compute(request);
+    for (int i = 0; i < 5; ++i) {
+        TF_AXIOM(cacheView.Get(i).IsEmpty());
+    }
 
-    // Cycle detection should abort the process before reaching the end.
-    return false;
+    return true;
 }
 
 // Test that we detect a cycle when a computation sources its input from its
@@ -281,10 +439,14 @@ Test_CyclicAncestorComputation()
         {fixture.GetPrimAtPath("/A"), _tokens->cyclicAncestorComputation}
     });
 
-    system.PrepareRequest(request);
+    // Compiling the request should detect a cycle.
+    EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
 
-    // Cycle detection should abort the process before reaching the end.
-    return false;
+    // Should extract an empty value because the leaf node was not compiled.
+    const ExecUsdCacheView cacheView = system.Compute(request);
+    TF_AXIOM(cacheView.Get(0).IsEmpty());
+
+    return true;
 }
 
 // Test that we detect a cycle when a previously cycle-free scene introduces
@@ -310,17 +472,34 @@ Test_CyclicRelationshipComputationAfterRecompile()
         {fixture.GetPrimAtPath("/A"), _tokens->cyclicRelComputation}
     });
 
-    // There are no cycles in the network. This should compile successfully.
-    system.PrepareRequest(request);
+    {
+        // There are no cycles in the network. This should compile successfully.
+        EXPECT_VALIDATION_ERRORS();
+        system.PrepareRequest(request);
+    }
+
+    // Compute values. The result is well-defined.
+    const ExecUsdCacheView cacheView = system.Compute(request);
+    TF_AXIOM(cacheView.Get(0).IsHolding<int>());
+    TF_AXIOM(cacheView.Get(0).Get<int>() == 3);
 
     // Make a change such that </C> [cyclicRelComputation] now depends on
     // </A> [cyclicRelComputaiton]. This would introduce a cycle.
-    fixture.GetRelationshipAtPath("/C.customRel").AddTarget(SdfPath("/A"));
+    fixture.AddRelationshipTarget("/C.customRel", "/A");
 
-    system.PrepareRequest(request);
+    {
+        EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
 
-    // Cycle detection should abort the process before reaching the end.
-    return false;
+        // The new VdfConnection from </A> [cyclicRelComputation] to
+        // </C> [cyclicRelComputation] will not be created because it introduces
+        // a cycle. The network will not be modified, so the computed value
+        // should not change.
+        const ExecUsdCacheView cacheView = system.Compute(request);
+        TF_AXIOM(cacheView.Get(0).IsHolding<int>());
+        TF_AXIOM(cacheView.Get(0).Get<int>() == 3);
+    }
+
+    return true;
 }
 
 // Test that we detect a cycle when a previously cycle-free scene recompiles
@@ -359,7 +538,17 @@ Test_CyclicRelationshipComputationFigure8()
     //                   V                                  V              
     //             [ Leaf Node ]                      [ Leaf Node ]        
     //
-    system.PrepareRequest(request);
+    {
+        EXPECT_VALIDATION_ERRORS();
+        system.PrepareRequest(request);
+    }
+
+    // The computed values are well-defined.
+    const ExecUsdCacheView cacheView = system.Compute(request);
+    TF_AXIOM(cacheView.Get(0).IsHolding<int>());
+    TF_AXIOM(cacheView.Get(1).IsHolding<int>());
+    TF_AXIOM(cacheView.Get(0).Get<int>() == 2);
+    TF_AXIOM(cacheView.Get(1).Get<int>() == 2);
 
     // Make scene changes that would introduce a cycle in a "figure 8" pattern:
     //
@@ -372,15 +561,25 @@ Test_CyclicRelationshipComputationFigure8()
     //             [ Leaf Node ]   +----- | --+     |  [ Leaf Node ]        
     //                                    +---------+                       
     //
-    fixture.GetRelationshipAtPath("/A2.customRel").AddTarget(SdfPath("/B1"));
-    fixture.GetRelationshipAtPath("/B2.customRel").AddTarget(SdfPath("/A1"));
+    fixture.AddRelationshipTarget("/A2.customRel", "/B1");
+    fixture.AddRelationshipTarget("/B2.customRel", "/A1");
 
-    system.PrepareRequest(request);
+    {
+        EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
 
-    // Cycle detection should abort the process before reaching the end.
-    return false;
+        // The new connections will not be made because together they would
+        // introduce a cycle. As a result, the computed values are the same.
+        const ExecUsdCacheView cacheView = system.Compute(request);
+        TF_AXIOM(cacheView.Get(0).IsHolding<int>());
+        TF_AXIOM(cacheView.Get(1).IsHolding<int>());
+        TF_AXIOM(cacheView.Get(0).Get<int>() == 2);
+        TF_AXIOM(cacheView.Get(1).Get<int>() == 2);
+    }
+
+    return true;
 }
 
+TF_ADD_REGTEST(CycleDetectionRequiresRecompilation);
 TF_ADD_REGTEST(CyclicComputation);
 TF_ADD_REGTEST(CyclicComputationPair);
 TF_ADD_REGTEST(CyclicRelationshipComputation);

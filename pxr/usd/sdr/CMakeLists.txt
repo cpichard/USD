@@ -27,9 +27,11 @@ pxr_library(sdr
         sdfTypeIndicator
         shaderMetadataHelpers
         shaderNode
+        shaderNodeMetadata
         shaderNodeQuery
         shaderNodeQueryUtils
         shaderProperty
+        shaderPropertyMetadata
 
     PYMODULE_CPPFILES
         module.cpp
@@ -42,9 +44,11 @@ pxr_library(sdr
         wrapShaderMetadataHelpers.cpp
         wrapShaderNode.cpp
         wrapShaderNodeDiscoveryResult.cpp
+        wrapShaderNodeMetadata.cpp
         wrapShaderNodeQuery.cpp
         wrapShaderNodeQueryUtils.cpp
         wrapShaderProperty.cpp
+        wrapShaderPropertyMetadata.cpp
 
     PYMODULE_FILES
         __init__.py

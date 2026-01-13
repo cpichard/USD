@@ -2421,8 +2421,7 @@ class InstallContext:
                             not embedded and 
                             not self.targetWasm)
         self.buildExamples = (args.build_examples and 
-                              not embedded and 
-                              not self.targetWasm)
+                              not embedded)
         self.buildTutorials = (args.build_tutorials and 
                                not embedded and 
                                not self.targetWasm)
@@ -2603,9 +2602,6 @@ if context.targetWasm:
         sys.exit(1)
     if "--python" in sys.argv:
         PrintError("Cannot build python components for wasm build targets")
-        sys.exit(1)
-    if "--examples" in sys.argv:
-        PrintError("Cannot build examples for wasm build targets")
         sys.exit(1)
     if "--tutorials" in sys.argv:
         PrintError("Cannot build tutorials for wasm build targets")
