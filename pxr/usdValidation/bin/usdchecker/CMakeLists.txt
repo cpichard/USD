@@ -18,6 +18,19 @@ if (NOT BUILD_SHARED_LIBS)
     return()
 endif()
 
+if (PXR_BUILD_PRMAN_PLUGIN)
+    set(BASELINE_VALIDATOR_LIST baseRules_validationFramework.txt)
+else()
+    set(BASELINE_VALIDATOR_LIST baseRules_validationFramework_norman.txt)
+endif()
+pxr_register_test(testUsdCheckerListValidators
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdchecker -d"
+    TESTENV testenv/testUsdChecker
+    STDOUT_REDIRECT ${BASELINE_VALIDATOR_LIST}
+    DIFF_COMPARE ${BASELINE_VALIDATOR_LIST}
+    EXPECTED_RETURN_CODE 0
+)
+
 # Following are all usdchecker tests using the new Validation Framework.
 # These tests are expected to pass with the new validation framework.
 pxr_register_test(testUsdChecker1
