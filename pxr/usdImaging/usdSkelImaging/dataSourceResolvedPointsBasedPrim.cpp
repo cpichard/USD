@@ -22,6 +22,8 @@
 #include "pxr/imaging/hd/extComputationPrimvarsSchema.h"
 #include "pxr/imaging/hd/extComputationOutputSchema.h"
 #include "pxr/imaging/hd/extComputationSchema.h"
+#include "pxr/imaging/hd/meshSchema.h"
+#include "pxr/imaging/hd/meshTopologySchema.h"
 #include "pxr/imaging/hd/overlayContainerDataSource.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
 #include "pxr/imaging/hd/sceneIndex.h"
@@ -213,11 +215,22 @@ namespace
 {
 
 HdContainerDataSourceHandle
-_ExtComputationPrimvars(const SdfPath &primPath)
+_ExtComputationPrimvars(
+    const SdfPath &primPath,
+    const HdPrimvarsSchema &primvars)
 {
     static const TfToken names[] = {
-        HdPrimvarsSchemaTokens->points
+        HdPrimvarsSchemaTokens->points,
+        HdPrimvarsSchemaTokens->normals
     };
+
+    HdTokenDataSourceHandle normalsInterpolationDs =
+        primvars.GetPrimvar(HdPrimvarsSchemaTokens->normals).GetInterpolation();
+    const TfToken normalsInterpolation =
+        normalsInterpolationDs
+            ? normalsInterpolationDs->GetTypedValue(0.0f)
+            : HdPrimvarSchemaTokens->vertex;
+
     HdDataSourceBaseHandle const values[] = {
         HdExtComputationPrimvarSchema::Builder()
             .SetInterpolation(
@@ -229,10 +242,33 @@ _ExtComputationPrimvars(const SdfPath &primPath)
             .SetSourceComputation(
                 HdRetainedTypedSampledDataSource<SdfPath>::New(
                     primPath.AppendChild(
-                        UsdSkelImagingExtComputationNameTokens->computation)))
+                        UsdSkelImagingExtComputationNameTokens
+                            ->pointsComputation)))
             .SetSourceComputationOutputName(
                 HdRetainedTypedSampledDataSource<TfToken>::New(
-                    UsdSkelImagingExtComputationOutputNameTokens->skinnedPoints))
+                    UsdSkelImagingExtComputationOutputNameTokens
+                        ->skinnedPoints))
+            .SetValueType(
+                HdRetainedTypedSampledDataSource<HdTupleType>::New(
+                    HdTupleType{HdTypeFloatVec3, 1}))
+        .Build(),
+
+        HdExtComputationPrimvarSchema::Builder()
+            .SetInterpolation(
+                HdExtComputationPrimvarSchema::BuildInterpolationDataSource(
+                    normalsInterpolation))
+            .SetRole(
+                HdExtComputationPrimvarSchema::BuildRoleDataSource(
+                    HdPrimvarSchemaTokens->normal))
+            .SetSourceComputation(
+                HdRetainedTypedSampledDataSource<SdfPath>::New(
+                    primPath.AppendChild(
+                        UsdSkelImagingExtComputationNameTokens
+                            ->normalsComputation)))
+            .SetSourceComputationOutputName(
+                HdRetainedTypedSampledDataSource<TfToken>::New(
+                    UsdSkelImagingExtComputationOutputNameTokens
+                        ->skinnedNormals))
             .SetValueType(
                 HdRetainedTypedSampledDataSource<HdTupleType>::New(
                     HdTupleType{HdTypeFloatVec3, 1}))
@@ -428,7 +464,7 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::Get(const TfToken &name)
 
     if (name == HdExtComputationPrimvarsSchema::GetSchemaToken()) {
         return HdOverlayContainerDataSource::OverlayedContainerDataSources(
-            _ExtComputationPrimvars(_primPath),
+            _ExtComputationPrimvars(_primPath, _primvars),
             HdContainerDataSource::Cast(inputSrc));
     }
 
@@ -951,6 +987,54 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::GetNumBlendShapeOffsetRanges()
         GetBlendShapeData()->blendShapeOffsetRanges.size());
 }
 
+HdSampledDataSourceHandle 
+UsdSkelImagingDataSourceResolvedPointsBasedPrim::GetNormals()
+{
+    TRACE_FUNCTION();
+    return GetPrimvars().GetPrimvar(
+        HdPrimvarsSchemaTokens->normals).GetPrimvarValue();
+}
+
+HdSampledDataSourceHandle
+UsdSkelImagingDataSourceResolvedPointsBasedPrim::GetFaceVertexIndices()
+{
+    TRACE_FUNCTION();
+
+    const HdContainerDataSourceHandle meshDs =
+        HdContainerDataSource::Cast(
+            Get(HdMeshSchemaTokens->mesh));
+    if (!meshDs) {
+        return nullptr;
+    }
+
+    const HdMeshSchema meshSchema = HdMeshSchema(meshDs);
+    const HdMeshTopologySchema topoSchema = meshSchema.GetTopology();
+    if (!topoSchema.IsDefined()) {
+        return nullptr;
+    }
+
+    return HdSampledDataSource::Cast(
+        topoSchema.GetContainer()->Get(
+            HdMeshTopologySchemaTokens->faceVertexIndices));
+}
+
+HdDataSourceBaseHandle
+UsdSkelImagingDataSourceResolvedPointsBasedPrim::GetHasFaceVaryingNormals()
+{
+    TRACE_FUNCTION();
+
+    const HdPrimvarSchema normalsPrimvar =
+        GetPrimvars().GetPrimvar(HdPrimvarsSchemaTokens->normals);
+    HdTokenDataSourceHandle interpDs = normalsPrimvar.GetInterpolation();
+    if (!interpDs) {
+        return nullptr;
+    }
+    const TfToken interpolation = interpDs->GetTypedValue(0.0f);
+    const bool hasFaceVaryingNormals =
+        interpolation == HdPrimvarSchemaTokens->faceVarying;
+    return _ToDataSource(hasFaceVaryingNormals);
+}
+
 std::shared_ptr<UsdSkelImagingBlendShapeData>
 UsdSkelImagingDataSourceResolvedPointsBasedPrim::GetBlendShapeData()
 {
@@ -1115,6 +1199,28 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::_ProcessDirtyLocators(
                 HdExtComputationSchema::GetElementCountLocator()};
             dirtyLocatorsForComputation->insert(
                 inputLocators);
+        }
+    }
+
+    static const HdDataSourceLocator normalsPrimvarLocator =
+        HdPrimvarsSchema::GetDefaultLocator()
+            .Append(HdPrimvarsSchemaTokens->normals);
+    if (dirtyLocators.Intersects(normalsPrimvarLocator)) {
+        if (dirtyLocatorsForAggregatorComputation) {
+            static const HdDataSourceLocator aggregatorInputLocator =
+                HdExtComputationSchema::GetInputValuesLocator()
+                    .Append(
+                        UsdSkelImagingExtAggregatorComputationInputNameTokens
+                            ->restNormals);
+            dirtyLocatorsForAggregatorComputation->insert(
+                aggregatorInputLocator);
+        }
+
+        if (dirtyLocatorsForComputation) {
+            static const HdDataSourceLocatorSet inputLocators{
+                HdExtComputationSchema::GetDispatchCountLocator(),
+                HdExtComputationSchema::GetElementCountLocator()};
+            dirtyLocatorsForComputation->insert(inputLocators);
         }
     }
 
@@ -1384,30 +1490,44 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::ProcessDirtyLocators(
     }
 
     if (entries) {
-        bool sendPointsPrimvarValueDirty = false;
+        bool sendPointsAndNormalsPrimvarValueDirty = false;
 
         if (!dirtyLocatorsForAggregatorComputation.IsEmpty()) {
             entries->push_back({
                 _primPath.AppendChild(
                     UsdSkelImagingExtComputationNameTokens
-                    ->aggregatorComputation),
-                std::move(dirtyLocatorsForAggregatorComputation)});
-            sendPointsPrimvarValueDirty = true;
+                        ->pointsAggregatorComputation),
+                dirtyLocatorsForAggregatorComputation});
+            entries->push_back({
+                _primPath.AppendChild(
+                    UsdSkelImagingExtComputationNameTokens
+                        ->normalsAggregatorComputation),
+                dirtyLocatorsForAggregatorComputation});
+            sendPointsAndNormalsPrimvarValueDirty = true;
         }
         if (!dirtyLocatorsForComputation.IsEmpty()) {
             entries->push_back({
                 _primPath.AppendChild(
-                    UsdSkelImagingExtComputationNameTokens->computation),
-                std::move(dirtyLocatorsForComputation)});
-            sendPointsPrimvarValueDirty = true;
+                    UsdSkelImagingExtComputationNameTokens->pointsComputation),
+                dirtyLocatorsForComputation});
+            entries->push_back({
+                _primPath.AppendChild(
+                    UsdSkelImagingExtComputationNameTokens->normalsComputation),
+                dirtyLocatorsForComputation});
+            sendPointsAndNormalsPrimvarValueDirty = true;
         }
 
-        if (sendPointsPrimvarValueDirty) {
-            static const HdDataSourceLocator locator =
+        if (sendPointsAndNormalsPrimvarValueDirty) {
+            static const HdDataSourceLocator pointsLocator =
                 HdPrimvarsSchema::GetDefaultLocator()
                     .Append(HdPrimvarsSchemaTokens->points)
                     .Append(HdPrimvarSchemaTokens->primvarValue);
-            entries->push_back({ _primPath, locator });
+            static const HdDataSourceLocator normalsLocator =
+                HdPrimvarsSchema::GetDefaultLocator()
+                    .Append(HdPrimvarsSchemaTokens->normals)
+                    .Append(HdPrimvarSchemaTokens->primvarValue);
+            entries->push_back({ _primPath, pointsLocator});
+            entries->push_back({ _primPath, normalsLocator});
         }
 
         if (!dirtyPrimvars.empty()) {
