@@ -611,6 +611,24 @@ HdStMesh::_PopulateTopology(HdSceneDelegate *sceneDelegate,
             refineLevel = 0;
         }
 
+        // If the topology is loop, and subdivision has been requested, validate
+        // that all the faces are triangular. If not, force the refinement level
+        // back to 0 (since asking PxOsd to loop-subdivide a non-triangular mesh
+        // is unsupported and may crash).
+        if (meshTopology.GetScheme() == PxOsdOpenSubdivTokens->loop &&
+            refineLevel > 0) {
+            TRACE_SCOPE("Loop topology validation");
+            const int numFaces = meshTopology.GetFaceVertexCounts().size();
+            int const *numVertsPtr = meshTopology.GetFaceVertexCounts().cdata();
+            if (std::find_if(numVertsPtr, numVertsPtr + numFaces,
+                [](int x) { return x != 3; })
+                != numVertsPtr + numFaces) {
+                HF_VALIDATION_WARN(id, "Cannot apply loop subdivision due to "
+                    "non-triangular faces");
+                refineLevel = 0;
+            }
+        }
+
         // If the topology supports adaptive refinement and that's what this
         // prim wants, note that and also that our normals will be generated
         // in the shader.
