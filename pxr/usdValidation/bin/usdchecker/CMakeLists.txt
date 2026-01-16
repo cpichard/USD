@@ -18,16 +18,11 @@ if (NOT BUILD_SHARED_LIBS)
     return()
 endif()
 
-if (PXR_BUILD_PRMAN_PLUGIN)
-    set(BASELINE_VALIDATOR_LIST baseRules_validationFramework.txt)
-else()
-    set(BASELINE_VALIDATOR_LIST baseRules_validationFramework_norman.txt)
-endif()
 pxr_register_test(testUsdCheckerListValidators
-    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdchecker -d"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdchecker --includeKeywords UsdCoreValidators,UsdGeomValidators,UsdPhysicsValidators,UsdShadeValidators,UsdSkelValidators,UsdUtilsValidators -d"
     TESTENV testenv/testUsdChecker
-    STDOUT_REDIRECT ${BASELINE_VALIDATOR_LIST}
-    DIFF_COMPARE ${BASELINE_VALIDATOR_LIST}
+    STDOUT_REDIRECT baseRules_validationFramework.txt
+    DIFF_COMPARE baseRules_validationFramework.txt
     EXPECTED_RETURN_CODE 0
 )
 
