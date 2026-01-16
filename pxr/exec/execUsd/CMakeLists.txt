@@ -202,23 +202,11 @@ pxr_build_test(testExecUsdCycleDetection
         testenv/testExecUsdCycleDetection.cpp
 )
 
-function(pxr_register_test_ExecUsdCycleDetection TESTNAME)
-    pxr_register_test(testExecUsdCycleDetection_${TESTNAME}
-        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdCycleDetection ${TESTNAME}"
-        EXPECTED_RETURN_CODE 0
-        TESTENV testenv/testExecUsdCycleDetection
-    )
-endfunction()
-
-pxr_register_test_ExecUsdCycleDetection(CycleDetectionRequiresRecompilation)
-pxr_register_test_ExecUsdCycleDetection(CyclicComputation)
-pxr_register_test_ExecUsdCycleDetection(CyclicComputationPair)
-pxr_register_test_ExecUsdCycleDetection(CyclicRelationshipComputation)
-pxr_register_test_ExecUsdCycleDetection(LargeCyclicRelationshipComputation)
-pxr_register_test_ExecUsdCycleDetection(CyclicAncestorComputation)
-pxr_register_test_ExecUsdCycleDetection(CyclicRelationshipComputationAfterRecompile)
-pxr_register_test_ExecUsdCycleDetection(CyclicRelationshipComputationFigure8)
-pxr_register_test_ExecUsdCycleDetection(CycleDetectionRequestInvalidation)
+pxr_register_test(testExecUsdCycleDetection
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdCycleDetection"
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testExecUsdCycleDetection
+)
 
 pxr_build_test(testExecUsdRecompilation
     LIBRARIES

@@ -262,7 +262,7 @@ private:
     const ExpectedValidationErrors _expectedErrors(                            \
         TF_CALL_CONTEXT, {__VA_ARGS__});
 
-static bool
+static void
 Test_CycleDetectionRequiresRecompilation()
 {
     Fixture fixture;
@@ -294,12 +294,10 @@ Test_CycleDetectionRequiresRecompilation()
         const ExecUsdCacheView cacheView = system.Compute(request);
         TF_AXIOM(cacheView.Get(0).IsEmpty());
     }
-
-    return true;
 }
 
 // Test that we detect a cycle when a computation sources itself as an input.
-static bool
+static void
 Test_CyclicComputation()
 {
     Fixture fixture;
@@ -318,14 +316,12 @@ Test_CyclicComputation()
     // Should extract an empty value because the leaf node was not compiled.
     const ExecUsdCacheView cacheView = system.Compute(request);
     TF_AXIOM(cacheView.Get(0).IsEmpty());
-
-    return true;
 }
 
 // Test that we detect a cycle when a pair of computations source eachother as
 // inputs.
 //
-static bool
+static void
 Test_CyclicComputationPair()
 {
     Fixture fixture;
@@ -344,14 +340,12 @@ Test_CyclicComputationPair()
     // Should extract an empty value because the leaf node was not compiled.
     const ExecUsdCacheView cacheView = system.Compute(request);
     TF_AXIOM(cacheView.Get(0).IsEmpty());
-
-    return true;
 }
 
 // Test that we detect a cycle when a computation sources its input from a
 // relationship target, which is part of a cycle of relationship targets.
 //
-static bool
+static void
 Test_CyclicRelationshipComputation()
 {
     Fixture fixture;
@@ -377,8 +371,6 @@ Test_CyclicRelationshipComputation()
     // Should extract an empty value because the leaf node was not compiled.
     const ExecUsdCacheView cacheView = system.Compute(request);
     TF_AXIOM(cacheView.Get(0).IsEmpty());
-
-    return true;
 }
 
 // Test that we detect a cycle when a computation sources its input from a
@@ -386,7 +378,7 @@ Test_CyclicRelationshipComputation()
 // specifically tests the case when the relationship cycle is large, and also
 // tests the case where multiple leaf tasks depend on the same cycle.
 //
-static bool
+static void
 Test_LargeCyclicRelationshipComputation()
 {
     const int SIZE = 500;
@@ -424,14 +416,12 @@ Test_LargeCyclicRelationshipComputation()
     for (int i = 0; i < 5; ++i) {
         TF_AXIOM(cacheView.Get(i).IsEmpty());
     }
-
-    return true;
 }
 
 // Test that we detect a cycle when a computation sources its input from its
 // ancestor, but one of those ancestors sources its input from a descendant.
 //
-static bool
+static void
 Test_CyclicAncestorComputation()
 {
     Fixture fixture;
@@ -457,14 +447,12 @@ Test_CyclicAncestorComputation()
     // Should extract an empty value because the leaf node was not compiled.
     const ExecUsdCacheView cacheView = system.Compute(request);
     TF_AXIOM(cacheView.Get(0).IsEmpty());
-
-    return true;
 }
 
 // Test that we detect a cycle when a previously cycle-free scene introduces
 // a cycle by authoring a new relationship target.
 //
-static bool
+static void
 Test_CyclicRelationshipComputationAfterRecompile()
 {
     Fixture fixture;
@@ -510,15 +498,13 @@ Test_CyclicRelationshipComputationAfterRecompile()
         TF_AXIOM(cacheView.Get(0).IsHolding<int>());
         TF_AXIOM(cacheView.Get(0).Get<int>() == 3);
     }
-
-    return true;
 }
 
 // Test that we detect a cycle when a previously cycle-free scene recompiles
 // two separate inputs that end up depending on each other, creating a
 // "figure 8" cycle.
 //
-static bool
+static void
 Test_CyclicRelationshipComputationFigure8()
 {
     Fixture fixture;
@@ -587,12 +573,15 @@ Test_CyclicRelationshipComputationFigure8()
         TF_AXIOM(cacheView.Get(0).Get<int>() == 2);
         TF_AXIOM(cacheView.Get(1).Get<int>() == 2);
     }
-
-    return true;
 }
 
-
-static bool Test_CycleDetectionRequestInvalidation()
+// Test that we send value key invalidation for indicies that depend on cycles.
+// When compilation is interrupted due to cycle detection, we cannot tell which
+// scene changes would break those cycles. We must conservatively invalidate
+// those value keys on every scene change.
+// 
+static void
+Test_CycleDetectionRequestInvalidation()
 {
     Fixture fixture;
     ExecUsdSystem &system = fixture.NewSystemFromLayer(R"usd(#usda 1.0
@@ -678,22 +667,19 @@ static bool Test_CycleDetectionRequestInvalidation()
     TF_AXIOM(fixture.invalidRequestIndices.size() == 2);
     TF_AXIOM(fixture.invalidRequestIndices.contains(0));
     TF_AXIOM(fixture.invalidRequestIndices.contains(1));
-
-    return true;
 }
 
-TF_ADD_REGTEST(CycleDetectionRequiresRecompilation);
-TF_ADD_REGTEST(CyclicComputation);
-TF_ADD_REGTEST(CyclicComputationPair);
-TF_ADD_REGTEST(CyclicRelationshipComputation);
-TF_ADD_REGTEST(LargeCyclicRelationshipComputation);
-TF_ADD_REGTEST(CyclicAncestorComputation);
-TF_ADD_REGTEST(CyclicRelationshipComputationAfterRecompile);
-TF_ADD_REGTEST(CyclicRelationshipComputationFigure8);
-TF_ADD_REGTEST(CycleDetectionRequestInvalidation);
-
-int main(int argc, char **argv)
+int main()
 {
     ConfigureTestPlugin();
-    return TfRegTest::Main(argc, argv);
+
+    Test_CycleDetectionRequiresRecompilation();
+    Test_CyclicComputation();
+    Test_CyclicComputationPair();
+    Test_CyclicRelationshipComputation();
+    Test_LargeCyclicRelationshipComputation();
+    Test_CyclicAncestorComputation();
+    Test_CyclicRelationshipComputationAfterRecompile();
+    Test_CyclicRelationshipComputationFigure8();
+    Test_CycleDetectionRequestInvalidation();
 }
