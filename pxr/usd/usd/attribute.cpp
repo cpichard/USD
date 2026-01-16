@@ -190,9 +190,15 @@ UsdAttribute::HasValue() const
 bool
 UsdAttribute::HasFallbackValue() const
 {
+    return GetFallbackValue(nullptr);
+}
+
+bool
+UsdAttribute::GetFallbackValue(VtValue* value) const
+{
     UsdPrimDefinition::Attribute attrDef =
         _GetStage()->_GetSchemaAttribute(*this);
-    return attrDef && attrDef.GetFallbackValue<VtValue>(nullptr);
+    return attrDef && attrDef.GetFallbackValue<VtValue>(value);
 }
 
 bool 

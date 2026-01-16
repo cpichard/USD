@@ -1627,6 +1627,7 @@ private:
     UsdPrimDefinition::Property
     _GetSchemaProperty(const UsdProperty &prop) const;
 
+    USD_API
     UsdPrimDefinition::Attribute
     _GetSchemaAttribute(const UsdAttribute &attr) const;
 
