@@ -773,6 +773,7 @@ private:
     HdContainerDataSourceHandle _inputDsContainer;
     SdfPath _newBinding;
 };
+
 } // end anonymous namespace
 
 HdsiMaterialOverrideResolvingSceneIndex::
@@ -1070,135 +1071,34 @@ HdsiMaterialOverrideResolvingSceneIndex::_DirtyGeneratedMaterials(
     PathSet dirtiedEntriesSet;
     const HdSceneIndexBaseRefPtr inputScene = _GetInputSceneIndex();
 
+    // Set of prims processed as part of this block of dirtying operations
+    PathSet processedPrimsSet;
+
     for (const HdSceneIndexObserver::DirtiedPrimEntry& entry : entries) {
+        if (processedPrimsSet.count(entry.primPath) > 0) {
+            TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
+                "Skipping %s because it was already processed in this "
+                "change block.\n", entry.primPath.GetText());
+            continue;
+        }
+
         auto materialIt = _oldToNewMaterialPaths.find(entry.primPath);
         auto primIt = _primData.find(entry.primPath);
 
         if (materialIt != _oldToNewMaterialPaths.end()) {
-            TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
-                "Processing dirty prim entry %s.\n", entry.primPath.GetText());
-            TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
-                "\tThis material was used to generate material overrides by "
-                "creating the following materials:\n");
-
-            // From a user standpoint, generated materials should be transparent.
-            // If the material they were generated from changes, the changes
-            // should be reflected in them.
-            // Therefore, If a material used to generate other materials is 
-            // dirtied, add the generated materials to the list of dirtied prims.
-            for (const SdfPath& newMaterialPath : materialIt->second) {
-                TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
-                    "\t\t%s\n", newMaterialPath.GetText());
-                dirtiedEntriesSet.insert(newMaterialPath);    
-            }
+            processedPrimsSet.insert(entry.primPath);
+            _DirtyBaseMaterial(entry.primPath, materialIt->second, 
+                &dirtiedEntriesSet);
         } else if (primIt != _primData.end()) {
-            // If the set of material overrides on a prim changes also dirty
-            // the generated material bound to it.
-            if (!entry.dirtyLocators.Intersects(
-                HdMaterialOverrideSchema::GetDefaultLocator())) {
-                continue;
-            }
-
-            // Sanity check: the dirty prim should be available on the input
-            // scene index. This is needed to get the prim's type
-            const HdSceneIndexPrim prim = inputScene->GetPrim(entry.primPath);
-            if (!prim) {
-                continue;
-            }
-            
-            // Sanity check: if prim data is available for this entry, then data
-            // about its generated material should also be available.
-            const SdfPath genMaterialPath = primIt->second.generatedMaterialPath;
-            auto newMaterialDataIt = _materialData.find(genMaterialPath);
-            if (newMaterialDataIt == _materialData.end()) {
-                continue;
-            }
-
-            // Only geometry prims can receive material overrides
-            if (!HdPrimTypeIsGprim(prim.primType)) {
-                continue;
-            }
-
-            // Processing a geometry prim which had previously received a 
-            // generated material to express its material overrides.
-            // The material overrides have now changed.
-            TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
-                "Processing dirty prim entry %s.\n", entry.primPath.GetText());
-
-            // Remove the material that was created to express the intersection
-            // of the previous material overrides and base material
-            // Invalidate relevant bookkeeping data
-            removedEntriesSet.insert(genMaterialPath);
-            _InvalidateMaps(entry.primPath);
-
-            std::vector<std::pair<TfToken, SdfPath>> primsToProcess;
-            primsToProcess.push_back({prim.primType, entry.primPath});
-
-            // Other prims that shared the same generated material with 
-            // entry.primPath prior to that prim changing its material overrides
-            // might need to have their generated materials adjusted.
-            // This is needed, for example, in the case where multiple prims
-            // shared the same generated material and only one of them 
-            // received new material overrides
-            auto primPathsIt = _materialData.find(genMaterialPath);
-            if (primPathsIt != _materialData.end()) {
-                for (const SdfPath& primPath : primPathsIt->second.boundPrims) {
-                    if (primPath == entry.primPath) {
-                        continue;
-                    }
-
-                    const HdSceneIndexPrim associatedPrim = 
-                        inputScene->GetPrim(primPath);
-                    if (!associatedPrim) {
-                        continue;
-                    }
-
-                    TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
-                        "\tAlso mark %s as dirty because it uses the same "
-                        "generated material.\n", primPath.GetText());
-                    primsToProcess.push_back({associatedPrim.primType, primPath});
-                }
-            }
-
-            // Figure out what the new material to express the new material
-            // overrides would be. This could result in a cache hit.
-            for (const auto& [primType, primPath] : primsToProcess) {
-                const SdfPath newGeneratedMaterialPath = 
-                    _AddGeneratedMaterial(primType, primPath);
-                // Adding primPath to the dirty pool to express
-                // that its material bindings have changed (either because they
-                // reverted to the original material or because a new generated
-                // material is needed)
-                dirtiedEntriesSet.insert(primPath);
-                if (!newGeneratedMaterialPath.IsEmpty()) {
-                    // If a new generated material is needed, mark it as being
-                    // added
-                    addedEntriesSet.insert(newGeneratedMaterialPath);
-                }
-            }
+            processedPrimsSet.insert(entry.primPath);
+            _DirtyGeometry(entry, inputScene, primIt->second, 
+                &processedPrimsSet, &addedEntriesSet, &dirtiedEntriesSet, 
+                &removedEntriesSet);
         } else if (entry.dirtyLocators.Intersects(
             HdMaterialOverrideSchema::GetDefaultLocator())) {
-            TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
-                "Processing dirty prim entry %s.\n", entry.primPath.GetText());
-            TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
-                "\tThis prim is receiving a material override for the first "
-                "time.\n");
-
-            // A prim which did not use to have a material override now 
-            // received one. Add a generated material to account for this 
-            // override if necessary
-            const HdSceneIndexPrim prim = inputScene->GetPrim(entry.primPath);
-            if (!prim) {
-                continue;
-            }
-
-            const SdfPath newMatPath = 
-                _AddGeneratedMaterial(prim.primType, entry.primPath);
-            if (!newMatPath.IsEmpty()) {
-                // Adding again to dirty its material binding
-                dirtiedEntriesSet.insert(entry.primPath);
-                addedEntriesSet.insert(newMatPath);
-            }
+            processedPrimsSet.insert(entry.primPath);
+            _DirtyMaterialOverrideLocator(entry.primPath, inputScene, 
+                &addedEntriesSet, &dirtiedEntriesSet);
         }
     }
 
@@ -1227,7 +1127,202 @@ HdsiMaterialOverrideResolvingSceneIndex::_DirtyGeneratedMaterials(
                 HdDataSourceLocatorSentinelTokens->container}};
         newEntries.emplace_back(dirtiedPath, locators);
     }
+
+    if (TfDebug::IsEnabled(HDSI_MATERIAL_OVERRIDES) && 
+        // Only print if there are generated materials
+        !_scopeToNewMaterialPaths.empty() &&
+            // Only print if this dirty function did some work
+            (!dirtiedEntriesSet.empty() || !addedEntriesSet.empty() || 
+            !removedEntriesSet.empty())) {
+
+        fprintf(stdout, "Current list of generated materials:\n");
+        for (const auto& [materialScope, materialList] : 
+            _scopeToNewMaterialPaths) {
+            fprintf(stdout, "\t%s\n", materialScope.GetText());
+            for (const SdfPath& materialPath : materialList) {
+                fprintf(stdout, "\t\t%s\n", materialPath.GetText());
+            }
+        } 
+    }
+
     return newEntries;
+}
+
+void
+HdsiMaterialOverrideResolvingSceneIndex::_DirtyBaseMaterial(
+    const SdfPath& primPath,
+    const PathSet& generatedMaterials,
+    PathSet* dirtiedPaths) const
+{
+    if (!dirtiedPaths) {
+        return;
+    }
+
+    if (generatedMaterials.empty()) {
+        return;
+    }
+
+    TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
+        "Processing dirty prim entry %s.\n", primPath.GetText());
+    TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
+        "\tThis material was used to generate material overrides by "
+        "creating the following materials:\n");
+
+    // From a user standpoint, generated materials should be transparent.
+    // If the material they were generated from changes, the changes
+    // should be reflected in them.
+    // Therefore, If a material used to generate other materials is 
+    // dirtied, add the generated materials to the list of dirtied prims.
+    for (const SdfPath& newMaterialPath : generatedMaterials) {
+        TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
+            "\t\t%s\n", newMaterialPath.GetText());
+        dirtiedPaths->insert(newMaterialPath);    
+    }
+}
+
+void
+HdsiMaterialOverrideResolvingSceneIndex::_DirtyGeometry(
+    const HdSceneIndexObserver::DirtiedPrimEntry& entry,
+    const HdSceneIndexBaseRefPtr inputScene,
+    const PrimData& primData,
+    PathSet* processedPrimsSet,
+    PathSet* addedPaths,
+    PathSet* dirtiedPaths,
+    PathSet* removedPaths)
+{
+    if (!processedPrimsSet || !addedPaths || !dirtiedPaths) {
+        return;
+    }
+
+    // If the set of material overrides on a prim changes also dirty
+    // the generated material bound to it.
+    if (!entry.dirtyLocators.Intersects(
+        HdMaterialOverrideSchema::GetDefaultLocator())) {
+        return;
+    }
+
+    // Sanity check: the dirty prim should be available on the input
+    // scene index. This is needed to get the prim's type
+    const HdSceneIndexPrim prim = inputScene->GetPrim(entry.primPath);
+    if (!prim) {
+        return;
+    }
+    
+    // Sanity check: if prim data is available for this entry, then data
+    // about its generated material should also be available.
+    const SdfPath genMaterialPath = primData.generatedMaterialPath;
+    auto newMaterialDataIt = _materialData.find(genMaterialPath);
+    if (newMaterialDataIt == _materialData.end()) {
+        return;
+    }
+
+    // Only geometry prims can receive material overrides
+    if (!HdPrimTypeIsGprim(prim.primType)) {
+        return;
+    }
+
+    // Processing a geometry prim which had previously received a 
+    // generated material to express its material overrides.
+    // The material overrides have now changed.
+    TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
+        "Processing dirty prim entry %s.\n", entry.primPath.GetText());
+    processedPrimsSet->insert(entry.primPath);
+
+    // Remove the material that was created to express the intersection
+    // of the previous material overrides and base material
+    // Invalidate relevant bookkeeping data
+    removedPaths->insert(genMaterialPath);
+
+    std::vector<std::pair<TfToken, SdfPath>> primsToProcess;
+    primsToProcess.push_back({prim.primType, entry.primPath});
+
+    // Other prims that shared the same generated material with 
+    // entry.primPath prior to that prim changing its material overrides
+    // might need to have their generated materials adjusted.
+    // This is needed, for example, in the case where multiple prims
+    // shared the same generated material and only one of them 
+    // received new material overrides
+    auto primPathsIt = _materialData.find(genMaterialPath);
+    if (primPathsIt != _materialData.end()) {
+        for (const SdfPath& primPath : primPathsIt->second.boundPrims) {
+            if (primPath == entry.primPath) {
+                continue;
+            }
+
+            const HdSceneIndexPrim associatedPrim = 
+                inputScene->GetPrim(primPath);
+            if (!associatedPrim) {
+                continue;
+            }
+
+            if (processedPrimsSet->count(primPath) > 0) {
+                TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
+                "\tSkipping %s because it was already processed in this "
+                "change block.\n", primPath.GetText());
+                continue;
+            }
+
+            TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
+                "\tAlso mark %s as dirty because it uses the same "
+                "generated material.\n", primPath.GetText());
+            processedPrimsSet->insert(primPath);
+            primsToProcess.push_back({associatedPrim.primType, primPath});
+        }
+    }
+
+    // Invalidate stale data before generating new materials
+    _InvalidateMaps(entry.primPath);
+
+    // Figure out what the new material to express the new material
+    // overrides would be. This could result in a cache hit.
+    for (const auto& [primType, primPath] : primsToProcess) {
+        const SdfPath newGeneratedMaterialPath = 
+            _AddGeneratedMaterial(primType, primPath);
+        // Adding primPath to the dirty pool to express
+        // that its material bindings have changed (either because they
+        // reverted to the original material or because a new generated
+        // material is needed)
+        dirtiedPaths->insert(primPath);
+        if (!newGeneratedMaterialPath.IsEmpty()) {
+            // If a new generated material is needed, mark it as being
+            // added
+            addedPaths->insert(newGeneratedMaterialPath);
+        }
+    }
+}
+
+void
+HdsiMaterialOverrideResolvingSceneIndex::_DirtyMaterialOverrideLocator(
+    const SdfPath& primPath,
+    const HdSceneIndexBaseRefPtr inputScene,
+    PathSet* addedPaths,
+    PathSet* dirtiedPaths)
+{
+    if (!addedPaths || !dirtiedPaths) {
+        return;
+    }
+
+    TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
+        "Processing dirty prim entry %s.\n", primPath.GetText());
+    TF_DEBUG(HDSI_MATERIAL_OVERRIDES).Msg(
+        "\tThis prim is receiving a material override for the first "
+        "time.\n");
+
+    // A prim which did not use to have a material override now 
+    // received one. Add a generated material to account for this 
+    // override if necessary
+    const HdSceneIndexPrim prim = inputScene->GetPrim(primPath);
+    if (!prim) {
+        return;
+    }
+
+    const SdfPath newMatPath = 
+        _AddGeneratedMaterial(prim.primType, primPath);
+    if (!newMatPath.IsEmpty()) {
+        // Adding again to dirty its material binding
+        dirtiedPaths->insert(primPath);
+        addedPaths->insert(newMatPath);
+    }
 }
 
 PathSet
@@ -1384,10 +1479,7 @@ HdsiMaterialOverrideResolvingSceneIndex::_InvalidateMaps(const SdfPath& primPath
         _primData.erase(boundPrimPath);
     }
 
-    _materialData[generatedMaterialPath].boundPrims.erase(primPath);
-    if (_materialData[generatedMaterialPath].boundPrims.empty()) {
-        _materialData.erase(generatedMaterialPath);    
-    }
+    _materialData.erase(generatedMaterialPath);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

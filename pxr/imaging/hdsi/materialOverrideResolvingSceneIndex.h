@@ -259,6 +259,54 @@ private:
     HdSceneIndexObserver::DirtiedPrimEntries _DirtyGeneratedMaterials(
         const HdSceneIndexObserver::DirtiedPrimEntries& entries);
 
+    /// Process dirty notices for materials used to generated override
+    /// materials in this scene index.
+    /// This function is responsible for propagating changes from base materials
+    /// to the materials generated from them.
+    /// \p primPath is the path of the dirty material prim
+    /// \p generatedMaterials is a list of materials generated from \p primPath
+    /// \p dirtiedPaths which is returned to the caller, will contain a set
+    /// of paths dirtied by this call. New elements are appended to any 
+    /// already there.
+    void _DirtyBaseMaterial(
+        const SdfPath& primPath,
+        const PathSet& generatedMaterials,
+        PathSet* dirtiedPaths) const;
+
+    /// Process dirty notices for geometry that has received material overrides.
+    /// \p entry is the dirty entry to operate on
+    /// \p inputScene is a pointer to this Scene Index's input Scene Index
+    /// \p primData contains material override data for the dirtied prim
+    /// \p processedPrimsSet which is returned to the caller, will contain a set
+    /// of paths for prims that have been processed by this function in addition
+    /// to the prim described by \p entry. New elements are appended to any 
+    /// already there.
+    /// \p addedPaths \p dirtiedPaths and \p removedPaths which are all returned
+    /// to the caller will contain sets of paths that have been added, dirtied
+    /// or removed by this call. New elements are appended to any 
+    /// already there.
+    void _DirtyGeometry(
+        const HdSceneIndexObserver::DirtiedPrimEntry& entry,
+        const HdSceneIndexBaseRefPtr inputScene,
+        const PrimData& primData,
+        PathSet* processedPrimsSet,
+        PathSet* addedPaths,
+        PathSet* dirtiedPaths,
+        PathSet* removedPaths);
+
+    /// Process dirty notices to the materialOverride locator for prims which
+    /// are receiving a material override for the first time.
+    /// \p primPath is the dirty prim
+    /// \p inputScene is a pointer to this Scene Index's input Scene Index
+    /// \p addedPaths and \p dirtiedPaths which are all returned
+    /// to the caller will contain sets of paths that have been added or dirtied
+    /// by this call. New elements are appended to any already there.
+    void _DirtyMaterialOverrideLocator(
+        const SdfPath& primPath,
+        const HdSceneIndexBaseRefPtr inputScene,
+        PathSet* addedPaths,
+        PathSet* dirtiedPaths);
+
     /// Given a path \p primPath to a material scope, return a set of 
     /// generated materials that are located under it 
     PathSet _GetGeneratedMaterials(const SdfPath& primPath) const;
