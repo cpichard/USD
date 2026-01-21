@@ -27,6 +27,56 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
+TfTokenVector
+_ExtComputationInputNamesForPoints()
+{
+    TfTokenVector result;
+    for (const TfToken &name :
+             UsdSkelImagingExtAggregatorComputationInputNameTokens->allTokens) {
+        if (name == UsdSkelImagingExtAggregatorComputationInputNameTokens
+                        ->restNormals) {
+            continue;
+        }
+        if (name == UsdSkelImagingExtAggregatorComputationInputNameTokens
+                        ->faceVertexIndices) {
+            continue;
+        }
+        if (name == UsdSkelImagingExtAggregatorComputationInputNameTokens
+                        ->hasFaceVaryingNormals) {
+            continue;
+        }
+        result.push_back(name);
+    }
+    return result;
+}
+
+TfTokenVector
+_ExtComputationInputNamesForNormals()
+{
+    TfTokenVector result;
+    for (const TfToken &name :
+             UsdSkelImagingExtAggregatorComputationInputNameTokens->allTokens) {
+        if (name == UsdSkelImagingExtAggregatorComputationInputNameTokens
+                        ->restPoints) {
+            continue;
+        }
+        if (name == UsdSkelImagingExtAggregatorComputationInputNameTokens
+                        ->blendShapeOffsets) {
+            continue;
+        }
+        if (name == UsdSkelImagingExtAggregatorComputationInputNameTokens
+                        ->blendShapeOffsetRanges) {
+            continue;
+        }
+        if (name == UsdSkelImagingExtAggregatorComputationInputNameTokens
+                        ->numBlendShapeOffsetRanges) {
+            continue;
+        }
+        result.push_back(name);
+    }
+    return result;
+}
+
 // Data source for locator extComputation:inputValues on
 // skinningInputAggregatorComputation prim.
 class _ExtAggregatorComputationInputValuesDataSource
@@ -40,7 +90,16 @@ public:
     {
         // TODO
         // We might wanna consider reusing HdSkinningInputTokens here.
-        return UsdSkelImagingExtAggregatorComputationInputNameTokens->allTokens;
+        if (_computationType == UsdSkelImagingExtComputationTypeTokens
+                                    ->points) {
+            static const TfTokenVector pointInputNames =
+                _ExtComputationInputNamesForPoints();
+            return pointInputNames;
+        } else {
+            static const TfTokenVector normalInputNames =
+                _ExtComputationInputNamesForNormals();
+            return normalInputNames;
+        }
     }
 
     HdDataSourceBaseHandle Get(const TfToken &name) override {
@@ -78,18 +137,33 @@ public:
                                 ->numBlendShapeOffsetRanges) {
             return _resolvedPrimSource->GetNumBlendShapeOffsetRanges();
         }
+        if (name == UsdSkelImagingExtAggregatorComputationInputNameTokens
+                                ->restNormals) {
+            return _resolvedPrimSource->GetNormals();
+        }
+        if (name == UsdSkelImagingExtAggregatorComputationInputNameTokens
+                                ->faceVertexIndices) {
+            return _resolvedPrimSource->GetFaceVertexIndices();
+        }
+        if (name == UsdSkelImagingExtAggregatorComputationInputNameTokens
+                                ->hasFaceVaryingNormals) {
+            return _resolvedPrimSource->GetHasFaceVaryingNormals();
+        }
 
         return nullptr;
     }
 
 private:
     _ExtAggregatorComputationInputValuesDataSource(
-        UsdSkelImagingDataSourceResolvedPointsBasedPrimHandle resolvedPrimSource)
-     : _resolvedPrimSource(std::move(resolvedPrimSource))
+        UsdSkelImagingDataSourceResolvedPointsBasedPrimHandle resolvedPrimSource,
+        const TfToken& computationType)
+      : _resolvedPrimSource(std::move(resolvedPrimSource))
+      , _computationType(computationType)
     {
     }
 
     UsdSkelImagingDataSourceResolvedPointsBasedPrimHandle const _resolvedPrimSource;
+    const TfToken _computationType;
 };
 
 TfTokenVector
@@ -188,19 +262,21 @@ private:
 // Data source for locator extComputations:dispatchCount and
 // extComputations:elementCount on skinningComputation prim.
 
-class _NumPointsDataSource : public HdSizetDataSource
+class _NumElementsDataSource : public HdSizetDataSource
 {
 public:
-    HD_DECLARE_DATASOURCE(_NumPointsDataSource);
+    HD_DECLARE_DATASOURCE(_NumElementsDataSource);
 
-    VtValue GetValue(const HdSampledDataSource::Time shutterOffset) override {
+    VtValue GetValue(const HdSampledDataSource::Time shutterOffset) override
+    {
         return VtValue(GetTypedValue(shutterOffset));
     }
 
-    size_t GetTypedValue(const HdSampledDataSource::Time shutterOffset) override {
+    size_t GetTypedValue(const HdSampledDataSource::Time shutterOffset) override
+    {
         TRACE_FUNCTION();
 
-        HdSampledDataSourceHandle const ds = _GetPoints();
+        HdSampledDataSourceHandle const ds = _GetPrimvarValue();
         if (!ds) {
             return 0;
         }
@@ -214,7 +290,7 @@ public:
     {
         TRACE_FUNCTION();
 
-        HdSampledDataSourceHandle const ds = _GetPoints();
+        HdSampledDataSourceHandle const ds = _GetPrimvarValue();
         if (!ds) {
             return false;
         }
@@ -223,23 +299,28 @@ public:
     }
 
 private:
-    _NumPointsDataSource(const HdPrimvarsSchema &primvars)
-     : _primvars(primvars)
+    _NumElementsDataSource(
+        const HdPrimvarsSchema &primvars,
+        const TfToken &primvarName)
+      : _primvars(primvars)
+      , _primvarName(primvarName)
     {
     }
 
-    HdSampledDataSourceHandle _GetPoints() {
-        return _primvars.GetPrimvar(HdPrimvarsSchemaTokens->points)
-                                .GetPrimvarValue();
+    HdSampledDataSourceHandle _GetPrimvarValue()
+    {
+        return _primvars.GetPrimvar(_primvarName).GetPrimvarValue();
     }
 
     const HdPrimvarsSchema _primvars;
+    const TfToken _primvarName;
 };
 
 // Prim data source skinningInputAggregatorComputation prim.
 HdContainerDataSourceHandle
 _ExtAggregatorComputationPrimDataSource(
-    UsdSkelImagingDataSourceResolvedPointsBasedPrimHandle resolvedPrimSource)
+    UsdSkelImagingDataSourceResolvedPointsBasedPrimHandle resolvedPrimSource,
+    const TfToken &computationType)
 {
     TRACE_FUNCTION();
 
@@ -249,24 +330,41 @@ _ExtAggregatorComputationPrimDataSource(
             HdExtComputationSchema::Builder()
                 .SetInputValues(
                     _ExtAggregatorComputationInputValuesDataSource::New(
-                        std::move(resolvedPrimSource)))
+                        std::move(resolvedPrimSource),
+                        computationType))
                 .Build());
 }
 
 // Data source for locator extComputation:inputComputations on
 // skinningComputation prim.
 HdContainerDataSourceHandle
-_ExtComputationInputComputations(const SdfPath &primPath)
+_ExtComputationInputComputations(
+    const SdfPath &primPath,
+    const TfToken &computationType)
 {
     TRACE_FUNCTION();
 
-    static const TfTokenVector names =
-        UsdSkelImagingExtAggregatorComputationInputNameTokens->allTokens;
+    static const TfTokenVector pointInputNames =
+        _ExtComputationInputNamesForPoints();
+    static const TfTokenVector normalInputNames =
+        _ExtComputationInputNamesForNormals();
+
+    const TfTokenVector &names =
+        (computationType == UsdSkelImagingExtComputationTypeTokens->points)
+            ? pointInputNames
+            : normalInputNames;
+
+    const TfToken computationName = 
+        (computationType == UsdSkelImagingExtComputationTypeTokens->points)
+            ? UsdSkelImagingExtComputationNameTokens
+                ->pointsAggregatorComputation
+            : UsdSkelImagingExtComputationNameTokens
+                ->normalsAggregatorComputation;
 
     HdPathDataSourceHandle const pathSrc =
         HdRetainedTypedSampledDataSource<SdfPath>::New(
             primPath.AppendChild(
-                UsdSkelImagingExtComputationNameTokens->aggregatorComputation));
+                computationName));
 
     std::vector<HdDataSourceBaseHandle> values;
     values.reserve(names.size());
@@ -289,11 +387,14 @@ _ExtComputationInputComputations(const SdfPath &primPath)
 // Data source for locator extComputation:outputs on
 // skinningComputation prim.
 HdContainerDataSourceHandle
-_ExtComputationOutputs()
+_ExtComputationOutputs(
+    const TfToken& computationType)
 {
-    static const TfToken names[] = {
-        UsdSkelImagingExtComputationOutputNameTokens->skinnedPoints
-    };
+    const TfToken computationOutput =
+        (computationType == UsdSkelImagingExtComputationTypeTokens->points)
+            ? UsdSkelImagingExtComputationOutputNameTokens->skinnedPoints
+            : UsdSkelImagingExtComputationOutputNameTokens->skinnedNormals;
+    const TfToken names[] = { computationOutput };
     HdDataSourceBaseHandle const values[] = {
         HdExtComputationOutputSchema::Builder()
             .SetValueType(
@@ -311,15 +412,19 @@ _ExtComputationOutputs()
 // Prim data source skinningComputation prim.
 HdContainerDataSourceHandle
 _ExtComputationPrimDataSource(
-    UsdSkelImagingDataSourceResolvedPointsBasedPrimHandle resolvedPrimSource)
+    UsdSkelImagingDataSourceResolvedPointsBasedPrimHandle resolvedPrimSource,
+    const TfToken &computationType)
 {
     TRACE_FUNCTION();
 
-    static HdContainerDataSourceHandle const outputs =
-        _ExtComputationOutputs();
-    const SdfPath &primPath = resolvedPrimSource->GetPrimPath();
-    HdSizetDataSourceHandle const numPoints =
-        _NumPointsDataSource::New(resolvedPrimSource->GetPrimvars());
+    const TfToken primvarName = 
+        (computationType == UsdSkelImagingExtComputationTypeTokens->points)
+            ? HdPrimvarsSchemaTokens->points
+            : HdPrimvarsSchemaTokens->normals;
+    HdSizetDataSourceHandle const elementCount =
+        _NumElementsDataSource::New(
+            resolvedPrimSource->GetPrimvars(),
+            primvarName);
 
     return
         HdRetainedContainerDataSource::New(
@@ -330,17 +435,20 @@ _ExtComputationPrimDataSource(
                         resolvedPrimSource))
                 .SetInputComputations(
                     _ExtComputationInputComputations(
-                        primPath))
+                        resolvedPrimSource->GetPrimPath(),
+                        computationType))
                 .SetOutputs(
-                    outputs)
+                    _ExtComputationOutputs(
+                        computationType))
                 .SetGlslKernel(
                     UsdSkelImagingExtComputationGlslKernel(
-                        resolvedPrimSource->GetSkinningMethod()))
+                        resolvedPrimSource->GetSkinningMethod(),
+                        computationType))
                 .SetCpuCallback(
                     UsdSkelImagingExtComputationCpuCallback(
                         resolvedPrimSource->GetSkinningMethod()))
-                .SetDispatchCount(numPoints)
-                .SetElementCount(numPoints)
+                .SetDispatchCount(elementCount)
+                .SetElementCount(elementCount)
                 .Build());
 }
 
@@ -354,16 +462,32 @@ UsdSkelImagingDataSourceResolvedExtComputationPrim(
     TRACE_FUNCTION();
 
     if (computationName == UsdSkelImagingExtComputationNameTokens
-                                ->computation) {
+                                ->pointsComputation) {
         return
             _ExtComputationPrimDataSource(
-                std::move(resolvedPrimSource));
+                std::move(resolvedPrimSource),
+                UsdSkelImagingExtComputationTypeTokens->points);
     }
     if (computationName == UsdSkelImagingExtComputationNameTokens
-                                ->aggregatorComputation) {
+                                ->normalsComputation) {
+        return
+            _ExtComputationPrimDataSource(
+                std::move(resolvedPrimSource),
+                UsdSkelImagingExtComputationTypeTokens->normals);
+    }
+    if (computationName == UsdSkelImagingExtComputationNameTokens
+                                ->pointsAggregatorComputation) {
         return
             _ExtAggregatorComputationPrimDataSource(
-                std::move(resolvedPrimSource));
+                std::move(resolvedPrimSource),
+                UsdSkelImagingExtComputationTypeTokens->points);
+    }
+    if (computationName == UsdSkelImagingExtComputationNameTokens
+                                ->normalsAggregatorComputation) {
+        return
+            _ExtAggregatorComputationPrimDataSource(
+                std::move(resolvedPrimSource),
+                UsdSkelImagingExtComputationTypeTokens->normals);
     }
 
     return nullptr;

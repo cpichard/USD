@@ -22,6 +22,7 @@
 #include "pxr/base/tf/regTest.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/stringUtils.h"
+#include "pxr/exec/ef/timeInterval.h"
 #include "pxr/exec/exec/computationBuilders.h"
 #include "pxr/exec/exec/registerSchema.h"
 #include "pxr/exec/exec/validationError.h"
@@ -136,7 +137,14 @@ public:
     ExecUsdRequest BuildRequest(
         std::vector<ExecUsdValueKey> &&valueKeys) {
         return _system->BuildRequest(
-            std::move(valueKeys));
+            std::move(valueKeys),
+            [this](
+                const ExecRequestIndexSet &invalidIndices,
+                const EfTimeInterval &invalidInterval) {
+                invalidRequestIndices.insert(
+                    invalidIndices.begin(), invalidIndices.end());
+                invalidTimeInterval |= invalidInterval;
+            });
     }
 
     UsdRelationship GetRelationshipAtPath(const char *const pathStr) const {
@@ -160,6 +168,10 @@ public:
         rel.AddTarget(SdfPath(targetPathStr));
     }
 
+public:
+    ExecRequestIndexSet invalidRequestIndices;
+    EfTimeInterval invalidTimeInterval;
+
 private:
     UsdStageRefPtr _stage;
     std::optional<ExecUsdSystem> _system;
@@ -180,7 +192,7 @@ public:
         std::string foundExpectedErrors;
         std::string missingExpectedErrors;
         std::string unexpectedErrors;
-        
+
         for (const TfError &error : _errorMark) {
             const auto it = std::find(
                 _expectedErrorTypes.begin(),
@@ -250,7 +262,7 @@ private:
     const ExpectedValidationErrors _expectedErrors(                            \
         TF_CALL_CONTEXT, {__VA_ARGS__});
 
-static bool
+static void
 Test_CycleDetectionRequiresRecompilation()
 {
     Fixture fixture;
@@ -282,12 +294,10 @@ Test_CycleDetectionRequiresRecompilation()
         const ExecUsdCacheView cacheView = system.Compute(request);
         TF_AXIOM(cacheView.Get(0).IsEmpty());
     }
-
-    return true;
 }
 
 // Test that we detect a cycle when a computation sources itself as an input.
-static bool
+static void
 Test_CyclicComputation()
 {
     Fixture fixture;
@@ -306,14 +316,12 @@ Test_CyclicComputation()
     // Should extract an empty value because the leaf node was not compiled.
     const ExecUsdCacheView cacheView = system.Compute(request);
     TF_AXIOM(cacheView.Get(0).IsEmpty());
-
-    return true;
 }
 
 // Test that we detect a cycle when a pair of computations source eachother as
 // inputs.
 //
-static bool
+static void
 Test_CyclicComputationPair()
 {
     Fixture fixture;
@@ -332,14 +340,12 @@ Test_CyclicComputationPair()
     // Should extract an empty value because the leaf node was not compiled.
     const ExecUsdCacheView cacheView = system.Compute(request);
     TF_AXIOM(cacheView.Get(0).IsEmpty());
-
-    return true;
 }
 
 // Test that we detect a cycle when a computation sources its input from a
 // relationship target, which is part of a cycle of relationship targets.
 //
-static bool
+static void
 Test_CyclicRelationshipComputation()
 {
     Fixture fixture;
@@ -365,8 +371,6 @@ Test_CyclicRelationshipComputation()
     // Should extract an empty value because the leaf node was not compiled.
     const ExecUsdCacheView cacheView = system.Compute(request);
     TF_AXIOM(cacheView.Get(0).IsEmpty());
-
-    return true;
 }
 
 // Test that we detect a cycle when a computation sources its input from a
@@ -374,7 +378,7 @@ Test_CyclicRelationshipComputation()
 // specifically tests the case when the relationship cycle is large, and also
 // tests the case where multiple leaf tasks depend on the same cycle.
 //
-static bool
+static void
 Test_LargeCyclicRelationshipComputation()
 {
     const int SIZE = 500;
@@ -412,14 +416,12 @@ Test_LargeCyclicRelationshipComputation()
     for (int i = 0; i < 5; ++i) {
         TF_AXIOM(cacheView.Get(i).IsEmpty());
     }
-
-    return true;
 }
 
 // Test that we detect a cycle when a computation sources its input from its
 // ancestor, but one of those ancestors sources its input from a descendant.
 //
-static bool
+static void
 Test_CyclicAncestorComputation()
 {
     Fixture fixture;
@@ -445,14 +447,12 @@ Test_CyclicAncestorComputation()
     // Should extract an empty value because the leaf node was not compiled.
     const ExecUsdCacheView cacheView = system.Compute(request);
     TF_AXIOM(cacheView.Get(0).IsEmpty());
-
-    return true;
 }
 
 // Test that we detect a cycle when a previously cycle-free scene introduces
 // a cycle by authoring a new relationship target.
 //
-static bool
+static void
 Test_CyclicRelationshipComputationAfterRecompile()
 {
     Fixture fixture;
@@ -498,15 +498,13 @@ Test_CyclicRelationshipComputationAfterRecompile()
         TF_AXIOM(cacheView.Get(0).IsHolding<int>());
         TF_AXIOM(cacheView.Get(0).Get<int>() == 3);
     }
-
-    return true;
 }
 
 // Test that we detect a cycle when a previously cycle-free scene recompiles
 // two separate inputs that end up depending on each other, creating a
 // "figure 8" cycle.
 //
-static bool
+static void
 Test_CyclicRelationshipComputationFigure8()
 {
     Fixture fixture;
@@ -575,21 +573,113 @@ Test_CyclicRelationshipComputationFigure8()
         TF_AXIOM(cacheView.Get(0).Get<int>() == 2);
         TF_AXIOM(cacheView.Get(1).Get<int>() == 2);
     }
-
-    return true;
 }
 
-TF_ADD_REGTEST(CycleDetectionRequiresRecompilation);
-TF_ADD_REGTEST(CyclicComputation);
-TF_ADD_REGTEST(CyclicComputationPair);
-TF_ADD_REGTEST(CyclicRelationshipComputation);
-TF_ADD_REGTEST(LargeCyclicRelationshipComputation);
-TF_ADD_REGTEST(CyclicAncestorComputation);
-TF_ADD_REGTEST(CyclicRelationshipComputationAfterRecompile);
-TF_ADD_REGTEST(CyclicRelationshipComputationFigure8);
+// Test that we send value key invalidation for indicies that depend on cycles.
+// When compilation is interrupted due to cycle detection, we cannot tell which
+// scene changes would break those cycles. We must conservatively invalidate
+// those value keys on every scene change.
+// 
+static void
+Test_CycleDetectionRequestInvalidation()
+{
+    Fixture fixture;
+    ExecUsdSystem &system = fixture.NewSystemFromLayer(R"usd(#usda 1.0
+        def CustomSchema "A" {
+            add rel customRel = </B>
+        }
+        def CustomSchema "B" {
+            rel customRel
+        }
+        def "Other" {
+            int customAttr = 42
+            rel customRel
+            def "Target1" {}
+            def "Target2" {}
+            def "Target3" {}
+        }
+    )usd");
 
-int main(int argc, char **argv)
+    ExecUsdRequest request = fixture.BuildRequest({
+        // [Key 0] This value key always depends on a cycle.
+        {fixture.GetPrimAtPath("/A"), _tokens->cyclicComputation},
+
+        // [Key 1] This value key initially does not depend on a cycle. Then,
+        // adding a relationship target from /B.customRel -> /A creates a cycle.
+        {fixture.GetPrimAtPath("/A"), _tokens->cyclicRelComputation},
+
+        // [Key 2] The value key will never depend on a cycle.
+        ExecUsdValueKey{fixture.GetAttributeAtPath("/Other.customAttr")}
+    });
+
+    {
+        // On first compute, we find a cycle due to Key 0. The leaf node for key
+        // 0 could not be compiled. Keys 1 and 2 are well-defined.
+        EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
+        const ExecUsdCacheView cacheView = system.Compute(request);
+        TF_AXIOM(cacheView.Get(0).IsEmpty());
+        TF_AXIOM(cacheView.Get(1).Get<int>() == 2);
+        TF_AXIOM(cacheView.Get(2).Get<int>() == 42);
+    }
+
+    // Keys that depend on a cycle should be invalidated for all scene changes,
+    // because exec cannot know if the network objects that *would have* been
+    // compiled actually depend on a given scene change.
+    fixture.invalidRequestIndices.clear();
+    fixture.AddRelationshipTarget("/Other.customRel", "/Other/Target1");
+    TF_AXIOM(fixture.invalidRequestIndices.size() == 1);
+    TF_AXIOM(fixture.invalidRequestIndices.contains(0));
+
+    // Once invalidated, the indices are not notified again (until the next call
+    // to Compute).
+    fixture.invalidRequestIndices.clear();
+    fixture.AddRelationshipTarget("/Other.customRel", "/Other/Target2");
+    TF_AXIOM(fixture.invalidRequestIndices.empty());
+
+    // Make another scene change that causes key 1 to depend on a cycle. This
+    // should invalidate key 1.
+    fixture.invalidRequestIndices.clear();
+    fixture.AddRelationshipTarget("/B.customRel", "/A");
+    TF_AXIOM(fixture.invalidRequestIndices.size() == 1);
+    TF_AXIOM(fixture.invalidRequestIndices.contains(1));
+
+    {
+        // Recomputing the request should again find cycles. The leaf node for
+        // key 0 still cannot be created.
+        EXPECT_VALIDATION_ERRORS(ExecValidationErrorType::DataDependencyCycle);
+        const ExecUsdCacheView cacheView = system.Compute(request);
+
+        // Key 0 still doesn't have a leaf node. We extract an empty VtValue.
+        TF_AXIOM(cacheView.Get(0).IsEmpty());
+
+        // Key 1 did have a leaf node, so we're still able to extract a value,
+        // even if it is an incorrect value.
+        TF_AXIOM(cacheView.Get(1).Get<int>() == 2);
+
+        // Key 2 still has a well-defined value.
+        TF_AXIOM(cacheView.Get(2).Get<int>() == 42);
+    }
+
+    // Now that keys 0 and 1 both depend on cycles, they should both be
+    // invalidated on any scene change.
+    fixture.invalidRequestIndices.clear();
+    fixture.AddRelationshipTarget("/Other.customRel", "/Other/Target3");
+    TF_AXIOM(fixture.invalidRequestIndices.size() == 2);
+    TF_AXIOM(fixture.invalidRequestIndices.contains(0));
+    TF_AXIOM(fixture.invalidRequestIndices.contains(1));
+}
+
+int main()
 {
     ConfigureTestPlugin();
-    return TfRegTest::Main(argc, argv);
+
+    Test_CycleDetectionRequiresRecompilation();
+    Test_CyclicComputation();
+    Test_CyclicComputationPair();
+    Test_CyclicRelationshipComputation();
+    Test_LargeCyclicRelationshipComputation();
+    Test_CyclicAncestorComputation();
+    Test_CyclicRelationshipComputationAfterRecompile();
+    Test_CyclicRelationshipComputationFigure8();
+    Test_CycleDetectionRequestInvalidation();
 }

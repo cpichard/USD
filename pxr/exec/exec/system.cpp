@@ -244,4 +244,10 @@ ExecSystem::_InvalidateMetadataValues(
     });
 }
 
+void
+ExecSystem::_InvalidateUnknownValues()
+{
+    _requestTracker->DidInvalidateUnknownValues();
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE

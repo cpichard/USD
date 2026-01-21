@@ -98,7 +98,7 @@ const FromLegacyFnMap& _GetFromLegacyFnMap() {
     static const FromLegacyFnMap _fromLegacyFns = {
         {SdrNodeMetadata->Label, _LegacyStringToTfToken},
         {SdrNodeMetadata->Category, _LegacyStringToTfToken},
-        {SdrNodeMetadata->Role, _LegacyStringToString},
+        {SdrNodeMetadata->Role, _LegacyStringToTfToken},
         {SdrNodeMetadata->Help, _LegacyStringToString},
         {SdrNodeMetadata->Departments, _LegacyStringToSdrTokenVec},
         {SdrNodeMetadata->Pages, _LegacyStringToSdrTokenVec},
@@ -117,7 +117,7 @@ const ToLegacyFnMap& _GetToLegacyFnMap() {
     static const ToLegacyFnMap _toLegacyFns = {
         {SdrNodeMetadata->Label, _LegacyStringFromTfToken},
         {SdrNodeMetadata->Category, _LegacyStringFromTfToken},
-        {SdrNodeMetadata->Role, _LegacyStringFromString},
+        {SdrNodeMetadata->Role, _LegacyStringFromTfToken},
         {SdrNodeMetadata->Help, _LegacyStringFromString},
         {SdrNodeMetadata->Departments, _LegacyStringFromSdrTokenVec},
         {SdrNodeMetadata->Pages, _LegacyStringFromSdrTokenVec},
@@ -138,7 +138,7 @@ const DefaultsMap& _GetDefaultsMap() {
     static const DefaultsMap _defaults = {
         {SdrNodeMetadata->Label, VtValue(TfToken(""))},
         {SdrNodeMetadata->Category, VtValue(TfToken(""))},
-        {SdrNodeMetadata->Role, VtValue(std::string(""))},
+        {SdrNodeMetadata->Role, VtValue(TfToken(""))},
         {SdrNodeMetadata->Help, VtValue(std::string(""))},
         {SdrNodeMetadata->Departments, VtValue(SdrTokenVec())},
         {SdrNodeMetadata->Pages, VtValue(SdrTokenVec())},
@@ -151,6 +151,13 @@ const DefaultsMap& _GetDefaultsMap() {
             VtValue(std::string(""))}
     };
     return _defaults;
+}
+
+bool _HasSetItemExclusion(const TfToken& key, const VtValue& value) {
+    if (key == SdrNodeMetadata->Role && value == VtValue(TfToken(""))) {
+        return true;
+    }
+    return false;
 }
 
 } // anonymous namespace
@@ -200,8 +207,14 @@ SdrShaderNodeMetadata::SetItem(
                             "to the registered type for key %s, "
                             "item not set", key.GetText());
         } else {
-            _items[key] = value;
+            _items[key] = cast;
         }
+    }
+
+    // Clear the value if the assigned value is an value that
+    // is meant to indicate non-existence.
+    if (_HasSetItemExclusion(key, _items[key])) {
+        ClearItem(key);
     }
 }
 
@@ -240,10 +253,13 @@ SdrShaderNodeMetadata::_EncodeLegacyMetadata() const
             // add metadata items that don't have a legacy encoding.
             const VtValue cast = VtValue::Cast<std::string>(value);
             if (cast.IsEmpty()) {
-                TF_WARN("Unable to encode legacy metadata "
-                        "(SdrTokenMap)-compatible value string for key "
-                        "'%s'. Use SdrShaderNodeMetadata to inspect "
-                        "complete metadata.\n", key.GetText());
+                // Do nothing here. If we get to this point, the user has
+                // constructed a SdrShaderNodeMetadata with a custom value
+                // not directly compatible with string. This indicates
+                // that the user is aware of the metadata upgrade in general,
+                // and should also use SdrShaderNode::GetMetadataObject
+                // instead of the deprecated SdrShaderNode::GetMetadata to
+                // get their custom value.
             } else {
                 legacyMetadata[key] = cast.UncheckedGet<std::string>();
             }
@@ -267,7 +283,7 @@ SdrShaderNodeMetadata::_EncodeLegacyMetadata() const
 
 SDR_NODE_METADATA_DEFINE_ITEM_API(Label, TfToken)
 SDR_NODE_METADATA_DEFINE_ITEM_API(Category, TfToken)
-SDR_NODE_METADATA_DEFINE_ITEM_API(Role, std::string)
+SDR_NODE_METADATA_DEFINE_ITEM_API(Role, TfToken)
 SDR_NODE_METADATA_DEFINE_ITEM_API(Help, std::string)
 SDR_NODE_METADATA_DEFINE_ITEM_API(Departments, SdrTokenVec)
 SDR_NODE_METADATA_DEFINE_ITEM_API(Pages, SdrTokenVec)

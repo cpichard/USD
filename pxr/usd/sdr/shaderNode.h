@@ -239,7 +239,7 @@ public:
     /// volume fields (like extinction or scattering). This is done to identify
     /// resources used by a shading network.
     SDR_API
-    std::string GetRole() const;
+    TfToken GetRole() const;
 
     /// The help message assigned to this node, if any.
     ///

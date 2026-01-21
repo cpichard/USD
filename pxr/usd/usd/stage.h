@@ -705,7 +705,9 @@ public:
     ///
     /// The stage's named root prims are namespace children of this prim,
     /// which exists to make the namespace hierarchy a tree instead of a
-    /// forest.  This simplifies algorithms that want to traverse all prims.
+    /// forest.  This simplifies algorithms that want to traverse all prims.  
+    /// Note that the \ref Usd_stageMetadata "stage metadata" is accesible 
+    /// through the pseudo root.
     ///
     /// A UsdStage always has a pseudo-root prim, unless there was an error
     /// opening or creating the stage, in which case this method returns
@@ -1627,6 +1629,7 @@ private:
     UsdPrimDefinition::Property
     _GetSchemaProperty(const UsdProperty &prop) const;
 
+    USD_API
     UsdPrimDefinition::Attribute
     _GetSchemaAttribute(const UsdAttribute &attr) const;
 

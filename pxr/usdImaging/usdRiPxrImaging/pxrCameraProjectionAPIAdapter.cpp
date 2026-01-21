@@ -130,6 +130,10 @@ _GetNamespacedPropertyMappingsForAppliedSchema(
     }
 
     for (const TfToken &usdName : primDef->GetPropertyNames()) {
+        auto prop = primDef->GetPropertyDefinition(usdName);
+        if (!prop || !prop.IsAttribute()) {
+            continue;
+        }
         std::pair<TfToken, TfToken> namespaceAndName =
             _SplitNamespace(usdName);
         if (namespaceAndName.first == _tokens->outputs) {

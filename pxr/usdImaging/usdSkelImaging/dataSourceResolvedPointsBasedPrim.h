@@ -138,6 +138,15 @@ public:
     USDSKELIMAGING_API
     HdDataSourceBaseHandle GetNumBlendShapeOffsetRanges();
 
+    USDSKELIMAGING_API
+    HdSampledDataSourceHandle GetNormals();
+
+    USDSKELIMAGING_API
+    HdSampledDataSourceHandle GetFaceVertexIndices();
+
+    USDSKELIMAGING_API
+    HdDataSourceBaseHandle GetHasFaceVaryingNormals();
+
     /// Blend shape data computed from primvars, skel bindings and skeleton.
     USDSKELIMAGING_API
     std::shared_ptr<UsdSkelImagingBlendShapeData> GetBlendShapeData();

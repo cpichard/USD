@@ -219,7 +219,7 @@ SdrShaderPropertyMetadata::SetItem(
                             "to the registered type for key %s, "
                             "item not set", key.GetText());
         } else {
-            _items[key] = value;
+            _items[key] = cast;
         }
     }
 }
@@ -259,10 +259,13 @@ SdrShaderPropertyMetadata::_EncodeLegacyMetadata() const
             // add metadata items that don't have a legacy encoding.
             const VtValue cast = VtValue::Cast<std::string>(value);
             if (cast.IsEmpty()) {
-                TF_WARN("Unable to encode legacy metadata "
-                        "(SdrTokenMap)-compatible value string for key "
-                        "'%s'. Use SdrShaderNodeMetadata to inspect "
-                        "complete metadata.\n", key.GetText());
+                // Do nothing here. If we get to this point, the user has
+                // constructed a SdrShaderPropertyMetadata with a custom value
+                // not directly compatible with string. This indicates
+                // that the user is aware of the metadata upgrade in general,
+                // and should also use SdrShaderProperty::GetMetadataObject
+                // instead of the deprecated SdrShaderProperty::GetMetadata to
+                // get their custom value.
             } else {
                 legacyMetadata[key] = cast.UncheckedGet<std::string>();
             }

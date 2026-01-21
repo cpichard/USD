@@ -124,6 +124,7 @@ pxr_library(usdImaging
         usdRenderProductSchema
         usdRenderSettingsSchema
         usdRenderVarSchema
+        usdSceneIndexInputArgsSchema
         rectLightAdapter
         renderPassAdapter
         renderProductAdapter
