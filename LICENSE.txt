@@ -553,6 +553,13 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+============================================================
+PBRT (Sampling functions)
+============================================================
+USD includes code derived from the pbrt-v4 library, retrieved from 
+https://github.com/mmp/pbrt-v4/tree/8c19f304558fd7681e2fef2c395a689d0106fb05, which was
+provided subject to the unmodified Apache 2.0 license. For details, see
+https://github.com/mmp/pbrt-v4/blob/8c19f304558fd7681e2fef2c395a689d0106fb05/LICENSE.txt
 
 ============================================================
 Spirv Reflect
