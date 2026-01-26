@@ -32,6 +32,7 @@ pxr_plugin(hdEmbree
         lightSamplers
         mesh
         meshSamplers
+        pxrIES/ies
         renderBuffer
         renderer
         rendererPlugin
