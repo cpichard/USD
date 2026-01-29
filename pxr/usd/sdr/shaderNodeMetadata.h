@@ -111,9 +111,12 @@ public:
     /// If the key-value item already exists, it will be overwritten by the
     /// provided arguments.
     ///
-    /// Issues a TF_CODING_ERROR if the value is empty or if the key is in
-    /// "named metadata" and the value's contained type does not match the type
-    /// registered by the named metadata item.
+    /// Clears the item if given an empty VtValue.
+    ///
+    /// Issues a TF_CODING_ERROR if the key is in "named metadata" and
+    /// the value's contained type does not match the type
+    /// registered by the named metadata item. In this case, no action
+    /// is taken to set the item.
     SDR_API
     void SetItem(const TfToken& key, const VtValue& value);
 

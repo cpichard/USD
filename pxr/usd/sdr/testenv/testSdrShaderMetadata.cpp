@@ -41,6 +41,11 @@ TestNodeLabel()
     TF_VERIFY(m.HasLabel());
     TF_VERIFY(m.HasItem(SdrNodeMetadata->Label));
     TF_VERIFY(m.GetItemValue(SdrNodeMetadata->Label) == VtValue(TfToken("")));
+
+    // Test that setting label's value to an empty VtValue clears the item
+    m.SetItem(SdrNodeMetadata->Label, VtValue());
+    TF_VERIFY(!m.HasLabel());
+    TF_VERIFY(!m.HasItem(SdrNodeMetadata->Label));
 }
 
 void

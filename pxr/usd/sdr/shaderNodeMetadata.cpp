@@ -208,7 +208,7 @@ SdrShaderNodeMetadata::SetItem(
     const VtValue& value)
 {
     if (value.IsEmpty()) {
-        TF_CODING_ERROR("SetItem: Cannot set empty VtValue.");
+        ClearItem(key);
         return;
     }
 
@@ -222,6 +222,7 @@ SdrShaderNodeMetadata::SetItem(
             TF_CODING_ERROR("SetItem: Unable to convert given value"
                             "to the registered type for key %s, "
                             "item not set", key.GetText());
+            return;
         } else {
             _items[key] = cast;
         }
