@@ -3646,9 +3646,7 @@ _EvalImpliedClassTree(
         // the implied class for srcChild, so we don't don't need to redo 
         // the work to process it.
         TF_FOR_ALL(destChildIt, Pcp_GetChildrenRange(destNode)) {
-            if (destChildIt->GetOriginNode() != srcChild ||
-                destChildIt->GetMapToParent().Evaluate() 
-                    != destClassFunc.Evaluate()) {
+            if (destChildIt->GetOriginNode() != srcChild) {
                 continue;
             }
 
