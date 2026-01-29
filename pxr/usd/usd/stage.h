@@ -58,7 +58,7 @@ class Usd_AssetPathContext;
 class Usd_ClipCache;
 class Usd_InstanceCache;
 class Usd_InstanceChanges;
-class Usd_InterpolatorBase;
+class Usd_Interpolator;
 class Usd_Resolver;
 class UsdResolveInfo;
 class UsdResolveTarget;
@@ -1913,18 +1913,6 @@ private:
                                       VtValue *value,
                                       bool anchorAssetPathsOnly = false) const;
 
-    void _MakeResolvedTimeCodes(UsdTimeCode time, const UsdAttribute &attr,
-                                SdfTimeCode *timeCodes,
-                                size_t numTimeCodes) const;
-
-    void _MakeResolvedPathExpressions(
-        UsdTimeCode time, const UsdAttribute &attr,
-        SdfPathExpression *pathExprs,
-        size_t numPathExprs) const;
-
-    void _MakeResolvedAttributeValue(UsdTimeCode time, const UsdAttribute &attr,
-                                     VtValue *value) const;
-
     // --------------------------------------------------------------------- //
     // Metadata Resolution
     // --------------------------------------------------------------------- //
@@ -2044,7 +2032,7 @@ private:
         UsdResolveInfo *resolveInfo,
         const UsdTimeCode *time = nullptr) const;
 
-    template <class T> struct _ExtraResolveInfo;
+    template <class T=VtValue> struct _ExtraResolveInfo;
 
     // Gets the value resolve info for the given attribute. If time is provided,
     // the resolve info is evaluated for that specific time (which may be 
@@ -2083,8 +2071,15 @@ private:
                          _ExtraResolveInfo<T> *extraInfo,
                          const MakeUsdResolverFn &makeUsdResolveFn) const;
 
-    template <class T> struct _ResolveInfoResolver;
+    struct _BracketingSamplesResolver;
     struct _PropertyStackResolver;
+    template <class T> struct _ResolveInfoResolver;
+    struct _SamplesInIntervalResolver;
+    struct _TimeSampleMapResolver;
+
+    bool _GetTimeSampleMap(const UsdAttribute &attr,
+                           SdfTimeSampleMap *out,
+                           bool forFlattening=false) const;
 
     template <class Resolver, class MakeUsdResolverFn>
     void _GetResolvedValueAtDefaultImpl(
@@ -2102,36 +2097,48 @@ private:
     bool _GetValue(UsdTimeCode time, const UsdAttribute &attr, 
                    VtValue* result) const;
 
-    template <class T>
+    USD_API
     bool _GetValue(UsdTimeCode time, const UsdAttribute &attr,
-                   T* result) const;
+                   SdfAbstractDataValue* result) const;
 
     template <class T>
     bool _GetValueImpl(UsdTimeCode time, const UsdAttribute &attr, 
-                       Usd_InterpolatorBase* interpolator,
+                       Usd_Interpolator const &interpolator,
                        T* value) const;
 
     USD_API
-    bool _GetValueFromResolveInfo(const UsdResolveInfo &info,
-                                  UsdTimeCode time, const UsdAttribute &attr,
-                                  VtValue* result) const;
+    bool _GetValueFromResolveInfo(
+        const UsdResolveInfo &info,
+        UsdTimeCode time, const UsdAttribute &attr,
+        VtValue* result,
+        const UsdResolveTarget *resolveTarget = nullptr) const;
 
-    template <class T>
     USD_API
-    bool _GetValueFromResolveInfo(const UsdResolveInfo &info,
-                                  UsdTimeCode time, const UsdAttribute &attr,
-                                  T* result) const;
+    bool _GetValueFromResolveInfo(
+        const UsdResolveInfo &info,
+        UsdTimeCode time, const UsdAttribute &attr,
+        SdfAbstractDataValue* result,
+        const UsdResolveTarget *resolveTarget = nullptr) const;
+
+    // If `resolveTarget` is not null, then `infoIn` must have been obtained
+    // with it (see _GetResolveInfoWithResolveTarget).
+    //
+    // If `extraInfo` is not null, then `infoIn` must be a complete resolve info
+    // obtained for the specific `time`.
+    template <class T>
+    bool _GetValueFromResolveInfoImpl(
+        UsdTimeCode time, const UsdAttribute &attr,
+        Usd_Interpolator const &interpolator,
+        const UsdResolveInfo &infoIn, const UsdResolveTarget *resolveTarget,
+        const _ExtraResolveInfo<T> *extraInfo, T *result) const;
 
     template <class T>
-    bool _GetValueFromResolveInfoImpl(const UsdResolveInfo &info,
-                                      UsdTimeCode time, const UsdAttribute &attr,
-                                      Usd_InterpolatorBase* interpolator,
-                                      T* value) const;
-
-    template <class T>
-    bool _GetDefaultValueFromResolveInfoImpl(const UsdResolveInfo &info,
-                                             const UsdAttribute &attr,
-                                             T* value) const;
+    bool _GetCompletedResolveInfo(const UsdAttribute &attr,
+                                  UsdTimeCode time,
+                                  const UsdResolveTarget *resolveTarget,
+                                  const UsdResolveInfo &infoIn,
+                                  UsdResolveInfo *infoOut,
+                                  _ExtraResolveInfo<T> *extraInfoOut) const;
 
     Usd_AssetPathContext
     _GetAssetPathContext(UsdTimeCode time, const UsdAttribute &attr) const;
@@ -2146,43 +2153,35 @@ private:
     /// open/finite endpoints, however, this restriction may be lifted 
     /// in the future.
     /// Returns false on an error.
-    bool _GetTimeSamplesInInterval(const UsdAttribute &attr,
-                                   const GfInterval& interval,
-                                   std::vector<double>* times) const;
+    bool _GetTimeSamplesInInterval(
+        const UsdAttribute &attr,
+        const GfInterval& interval,
+        std::vector<double>* times,
+        const UsdResolveInfo *resolveInfo=nullptr,
+        const UsdResolveTarget *resolveTarget=nullptr) const;
 
-    bool _GetTimeSamplesInIntervalFromResolveInfo(
-                                   const UsdResolveInfo &info,
-                                   const UsdAttribute &attr,
-                                   const GfInterval& interval,
-                                   std::vector<double>* times) const;
-
-    size_t _GetNumTimeSamples(const UsdAttribute &attr) const;
-
-    size_t _GetNumTimeSamplesFromResolveInfo(const UsdResolveInfo &info,
-                                           const UsdAttribute &attr) const;
+    size_t _GetNumTimeSamples(
+        const UsdAttribute &attr,
+        const UsdResolveInfo *resolveInfo=nullptr,
+        const UsdResolveTarget *resolveTarget=nullptr) const;
 
     /// Gets the bracketing times around a desiredTime. Only false on error
     /// or if no value exists (default or timeSamples). See
     /// UsdAttribute::GetBracketingTimeSamples for details.
-    bool _GetBracketingTimeSamples(const UsdAttribute &attr,
-                                   double desiredTime,
-                                   bool authoredOnly,
-                                   double* lower,
-                                   double* upper,
-                                   bool* hasSamples) const;
-
-    bool _GetBracketingTimeSamplesFromResolveInfo(const UsdResolveInfo &info,
-                                                  const UsdAttribute &attr,
-                                                  double desiredTime,
-                                                  bool authoredOnly,
-                                                  double* lower,
-                                                  double* upper,
-                                                  bool* hasSamples) const;
+    bool _GetBracketingTimeSamples(
+        const UsdAttribute &attr,
+        double desiredTime,
+        double* lower,
+        double* upper,
+        bool* hasSamples,
+        const UsdResolveInfo *resolveInfo=nullptr,
+        const UsdResolveTarget *resolveTarget=nullptr) const;
 
     bool _ValueMightBeTimeVarying(const UsdAttribute &attr) const;
 
-    bool _ValueMightBeTimeVaryingFromResolveInfo(const UsdResolveInfo &info,
-                                                 const UsdAttribute &attr) const;
+    bool _ValueMightBeTimeVaryingFromResolveInfo(
+        const UsdResolveInfo &info,
+        const UsdAttribute &attr) const;
 
     void _RegisterPerLayerNotices();
     void _RegisterResolverChangeNotice();

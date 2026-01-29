@@ -22,7 +22,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class Usd_InterpolatorBase;
+class Usd_Interpolator;
 
 /// Returns true if \p value contains BlockType (SdfValueBlock or
 /// SdfAnimationBlock), false otherwise.
@@ -144,7 +144,8 @@ enum class Usd_DefaultValueResult
 
 template <class T, class Source>
 Usd_DefaultValueResult 
-Usd_HasDefault(const Source& source, const SdfPath& specPath, T* value)
+Usd_HasDefault(const Source& source, const SdfPath& specPath, T* value,
+               const std::type_info **valueTypeId=nullptr)
 {
 
     if (!value) {
@@ -161,6 +162,9 @@ Usd_HasDefault(const Source& source, const SdfPath& specPath, T* value)
             return Usd_DefaultValueResult::BlockedAnimation;
         }
         else {
+            if (valueTypeId) {
+                *valueTypeId = &ti;
+            }
             return Usd_DefaultValueResult::Found;
         }
     }
@@ -173,6 +177,17 @@ Usd_HasDefault(const Source& source, const SdfPath& specPath, T* value)
             if (Usd_ClearValueIfBlocked<SdfAnimationBlock>(value)) {
                 return Usd_DefaultValueResult::BlockedAnimation;
             }
+            if (valueTypeId) {
+                if constexpr (std::is_same_v<T, VtValue>) {
+                    *valueTypeId = &value->GetTypeid();
+                }
+                else if constexpr (std::is_same_v<T, SdfAbstractDataValue>) {
+                    *valueTypeId = &value->valueType;
+                }
+                else {
+                    *valueTypeId = &typeid(T);
+                }
+            }
             return Usd_DefaultValueResult::Found;
         }
         // fall-through
@@ -184,7 +199,7 @@ template <class T>
 inline bool
 Usd_QueryTimeSample(
     const SdfLayerRefPtr& layer, const SdfPath& path,
-    double time, Usd_InterpolatorBase* interpolator, T* result)
+    double time, Usd_Interpolator const &interpolator, T* result)
 {
     return layer->QueryTimeSample(path, time, result);
 }
