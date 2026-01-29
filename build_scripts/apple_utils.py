@@ -117,7 +117,7 @@ def SupportsMacOSUniversalBinaries():
     if not MacOS():
         return False
     XcodeVersion = GetXcodeVersion()[0]
-    return (XcodeVersion > 11)
+    return XcodeVersion > (11, 0)
 
 def GetSDKRoot(context) -> Optional[str]:
     sdk = "macosx"
@@ -171,7 +171,7 @@ def _GetCodeSignStringFromTerminal():
 
 def GetXcodeVersion():
     output = GetCommandOutput(['xcodebuild', '-version']).split()
-    version = float(output[1])
+    version = tuple(int(f) for f in output[1].split("."))
     build = output[-1]
 
     return version, build
@@ -188,7 +188,7 @@ def GetCodeSigningIdentifiers() -> Dict[str, str]:
             continue
         if ")" not in codeSignID:
             continue
-        if ((XcodeVersion >= 11 and "Apple Development" in codeSignID)
+        if ((XcodeVersion >= (11, 0) and "Apple Development" in codeSignID)
             or "Mac Developer" in codeSignID):
             identifier = codeSignID.split()[1]
             identifier_hash = re.search(r'\(.*?\)', codeSignID)
