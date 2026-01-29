@@ -49,43 +49,6 @@ TestNodeLabel()
 }
 
 void
-TestNodeRole()
-{
-    // Test that an empty Token value clears Role. This is a
-    // special behavior of Role that doesn't apply to other token
-    // valued metadata.
-    SdrShaderNodeMetadata m;
-    TF_VERIFY(!m.HasRole());
-    TF_VERIFY(!m.HasItem(SdrNodeMetadata->Role));
-    m.SetRole(TfToken());
-    TF_VERIFY(!m.HasRole());
-    TF_VERIFY(!m.HasItem(SdrNodeMetadata->Role));
-    m.SetRole(TfToken("hi"));
-    TF_VERIFY(m.HasRole());
-    TF_VERIFY(m.HasItem(SdrNodeMetadata->Role));
-    m.SetRole(TfToken());
-    TF_VERIFY(!m.HasRole());
-    TF_VERIFY(!m.HasItem(SdrNodeMetadata->Role));
-
-    // Test that ingesting an empty TfToken Role means that
-    // the metadata "doesn't have" a Role item.
-    VtDictionary d;
-    d[SdrNodeMetadata->Role] = TfToken("");
-    m = SdrShaderNodeMetadata(d);
-    TF_VERIFY(!m.HasRole());
-    TF_VERIFY(!m.HasItem(SdrNodeMetadata->Role));
-    // "Get" returns the default constructed type
-    TF_VERIFY(m.GetRole() == TfToken());
-    TF_VERIFY(m.GetItemValue(SdrNodeMetadata->Role) == VtValue());
-
-    // Test the positive ingestion case
-    d[SdrNodeMetadata->Role] = TfToken("hi");
-    m = SdrShaderNodeMetadata(d);
-    TF_VERIFY(m.HasRole());
-    TF_VERIFY(m.HasItem(SdrNodeMetadata->Role));
-}
-
-void
 TestNodeOpenPages()
 {
     // Tests the typical behavior for a metadata item with a complex type
@@ -105,7 +68,6 @@ void
 TestSdrShaderNodeMetadata()
 {
     TestNodeLabel();
-    TestNodeRole();
     TestNodeOpenPages();
 }
 

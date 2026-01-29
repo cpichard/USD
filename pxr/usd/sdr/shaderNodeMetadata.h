@@ -189,22 +189,11 @@ public:
     ///
     /// Role is used to annotate the role that the shader node plays inside
     /// a shader network.
-    ///
-    /// An empty Token value for Role indicates non-existence of Role metadata;
-    /// this is a disallowed state for Role.
-    /// \sa SetRole
-    ///
-    /// The "empty Token value" non-existence criterion is in addition to the
-    /// usual metadata non-existence criteria.
     /// {@
     SDR_API
     bool HasRole() const;
     SDR_API
     TfToken GetRole() const;
-
-    /// Sets the given Role value.
-    ///
-    /// If given an empty string, clears the Role item.
     SDR_API
     void SetRole(const TfToken& v);
     SDR_API
