@@ -706,7 +706,6 @@ public:
         static const TfTokenSet purposes = 
         {
             UsdShadeTokens->full,
-            HdMaterialBindingsSchemaTokens->_allPurposeToken,
             HdMaterialBindingsSchemaTokens->allPurpose,
         };
 

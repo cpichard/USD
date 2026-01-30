@@ -180,6 +180,22 @@ SdrShaderNodeMetadata::SdrShaderNodeMetadata(const SdrTokenMap& legacyMetadata)
     }
 }
 
+SdrShaderNodeMetadata::SdrShaderNodeMetadata(const VtDictionary& items) {
+    // Run SetItem on each metadata item because some items may have
+    // exclusions from _HasSetItemExclusion.
+    for (const auto& kv : items) {
+        SetItem(TfToken(kv.first), kv.second);
+    }
+}
+
+SdrShaderNodeMetadata::SdrShaderNodeMetadata(VtDictionary&& items) {
+    // Run SetItem on each metadata item because some items may have
+    // exclusions from _HasSetItemExclusion.
+    for (const auto& kv : items) {
+        SetItem(TfToken(kv.first), kv.second);
+    }
+}
+
 bool
 SdrShaderNodeMetadata::HasItem(const TfToken& key) const
 {

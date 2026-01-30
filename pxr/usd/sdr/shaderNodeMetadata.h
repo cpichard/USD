@@ -94,11 +94,11 @@ public:
         const std::initializer_list<std::pair<TfToken, std::string>>& init
     ): SdrShaderNodeMetadata(_LegacyCtorFromInitializer(init)) {}
 
-    explicit SdrShaderNodeMetadata(const VtDictionary& items)
-        : _items(items) {}
+    SDR_API
+    explicit SdrShaderNodeMetadata(const VtDictionary& items);
 
-    explicit SdrShaderNodeMetadata(VtDictionary&& items)
-        : _items(std::move(items)) {}
+    SDR_API
+    explicit SdrShaderNodeMetadata(VtDictionary&& items);
 
     SdrShaderNodeMetadata() {}
 

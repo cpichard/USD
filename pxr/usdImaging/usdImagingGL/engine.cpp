@@ -71,6 +71,11 @@ TF_DEFINE_ENV_SETTING(USDIMAGINGGL_ENGINE_DEBUG_SCENE_DELEGATE_ID, "/",
 TF_DEFINE_ENV_SETTING(USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX, true,
                       "Use Scene Index API for imaging scene input");
 
+TF_DEFINE_ENV_SETTING(
+    USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_DEPRECATION_WARNING, true,
+    "Issue a deprecation warning when USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX "
+    "is overriden to false.");
+
 /// \deprecated. Will always use task controller scene index in the future.
 TF_DEFINE_ENV_SETTING(USDIMAGINGGL_ENGINE_ENABLE_TASK_SCENE_INDEX, true,
                       "Use Scene Index API for task controller");
@@ -2992,9 +2997,15 @@ UsdImagingGLEngine::UseUsdImagingSceneIndex()
     if (!result) {
         static std::once_flag once;
         std::call_once(once, []() {
-            TF_WARN("*** Warning: USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX is "
-            "overridden to 0.  This code path is deprecated, and will be "
-            "removed in a future release of USD. ***");
+            if (TfGetEnvSetting(
+                USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_DEPRECATION_WARNING)) {
+                TF_WARN("*** Warning: USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX "
+                    "is overridden to 0.  This code path is deprecated, "
+                    "and will be removed in a future release of USD.  This "
+                    "deprecation notice can be suppressed by setting "
+                   "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_DEPRECATION_WARNING"
+                    "to '0'. ***");
+            }
         });
     }
 

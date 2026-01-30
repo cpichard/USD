@@ -98,6 +98,17 @@ pxr_build_test_shared_lib(TestSdrRegistry
         testenv/TestSdrRegistry_oslParserPlugin.cpp
 )
 
+pxr_build_test(testSdrShaderMetadata
+    LIBRARIES
+        gf
+        sdf
+        sdr
+        tf
+        vt
+    CPPFILES
+        testenv/testSdrShaderMetadata.cpp
+)
+
 pxr_build_test(testSdrParseValue
     LIBRARIES
         gf
@@ -107,6 +118,11 @@ pxr_build_test(testSdrParseValue
         vt
     CPPFILES
         testenv/testSdrParseValue.cpp
+)
+
+pxr_register_test(testSdrShaderMetadata
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testSdrShaderMetadata"
+    EXPECTED_RETURN_CODE 0
 )
 
 pxr_register_test(testSdrParseValue
