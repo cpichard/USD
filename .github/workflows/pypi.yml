@@ -139,7 +139,7 @@ jobs:
         run: |
           ${{ matrix.PYTHON.INTERPRETER }} -m pip install --upgrade pip
           ${{ matrix.PYTHON.INTERPRETER }} -m pip install setuptools
-          ${{ matrix.PYTHON.INTERPRETER }} -m pip install delocate~=0.10.2 wheel
+          ${{ matrix.PYTHON.INTERPRETER }} -m pip install delocate==0.13.0 wheel
       - name: Build USD
         run: |
           sudo xcode-select -s /Applications/Xcode_16.app/Contents/Developer
