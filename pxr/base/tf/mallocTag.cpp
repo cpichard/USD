@@ -15,7 +15,6 @@
 #include "pxr/base/tf/hashmap.h"
 #include "pxr/base/tf/iterator.h"
 #include "pxr/base/tf/pxrTslRobinMap/robin_map.h"
-#include "pxr/base/tf/pxrTslRobinMap/robin_set.h"
 #include "pxr/base/tf/stl.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/tf.h"
@@ -344,8 +343,8 @@ Tf_GetOrCreateChild(
 
     // Otherwise new up a child node and attempt to insert.  If we lose a race
     // here we'll drop the node we created.
-    auto newChild =
-        std::make_unique<Tf_MallocPathNode>(parentAndCallSite.second);
+    auto newChild = std::make_unique<Tf_MallocPathNode>(
+        parentAndCallSite.second, parentAndCallSite.first);
 
     Tf_MallocPathNodeTable::accessor acc;
     if (table->emplace(acc, parentAndCallSite, newChild.get())) {
@@ -472,18 +471,18 @@ struct Tf_MallocGlobalData
     
 };
 
-/*
- * Each node describes a sequence (i.e. path) of call sites.
- * However, a given call-site can occur only once in a given path -- recursive
- * call loops are excised.
- */
+//
+// Each node describes a sequence (i.e. path) of call sites.
+// Recursively-encountered sites in a path can be detected by walking _parents.
+//
 struct Tf_MallocPathNode
 {
-    explicit Tf_MallocPathNode(Tf_MallocCallSite* callSite)
+    explicit Tf_MallocPathNode(Tf_MallocCallSite* callSite,
+                               Tf_MallocPathNode const *parent)
         : _callSite(callSite)
+        , _parent(parent)
         , _totalBytes(0)
         , _numAllocations(0)
-        , _repeated(false)
     {
     }
 
@@ -491,10 +490,20 @@ struct Tf_MallocPathNode
                     TfMallocTag::CallTree::PathNode* node,
                     bool skipRepeated) const;
 
-    Tf_MallocCallSite* _callSite;
+    bool _IsRepeated() const {
+        const Tf_MallocCallSite * const site = _callSite;
+        for (const Tf_MallocPathNode *n = _parent; n; n = n->_parent) {
+            if (n->_callSite == site) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    Tf_MallocCallSite * const _callSite;
+    const Tf_MallocPathNode * const _parent;
     std::atomic<int64_t> _totalBytes;
     std::atomic<int64_t> _numAllocations;
-    std::atomic<bool> _repeated;    // repeated node
 };
 
 // Enum describing whether allocations are being tagged in an associated
@@ -516,32 +525,12 @@ struct TfMallocTag::_ThreadData {
         return _taggingState == _TaggingEnabled;
     }
 
-    inline void Push(Tf_MallocCallSite *site,
-                     Tf_MallocPathNode *node) {
-        if (!_callSitesOnStack.insert(site).second) {
-            node->_repeated = true;
-            // Push a nullptr onto the _nodeStack preceding repeated nodes.
-            // This lets Pop() know not to erase node's site from
-            // _callSitesOnStack.
-            _nodeStack.push_back(nullptr);
-        }
+    inline void Push(Tf_MallocPathNode *node) {
         _nodeStack.push_back(node);
     }
 
     inline void Pop() {
-        Tf_MallocPathNode *node = _nodeStack.back();
         _nodeStack.pop_back();
-        // If _nodeStack is not empty check to see if there's a nullptr.  If so,
-        // this is a repeated node, so just pop the nullptr.  Otherwise we need
-        // to erase this node's site from _callSitesOnStack.
-        if (!_nodeStack.empty() && !_nodeStack.back()) {
-            // Pop the nullptr, leave the repeated node in _callSitesOnStack.
-            _nodeStack.pop_back();
-        }
-        else {
-            // Remove from _callSitesOnStack.
-            _callSitesOnStack.erase(node->_callSite);
-        }
     }
 
     inline Tf_MallocPathNode *GetCurrentPathNode() const {
@@ -550,9 +539,8 @@ struct TfMallocTag::_ThreadData {
             : _mallocGlobalData->_rootNode;
     }
 
+    std::vector<Tf_MallocPathNode *> _nodeStack;
     _TaggingState _taggingState;
-    std::vector<Tf_MallocPathNode*> _nodeStack;
-    pxr_tsl::robin_set<Tf_MallocCallSite *, TfHash> _callSitesOnStack;
 };
 
 class TfMallocTag::Tls {
@@ -610,10 +598,15 @@ Tf_MallocGlobalData::_RegisterBlock(
     // here do not get intercepted and cause recursion.
     _TemporaryDisabler disable;
 
+    // If this fails it could be that there's a missing or mismatched
+    // _TemporaryDisabler.  For example if an allocation that is accidentally
+    // unintentionally tracked is later freed or realloc'd in a different
+    // disabled context, the same address might be malloc'd later, failing this
+    // axiom.
     TF_DEV_AXIOM(!_blockInfo.count(block));
 
     _MaybeCaptureStackOrDebug(node, block, blockSize);
-    
+
     _blockInfo.emplace(block, Tf_MallocBlockInfo(blockSize, node));
     
     node->_totalBytes.fetch_add(blockSize, std::memory_order_relaxed);
@@ -895,7 +888,7 @@ Tf_MallocPathNode::_BuildTree(Tf_PathNodeChildrenTable const &nodeChildren,
         // nodes for all allocations that should be skipped. Then tree is 
         // collapsed by copying the children of temporary nodes to their parents
         // in bottom-up fasion.
-        if (skipRepeated && child->_repeated) {
+        if (skipRepeated && child->_IsRepeated()) {
             // Create a temporary node
             TfMallocTag::CallTree::PathNode childNode;
             child->_BuildTree(nodeChildren, &childNode, skipRepeated);
@@ -1164,7 +1157,8 @@ TfMallocTag::_Initialize(std::string* errMsg)
 
     _mallocGlobalData = new Tf_MallocGlobalData();
     Tf_MallocCallSite* site = _mallocGlobalData->_GetOrCreateCallSite("__root");
-    Tf_MallocPathNode* rootNode = new Tf_MallocPathNode(site);
+    Tf_MallocPathNode* rootNode =
+        new Tf_MallocPathNode(site, /*parent=*/nullptr);
     _mallocGlobalData->_rootNode = rootNode;
 
     TfMallocTag::_isInitialized = true;
@@ -1198,7 +1192,7 @@ TfMallocTag::_Begin(const char* name, _ThreadData *threadData)
 
     lock.Release();
 
-    tls.Push(site, thisNode);
+    tls.Push(thisNode);
 
     return &tls;
 }
@@ -1213,6 +1207,44 @@ TfMallocTag::_End(int nTags, TfMallocTag::_ThreadData *tls)
     while (nTags--) {
         tls->Pop();
     }
+}
+
+TfMallocTag::StackState
+TfMallocTag::_GetCurrentStackState()
+{
+    _ThreadData &tls = TfMallocTag::Tls::Find();
+    return StackState {
+        tls._nodeStack.empty() ? nullptr : tls._nodeStack.back()
+    };
+}
+
+TfMallocTag::_ThreadData *
+TfMallocTag::StackOverride::_Push() const
+{
+    if (!TF_VERIFY(_state._top)) {
+        return nullptr;
+    }
+    _ThreadData &tls = TfMallocTag::Tls::Find();
+    _TemporaryDisabler disable(&tls);
+    
+    // We can just push the override node top onto the stack.  The node we're
+    // pushing is likely to have a different parent than the current stack top,
+    // but that's okay.  Nothing looks beyond the stack top, so operations like
+    // pushing & popping new tags will create new path nodes appropriately.
+    // When the stack override pops, the stack state returns to what it was
+    // prior to the override.  This makes tag-stack overrides ultra-lightweight.
+    tls.Push(_state._top);
+    return &tls;
+}
+
+void
+TfMallocTag::StackOverride::_Pop() const
+{
+    if (!TF_VERIFY(_state._top && _tls)) {
+        return;
+    }
+    TF_DEV_AXIOM(_tls->GetCurrentPathNode() == _state._top);
+    _tls->Pop();
 }
 
 // Returns the given number as a string with commas used as thousands

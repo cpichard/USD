@@ -1082,31 +1082,24 @@ def InstallTBB_MacOS(context, force, buildArgs):
                  ("ifeq ($(arch),$(filter $(arch),armv7 armv7s arm64))",
                   "ifeq ($(arch),$(filter $(arch),armv7 armv7s {0}))"
                         .format(apple_utils.GetTargetArmArch()))])
+        target_config_patches, clang_config_patches = \
+                apple_utils.GetTBBPatches(context)
+        if target_config_patches:
+            # Create config from iOS config
+            shutil.copy(src="build/ios.macos.inc",
+                        dst=f"build/{context.buildTarget.lower()}.macos.inc")
 
-        if context.buildTarget == apple_utils.TARGET_VISIONOS:
-            # Create visionOS config from iOS config
-            shutil.copy(
-                src="build/ios.macos.inc",
-                dst="build/visionos.macos.inc")
+            PatchFile(f"build/{context.buildTarget.lower()}.macos.inc", 
+                      target_config_patches)
 
-            PatchFile("build/visionos.macos.inc",
-                      [("ios","visionos"),
-                       ("iOS", "visionOS"),
-                       ("iPhone", "XR"),
-                       ("IPHONEOS","XROS"),
-                       ("?= 8.0", "?= 1.0")])
-
+        if clang_config_patches:
             # iOS clang just reuses the macOS one,
             # so it's easier to copy it directly.
             shutil.copy(src="build/macos.clang.inc",
-                        dst="build/visionos.clang.inc")
+                        dst=f"build/{context.buildTarget.lower()}.clang.inc")
 
-            PatchFile("build/visionos.clang.inc",
-                      [("ios","visionos"),
-                       ("-miphoneos-version-min=", "-target arm64-apple-xros"),
-                       ("iOS", "visionOS"),
-                       ("iPhone", "XR"),
-                       ("IPHONEOS","XROS")])
+            PatchFile(f"build/{context.buildTarget.lower()}.clang.inc", 
+                        clang_config_patches)
 
         (primaryArch, secondaryArch) = apple_utils.GetTargetArchPair(context)
 
