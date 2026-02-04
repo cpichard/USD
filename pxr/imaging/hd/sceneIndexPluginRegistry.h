@@ -183,6 +183,8 @@ public:
 
     /// Loads plugins for \p rendererDisplayName and \p appName.
     /// Returns the sceneIndexPluginId's in the order they'll be run.
+    /// This does not include scene indices registered via the callback
+    /// registration method.
     ///
     /// This is primarily in service of tests.
     HD_API

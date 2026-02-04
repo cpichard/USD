@@ -375,6 +375,10 @@ HdSceneIndexPluginRegistry::LoadAndGetSceneIndexPluginIds(
          _ComputeEntriesByPhaseMap(rendererDisplayName)) {
         const _EntryList& entryList = phaseAndEntryList.second;
         for (const _Entry& entry: entryList) {
+            if (entry.sceneIndexPluginId.IsEmpty()) {
+                // Skip callback-registered entries.
+                continue;
+            }
             ret.push_back(entry.sceneIndexPluginId);
         }
     }
