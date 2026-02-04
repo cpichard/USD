@@ -9,11 +9,22 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hd/sceneIndexPlugin.h"
+#include "pxr/imaging/hd/sceneIndexPluginRegistry.h"
 #include "pxr/imaging/hd/version.h"
 #include "hdPrman/api.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+/// Returns the insertion phase of the first material filtering scene index 
+/// plugin. This avoids hard-coding the insertion phase for plugins that
+/// need to go before or after material filtering.
+///
+HDPRMAN_API
+HdSceneIndexPluginRegistry::InsertionPhase
+HdPrmanGetMatFiltSceneIndexPluginInsertionPhase();
+
+/// XXX The declarations below se can be moved to the cpp.
+///
 /// \class HdPrman_PreviewMaterialFilteringSceneIndexPlugin
 ///
 /// Plugin that provides a scene index that transforms the underlying material

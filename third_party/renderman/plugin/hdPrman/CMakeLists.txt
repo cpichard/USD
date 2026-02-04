@@ -108,6 +108,7 @@ pxr_plugin(${PXR_PACKAGE}
         material
         matfiltConvertPreviewMaterial
         matfiltResolveVstructs
+        matfiltSceneIndexPlugins
         mesh
         meshLightResolvingSceneIndex
         meshLightResolvingSceneIndexPlugin
@@ -154,7 +155,6 @@ pxr_plugin(${PXR_PACKAGE}
         framebuffer
         implicitSurfaceSceneIndexPlugin
         materialPrimvarTransferSceneIndexPlugin
-        matfiltSceneIndexPlugins
         motionBlurSceneIndexPlugin
         pinnedCurveExpandingSceneIndexPlugin
         previewSurfacePrimvarsSceneIndexPlugin

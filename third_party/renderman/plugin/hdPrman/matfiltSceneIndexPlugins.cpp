@@ -214,6 +214,12 @@ protected:
 
 } // anonymous namespace
 
+HdSceneIndexPluginRegistry::InsertionPhase
+HdPrmanGetMatFiltSceneIndexPluginInsertionPhase()
+{
+    return _MatfiltOrder::ConnectionResolve;
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // Scene Index Plugin Implementations
 ////////////////////////////////////////////////////////////////////////////////
