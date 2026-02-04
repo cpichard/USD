@@ -4004,6 +4004,8 @@ _FindPriorVariantSelection(
     PcpNodeRef *nodeWithVsel,
     Pcp_PrimIndexer *indexer)
 {
+    TRACE_FUNCTION();
+
     auto& traverser = 
         indexer->GetVariantTraversalCache(startNode, pathInStartNode);
 
@@ -4060,6 +4062,8 @@ _ComposeVariantSelectionAcrossNodes(
     PcpNodeRef *nodeWithVsel,
     Pcp_PrimIndexer *indexer)
 {
+    TRACE_FUNCTION();
+
     // Compose variant selection in strong-to-weak order.
     auto& traverser = 
         indexer->GetVariantTraversalCache(startNode, pathInStartNode);
