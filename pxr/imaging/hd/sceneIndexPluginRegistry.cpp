@@ -315,16 +315,12 @@ HdSceneIndexPluginRegistry::_EntriesByPhaseMap
 HdSceneIndexPluginRegistry::_ComputeEntriesByPhaseMap(
     const std::string& rendererDisplayName) const
 {
-    if (rendererDisplayName.empty()) {
-        TF_CODING_ERROR("Empty rendererDisplayName is reserved to mean all"
-            " renderers.");
-        return {};
-    }
-
     _PhaseOrderEntriesMapByRenderer::const_iterator allRenderersIt =
         _entriesMapForRenderers.find("");
     _PhaseOrderEntriesMapByRenderer::const_iterator rendererIt =
-        _entriesMapForRenderers.find(rendererDisplayName);
+        rendererDisplayName.empty()
+        ? _entriesMapForRenderers.end()
+        : _entriesMapForRenderers.find(rendererDisplayName);
 
     // XXX
     // Ideally, we honor the insertion order more strictly by merging the
