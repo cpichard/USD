@@ -88,8 +88,12 @@ public:
     using InsertionPhase = int;
 
     ///
-    /// Register a scene index to be instantiated for a specified 
+    /// Register a scene index plugin to be instantiated for a specified 
     /// renderer (or all renderers if \p rendererDisplayName is empty).
+    ///
+    /// \note
+    /// The function name is misleading as this registers the plugin and not
+    /// an instance of the scene index itself.
     ///
     /// \p sceneIndexPluginId identifies the associated scene index plugin.
     /// This should match the name used in the plugInfo.json entry and is
@@ -165,15 +169,9 @@ public:
     ///       when Hydra scene index emulation is enabled.
     ///
     /// \note
-    /// This method is typically invoked via the TF_REGISTRY_FUNCTION macro at
-    /// module load time, like:
-    /// \code
-    /// TF_REGISTRY_FUNCTION(HdSceneIndexPlugin)
-    /// {
-    ///     HdSceneIndexPluginRegistry::GetInstance()
-    ///     .RegisterSceneIndexForRenderer(...);
-    /// }
-    /// \endcode
+    /// Unlike the pattern for registering scene index plugins, it is
+    /// better to invoke this method explicitly in application code rather
+    /// than using a TF_REGISTRY_FUNCTION block.
     ///
     HD_API
     void RegisterSceneIndexForRenderer(
@@ -210,6 +208,7 @@ private:
 
     HdSceneIndexPlugin *_GetSceneIndexPlugin(const TfToken &pluginId);
 
+    // Registration entry. Ordering info is held in the map key.
     struct _Entry
     {
         _Entry(const TfToken &sceneIndexPluginId,
@@ -230,35 +229,37 @@ private:
     };
 
     using _EntryList = std::vector<_Entry>;
-    using _EntriesByPhasesMap = std::map<InsertionPhase, _EntryList>;
-    using _RendererEntries
+    using _EntriesByPhaseMap = std::map<InsertionPhase, _EntryList>;
+    using _EntriesByPhaseAndOrderMap
         = std::map<std::pair<InsertionPhase, InsertionOrder>, _EntryList>;
+    using _PhaseOrderEntriesMapByRenderer =
+        std::map<std::string, _EntriesByPhaseAndOrderMap>;
 
-    using _RenderersMap = std::map<std::string, _RendererEntries>;
+    static
+    _EntriesByPhaseMap
+    _Collapse(const _EntriesByPhaseAndOrderMap& rendererEntriesMap);
 
-    static _EntriesByPhasesMap
-    _RendererEntriesToPhaseMap(const _RendererEntries& rendererEntries);
-
-    /// Computes entries per-phases map for \p rendererDisplayName
+    /// Computes entries per-phase map for \p rendererDisplayName
     ///
     /// Caller is expected to have loaded plugins.
-    _EntriesByPhasesMap
-    _ComputeEntriesByPhasesMap(const std::string& rendererDisplayName) const;
+    _EntriesByPhaseMap
+    _ComputeEntriesByPhaseMap(const std::string& rendererDisplayName) const;
 
     HdSceneIndexBaseRefPtr _AppendForPhases(
         const HdSceneIndexBaseRefPtr &inputScene,
-        const _EntriesByPhasesMap &entriesByPhases,
+        const _EntriesByPhaseMap &entriesByPhases,
         const HdContainerDataSourceHandle &argsUnderlay,
         const std::string &renderInstanceId);
 
-    _RenderersMap _sceneIndicesForRenderers;
+    // Updated via RegisterSceneIndexForRenderer calls.
+    _PhaseOrderEntriesMapByRenderer _entriesMapForRenderers;
 
     // Used to track plugins whose plugInfo entries contain "loadWithRenderer"
     // values to load when the specified renderer or renderers are used.
     // Loading the plug-in allows for further registration code to run when
     // a plug-in wouldn't be loaded elsewhere.
     using _PreloadMap = std::map<std::string, TfTokenVector>;
-    _PreloadMap _preloadsForRenderer;
+    _PreloadMap _preloadsForRenderers;
 
     // Used to track app-name-based filtering for plugin loading. If a plugin
     // declares "preloadInApps" in its plugInfo, the plugin will appear in this
