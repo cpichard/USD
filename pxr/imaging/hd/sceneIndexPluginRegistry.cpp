@@ -5,13 +5,23 @@
 // https://openusd.org/license.
 //
 #include "pxr/imaging/hd/sceneIndexPluginRegistry.h"
-#include "pxr/imaging/hd/sceneIndexPlugin.h"
-#include "pxr/imaging/hd/sceneIndexUtil.h"
+
+#include "pxr/imaging/hd/dataSource.h"
+#include "pxr/imaging/hd/dataSourceTypeDefs.h"
+#include "pxr/imaging/hd/filteringSceneIndex.h"
 #include "pxr/imaging/hd/overlayContainerDataSource.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
+#include "pxr/imaging/hd/sceneIndexObserver.h"
+#include "pxr/imaging/hd/sceneIndexPlugin.h"
+#include "pxr/imaging/hd/sceneIndexUtil.h"
 
 #include "pxr/base/tf/instantiateSingleton.h"
 #include "pxr/base/tf/iterator.h"
+#include "pxr/base/tf/refPtr.h"
+#include "pxr/base/tf/weakPtr.h"
+
+#include <string>
+#include <utility>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -46,6 +56,54 @@ HdSceneIndexPluginRegistry::_GetSceneIndexPlugin(const TfToken &pluginId)
     return static_cast<HdSceneIndexPlugin*>(GetPlugin(pluginId));
 }
 
+void HdSceneIndexPluginRegistry::_PopulateMetadata(
+    const HdSceneIndexBaseRefPtr& sceneIndex,
+    const PluginInsertionMetadata&& metadata,
+    _VisitedSet&& visited)
+{
+    if (visited.count(sceneIndex)) {
+        return;
+    }
+    TfWeakPtr<HdSceneIndexBase> weakSI = TfCreateWeakPtr(&(*sceneIndex));
+    _metadata[weakSI] = metadata;
+    visited.insert(sceneIndex);
+
+    if (auto *const encapsulatingSI =
+        HdEncapsulatingSceneIndexBase::Cast(sceneIndex)) {
+        for (const auto& scene : encapsulatingSI->GetEncapsulatedScenes()) {
+            _PopulateMetadata(
+                scene,
+                std::forward<const PluginInsertionMetadata>(metadata),
+                std::forward<_VisitedSet>(visited));
+        }
+    }
+
+    if (const auto filteringSI =
+        TfDynamic_cast<HdFilteringSceneIndexBasePtr>(sceneIndex)) {
+        for (const auto& scene : filteringSI->GetInputScenes()) {
+            _PopulateMetadata(
+                scene,
+                std::forward<const PluginInsertionMetadata>(metadata),
+                std::forward<_VisitedSet>(visited));
+        }
+    }
+}
+
+static
+std::string
+_GetRendererName(const HdContainerDataSourceHandle& inputArgs)
+{
+    std::string rendererName;
+    if (!inputArgs) {
+        return rendererName;
+    }
+    if (const auto& nameDS = HdStringDataSource::Cast(inputArgs->Get(
+        HdSceneIndexPluginRegistryTokens->rendererDisplayName))) {
+        rendererName = nameDS->GetTypedValue(0.f);
+    }
+    return rendererName;
+}
+
 HdSceneIndexBaseRefPtr
 HdSceneIndexPluginRegistry::AppendSceneIndex(
     const TfToken &sceneIndexPluginId,
@@ -62,6 +120,13 @@ HdSceneIndexPluginRegistry::AppendSceneIndex(
         //       cleaned up -- so we won't manually decrement their ref count
         //ReleasePlugin(plugin);
 
+        const std::string rendererName = _GetRendererName(inputArgs);
+
+        _PopulateMetadata(
+            result,
+            { rendererName, sceneIndexPluginId, -1 },
+            { inputScene });
+
         return result;
     } else {
         return inputScene;
@@ -76,9 +141,10 @@ HdSceneIndexPluginRegistry::_AppendForPhases(
     const std::string &renderInstanceId)
 {
     HdSceneIndexBaseRefPtr result = inputScene;
+    const std::string rendererName = _GetRendererName(argsUnderlay);
     for (const auto &phasesPair : entriesByPhases) {
         for (const _Entry &entry : phasesPair.second) {
-            
+            HdSceneIndexBaseRefPtr input = result;
             HdContainerDataSourceHandle args = entry.args;
 
             if (args) {
@@ -102,7 +168,10 @@ HdSceneIndexPluginRegistry::_AppendForPhases(
                 result = AppendSceneIndex(
                     entry.sceneIndexPluginId, result, args, renderInstanceId);
             }
-
+            _PopulateMetadata(
+                result,
+                { rendererName, entry.sceneIndexPluginId, phasesPair.first },
+                { input });
         }
     }
     return result;
@@ -128,7 +197,7 @@ HdSceneIndexPluginRegistry::_CollectAdditionalMetadata(
             pluginTypeToken);
 
     } else if (loadWithRendererValue.GetType() == JsValue::ArrayType) {
-        for (const std::string &s  : 
+        for (const std::string &s  :
                 loadWithRendererValue.GetArrayOf<std::string>()) {
             _preloadsForRenderers[s].push_back(pluginTypeToken);
         }
@@ -383,6 +452,24 @@ HdSceneIndexPluginRegistry::LoadAndGetSceneIndexPluginIds(
         }
     }
     return ret;
+}
+
+bool
+HdSceneIndexPluginRegistry::
+GetPluginInsertionMetadataForSceneIndex(
+    const HdSceneIndexBaseRefPtr& sceneIndex,
+    PluginInsertionMetadata& metadata)
+{
+    auto it = _metadata.find(TfCreateWeakPtr<HdSceneIndexBase>(&(*sceneIndex)));
+    if (it == _metadata.end()) {
+        return false;
+    }
+    if (!it->first) {
+        _metadata.erase(it);
+        return false;
+    }
+    metadata = it->second;
+    return true;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
