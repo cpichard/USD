@@ -4,7 +4,7 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#include "hdPrman/rileyFallbackMaterialSceneIndexPlugin.h"
+#include "hdPrman/rileyFallbackMaterial.h"
 
 #include "hdPrman/rileyMaterialSchema.h"
 #include "hdPrman/rileyParamSchema.h"
@@ -12,6 +12,7 @@
 #include "hdPrman/sceneIndexObserverApi.h"
 #include "hdPrman/tokens.h"
 
+#include "pxr/usd/sdf/path.h"
 #include "pxr/usd/sdr/declare.h"
 #include "pxr/usd/sdr/shaderNode.h"
 #include "pxr/usd/sdr/shaderProperty.h"
@@ -20,24 +21,17 @@
 #include "pxr/imaging/hd/mergingSceneIndex.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
 #include "pxr/imaging/hd/retainedSceneIndex.h"
-#include "pxr/imaging/hd/sceneIndexPluginRegistry.h"
 #include "pxr/imaging/hd/tokens.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
-    ((sceneIndexPluginName, "HdPrman_RileyFallbackMaterialSceneIndexPlugin"))
-);
-
-#ifdef HDPRMAN_USE_SCENE_INDEX_OBSERVER
 
 #if PXR_VERSION < 2505
 using SdrIdentifier = NdrIdentifier;
 using SdrTokenVec = NdrTokenVec;
 #endif
 
-static
+namespace {
+
 HdContainerDataSourceHandle
 _MaterialNodeDataSource(
     const TfToken &rileyShadingNodeType,
@@ -79,7 +73,6 @@ _MaterialNodeDataSource(
            .Build();
 }
 
-static
 HdContainerDataSourceHandle
 _PxrSurfaceParams()
 {
@@ -183,7 +176,6 @@ _PxrSurfaceParams()
         TfArraySize(names), names, params);
 }
 
-static
 HdContainerDataSourceHandle
 _UsdPreviewSurfaceParametersParams()
 {
@@ -228,7 +220,6 @@ _UsdPreviewSurfaceParametersParams()
         );
 }
 
-static
 HdContainerDataSourceHandle
 _ColorPrimvarReader(
     const TfToken &rileyHandle,
@@ -264,7 +255,6 @@ _ColorPrimvarReader(
                    .Build()));
 }
 
-static
 HdContainerDataSourceHandle
 _FloatPrimvarReader(
     const TfToken &rileyHandle,
@@ -306,7 +296,6 @@ _FloatPrimvarReader(
 // However, we do not have implemented yet the conversion function and scene
 // index translating HdMaterialNetworkSchema to HdPrmanRileyMaterialSchema.
 //
-static
 HdContainerDataSourceHandle
 _FallbackMaterialDataSource()
 {
@@ -354,15 +343,13 @@ _FallbackMaterialDataSource()
             .Build();
 }
 
-static
 HdSceneIndexBaseRefPtr
 _FallbackMaterialScene()
 {
     HdRetainedSceneIndexRefPtr const scene = HdRetainedSceneIndex::New();
 
     scene->AddPrims(
-        { { HdPrman_RileyFallbackMaterialSceneIndexPlugin::
-                GetFallbackMaterialPath(),
+        { { HdPrman_RileyFallbackMaterial::GetPrimPath(),
             HdPrmanRileyPrimTypeTokens->material,
             HdRetainedContainerDataSource::New(
                 HdPrmanRileyMaterialSchema::GetSchemaToken(),
@@ -371,68 +358,37 @@ _FallbackMaterialScene()
     return scene;
 }
 
-#endif // HDPRMAN_USE_SCENE_INDEX_OBSERVER
+} // anon
 
-////////////////////////////////////////////////////////////////////////////////
-// Plugin registrations
-////////////////////////////////////////////////////////////////////////////////
-
-TF_REGISTRY_FUNCTION(TfType)
-{
-    HdSceneIndexPluginRegistry::Define<
-        HdPrman_RileyFallbackMaterialSceneIndexPlugin>();
-}
-
-TF_REGISTRY_FUNCTION(HdSceneIndexPlugin)
-{
-    const HdSceneIndexPluginRegistry::InsertionPhase insertionPhase = 100;
-
-    for( auto const& rendererDisplayName : HdPrman_GetPluginDisplayNames()) {
-        HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
-            rendererDisplayName,
-            _tokens->sceneIndexPluginName,
-            /* inputArgs = */ nullptr,
-            insertionPhase,
-            HdSceneIndexPluginRegistry::InsertionOrderAtEnd);
-    }
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Scene Index plugin Implementation
-////////////////////////////////////////////////////////////////////////////////
-
-HdPrman_RileyFallbackMaterialSceneIndexPlugin::
-HdPrman_RileyFallbackMaterialSceneIndexPlugin() = default;
+namespace HdPrman_RileyFallbackMaterial {
 
 const SdfPath &
-HdPrman_RileyFallbackMaterialSceneIndexPlugin::GetFallbackMaterialPath()
+GetPrimPath()
 {
     static const SdfPath result("/__RileyFallbackMaterial");
     return result;
 }
 
 HdSceneIndexBaseRefPtr
-HdPrman_RileyFallbackMaterialSceneIndexPlugin::_AppendSceneIndex(
-    const HdSceneIndexBaseRefPtr &inputScene,
-    const HdContainerDataSourceHandle &inputArgs)
+CreateRetainedSceneIndex()
 {
-#ifdef HDPRMAN_USE_SCENE_INDEX_OBSERVER
-    if (!TfGetEnvSetting(HD_PRMAN_EXPERIMENTAL_RILEY_SCENE_INDEX_OBSERVER)) {
-        return inputScene;
-    }
+    return _FallbackMaterialScene();
+}
 
+HdSceneIndexBaseRefPtr
+AppendSceneIndex(const HdSceneIndexBaseRefPtr &inputScene)
+{
     HdMergingSceneIndexRefPtr const result = HdMergingSceneIndex::New();
 
     result->AddInputScene(inputScene, SdfPath::AbsoluteRootPath());
 
     static HdSceneIndexBaseRefPtr fallbackMaterialScene =
         _FallbackMaterialScene();
-    result->AddInputScene(fallbackMaterialScene, GetFallbackMaterialPath());
+    result->AddInputScene(fallbackMaterialScene, GetPrimPath());
 
     return result;
-#else 
-    return inputScene;
-#endif
 }
+
+} // HdPrman_RileyFallbackMaterial
 
 PXR_NAMESPACE_CLOSE_SCOPE
