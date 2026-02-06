@@ -845,10 +845,9 @@ UsdSkelImagingDataSourceResolvedSkeletonPrim(
  // Should verify if the instancer we get from _xformResolver that instances
  // this skeleton and the instancer with prototypes bound to this skeleton are
  // the same thing. Is it possible that they could be different?
- , _instanceAnimationSources(std::move(
-    _xformResolver.GetInstanceAnimationSource()))
- , _instanceAnimationSchemas(std::move(
-    _GetInstanceAnimationSchemas(_instanceAnimationSources, sceneIndex)))
+ , _instanceAnimationSources(_xformResolver.GetInstanceAnimationSource())
+ , _instanceAnimationSchemas(
+    _GetInstanceAnimationSchemas(_instanceAnimationSources, sceneIndex))
 {
 }
 
