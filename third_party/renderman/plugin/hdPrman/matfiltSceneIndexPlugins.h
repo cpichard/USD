@@ -15,98 +15,40 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-/// Returns the insertion phase of the first material filtering scene index 
-/// plugin. This avoids hard-coding the insertion phase for plugins that
-/// need to go before or after material filtering.
-///
-HDPRMAN_API
-HdSceneIndexPluginRegistry::InsertionPhase
-HdPrmanGetMatFiltSceneIndexPluginInsertionPhase();
-
 /// XXX The declarations below se can be moved to the cpp.
 ///
-/// \class HdPrman_PreviewMaterialFilteringSceneIndexPlugin
+/// \class HdPrman_MatFiltSceneIndexPlugin
 ///
-/// Plugin that provides a scene index that transforms the underlying material
-/// network into Prman equivalents for each material prim that has a
-/// UsdPreviewSurface node,
+/// Plugin that chains a scene index for each of the following ops:
+/// 1. Resolve connections: Expand "virtual struct" connections, including
+///    evaluation of conditional actions.
+/// 2. Node translation: Transform materials with a UsdPreviewSurface node or
+///    MaterialX node into Prman equivalents.
+///    XXX For MaterialX nodes, current support is limited to those connected to
+///    the 'surface' terminal.
+/// 3. Node identifier resolution: Find shaders without nodeID's and attempt to
+///    resolve their identifier via UsdShade sourceAsset or sourceCode
+///    properties.
 ///
-/// This plugin is registered with the scene index plugin registry for Prman.
+/// This plugin is registered with the scene index plugin registry for each of
+/// the Prman variants.
 ///
-class HdPrman_PreviewMaterialFilteringSceneIndexPlugin :
-    public HdSceneIndexPlugin
+class HdPrman_MatFiltSceneIndexPlugin : public HdSceneIndexPlugin
 {
 public:
-    HdPrman_PreviewMaterialFilteringSceneIndexPlugin();
+    HdPrman_MatFiltSceneIndexPlugin();
+
+    // Returns the insertion phase to avoid hard-coding it in plugins that need
+    // to go before or after material filtering.
+    HDPRMAN_API
+    static
+    HdSceneIndexPluginRegistry::InsertionPhase GetInsertionPhase();
 
 protected:
     HdSceneIndexBaseRefPtr _AppendSceneIndex(
         const HdSceneIndexBaseRefPtr &inputScene,
         const HdContainerDataSourceHandle &inputArgs) override;
 };
-
-/// ----------------------------------------------------------------------------
-/// \class HdPrman_MaterialXFilteringSceneIndexPlugin
-///
-/// Plugin that provides a scene index that transforms the underlying material
-/// network into Prman equivalents for each material prim that has a
-/// MaterialX node connected to the 'surface' terminal.
-/// XXX: matFiltMaterialX.h doesn't seem to support other terminals
-///      (displacmeent, volume)
-///
-/// This plugin is registered with the scene index plugin registry for Prman.
-///
-class HdPrman_MaterialXFilteringSceneIndexPlugin : public HdSceneIndexPlugin
-{
-public:
-    HdPrman_MaterialXFilteringSceneIndexPlugin();
-
-protected:
-    HdSceneIndexBaseRefPtr _AppendSceneIndex(
-        const HdSceneIndexBaseRefPtr &inputScene,
-        const HdContainerDataSourceHandle &inputArgs) override;
-};
-
-/// ----------------------------------------------------------------------------
-/// \class HdPrman_VirtualStructResolvingSceneIndexPlugin
-///
-/// Plugin that provides a scene index that expands "virtual struct"
-/// connections, including evaluation of conditional actions.
-///
-/// This plugin is registered with the scene index plugin registry for Prman.
-///
-class HdPrman_VirtualStructResolvingSceneIndexPlugin : public HdSceneIndexPlugin
-{
-public:
-    HdPrman_VirtualStructResolvingSceneIndexPlugin();
-
-protected:
-    HdSceneIndexBaseRefPtr _AppendSceneIndex(
-        const HdSceneIndexBaseRefPtr &inputScene,
-        const HdContainerDataSourceHandle &inputArgs) override;
-};
-
-#if HD_API_VERSION >= 76
-/// ----------------------------------------------------------------------------
-/// \class HdPrman_NodeIdentifierResolvingSceneIndexPlugin
-///
-/// Plugin that provides an HdSiNodeIdentifierResolvingSceneIndex. This 
-/// finds shaders without nodeID's and attempts to resolve their identifier
-/// via UsdShade sourceAsset or sourceCode properties.
-///
-/// This plugin is registered with the scene index plugin registry for Prman.
-///
-class HdPrman_NodeIdentifierResolvingSceneIndexPlugin : public HdSceneIndexPlugin
-{
-public:
-    HdPrman_NodeIdentifierResolvingSceneIndexPlugin();
-
-protected: // HdSceneIndexPlugin overrides
-    HdSceneIndexBaseRefPtr _AppendSceneIndex(
-        const HdSceneIndexBaseRefPtr& inputScene,
-        const HdContainerDataSourceHandle& inputArgs) override;
-};
-#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
