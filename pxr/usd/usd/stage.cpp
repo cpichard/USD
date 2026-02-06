@@ -3443,8 +3443,6 @@ UsdStage::_ComposeSubtreeImpl(
     UsdStagePopulationMask const *mask,
     const SdfPath& inPrimIndexPath)
 {
-    TfAutoMallocTag tag("Usd", _GetMallocTagId());
-
     const SdfPath primIndexPath = 
         (inPrimIndexPath.IsEmpty() ? prim->GetPath() : inPrimIndexPath);
 
@@ -5022,6 +5020,7 @@ UsdStage::_Recompose(const PcpChanges &changes,
                      T *pathsToRecompose)
 {
     TRACE_FUNCTION();
+    TfAutoMallocTag tag("Usd", _GetMallocTagId());
 
     // Note: Calling changes.Apply() will result in recomputation of  
     // pcpPrimIndexes for changed prims, these get updated on the respective  
@@ -5364,8 +5363,7 @@ UsdStage::_ComposePrimIndexesInParallel(
     _cache->ComputePrimIndexesInParallel(
         primIndexPaths, &errs, 
         _NameChildrenPred(mask, &_loadRules, _instanceCache.get()),
-        _IncludePayloadsPredicate(this),
-        "Usd", _GetMallocTagId());
+        _IncludePayloadsPredicate(this));
 
     if (!errs.empty()) {
         _ReportPcpErrors(errs, context);
