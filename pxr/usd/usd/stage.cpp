@@ -3443,8 +3443,6 @@ UsdStage::_ComposeSubtreeImpl(
     UsdStagePopulationMask const *mask,
     const SdfPath& inPrimIndexPath)
 {
-    TfAutoMallocTag tag("Usd", _GetMallocTagId());
-
     const SdfPath primIndexPath = 
         (inPrimIndexPath.IsEmpty() ? prim->GetPath() : inPrimIndexPath);
 
@@ -5022,6 +5020,7 @@ UsdStage::_Recompose(const PcpChanges &changes,
                      T *pathsToRecompose)
 {
     TRACE_FUNCTION();
+    TfAutoMallocTag tag("Usd", _GetMallocTagId());
 
     // Note: Calling changes.Apply() will result in recomputation of  
     // pcpPrimIndexes for changed prims, these get updated on the respective  
@@ -5364,8 +5363,7 @@ UsdStage::_ComposePrimIndexesInParallel(
     _cache->ComputePrimIndexesInParallel(
         primIndexPaths, &errs, 
         _NameChildrenPred(mask, &_loadRules, _instanceCache.get()),
-        _IncludePayloadsPredicate(this),
-        "Usd", _GetMallocTagId());
+        _IncludePayloadsPredicate(this));
 
     if (!errs.empty()) {
         _ReportPcpErrors(errs, context);
@@ -7517,19 +7515,55 @@ public:
 // Helper structure populated by _GetResolveInfo and _ResolveInfoResolver
 // with extra information accumulated in the process. This allows clients to
 // avoid redoing work.
-template <class T>
 struct UsdStage::_ExtraResolveInfo
 {
-    static_assert(std::is_same_v<T, SdfAbstractDataValue> ||
-                  std::is_same_v<T, VtValue>);
-
+    // Create an _ExtraResolveInfo but with space for the _ResolveInfoResolver
+    // to populate default or fallback values into.  This is used as an
+    // optimization when we're getting resolve info for the purposes of serving
+    // UsdAttribute::Get(), when we know we're going to fetch the value
+    // eventually.
+    static _ExtraResolveInfo WithDefaultOrFallbackValueStorage() {
+        _ExtraResolveInfo ret;
+        ret._defaultOrFallback.emplace();
+        return ret;
+    }
+    
     _ExtraResolveInfo *_AddNextWeakerInfo() {
         if (!TF_VERIFY(!nextWeaker, "Cannot add weaker info to an "
                        "_ExtraResolveInfo that already has it.")) {
             return this;
         }
         nextWeaker = std::make_shared<_ExtraResolveInfo>();
+        // Propagate _defaultOrFallback's existence.
+        if (_defaultOrFallback) {
+            nextWeaker->_defaultOrFallback.emplace();
+        }
         return nextWeaker.get();
+    }
+
+    // If this object was created by WithDefaultOrFallbackValueStorage(), return
+    // a pointer to a VtValue to store a default or fallback value into.  This
+    // is a value resolution optimization that avoids a double fetch in case
+    // there's just one strongest default or fallback.
+    VtValue *GetDefaultOrFallbackStorage() {
+        return _defaultOrFallback
+            ? std::addressof(_defaultOrFallback.value())
+            : nullptr;
+    }
+
+    // If this object was created by WithDefaultOrFallbackValueStorage() and a
+    // non-empty VtValue was stored to it move the stored value to `val`, delete
+    // this object's storage for a default or fallback value, and return true.
+    // Otherwise do nothing and return false.  After a call to this function,
+    // subsequent calls to GetDefaultOrFallbackStorage() return nullptr and this
+    // function always returns false.
+    bool MoveDefaultOrFallbackValueTo(VtValue *val) const {
+        if (_defaultOrFallback && !_defaultOrFallback.value().IsEmpty()) {
+            *val = std::move(_defaultOrFallback.value());
+            _defaultOrFallback.reset();
+            return true;
+        }
+        return false;
     }
     
     // If we're chaining together _ExtraResolveInfos to represent composing
@@ -7547,6 +7581,13 @@ struct UsdStage::_ExtraResolveInfo
     // If the resolve info source is UsdResolveInfoSourceValueClips this will 
     // be the Usd_ClipSet containing values for the attribute.
     Usd_ClipSetRefPtr clipSet;
+
+private:
+    // If not empty, then GetDefaultOrFallbackStorage() returns the address of
+    // _defaultOrFallback, so the _ResolveInfoResolver can store one there.
+    // It's the raw value from the layer, not transformed to the stage's
+    // name/time-space, normally _GetValueFromResolveInfoImpl does that.
+    mutable std::optional<VtValue> _defaultOrFallback;
 };
 
 Usd_AssetPathContext
@@ -7621,14 +7662,13 @@ UsdStage::_GetAssetPathContext(UsdTimeCode time, const UsdAttribute &attr) const
 //
 // Otherwise compute the full resolve info at `time`, and fill both `infoOut`
 // and `extraInfoOut` and return true.
-template <class T>
 bool
 UsdStage::_GetCompletedResolveInfo(const UsdAttribute &attr,
                                    UsdTimeCode time,
                                    const UsdResolveTarget *resolveTarget,
                                    const UsdResolveInfo &infoIn,
                                    UsdResolveInfo *infoOut,
-                                   _ExtraResolveInfo<T> *extraInfoOut) const
+                                   _ExtraResolveInfo *extraInfoOut) const
 {
     if (infoIn._source == UsdResolveInfoSourceNone ||
         infoIn._source == UsdResolveInfoSourceFallback) {
@@ -7728,7 +7768,7 @@ UsdStage::_GetValueFromResolveInfoImpl(
     UsdTimeCode time, const UsdAttribute &attr,
     Usd_Interpolator const &interpolator,
     const UsdResolveInfo &infoIn, const UsdResolveTarget *resolveTarget,
-    const _ExtraResolveInfo<T> *extraInfo, T *result) const
+    const _ExtraResolveInfo *extraInfo, T *result) const
 {
     static_assert(std::is_same_v<T, VtValue> ||
                   std::is_same_v<T, SdfAbstractDataValue>);
@@ -7740,10 +7780,11 @@ UsdStage::_GetValueFromResolveInfoImpl(
     // or a nullary call to UsdAttribute::GetResolveInfo().  In this case we
     // need to "complete" the resolveInfo for `time` and fill in an `extraInfo`.
     UsdResolveInfo completedInfo_;
-    _ExtraResolveInfo<T> completedExtraInfo_;
+    _ExtraResolveInfo completedExtraInfo_ =
+        _ExtraResolveInfo::WithDefaultOrFallbackValueStorage();
     const auto &[resolveInfo, extraResolveInfo] =
         [&]() -> std::tuple<const UsdResolveInfo &,
-                            const _ExtraResolveInfo<T> &> {
+                            const _ExtraResolveInfo &> {
         if (!extraInfo) {
             if (_GetCompletedResolveInfo(
                     attr, time, resolveTarget, infoIn,
@@ -7768,7 +7809,7 @@ UsdStage::_GetValueFromResolveInfoImpl(
     // interpolate the final samples.
 
     UsdResolveInfo const *curResolveInfo = &resolveInfo;
-    _ExtraResolveInfo<T> const *curExtraResolveInfo = &extraResolveInfo;
+    _ExtraResolveInfo const *curExtraResolveInfo = &extraResolveInfo;
 
     Usd_InterpolationSampleSeries composedSamples;
     Usd_InterpolationSampleSeries curSamples;
@@ -7950,10 +7991,16 @@ UsdStage::_GetValueFromResolveInfoImpl(
             SdfPath specPath = curResolveInfo->
                 _primPathInLayerStack.AppendProperty(attr.GetName());
             Usd_InterpolationSampleSeries defaultSeries(1);
-            Usd_DefaultValueResult defValue = Usd_HasDefault(
-                curResolveInfo->_layer, specPath, &defaultSeries.front().value);
-            TF_VERIFY(defValue == Usd_DefaultValueResult::Found,
-                      "Resolve info source default has no default value");
+            // Fetch a value from curExtraResolveInfo if we have one, otherwise
+            // call Usd_HasDefault().
+            if (!curExtraResolveInfo->
+                MoveDefaultOrFallbackValueTo(&defaultSeries.front().value)) {
+                Usd_DefaultValueResult defValue = Usd_HasDefault(
+                    curResolveInfo->_layer, specPath,
+                    &defaultSeries.front().value);
+                TF_VERIFY(defValue == Usd_DefaultValueResult::Found,
+                          "Resolve info source default has no default value");
+            }
             // Translate to the stage.
             xfValueToStage(defaultSeries.front().value, &specPath);
             // Compose samples over.
@@ -7968,11 +8015,14 @@ UsdStage::_GetValueFromResolveInfoImpl(
         else if (curResolveInfo->_source == UsdResolveInfoSourceFallback) {
             VtValue fallbackValue;
             Usd_InterpolationSampleSeries fallbackSeries(1);
-            const bool hasFallback = attr._Prim()->GetPrimDefinition()
-                .GetAttributeFallbackValue(
-                    attr.GetName(), &fallbackSeries.front().value);
-            TF_VERIFY(hasFallback,
-                      "Resolve info source fallback has no fallback value");
+            if (!curExtraResolveInfo->
+                MoveDefaultOrFallbackValueTo(&fallbackSeries.front().value)) {
+                const bool hasFallback = attr._Prim()->GetPrimDefinition()
+                    .GetAttributeFallbackValue(
+                        attr.GetName(), &fallbackSeries.front().value);
+                TF_VERIFY(hasFallback,
+                          "Resolve info source fallback has no fallback value");
+            }
             // Fallback values require no transformation to the stage space, but
             // they can be composed-over.  Fallbacks are always weakest, so we
             // can always break out here.
@@ -8016,7 +8066,8 @@ UsdStage::_GetValueImpl(UsdTimeCode time, const UsdAttribute &attr,
                   std::is_same_v<T, SdfAbstractDataValue>);
     
     UsdResolveInfo resolveInfo;
-    _ExtraResolveInfo<T> extraResolveInfo;
+    _ExtraResolveInfo extraResolveInfo =
+        _ExtraResolveInfo::WithDefaultOrFallbackValueStorage();
 
     TfErrorMark m;
     _GetResolveInfo(attr, &resolveInfo, &time, &extraResolveInfo);
@@ -8844,12 +8895,8 @@ UsdStage::_GetTimeSampleMap(const UsdAttribute &attr,
 }
 
 // A 'Resolver' for filling UsdResolveInfo.
-template <typename T>
 struct UsdStage::_ResolveInfoResolver 
 {
-    static_assert(std::is_same_v<T, SdfAbstractDataValue> ||
-                  std::is_same_v<T, VtValue>);
-
     // Helper to set the value source.  Normally this just sets the source from
     // None to `source`, but in the case where we're getting resolve info at no
     // specific time and we encounter a composing default, we continue looking
@@ -8878,7 +8925,7 @@ struct UsdStage::_ResolveInfoResolver
 
     explicit _ResolveInfoResolver(const UsdAttribute& attr,
                                   UsdResolveInfo* resolveInfo,
-                                  UsdStage::_ExtraResolveInfo<T>* extraInfo)
+                                  UsdStage::_ExtraResolveInfo* extraInfo)
         : _attr(attr)
         , _resolveInfo(resolveInfo)
         , _extraInfo(extraInfo)
@@ -8888,10 +8935,8 @@ struct UsdStage::_ResolveInfoResolver
     bool
     ProcessFallback()
     {
-        if (const bool hasFallback = 
-            _attr._Prim()->GetPrimDefinition()
-            .template GetAttributeFallbackValue<VtValue>(
-                _attr.GetName(), nullptr)) {
+        if (_attr._Prim()->GetPrimDefinition().GetAttributeFallbackValue(
+                _attr.GetName(), _extraInfo->GetDefaultOrFallbackStorage())) {
             _SetSource(_resolveInfo, UsdResolveInfoSourceFallback);
             return true;
         }
@@ -8924,7 +8969,7 @@ struct UsdStage::_ResolveInfoResolver
         }
 
         UsdResolveInfo *nextWeaker = nullptr;
-        UsdStage::_ExtraResolveInfo<T>* nextWeakerExtra = nullptr;
+        UsdStage::_ExtraResolveInfo *nextWeakerExtra = nullptr;
 
         UsdResolveInfoSource thisSource = UsdResolveInfoSourceNone;
         bool didSetSource = false;
@@ -8995,8 +9040,9 @@ struct UsdStage::_ResolveInfoResolver
         } else {
             const std::type_info *valueType = &typeid(void);
 
-            Usd_DefaultValueResult defValue =
-                Usd_HasDefault<VtValue>(layer, specPath, nullptr, &valueType);
+            Usd_DefaultValueResult defValue = Usd_HasDefault(
+                layer, specPath, _extraInfo->GetDefaultOrFallbackStorage(),
+                &valueType);
             
             if (defValue == Usd_DefaultValueResult::Found) {
                 *foundOpinion = true;
@@ -9072,8 +9118,9 @@ struct UsdStage::_ResolveInfoResolver
         // at the default time.  We never get here when resolving a value a
         // numeric time.
         const std::type_info *valueType = &typeid(void);
-        Usd_DefaultValueResult defValue =
-            Usd_HasDefault<VtValue>(layer, specPath, nullptr, &valueType);
+        Usd_DefaultValueResult defValue = Usd_HasDefault(
+            layer, specPath, _extraInfo->GetDefaultOrFallbackStorage(),
+            &valueType);
 
         if (defValue == Usd_DefaultValueResult::Found) {
             _resolveInfo->_source = UsdResolveInfoSourceDefault;
@@ -9173,9 +9220,9 @@ struct UsdStage::_ResolveInfoResolver
     }
 
 private:
-    const UsdAttribute& _attr;
-    UsdResolveInfo* _resolveInfo;
-    UsdStage::_ExtraResolveInfo<T>* _extraInfo;
+    const UsdAttribute &_attr;
+    UsdResolveInfo *_resolveInfo;
+    UsdStage::_ExtraResolveInfo *_extraInfo;
 
     // For composing value types, when we find a lower-time sample value that
     // doesn't compose and an upper-time sample value that does, that
@@ -9195,12 +9242,11 @@ private:
     bool _processingAnimationBlock = false;
 };
 
-template <class T>
 void
 UsdStage::_GetResolveInfo(const UsdAttribute &attr, 
                           UsdResolveInfo *resolveInfo,
                           const UsdTimeCode *time, 
-                          _ExtraResolveInfo<T> *extraInfo) const
+                          _ExtraResolveInfo *extraInfo) const
 {
     auto makeUsdResolverFn = [&attr](bool skipEmptyNodes) {
         return Usd_Resolver(&attr._Prim()->GetPrimIndex(), skipEmptyNodes);
@@ -9208,14 +9254,13 @@ UsdStage::_GetResolveInfo(const UsdAttribute &attr,
     _GetResolveInfoImpl(attr, resolveInfo, time, extraInfo, makeUsdResolverFn);
 }
 
-template <class T>
 void
 UsdStage::_GetResolveInfoWithResolveTarget(
     const UsdAttribute &attr, 
     const UsdResolveTarget &resolveTarget,
     UsdResolveInfo *resolveInfo,
     const UsdTimeCode *time, 
-    _ExtraResolveInfo<T> *extraInfo) const
+    _ExtraResolveInfo *extraInfo) const
 {
     auto makeUsdResolverFn = [&resolveTarget](bool skipEmptyNodes) {
         return Usd_Resolver(&resolveTarget, skipEmptyNodes);
@@ -9223,21 +9268,21 @@ UsdStage::_GetResolveInfoWithResolveTarget(
     _GetResolveInfoImpl(attr, resolveInfo, time, extraInfo, makeUsdResolverFn);
 }
 
-template <class T, class MakeUsdResolverFn>
+template <class MakeUsdResolverFn>
 void 
 UsdStage::_GetResolveInfoImpl(
     const UsdAttribute &attr, 
     UsdResolveInfo *resolveInfo,
     const UsdTimeCode *time,
-    _ExtraResolveInfo<T> *extraInfo,
+    _ExtraResolveInfo *extraInfo,
     const MakeUsdResolverFn &makeUsdResolverFn) const
 {
-    _ExtraResolveInfo<T> localExtraInfo;
+    _ExtraResolveInfo localExtraInfo;
     if (!extraInfo) {
         extraInfo = &localExtraInfo;
     }
 
-    _ResolveInfoResolver<T> resolver(attr, resolveInfo, extraInfo);
+    _ResolveInfoResolver resolver(attr, resolveInfo, extraInfo);
     if (!time) {
         _GetResolvedValueAtTimeImpl(
             attr, &resolver, nullptr, makeUsdResolverFn);
@@ -9413,25 +9458,6 @@ UsdStage::_GetResolvedValueAtTimeImpl(
         _GetResolvedValueAtTimeNoClipsImpl(
             &res, prop.GetName(), resolver, localTime);
     }
-}
-
-void
-UsdStage::_GetResolveInfo(const UsdAttribute &attr, 
-                          UsdResolveInfo *resolveInfo,
-                          const UsdTimeCode *time) const
-{
-    _GetResolveInfo<VtValue>(attr, resolveInfo, time);
-}
-
-void 
-UsdStage::_GetResolveInfoWithResolveTarget(
-    const UsdAttribute &attr, 
-    const UsdResolveTarget &resolveTarget,
-    UsdResolveInfo *resolveInfo,
-    const UsdTimeCode *time) const
-{
-    _GetResolveInfoWithResolveTarget<VtValue>(
-        attr, resolveTarget, resolveInfo, time);
 }
 
 bool

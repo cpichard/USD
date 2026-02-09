@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <atomic>
+#include <deque>
 #include <istream>
 #include <ostream>
 #include <regex>
@@ -486,9 +487,9 @@ struct Tf_MallocPathNode
     {
     }
 
-    void _BuildTree(Tf_PathNodeChildrenTable const &nodeChildren,
-                    TfMallocTag::CallTree::PathNode* node,
-                    bool skipRepeated) const;
+    TfMallocTag::CallTree::PathNode
+    _BuildTree(Tf_PathNodeChildrenTable const &nodeChildren,
+               bool skipRepeated) const;
 
     bool _IsRepeated() const {
         const Tf_MallocCallSite * const site = _callSite;
@@ -868,46 +869,92 @@ Tf_MallocGlobalData::_BuildPathNodeChildrenTable() const
     return result;
 }
 
-void
-Tf_MallocPathNode::_BuildTree(Tf_PathNodeChildrenTable const &nodeChildren,
-                              TfMallocTag::CallTree::PathNode* node,
+TfMallocTag::CallTree::PathNode
+Tf_MallocPathNode::_BuildTree(Tf_PathNodeChildrenTable const &pathNodeChildren,
                               bool skipRepeated) const
 {
-    std::vector<Tf_MallocPathNode const *> const &children =
-        nodeChildren.count(this)
-        ? nodeChildren.find(this).value()
-        : std::vector<Tf_MallocPathNode const *>();
-    node->children.reserve(children.size());
-    node->nBytes = node->nBytesDirect = _totalBytes;
-    node->nAllocations = _numAllocations;
-    node->siteName = _callSite->_name.get();
+    // We're doing a non-recursive post-order tree traversal of `this`, building
+    // up a `TfMallocTag::CallTree` to eventually return.
+    struct _StackEntry {
+        Tf_MallocPathNode const *pathNode = nullptr;
+        TfMallocTag::CallTree::PathNode callTreeNode;
+        uint32_t parentIndex = 0;
+        bool postOrderVisit = false;
+    };
+    // We use a deque here for the convenience that push/pop operations do not
+    // invalidate references.
+    std::deque<_StackEntry> stack;
 
-    for (Tf_MallocPathNode const *child: children) {
-        // The tree is built in a special way, if the repeated allocations
-        // should be skipped. First, the full tree is built using temporary 
-        // nodes for all allocations that should be skipped. Then tree is 
-        // collapsed by copying the children of temporary nodes to their parents
-        // in bottom-up fasion.
-        if (skipRepeated && child->_IsRepeated()) {
-            // Create a temporary node
-            TfMallocTag::CallTree::PathNode childNode;
-            child->_BuildTree(nodeChildren, &childNode, skipRepeated);
-            // Add the direct contribution of this node to the parent.
-            node->nBytesDirect += childNode.nBytesDirect;
-            // Copy the children, if there are any
-            if (!childNode.children.empty()) {
-                node->children.insert(node->children.end(), 
-                                      childNode.children.begin(),
-                                      childNode.children.end());
+    // Push a new entry for `pathNode` on the stack, whose parent is at
+    // `parentIndex` in the stack.  The new entry gets a `callTreeNode`
+    // initialized with `pathNode`'s initial statistics.
+    auto push = [&stack](Tf_MallocPathNode const *pathNode,
+                         uint32_t parentIndex) {
+        TfMallocTag::CallTree::PathNode callTreeNode;
+        callTreeNode.nBytes = callTreeNode.nBytesDirect = pathNode->_totalBytes;
+        callTreeNode.nAllocations = pathNode->_numAllocations;
+        callTreeNode.siteName = pathNode->_callSite->_name.get();
+        stack.push_back(_StackEntry {
+                pathNode, std::move(callTreeNode),
+                parentIndex, /*postOrderVisit=*/false
+            });
+        if (stack.size() > 5000) {
+            printf("_BuildTree stack to %zd\n", stack.size());
+        }
+    };
+            
+    // Push the root, then process the stack.
+    push(this, 0);
+    while (stack.size() > 1 || !stack.back().postOrderVisit) {
+        _StackEntry &cur = stack.back();
+        if (cur.postOrderVisit) {
+            // Accumulate cur into its parent and pop.
+            _StackEntry &parent = stack[cur.parentIndex];
+            // In all cases, add cur's total bytes to its parent.
+            parent.callTreeNode.nBytes += cur.callTreeNode.nBytes;
+            if (skipRepeated && cur.pathNode->_IsRepeated()) {
+                // If cur is a repeated node, add cur's direct contribution to
+                // its parent.
+                parent.callTreeNode.nBytesDirect +=
+                    cur.callTreeNode.nBytesDirect;
+                // And move any children to the parent.
+                parent.callTreeNode.children.insert(
+                    parent.callTreeNode.children.end(),
+                    std::make_move_iterator(cur.callTreeNode.children.begin()),
+                    std::make_move_iterator(cur.callTreeNode.children.end())
+                    );
             }
-            node->nBytes += childNode.nBytes;
-        } else {
-            node->children.push_back(TfMallocTag::CallTree::PathNode());
-            TfMallocTag::CallTree::PathNode& childNode = node->children.back();
-            child->_BuildTree(nodeChildren, &childNode, skipRepeated);
-            node->nBytes += childNode.nBytes;
+            else {
+                // Add cur as a child of its parent.
+                parent.callTreeNode
+                    .children.push_back(std::move(cur.callTreeNode));
+            }
+            stack.pop_back();
+        }
+        else {
+            // Push any children and mark cur for postOrderVisit.
+            if (pathNodeChildren.count(cur.pathNode)) {
+                auto const &children =
+                    pathNodeChildren.find(cur.pathNode).value();
+                const uint32_t curIndex = static_cast<uint32_t>(stack.size()-1);
+                // Push children in reverse order so that they appear in the
+                // resulting call tree in forward order.
+                for (auto childIter = children.rbegin(), end = children.rend();
+                     childIter != end; ++childIter) {
+                    push(*childIter, curIndex);
+                }
+                cur.callTreeNode.children.reserve(children.size());
+            }
+            cur.postOrderVisit = true;
         }
     }
+
+    // Now we should have just the root left with the completed tree.
+    TfMallocTag::CallTree::PathNode ret;
+    if (TF_VERIFY(stack.size() == 1 && stack.back().postOrderVisit)) {
+        ret = std::move(stack.back().callTreeNode);
+    }
+    return ret;
 }
 
 void
@@ -1100,8 +1147,8 @@ TfMallocTag::GetCallTree(CallTree* tree, bool skipRepeated)
         TfBigRWMutex::ScopedLock lock(gd->_mutex);
 
         // Build the snapshot call tree
-        gd->_rootNode->_BuildTree(
-            gd->_BuildPathNodeChildrenTable(), &tree->root, skipRepeated);
+        tree->root = gd->_rootNode->_BuildTree(
+            gd->_BuildPathNodeChildrenTable(), skipRepeated);
         
         // Build the snapshot callsites map based on the tree
         Tf_MallocCallSiteTable callSiteTable;
