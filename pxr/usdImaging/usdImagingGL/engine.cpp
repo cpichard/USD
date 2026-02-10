@@ -1076,13 +1076,27 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
+    SdfPath freeCameraPath;
+
     if (_taskControllerSceneIndex) {
         _taskControllerSceneIndex->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
+        freeCameraPath = _taskControllerSceneIndex->GetFreeCameraPath();
+
     } else if (_taskController) {
         _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
+        freeCameraPath = _taskController->GetFreeCameraPath();
     } else {
         TF_CODING_ERROR("No task controller or task controller scene index.");
     }
+    if (UseUsdImagingSceneIndex()) {
+        if (_appSceneIndices) {
+            if (auto& sgsi = _appSceneIndices->sceneGlobalsSceneIndex) {
+                sgsi->SetPrimaryCameraPrimPath(freeCameraPath);
+            }
+        }
+    }
+    // XXX: Do not set camera for sampling on legacy delegate; this camera does
+    // not actually exist in the usdImaging scene delegate!
 }
 
 void
