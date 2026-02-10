@@ -2035,6 +2035,7 @@ group.add_argument("--ignore-paths", type=str, nargs="*", default=[],
 group.add_argument("--build-target",
                     default=GetBuildTargetDefault(),
                     choices=GetBuildTargets(),
+                    type=str.lower,
                     help=("Build target for cross compilation. "
                             "(default: {})".format(
                             GetBuildTargetDefault())))
