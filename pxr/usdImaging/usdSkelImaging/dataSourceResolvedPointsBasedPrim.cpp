@@ -11,6 +11,7 @@
 #include "pxr/usdImaging/usdSkelImaging/blendShapeSchema.h"
 #include "pxr/usdImaging/usdSkelImaging/dataSourcePrimvar.h"
 #include "pxr/usdImaging/usdSkelImaging/dataSourceUtils.h"
+#include "pxr/usdImaging/usdSkelImaging/extComputations.h"
 #include "pxr/usdImaging/usdSkelImaging/jointInfluencesData.h"
 #include "pxr/usdImaging/usdSkelImaging/skeletonSchema.h"
 #include "pxr/usdImaging/usdSkelImaging/tokens.h"
@@ -1085,24 +1086,29 @@ UsdSkelImagingDataSourceResolvedPointsBasedPrim::HasExtComputations() const
 bool
 UsdSkelImagingDataSourceResolvedPointsBasedPrim::HasNormalsExtComputations() const
 {
-    // If there are ext computations ...
-    if (HasExtComputations()) {
-        // And the subdivision scheme is "none" ...
-        const HdTokenDataSourceHandle subdivisionSchemeDs =
-            _mesh.GetSubdivisionScheme();
-        const TfToken subdivisionScheme =
-            subdivisionSchemeDs
-                ? subdivisionSchemeDs->GetTypedValue(0.0f)
-                : PxOsdOpenSubdivTokens->none;
-        if (subdivisionScheme == PxOsdOpenSubdivTokens->none) {
-            // And there are authored normals ...
-            const VtVec3fArray normals =
-                UsdSkelImagingGetTypedValue(
-                    HdVec3fArrayDataSource::Cast(
-                        GetNormals()));
+    static const bool normalComputationsEnabled =
+        TfGetEnvSetting(USDSKELIMAGING_ENABLE_NORMAL_COMPUTATIONS);
 
-            // Then we should have ext computations for normals.
-            return !normals.empty();
+    if (normalComputationsEnabled) {
+        // If there are ext computations ...
+        if (HasExtComputations()) {
+            // And the subdivision scheme is "none" ...
+            const HdTokenDataSourceHandle subdivisionSchemeDs =
+                _mesh.GetSubdivisionScheme();
+            const TfToken subdivisionScheme =
+                subdivisionSchemeDs
+                    ? subdivisionSchemeDs->GetTypedValue(0.0f)
+                    : PxOsdOpenSubdivTokens->none;
+            if (subdivisionScheme == PxOsdOpenSubdivTokens->none) {
+                // And there are authored normals ...
+                const VtVec3fArray normals =
+                    UsdSkelImagingGetTypedValue(
+                        HdVec3fArrayDataSource::Cast(
+                            GetNormals()));
+
+                // Then we should have ext computations for normals.
+                return !normals.empty();
+            }
         }
     }
 
