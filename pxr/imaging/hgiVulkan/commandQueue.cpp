@@ -326,6 +326,7 @@ HgiVulkanCommandQueue::IsTimelinePastValue(uint64_t desiredValue, bool wait)
         VkSemaphoreWaitInfo waitInfo;
         waitInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
         waitInfo.pNext = nullptr;
+        waitInfo.flags = 0;
         waitInfo.semaphoreCount = 1;
         waitInfo.pSemaphores = &_timelineSemaphore;
         waitInfo.pValues = &desiredValue;
