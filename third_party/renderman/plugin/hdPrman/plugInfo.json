@@ -21,12 +21,6 @@
                         "priority": 0,
                         "displayName": "Prman Velocity Motion Resolving Scene Index"
                     },
-                    "HdPrman_VblurInterpretingSceneIndexPlugin" : {
-                        "bases": ["HdSceneIndexPlugin"],
-                        "loadWithRenderer": ["RenderMan RIS", "RenderMan XPU", "RenderMan XPU - CPU", "RenderMan XPU - GPU"],
-                        "priority": 0,
-                        "displayName": "Prman ri:object:vblur-Interpreting Scene Index"
-                    },
                     "HdPrman_MatFiltSceneIndexPlugin" : {
                         "bases": ["HdSceneIndexPlugin"],
                         "loadWithRenderer": ["RenderMan RIS", "RenderMan XPU", "RenderMan XPU - CPU", "RenderMan XPU - GPU"],

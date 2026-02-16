@@ -213,6 +213,7 @@ pxr_plugin(${PXR_PACKAGE}
         lightLinkingSceneIndexPlugin.cpp
         renderer2SceneIndexPlugin.cpp
         rendererPlugin.cpp
+        sceneIndexPluginOrdering.cpp
         virtualStructConditionalGrammar.lex.cpp
         virtualStructConditionalGrammar.tab.cpp
 
