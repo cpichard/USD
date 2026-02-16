@@ -32,8 +32,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_DECLARE_PUBLIC_TOKENS(HdSceneIndexPluginRegistryTokens, HD_API,
     HDSCENEINDEXPLUGINREGISTRY_TOKENS);
 
-
-
 class HdSceneIndexPlugin;
 
 ///
@@ -208,7 +206,10 @@ public:
         int insertionPhase = -1;
     };
 
-    HD_API
+    /// Gets metadata about the plugin that inserted the given scene index, if
+    /// available.
+    ///
+    /// This is primarily intended for debugging and diagnostic use.
     bool
     GetPluginInsertionMetadataForSceneIndex(
         const HdSceneIndexBaseRefPtr& sceneIndex,
@@ -240,51 +241,52 @@ private:
         const PluginInsertionMetadata&& metadata,
         _VisitedSet&& visited);
 
-    // Registration entry. Ordering info is held in the map key.
+    // Entry for a plugin/callback-scene-index that's registered via the C++
+    // registration API above.
     struct _Entry
     {
         _Entry(const TfToken &sceneIndexPluginId,
-                const HdContainerDataSourceHandle &args)
+               const HdContainerDataSourceHandle &args,
+               InsertionPhase phase,
+               InsertionOrder order)
         : sceneIndexPluginId(sceneIndexPluginId)
         , args(args)
+        , phase(phase)
+        , order(order)
         {}
 
         _Entry(SceneIndexAppendCallback callback,
-                const HdContainerDataSourceHandle &args)
+               const HdContainerDataSourceHandle &args,
+               InsertionPhase phase,
+               InsertionOrder order)
         : args(args)
         , callback(callback)
+        , phase(phase)
+        , order(order)
         {}
 
         TfToken sceneIndexPluginId;
         HdContainerDataSourceHandle args;
         SceneIndexAppendCallback callback;
+        InsertionPhase phase;
+        InsertionOrder order;
     };
 
     using _EntryList = std::vector<_Entry>;
-    using _EntriesByPhaseMap = std::map<InsertionPhase, _EntryList>;
-    using _EntriesByPhaseAndOrderMap
-        = std::map<std::pair<InsertionPhase, InsertionOrder>, _EntryList>;
-    using _PhaseOrderEntriesMapByRenderer =
-        std::map<std::string, _EntriesByPhaseAndOrderMap>;
+    using _EntriesByRendererMap = std::map<std::string, _EntryList>;
 
-    static
-    _EntriesByPhaseMap
-    _Collapse(const _EntriesByPhaseAndOrderMap& rendererEntriesMap);
-
-    /// Computes entries per-phase map for \p rendererDisplayName
-    ///
-    /// Caller is expected to have loaded plugins.
-    _EntriesByPhaseMap
-    _ComputeEntriesByPhaseMap(const std::string& rendererDisplayName) const;
+    _EntryList
+    _ComputeOrderedEntriesForRenderer(
+        const std::string& rendererDisplayName) const;
 
     HdSceneIndexBaseRefPtr _AppendForPhases(
         const HdSceneIndexBaseRefPtr &inputScene,
-        const _EntriesByPhaseMap &entriesByPhases,
+        const _EntryList &orderedEntries,
         const HdContainerDataSourceHandle &argsUnderlay,
         const std::string &renderInstanceId);
 
     // Updated via RegisterSceneIndexForRenderer calls.
-    _PhaseOrderEntriesMapByRenderer _entriesMapForRenderers;
+    _EntriesByRendererMap _entriesForRenderers;
 
     // Used to track plugins whose plugInfo entries contain "loadWithRenderer"
     // values to load when the specified renderer or renderers are used.

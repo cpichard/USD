@@ -136,43 +136,29 @@ HdSceneIndexPluginRegistry::AppendSceneIndex(
 HdSceneIndexBaseRefPtr
 HdSceneIndexPluginRegistry::_AppendForPhases(
     const HdSceneIndexBaseRefPtr &inputScene,
-    const _EntriesByPhaseMap &entriesByPhases,
+    const _EntryList &orderedEntries,
     const HdContainerDataSourceHandle &argsUnderlay,
     const std::string &renderInstanceId)
 {
     HdSceneIndexBaseRefPtr result = inputScene;
     const std::string rendererName = _GetRendererName(argsUnderlay);
-    for (const auto &phasesPair : entriesByPhases) {
-        for (const _Entry &entry : phasesPair.second) {
-            HdSceneIndexBaseRefPtr input = result;
-            HdContainerDataSourceHandle args = entry.args;
+    for (const auto &entry : orderedEntries) {
+        HdSceneIndexBaseRefPtr input = result;
+        HdContainerDataSourceHandle args = entry.args;
 
-            if (args) {
-                if (argsUnderlay) {
-
-                    HdContainerDataSourceHandle c[] = {
-                        args,
-                        argsUnderlay,
-                    };
-
-                    args = HdOverlayContainerDataSource::New(2, c);
-
-                }
-            } else {
-                args = argsUnderlay;
-            }
-
-            if (entry.callback) {
-                result = entry.callback(renderInstanceId, result, args);
-            } else {
-                result = AppendSceneIndex(
-                    entry.sceneIndexPluginId, result, args, renderInstanceId);
-            }
-            _PopulateMetadata(
-                result,
-                { rendererName, entry.sceneIndexPluginId, phasesPair.first },
-                { input });
+        args = HdOverlayContainerDataSource::OverlayedContainerDataSources(
+            args, argsUnderlay);
+        
+        if (entry.callback) {
+            result = entry.callback(renderInstanceId, input, args);
+        } else {
+            result = AppendSceneIndex(
+                entry.sceneIndexPluginId, input, args, renderInstanceId);
         }
+        _PopulateMetadata(
+            result,
+            { rendererName, entry.sceneIndexPluginId, entry.phase },
+            { input });
     }
     return result;
 }
@@ -184,7 +170,7 @@ HdSceneIndexPluginRegistry::_AppendForPhases(
 //       > HdSceneIndexPluginRegistry::_CollectAdditionalMetadata
 void
 HdSceneIndexPluginRegistry::_CollectAdditionalMetadata(
-        const PlugRegistry &plugRegistry, const TfType &pluginType)
+    const PlugRegistry &plugRegistry, const TfType &pluginType)
 {
     const JsValue &loadWithRendererValue =
         plugRegistry.GetDataFromPluginMetaData(pluginType,
@@ -279,53 +265,37 @@ HdSceneIndexPluginRegistry::_LoadPluginsForRenderer(
     }
 }
 
-// Collapses phase-and-order-entries map into a phase-entries map by
-// concatenating sorted entry lists for each insertion order in a given phase.
-// (Only two insertion orders currently exist: at start and at end.)
-// The sort ensures a stable order independent of plugin load order.
-/* static */
-HdSceneIndexPluginRegistry::_EntriesByPhaseMap
-HdSceneIndexPluginRegistry::_Collapse(
-    const _EntriesByPhaseAndOrderMap& rendererEntriesMap)
-{
-    // Assert that we will visit "start" before "end".
-    static_assert(
-        HdSceneIndexPluginRegistry::InsertionOrderAtStart
-        < HdSceneIndexPluginRegistry::InsertionOrderAtEnd);
-
-    _EntriesByPhaseMap ret;
-    for (const auto& [phaseAndOrder, entryList] : rendererEntriesMap) {
-        const InsertionPhase& insertionPhase = phaseAndOrder.first;
-
-        _EntryList& entries = ret[insertionPhase];
-        entries.insert(entries.end(), entryList.begin(), entryList.end());
-        // sort the entries inserted above by the id so that we get a stable 
-        // order that does not depend on the order in which the plugins are 
-        // discovered/loaded.
-        std::sort(
-            entries.end() - entryList.size(), entries.end(),
-            [](const _Entry& a, const _Entry& b) {
-                return a.sceneIndexPluginId < b.sceneIndexPluginId;
-            });
-    }
-    return ret;
-}
-
-HdSceneIndexPluginRegistry::_EntriesByPhaseMap
-HdSceneIndexPluginRegistry::_ComputeEntriesByPhaseMap(
+// Computes an ordered list of entries from the registered entries for
+// all renderers and the specified renderer.
+//
+HdSceneIndexPluginRegistry::_EntryList
+HdSceneIndexPluginRegistry::_ComputeOrderedEntriesForRenderer(
     const std::string& rendererDisplayName) const
 {
-    _PhaseOrderEntriesMapByRenderer::const_iterator allRenderersIt =
-        _entriesMapForRenderers.find("");
-    _PhaseOrderEntriesMapByRenderer::const_iterator rendererIt =
+    _EntriesByRendererMap::const_iterator allRenderersIt =
+        _entriesForRenderers.find("");
+    _EntriesByRendererMap::const_iterator rendererIt =
         rendererDisplayName.empty()
-        ? _entriesMapForRenderers.end()
-        : _entriesMapForRenderers.find(rendererDisplayName);
+        ? _entriesForRenderers.end()
+        : _entriesForRenderers.find(rendererDisplayName);
+    
+    auto sortFn = [](const _Entry& a, const _Entry& b) {
+        if (a.phase != b.phase) {
+            return a.phase < b.phase;
+        }
+        if (a.order != b.order) {
+            return a.order < b.order;
+        }
+        // Sort by plugin id to get a stable order that does not depend on the
+        // order in which the plugins are discovered/loaded.
+        // Note that callback-registered entries will have an empty plugin id, 
+        // so they will be sorted before any entries with a non-empty plugin id.
+        return a.sceneIndexPluginId < b.sceneIndexPluginId;
+    };
 
-    // XXX
-    // Ideally, we honor the insertion order more strictly by merging the
-    // two phase-and-order maps together and then collapsing that into a
-    // phase-only map.
+    // Ideally, we honor the insertion order more strictly by merging entries
+    // for "all" renderers and the specified renderer together and then sorting
+    // that merged list together.
     // But this requires changes to various scene index plugins that have
     // worked-around the existing adhoc-ordering where "all renderers" plugins
     // always run before "specific renderer" plugins for a given phase,
@@ -333,44 +303,60 @@ HdSceneIndexPluginRegistry::_ComputeEntriesByPhaseMap(
     //
     constexpr bool useIdealImpl = false;
     if constexpr (useIdealImpl) {
-        _EntriesByPhaseAndOrderMap mergedEntriesByPhaseAndOrder;
-        if (allRenderersIt != _entriesMapForRenderers.end()) {
+        _EntryList mergedEntries;
+
+        if (allRenderersIt != _entriesForRenderers.end()) {
             // Copy entries for all renderers first
-            mergedEntriesByPhaseAndOrder = allRenderersIt->second;
+            mergedEntries = allRenderersIt->second;
         }
         
-        if (rendererIt != _entriesMapForRenderers.end()) {
+        if (rendererIt != _entriesForRenderers.end()) {
             // Append entries tied to the specified renderer.
-            for (const auto& [phaseAndOrder, entryList] : rendererIt->second) {
-                _EntryList& mergedEntryList =
-                    mergedEntriesByPhaseAndOrder[phaseAndOrder];
-                mergedEntryList.insert(
-                    mergedEntryList.end(), entryList.begin(), entryList.end());
-            }
+            mergedEntries.insert(
+                mergedEntries.end(), rendererIt->second.begin(),
+                rendererIt->second.end());
         }
-        // Now collapse phase-and-order map into a phase-only map by
-        // concatenating entry lists in order.
-        return _Collapse(mergedEntriesByPhaseAndOrder);
+        std::sort(mergedEntries.begin(), mergedEntries.end(), sortFn);
+        return mergedEntries;
     }
 
-    _EntriesByPhaseMap mergedEntriesByPhase;
-    if (allRenderersIt != _entriesMapForRenderers.end()) {
-        // Collapse entries for all renderers first
-        mergedEntriesByPhase = _Collapse(allRenderersIt->second);
+    // Non-ideal ordering implementation:
+    _EntryList allEntries;
+    if (allRenderersIt != _entriesForRenderers.end()) {
+        allEntries = allRenderersIt->second;
+        std::sort(allEntries.begin(), allEntries.end(), sortFn);
     }
 
-    if (rendererIt != _entriesMapForRenderers.end()) {
-        // By collapsing the renderer-specific entries below before appending,
-        // we no longer strictly honor insertion order across the two lists...
-        const auto rendererEntriesByPhase = _Collapse(rendererIt->second);
-        for (const auto& [phase, entryList] : rendererEntriesByPhase) {
-            _EntryList& mergedEntryList = mergedEntriesByPhase[phase];
-            mergedEntryList.insert(
-                mergedEntryList.end(), entryList.begin(), entryList.end());
+    _EntryList rendererEntries;
+    if (rendererIt != _entriesForRenderers.end()) {
+        rendererEntries = rendererIt->second;    
+        std::sort(rendererEntries.begin(), rendererEntries.end(), sortFn);
+    }
+
+    _EntryList mergedEntries;
+    mergedEntries.reserve(allEntries.size() + rendererEntries.size());
+    // Merge the sorted lists together, ensuring that entries with the same
+    // phase are grouped together with "all renderers" entries coming before
+    // "specific renderer" entries (i.e. not strictly honoring insertion 
+    // order across the two lists).
+    auto it1 = allEntries.begin();
+    auto it2 = rendererEntries.begin();
+    while (it1 != allEntries.end() && it2 != rendererEntries.end()) {
+        if (it1->phase < it2->phase) {
+            mergedEntries.push_back(*it1);
+            ++it1;
+        } else if (it1->phase > it2->phase) {
+            mergedEntries.push_back(*it2);
+            ++it2;
+        } else {
+            mergedEntries.push_back(*it1);
+            ++it1;
         }
     }
-
-    return mergedEntriesByPhase;
+    mergedEntries.insert(mergedEntries.end(), it1, allEntries.end());
+    mergedEntries.insert(mergedEntries.end(), it2, rendererEntries.end());
+    
+    return mergedEntries;
 }
 
 HdSceneIndexBaseRefPtr
@@ -389,7 +375,7 @@ HdSceneIndexPluginRegistry::AppendSceneIndicesForRenderer(
                 rendererDisplayName));
 
     HdSceneIndexBaseRefPtr scene = _AppendForPhases(
-        inputScene, _ComputeEntriesByPhaseMap(rendererDisplayName),
+        inputScene, _ComputeOrderedEntriesForRenderer(rendererDisplayName),
         underlayArgs, renderInstanceId);
 
     if (TfGetEnvSetting<bool>(HD_USE_ENCAPSULATING_SCENE_INDICES)) {
@@ -409,10 +395,9 @@ HdSceneIndexPluginRegistry::RegisterSceneIndexForRenderer(
     InsertionOrder insertionOrder)
 {
     // Note that we're simply appending to the list here. The ordering
-    // will be resolved later when we build the per-phase map.
-    _entriesMapForRenderers[rendererDisplayName]
-                             [{ insertionPhase, insertionOrder }]
-                                 .emplace_back(sceneIndexPluginId, inputArgs);
+    // will be resolved later.
+    _entriesForRenderers[rendererDisplayName].emplace_back(
+        sceneIndexPluginId, inputArgs, insertionPhase, insertionOrder);
 }
 
 void
@@ -424,10 +409,9 @@ HdSceneIndexPluginRegistry::RegisterSceneIndexForRenderer(
     InsertionOrder insertionOrder)
 {
     // Note that we're simply appending to the list here. The ordering
-    // will be resolved later when we build the per-phase map.
-    _entriesMapForRenderers[rendererDisplayName]
-                             [{ insertionPhase, insertionOrder }]
-                                 .emplace_back(callback, inputArgs);
+    // will be resolved later.
+    _entriesForRenderers[rendererDisplayName].emplace_back(
+        callback, inputArgs, insertionPhase, insertionOrder);
 }
 
 std::vector<TfToken>
@@ -436,16 +420,13 @@ HdSceneIndexPluginRegistry::LoadAndGetSceneIndexPluginIds(
 {
     std::vector<TfToken> ret;
     _LoadPluginsForRenderer(rendererDisplayName, appName);
-    for (const auto& phaseAndEntryList :
-         _ComputeEntriesByPhaseMap(rendererDisplayName)) {
-        const _EntryList& entryList = phaseAndEntryList.second;
-        for (const _Entry& entry: entryList) {
-            if (entry.sceneIndexPluginId.IsEmpty()) {
-                // Skip callback-registered entries.
-                continue;
-            }
-            ret.push_back(entry.sceneIndexPluginId);
+    const auto entries = _ComputeOrderedEntriesForRenderer(rendererDisplayName);
+    for (const _Entry& entry: entries) {
+        if (entry.sceneIndexPluginId.IsEmpty()) {
+            // Skip callback-registered entries.
+            continue;
         }
+        ret.push_back(entry.sceneIndexPluginId);
     }
     return ret;
 }
