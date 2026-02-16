@@ -594,9 +594,9 @@ HgiVulkanDevice::GetPipelineCache() const
 void
 HgiVulkanDevice::WaitForIdle()
 {
-    HGIVULKAN_VERIFY_VK_RESULT(
-        vkDeviceWaitIdle(_vkDevice)
-    );
+    // HgiVulkan only uses a single command queue at the moment,
+    // so we flush that queue and wait.
+    GetCommandQueue()->Flush(HgiSubmitWaitTypeWaitUntilCompleted);
 }
 
 bool

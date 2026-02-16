@@ -118,15 +118,7 @@ HgiVulkanCommandQueue::SubmitToQueue(
     HgiVulkanCommandBuffer* cb,
     HgiSubmitWaitType wait)
 {
-    // If we have resource commands buffer those before work commands.
-    if (_resourceCommandBuffer) {
-        _resourceCommandBuffer->EndCommandBuffer();
-        _resourceCommandBuffer->SetCompletedTimelineValue(
-            _timelineNextVal);
-        _queuedBuffers.push_back(_resourceCommandBuffer);
-
-        _resourceCommandBuffer = nullptr;
-    }
+    _FlushResourceCommandBuffer();
 
     // XXX Ideally EndCommandBuffer is called on the thread that used it since
     // this can be a heavy operation. However, currently Hgi does not provide
@@ -250,6 +242,8 @@ HgiVulkanCommandQueue::Flush(
     HgiSubmitWaitType wait,
     VkSemaphore signalSemaphore)
 {
+    _FlushResourceCommandBuffer();
+
     std::vector<VkCommandBuffer> commandBuffers;
     commandBuffers.reserve(_queuedBuffers.size());
     for (auto& buffer : _queuedBuffers) {
@@ -361,6 +355,18 @@ HgiVulkanCommandQueue::_AcquireThreadCommandPool(
         return newPool;
     } else {
         return it->second;
+    }
+}
+
+void
+HgiVulkanCommandQueue::_FlushResourceCommandBuffer() {
+    if (_resourceCommandBuffer) {
+        _resourceCommandBuffer->EndCommandBuffer();
+        _resourceCommandBuffer->SetCompletedTimelineValue(
+            _timelineNextVal);
+        _queuedBuffers.push_back(_resourceCommandBuffer);
+
+        _resourceCommandBuffer = nullptr;
     }
 }
 
