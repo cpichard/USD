@@ -1500,9 +1500,18 @@ def InstallOpenSubdiv(context, force, buildArgs):
             extraArgs.append('-DCMAKE_C_FLAGS="{}"'.format(compileFlags))
             extraArgs.append('-DNO_METAL=ON')
 
-        # Use Metal for macOS and all Apple embedded systems.
+        # Enable GLSL shader source so it is available for Vulkan, etc
+        # even when OpenGL is disabled.
+        extraArgs.append(
+            '-DOSD_PATCH_SHADER_SOURCE_GLSL=ON'
+        )
+
+        # Enable MSL shader source for Apple systems and disable OpenGL.
         if MacOS():
-            extraArgs.append('-DNO_OPENGL=ON')
+            extraArgs.extend([
+                '-DNO_OPENGL=ON',
+                '-DOSD_PATCH_SHADER_SOURCE_MSL=ON',
+            ])
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
