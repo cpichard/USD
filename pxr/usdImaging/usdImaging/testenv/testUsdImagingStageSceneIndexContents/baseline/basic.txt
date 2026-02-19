@@ -195,11 +195,6 @@
 	[purpose]
 		[fallback]
 			geometry
-	[xform]
-		[matrix]
-			( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
-		[resetXformStack]
-			0
 </Materials> type = 
 	[__usdPrimInfo]
 		[isLoaded]
