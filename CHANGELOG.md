@@ -118,8 +118,8 @@
 
 - Various TsSpline updates:
   - Fixed the derivative calculation of a TsSpline using linear extrapolation.
-  - Updated implementation of spline evaluation, baking, and sampling using 
-    new Ts_Segment iterator.
+  - Implemented Ts_Segment iterator used for spline diffing, with the intent to
+    use this iterator for spline evaluation, baking, and sampling in the future.
   - Implemented `TsSpline::Diff()` to compare two splines or regions of 2 
     splines.
 
@@ -512,14 +512,14 @@
   space, and produces a posed space.
 
 - Cycle detection/handling improvements:
+  - Changes made to detect data cycles formed over multiple rounds of 
+    compilation.  
   - When compilation detects an attempt to create a cycle in the network, a 
     `TF_ERROR` is emitted with an error code value of 
     `ExecValidationErrorType::DataDependencyCycle`, and control is returned to 
-    the client. Computations that depend on data cycles may evaluate to 
-    incorrect values. To programmatically determine if compilation detected a 
-    cycle, use a `TfErrorMark`.
-  - Changes made to detect data cycles formed by multiple rounds of compilation 
-    and change processing.
+    the client instead of aborting the process. Computations that depend on data 
+    cycles may evaluate to incorrect values. To programmatically determine if 
+    compilation detected a cycle, use a `TfErrorMark`.
   - If an `ExecUsdRequest` contains value keys that depend on a data cycle, 
     those value keys will be invalidated by the 
     `ExecRequestComputedValueInvalidationCallback` for every scene change until 
