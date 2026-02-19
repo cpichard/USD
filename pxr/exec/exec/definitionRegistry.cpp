@@ -12,7 +12,6 @@
 #include "pxr/exec/exec/builtinStageComputations.h"
 #include "pxr/exec/exec/pluginData.h"
 #include "pxr/exec/exec/privateBuiltinComputations.h"
-#include "pxr/exec/exec/registrationBarrier.h"
 #include "pxr/exec/exec/typeRegistry.h"
 #include "pxr/exec/exec/types.h"
 
@@ -51,7 +50,6 @@ std::vector<TfType> _GetFullyExpandedSchemaTypeVector(
 TF_INSTANTIATE_SINGLETON(Exec_DefinitionRegistry);
 
 Exec_DefinitionRegistry::Exec_DefinitionRegistry()
-    : _registrationBarrier(std::make_unique<Exec_RegistrationBarrier>())
 {
     TRACE_FUNCTION();
 
@@ -80,10 +78,6 @@ Exec_DefinitionRegistry::Exec_DefinitionRegistry()
     // than the definition registry type, so Exec_DefinitionRegistry can remain
     // private.
     TfRegistryManager::GetInstance().SubscribeTo<ExecDefinitionRegistryTag>();
-
-    // Callers of Exec_DefinitionRegistry::GetInstance() can now safely return
-    // a fully-constructed registry.
-    _registrationBarrier->SetFullyConstructed();
 }
 
 // This must be defined in the cpp file, or we get undefined symbols when
@@ -92,10 +86,7 @@ Exec_DefinitionRegistry::Exec_DefinitionRegistry()
 const Exec_DefinitionRegistry&
 Exec_DefinitionRegistry::GetInstance()
 {
-    Exec_DefinitionRegistry &instance =
-        TfSingleton<Exec_DefinitionRegistry>::GetInstance();
-    instance._registrationBarrier->WaitUntilFullyConstructed();
-    return instance;
+    return TfSingleton<Exec_DefinitionRegistry>::GetInstance();
 }
 
 Exec_DefinitionRegistry&

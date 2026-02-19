@@ -72,7 +72,6 @@ pxr_library(exec
         pluginData
         privateBuiltinComputations
         program
-        registrationBarrier
         requestTracker
         runtime
         taskCycleDetector
