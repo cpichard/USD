@@ -284,11 +284,15 @@ HdContainerDataSourceHandle
 HdFlattenedPrimvarsDataSourceProvider::GetFlattenedDataSource(
     const Context &ctx) const
 {
+    auto childDs = ctx.GetInputDataSource();
+    auto parentDs = _PrimvarsDataSource::Cast(
+        ctx.GetFlattenedDataSourceFromParentPrim());
+    // If no child primvars, we can use the parent's _PrimvarsDataSource.
+    if (!childDs) {
+        return parentDs;
+    }
     return 
-        _PrimvarsDataSource::New(
-            ctx.GetInputDataSource(),
-            _PrimvarsDataSource::Cast(
-                ctx.GetFlattenedDataSourceFromParentPrim()));
+        _PrimvarsDataSource::New(childDs, parentDs);
 }
 
 void
