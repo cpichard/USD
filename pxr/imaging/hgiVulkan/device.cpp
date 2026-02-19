@@ -15,6 +15,7 @@
 
 #include "pxr/base/tf/diagnostic.h"
 
+#include <fstream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -611,5 +612,17 @@ HgiVulkanDevice::IsSupportedExtension(const char* extensionName) const
     return false;
 }
 
+void
+HgiVulkanDevice::DumpMemoryStats() const
+{
+    char* statsString;
+    vmaBuildStatsString(_vmaAllocator, &statsString, true);
+    
+    std::fstream output("VmaStatsOut.json", std::ios::out);
+    output << statsString;
+    output.close();
+
+    vmaFreeStatsString(_vmaAllocator, statsString);
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE
