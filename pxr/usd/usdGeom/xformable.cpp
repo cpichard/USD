@@ -714,13 +714,13 @@ UsdGeomXformable::XformQuery::GetLocalTransformation(
 bool
 UsdGeomXformable::XformQuery::TransformMightHaveEffect() const
 {
-    // Empty op list has no effect.
-    if (_xformOps.empty()) {
-        return false;
-    }
     // Resetting the stack has an effect.
     if (_resetsXformStack) {
         return true;
+    }
+    // Empty op list has no effect.
+    if (_xformOps.empty()) {
+        return false;
     }
     // An op followed by its inverse has no effect.  For example:
     // ["xformOp:translate:pivot", "!invert!:xformOp:translate:pivot"]
