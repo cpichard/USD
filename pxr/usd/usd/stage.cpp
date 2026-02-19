@@ -90,6 +90,7 @@
 #include "pxr/base/work/utils.h"
 #include "pxr/base/work/withScopedParallelism.h"
 
+#include <tbb/concurrent_vector.h>
 #include <tbb/spin_rw_mutex.h>
 #include <tbb/spin_mutex.h>
 
