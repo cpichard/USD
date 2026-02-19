@@ -284,15 +284,16 @@ HdContainerDataSourceHandle
 HdFlattenedPrimvarsDataSourceProvider::GetFlattenedDataSource(
     const Context &ctx) const
 {
-    auto childDs = ctx.GetInputDataSource();
-    auto parentDs = _PrimvarsDataSource::Cast(
-        ctx.GetFlattenedDataSourceFromParentPrim());
-    // If no child primvars, we can use the parent's _PrimvarsDataSource.
-    if (!childDs) {
-        return parentDs;
-    }
+    // Unlike other flattened data source providers, we cannot use
+    // the parent's flattened data source in the case where this
+    // prim provides no additional input data source.  The reason
+    // is that only interpolation=constant primvars inherit, and
+    // _PrimvarsDataSource() is what provides this filtering.
     return 
-        _PrimvarsDataSource::New(childDs, parentDs);
+        _PrimvarsDataSource::New(
+            ctx.GetInputDataSource(),
+            _PrimvarsDataSource::Cast(
+                ctx.GetFlattenedDataSourceFromParentPrim()));
 }
 
 void
