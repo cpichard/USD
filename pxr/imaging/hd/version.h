@@ -134,6 +134,9 @@
 #define HD_API_VERSION 91
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
-#define HD_SHADER_API 2
+// 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.
+//           NUM_LIGHTS still exists for shader code requiring a compile time
+//           max count constant. Ex: MAX_LIGHT_SOURCES in MaterialX
+#define HD_SHADER_API 3
 
 #endif // PXR_IMAGING_HD_VERSION_H
