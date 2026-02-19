@@ -19,15 +19,14 @@
 
 #include "pxr/pxr.h"
 
-#include <map>
-#include <set>
 #include <string>
+#include <memory>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 #define HDSCENEINDEXPLUGINREGISTRY_TOKENS \
     ((rendererDisplayName, "__rendererDisplayName")) \
-
+    ((allRenderers, ""))
 
 TF_DECLARE_PUBLIC_TOKENS(HdSceneIndexPluginRegistryTokens, HD_API,
     HDSCENEINDEXPLUGINREGISTRY_TOKENS);
@@ -233,79 +232,8 @@ private:
 
     HdSceneIndexPlugin *_GetSceneIndexPlugin(const TfToken &pluginId);
 
-    using _VisitedSet = std::set<HdSceneIndexBaseRefPtr>;
-
-    void
-    _PopulateMetadata(
-        const HdSceneIndexBaseRefPtr& sceneIndex,
-        const PluginInsertionMetadata&& metadata,
-        _VisitedSet&& visited);
-
-    // Entry for a plugin/callback-scene-index that's registered via the C++
-    // registration API above.
-    struct _Entry
-    {
-        _Entry(const TfToken &sceneIndexPluginId,
-               const HdContainerDataSourceHandle &args,
-               InsertionPhase phase,
-               InsertionOrder order)
-        : sceneIndexPluginId(sceneIndexPluginId)
-        , args(args)
-        , phase(phase)
-        , order(order)
-        {}
-
-        _Entry(SceneIndexAppendCallback callback,
-               const HdContainerDataSourceHandle &args,
-               InsertionPhase phase,
-               InsertionOrder order)
-        : args(args)
-        , callback(callback)
-        , phase(phase)
-        , order(order)
-        {}
-
-        TfToken sceneIndexPluginId;
-        HdContainerDataSourceHandle args;
-        SceneIndexAppendCallback callback;
-        InsertionPhase phase;
-        InsertionOrder order;
-    };
-
-    using _EntryList = std::vector<_Entry>;
-    using _EntriesByRendererMap = std::map<std::string, _EntryList>;
-
-    _EntryList
-    _ComputeOrderedEntriesForRenderer(
-        const std::string& rendererDisplayName) const;
-
-    HdSceneIndexBaseRefPtr _AppendForPhases(
-        const HdSceneIndexBaseRefPtr &inputScene,
-        const _EntryList &orderedEntries,
-        const HdContainerDataSourceHandle &argsUnderlay,
-        const std::string &renderInstanceId);
-
-    // Updated via RegisterSceneIndexForRenderer calls.
-    _EntriesByRendererMap _entriesForRenderers;
-
-    // Used to track plugins whose plugInfo entries contain "loadWithRenderer"
-    // values to load when the specified renderer or renderers are used.
-    // Loading the plug-in allows for further registration code to run when
-    // a plug-in wouldn't be loaded elsewhere.
-    using _PreloadMap = std::map<std::string, TfTokenVector>;
-    _PreloadMap _preloadsForRenderers;
-
-    // Used to track app-name-based filtering for plugin loading. If a plugin
-    // declares "preloadInApps" in its plugInfo, the plugin will appear in this
-    // map. When a plugin is in this map, its library will only be loaded if
-    // the appName provided to AppendSceneIndexes is in the list of
-    // preloadInApps for the plugin.
-    using _EnabledAppsMap = std::map<TfToken, std::set<std::string>>;
-    _EnabledAppsMap _preloadAppsForPlugins;
-
-    using _MetadataMap = std::map<
-        TfWeakPtr<HdSceneIndexBase>, PluginInsertionMetadata>;
-    _MetadataMap _metadata;
+    struct _Impl;
+    std::unique_ptr<_Impl> _impl;
 };
 
 template<typename T, typename... Bases>
