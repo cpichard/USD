@@ -2,11 +2,25 @@
 % Generated: 03:26PM on February 19, 2026
 
 
-(FieldAsset)=
-# FieldAsset
+(VolumeFieldAsset)=
+# VolumeFieldAsset
 
-This schema is deprecated, and VolumeFieldAsset 
-should be used instead. See {ref}`VolumeFieldAsset` for more details.
+VolumeFieldAsset is an abstract schema (that 
+inherits from {ref}`VolumeFieldBase`) that represents a volumetric field
+where the volumetric data is stored outside the layer, e.g. in a file asset.
+It is used as a base class for schemas that reference specific volume data
+asset types, such as OpenVDB data. 
+
+If you need to extend UsdVol with your own custom file-based field schemas, 
+your custom schemas should inherit from VolumeFieldAsset.
+
+```{admonition} Create Prims Using VolumeFieldAsset-derived Schemas
+:class: note
+
+Like VolumeFieldBase, VolumeFieldAsset is an abstract schema. In practice you 
+will most likely create prims using one of the field schemas that inherit from 
+VolumeFieldAsset, such as OpenVDBAsset or Field3DAsset.
+```
 
 ```{contents}
 :depth: 2
@@ -14,15 +28,11 @@ should be used instead. See {ref}`VolumeFieldAsset` for more details.
 :backlinks: none
 ```
 
-(FieldAsset_properties)=
+(VolumeFieldAsset_properties)=
 
 ## Properties
 
-(FieldAsset_inheritedproperties_VolumeFieldAsset)=
-
-## Inherited Properties ({ref}`VolumeFieldAsset`)
-
-(FieldAsset_fieldDataType)=
+(VolumeFieldAsset_fieldDataType)=
 
 ### fieldDataType
 
@@ -34,7 +44,7 @@ Use this attribute to tell consumers more about the field without requiring the
 consumer access the asset file directly. The list of allowed tokens is specified 
 with the specific asset type. A missing value is considered an error.
 
-(FieldAsset_fieldIndex)=
+(VolumeFieldAsset_fieldIndex)=
 
 ### fieldIndex
 
@@ -50,7 +60,7 @@ name. For example, in an OpenVDB file asset, there might be two Grids named
 "density" Grid.
 
 
-(FieldAsset_fieldName)=
+(VolumeFieldAsset_fieldName)=
 
 ### fieldName
 
@@ -72,7 +82,7 @@ by the Volume for organizing fields for the rendering pipeline. See
 relationship name differs from `fieldName`.
 
 
-(FieldAsset_filePath)=
+(VolumeFieldAsset_filePath)=
 
 ### filePath
 
@@ -94,7 +104,7 @@ See {ref}`usdVol_using_animated_field_data` for an example of using `filePath`
 to refer to animated volumetric data.
 
 
-(FieldAsset_vectorDataRoleHint)=
+(VolumeFieldAsset_vectorDataRoleHint)=
 
 ### vectorDataRoleHint
 
@@ -112,11 +122,11 @@ renderer or whether the vector values are to be transformed. Allowed tokens
 include `None`, `Point`, `Normal`, `Vector`, and `Color`.
 
 
-(FieldAsset_inheritedproperties_Xformable)=
+(VolumeFieldAsset_inheritedproperties_Xformable)=
 
 ## Inherited Properties ({ref}`Xformable`)
 
-(FieldAsset_xformOpOrder)=
+(VolumeFieldAsset_xformOpOrder)=
 
 ### xformOpOrder
 
@@ -124,11 +134,11 @@ include `None`, `Point`, `Normal`, `Vector`, and `Color`.
 
 
 
-(FieldAsset_inheritedproperties_Imageable)=
+(VolumeFieldAsset_inheritedproperties_Imageable)=
 
 ## Inherited Properties ({ref}`Imageable`)
 
-(FieldAsset_proxyPrim)=
+(VolumeFieldAsset_proxyPrim)=
 
 ### proxyPrim
 
@@ -136,7 +146,7 @@ include `None`, `Point`, `Normal`, `Vector`, and `Color`.
 
 
 
-(FieldAsset_purpose)=
+(VolumeFieldAsset_purpose)=
 
 ### purpose
 
@@ -146,7 +156,7 @@ include `None`, `Point`, `Normal`, `Vector`, and `Color`.
 
 
 
-(FieldAsset_visibility)=
+(VolumeFieldAsset_visibility)=
 
 ### visibility
 
