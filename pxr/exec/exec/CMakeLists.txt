@@ -45,6 +45,7 @@ pxr_library(exec
     PRIVATE_CLASSES
         attributeInputNode
         builtinAttributeComputations
+        builtinComputationRegistry
         builtinObjectComputations
         builtinStageComputations
         callbackNode

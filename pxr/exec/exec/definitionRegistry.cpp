@@ -7,6 +7,7 @@
 #include "pxr/exec/exec/definitionRegistry.h"
 
 #include "pxr/exec/exec/builtinAttributeComputations.h"
+#include "pxr/exec/exec/builtinComputationRegistry.h"
 #include "pxr/exec/exec/builtinComputations.h"
 #include "pxr/exec/exec/builtinObjectComputations.h"
 #include "pxr/exec/exec/builtinStageComputations.h"
@@ -104,14 +105,12 @@ Exec_DefinitionRegistry::GetComputationDefinition(
 {
     TRACE_FUNCTION();
 
-    const bool hasBuiltinPrefix =
-        TfStringStartsWith(
-            computationName.GetString(),
-            Exec_BuiltinComputations::builtinComputationNamePrefix);
+    const bool isBuiltinReservedName =
+        Exec_BuiltinComputationRegistry::IsReservedName(computationName);
 
     // If the provider is the stage, we only support builtin computations.
     if (providerPrim.IsPseudoRoot()) {
-        if (!hasBuiltinPrefix) {
+        if (!isBuiltinReservedName) {
             return nullptr;
         }
 
@@ -124,7 +123,7 @@ Exec_DefinitionRegistry::GetComputationDefinition(
         return nullptr;
     }
 
-    if (hasBuiltinPrefix) {
+    if (isBuiltinReservedName) {
         // Look for a builtin computation.
         const auto builtinIt =
             _builtinPrimComputationDefinitions.find(computationName);
@@ -281,12 +280,10 @@ Exec_DefinitionRegistry::GetComputationDefinition(
 {
     TRACE_FUNCTION();
 
-    const bool hasBuiltinPrefix =
-        TfStringStartsWith(
-            computationName.GetString(),
-            Exec_BuiltinComputations::builtinComputationNamePrefix);
+    const bool isBuiltinReservedName =
+        Exec_BuiltinComputationRegistry::IsReservedName(computationName);
 
-    if (hasBuiltinPrefix) {
+    if (isBuiltinReservedName) {
         // Look for a builtin computation.
         const auto builtinIt =
             _builtinAttributeComputationDefinitions.find(computationName);
@@ -503,15 +500,17 @@ Exec_DefinitionRegistry::_ValidateComputationRegistration(
         return false;
     }
 
-    if (TfStringStartsWith(
-            computationName.GetString(),
-            Exec_BuiltinComputations::builtinComputationNamePrefix)) {
-        TF_CODING_ERROR(
-            "Attempt to register computation '%s' with a name that uses the "
-            "prefix '%s', which is reserved for builtin computations.",
-            computationName.GetText(),
-            Exec_BuiltinComputations::builtinComputationNamePrefix);
-        return false;
+    if (Exec_BuiltinComputationRegistry::IsReservedName(computationName)) {
+        const auto *traits = Exec_BuiltinComputationRegistry::GetInstance()
+            .GetTraits(computationName);
+        if (!traits || !traits->IsUserDefinable()) {
+            TF_CODING_ERROR(
+                "Attempt to register computation '%s' with a name that uses "
+                "the prefix '%s', which is reserved for builtin computations.",
+                computationName.GetText(),
+                Exec_BuiltinComputationRegistry::GetReservedNamePrefix());
+            return false;
+        }
     }
 
     return true;
@@ -647,9 +646,7 @@ Exec_DefinitionRegistry::_RegisterBuiltinStageComputation(
     std::unique_ptr<Exec_ComputationDefinition> &&definition)
 {
     if (!TF_VERIFY(
-            TfStringStartsWith(
-                computationName.GetString(),
-                Exec_BuiltinComputations::builtinComputationNamePrefix))) {
+            Exec_BuiltinComputationRegistry::IsReservedName(computationName))) {
         return;
     }
 
@@ -672,9 +669,7 @@ Exec_DefinitionRegistry::_RegisterBuiltinPrimComputation(
     std::unique_ptr<Exec_ComputationDefinition> &&definition)
 {
     if (!TF_VERIFY(
-            TfStringStartsWith(
-                computationName.GetString(),
-                Exec_BuiltinComputations::builtinComputationNamePrefix))) {
+            Exec_BuiltinComputationRegistry::IsReservedName(computationName))) {
         return;
     }
 
@@ -697,9 +692,7 @@ Exec_DefinitionRegistry::_RegisterBuiltinAttributeComputation(
     std::unique_ptr<Exec_ComputationDefinition> &&definition)
 {
     if (!TF_VERIFY(
-            TfStringStartsWith(
-                computationName.GetString(),
-                Exec_BuiltinComputations::builtinComputationNamePrefix))) {
+            Exec_BuiltinComputationRegistry::IsReservedName(computationName))) {
         return;
     }
 
@@ -755,8 +748,8 @@ Exec_DefinitionRegistry::_RegisterBuiltinComputations()
               _builtinPrimComputationDefinitions.size() +
               _builtinAttributeComputationDefinitions.size() -
               numObjectComputations ==
-              ExecBuiltinComputations->GetComputationTokens().size() +
-              Exec_PrivateBuiltinComputations->GetComputationTokens().size());
+              Exec_BuiltinComputationRegistry::GetInstance()
+                .GetNumComputationsWithDefinitions());
 }
 
 void
