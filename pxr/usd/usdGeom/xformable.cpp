@@ -739,9 +739,8 @@ UsdGeomXformable::XformQuery::HasNonEmptyXformOpOrder() const
     return !_xformOps.empty();
 }
 
-static
-bool 
-_TransformMightBeTimeVarying(vector<UsdGeomXformOp> const &xformOps)
+static inline bool 
+_OpsMightBeTimeVarying(vector<UsdGeomXformOp> const &xformOps)
 {
     // If any of the xform ops may vary, then the cumulative transform may vary.
     TF_FOR_ALL(it, xformOps) {
@@ -755,7 +754,7 @@ _TransformMightBeTimeVarying(vector<UsdGeomXformOp> const &xformOps)
 bool
 UsdGeomXformable::XformQuery::TransformMightBeTimeVarying() const
 {
-    return _TransformMightBeTimeVarying(_xformOps);
+    return TransformMightHaveEffect() && _OpsMightBeTimeVarying(_xformOps);
 }
 
 bool
@@ -799,7 +798,7 @@ UsdGeomXformable::TransformMightBeTimeVarying(
     const vector<UsdGeomXformOp> &ops) const
 {
     if (!ops.empty())
-        return _TransformMightBeTimeVarying(ops);
+        return _OpsMightBeTimeVarying(ops);
 
     // Assume unvarying if neither orderedXformOps nor transform attribute is 
     // authored.
