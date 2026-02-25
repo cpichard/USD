@@ -69,7 +69,7 @@ HD_DECLARE_DATASOURCE_HANDLES(UsdImagingDataSourceMaterial);
 
 // ----------------------------------------------------------------------------
 
-/// \class UsdImagingDataSourceMaterial
+/// \class UsdImagingDataSourceMaterialPrim
 ///
 /// A prim data source mapping for a UsdShadeMaterial prim
 ///

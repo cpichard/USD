@@ -216,6 +216,21 @@ UsdImagingMaterialAdapter::InvalidateImagingSubprim(
     return result;
 }
 
+// XXX From dataSourceMaterial.cpp; can we share this somewhere?
+// Extract the renderContext from an output name, ex:
+// "outputs:surface" -> ""
+// "outputs:ri:surface" -> "ri"
+static TfToken
+_GetRenderContextForShaderOutput(UsdShadeOutput const& output)
+{
+    TfToken ns = output.GetAttr().GetNamespace();
+    if (TfStringStartsWith(ns, UsdShadeTokens->outputs)) {
+        return TfToken(ns.GetString().substr(UsdShadeTokens->outputs.size()));
+    }
+    // Empty namespace, e.g. "outputs:foo" -> ""
+    return TfToken();
+}
+
 HdDataSourceLocatorSet
 UsdImagingMaterialAdapter::InvalidateImagingSubprimFromDescendent(
         UsdPrim const& prim,
@@ -227,17 +242,34 @@ UsdImagingMaterialAdapter::InvalidateImagingSubprimFromDescendent(
     HdDataSourceLocatorSet result;
 
     UsdShadeMaterial material(prim);
-    if (!material) {
+    if (!TF_VERIFY(material)) {
         return result;
     }
 
     // Find which terminal (if any) we should dirty
     for (UsdShadeOutput& output : material.GetOutputs()) {
+        bool outputIsDirty = false;
         for (UsdShadeConnectionSourceInfo& connection :
              output.GetConnectedSources()) {
             if (_IsConnectionDirty(
                     descendentPrim, properties, material, connection)) {
                 result.insert(_CreateTerminalLocator(output.GetBaseName()));
+                outputIsDirty = true;
+                break;
+            }
+        }
+        if (outputIsDirty) {
+            // Dirty the associated shader node used by this output.
+            // Also dirty the shader node in the "all" context.
+            for (TfToken const& renderContext:
+                 { _GetRenderContextForShaderOutput(output),
+                   HdMaterialSchemaTokens->all })
+            {
+                result.insert(
+                    HdMaterialSchema::GetDefaultLocator()
+                    .Append(renderContext)
+                    .Append(HdMaterialNetworkSchemaTokens->nodes)
+                    .Append(descendentPrim.GetName()));
             }
         }
     }
