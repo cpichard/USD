@@ -14,6 +14,7 @@ pxr_library(esfUsd
 
     PUBLIC_CLASSES
         sceneAdapter
+        stageData
 
     PRIVATE_CLASSES
         attribute
@@ -31,6 +32,18 @@ pxr_library(esfUsd
         README.md        
 )
 
+pxr_build_test(testEsfUsdConnectionTables
+    LIBRARIES
+        esf
+        esfUsd
+        sdf
+        tf
+        usd
+        usdGeom
+    CPPFILES
+        testenv/testEsfUsdConnectionTables.cpp
+)
+
 pxr_build_test(testEsfUsdSceneObjects
     LIBRARIES
         esf
@@ -43,4 +56,10 @@ pxr_build_test(testEsfUsdSceneObjects
 pxr_register_test(testEsfUsdSceneObjects
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testEsfUsdSceneObjects"
     EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testEsfUsdConnectionTables
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testEsfUsdConnectionTables"
+    EXPECTED_RETURN_CODE 0
+    ENV TF_FATAL_VERIFY=1
 )
