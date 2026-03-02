@@ -212,6 +212,16 @@ private:
         const TfToken &computationName,
         EsfJournal *journal) const;
 
+    // Selects a computation definition for computeValue on the provider
+    // attribute. This returns the first of:
+    //   1. A definition of a registered built-in expression.
+    //   2. TODO: A built-in expression for single-connection dataflow.
+    //   3. The definition of computeResolvedValue.
+    //
+    const Exec_ComputationDefinition *_GetComputeValueDefinition(
+        const EsfAttributeInterface &providerAttribute,
+        EsfJournal *journal) const;
+
     // Returns a reference to the singleton that is suitable for registering
     // new computations.
     //

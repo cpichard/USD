@@ -20,7 +20,19 @@ Exec_BuiltinComputationTokens::Exec_BuiltinComputationTokens()
 Exec_BuiltinComputationTokens::Exec_BuiltinComputationTokens(
     Exec_BuiltinComputationRegistry &registry)
     : computeTime(registry._RegisterBuiltinComputation("computeTime"))
-    , computeValue(registry._RegisterBuiltinComputation("computeValue"))
+    , computeValue(registry._RegisterBuiltinComputation(
+        "computeValue",
+        Exec_BuiltinComputationTraits()
+            .SetHasDefinition(false)))
+    , computeExpression(registry._RegisterBuiltinComputation(
+        "computeExpression",
+        Exec_BuiltinComputationTraits()
+            .SetHasDefinition(false)
+            .SetIsUserDefinable(true)
+            .SetIsInputConsumable(false)))
+    , computeResolvedValue(
+        registry._RegisterBuiltinComputation("computeResolvedValue"))
+
 {}
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -55,6 +55,25 @@ pxr_register_test(testExecUsdAttributeComputations
     EXPECTED_RETURN_CODE 0
 )
 
+pxr_build_test(testExecUsdAttributeExpressions
+    LIBRARIES
+        tf
+        exec
+        execUsd
+        plug
+        sdf
+        vdf
+        usd
+    CPPFILES
+        testenv/testExecUsdAttributeExpressions.cpp
+)
+
+pxr_register_test(testExecUsdAttributeExpressions
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdAttributeExpressions"
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testExecUsdAttributeExpressions
+)
+
 pxr_build_test(testExecUsdAttributeValueInput
     LIBRARIES
         tf
