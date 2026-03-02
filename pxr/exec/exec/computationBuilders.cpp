@@ -143,7 +143,7 @@ Exec_ComputationBuilderValueSpecifierBase::_GetInputKey(
         _data->inputKey.computationName)) {
         const auto *traits = Exec_BuiltinComputationRegistry::GetInstance()
             .GetTraits(_data->inputKey.computationName);
-        if (!traits || !traits->IsInputConsumable()) {
+        if (!traits || !traits->isInputConsumable) {
             TF_CODING_ERROR(
                 "The builtin computation '%s' cannot be consumed by inputs to "
                 "user-defined computations.",

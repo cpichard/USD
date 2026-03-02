@@ -539,7 +539,7 @@ Exec_DefinitionRegistry::_ValidateComputationRegistration(
     if (Exec_BuiltinComputationRegistry::IsReservedName(computationName)) {
         const auto *traits = Exec_BuiltinComputationRegistry::GetInstance()
             .GetTraits(computationName);
-        if (!traits || !traits->IsUserDefinable()) {
+        if (!traits || !traits->isUserDefinable) {
             TF_CODING_ERROR(
                 "Attempt to register computation '%s' with a name that uses "
                 "the prefix '%s', which is reserved for builtin computations.",
