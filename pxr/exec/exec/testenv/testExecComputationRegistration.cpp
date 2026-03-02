@@ -224,8 +224,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
             // Take input from a computation provided by any objects targeted
             // by attribute connections on an attribute on the prim.
             Attribute(_tokens->attributeName)
-                .ConnectionTargetedObjects<int>(
-                    _tokens->attributeComputation),
+                .Connections<int>(_tokens->attributeComputation),
 
             // Take input from the value of an attribute, marking it as a
             // required input.
@@ -269,7 +268,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
 
             // Take input from the objects targeted by this attribute's
             // connections.
-            ConnectionTargetedObjects<double>(_tokens->otherComputation),
+            Connections<double>(_tokens->otherComputation),
 
             // Take input from a computation on the attribute's owning prim.
             Prim().Computation<double>(_tokens->primComputation),
