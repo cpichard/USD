@@ -7,12 +7,41 @@
 #include "pxr/imaging/hdsi/locatorCachingSceneIndex.h"
 
 #include "pxr/imaging/hd/containerDataSourceEditor.h"
+#include "pxr/imaging/hd/dependencyForwardingSceneIndex.h"
 #include "pxr/imaging/hf/perfLog.h"
 #include "pxr/base/tf/denseHashMap.h"
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/trace/trace.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+HdsiLocatorCachingSceneIndexRefPtr
+HdsiLocatorCachingSceneIndex::AddDependencyForwardingAndCache(
+    HdSceneIndexBaseRefPtr const& inputScene,
+    HdDataSourceLocator const& locatorToCache,
+    TfToken const& primTypeToCache)
+{
+    return HdsiLocatorCachingSceneIndex::New(
+        HdDependencyForwardingSceneIndex::New(inputScene),
+        locatorToCache, primTypeToCache);
+}
+
+HdsiLocatorCachingSceneIndexRefPtr
+HdsiLocatorCachingSceneIndex::New(
+    HdSceneIndexBaseRefPtr const& inputScene,
+    HdDataSourceLocator const& locatorToCache,
+    TfToken const& primTypeToCache)
+{
+    if (locatorToCache.IsEmpty()) {
+        // This scene index is not intended for prim-level caching.
+        TF_CODING_ERROR("HdsiLocatorCachingSceneIndex requires "
+                        "a non-empty locator to cache.");
+        return nullptr;
+    }
+    return TfCreateRefPtr(
+        new HdsiLocatorCachingSceneIndex(
+            inputScene, locatorToCache, primTypeToCache));
+}
 
 HdsiLocatorCachingSceneIndex::_DataSource::_DataSource(
     HdsiLocatorCachingSceneIndex const* cachingSceneIndex,

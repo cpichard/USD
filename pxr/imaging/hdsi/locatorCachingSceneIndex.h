@@ -95,10 +95,66 @@ TF_DECLARE_REF_PTRS(HdsiLocatorCachingSceneIndex);
 /// comptutations on child prims.  HdFlatteningSceneIndex, rather than
 /// HdsiLocatorCachingSceneIndex, is appropriate for such cases.
 ///
+///
+/// \section cacheInvalidation Cache Invalidation
+///
+/// HdsiLocatorCachingSceneIndex relies on PrimsDirtied
+/// notification to invalidate internal cache state correctly.
+///
+/// There are two approaches to dependency invalidation in Hydra.
+///
+/// The first is that a scene index may directly propagate
+/// invalidation to dependent prims and locators inside its
+/// PrimsDirtied notification handler.
+///
+/// The second is that a scene index can overlay the
+/// HdDependencySchema, and express its dependencies in
+/// that form.  This approach relies on a downsteam
+/// HdDependencyForwardingSceneIndex to observe those dependnecies,
+/// and propagate invalidation to dependent prims and locators
+/// based on the provided dependency data.
+///
+/// Since HdsiLocatorCachingSceneIndex has no way of knowing
+/// what approach is used by upstream scene indexes, a
+/// straightforward way to achieve correct cache invalidation is
+/// by inserting a HdDependencyForwardingSceneIndex directly before
+/// the HdsiLocatorCachingSceneIndex in the scene index chain.
+/// The method AddDependencyForwardingAndLocatorCache() does this.
+///
+/// Note that this does rely on upstream scene indexes properly
+/// implementing one or the other of the two approaches above.
+///
+///
+/// \section internalState Internal Runtime State Caching
+///
+/// The discussion above pertains to caching the scene index data
+/// produced by a scene index and seen by observers.  Some scene
+/// index implementations contain internal runtime state (as C++
+/// member variables or thread-safe/protected global state).
+///
+/// Maintaining integrity of internal runtime cache state is the
+/// responsibility of the scene index, and this will require handling
+/// inside change notification methods.  Such state is not addressed
+/// by the dependency schema or HdDependencyForwardingSceneIndex.
+///
 class HdsiLocatorCachingSceneIndex : public HdSingleInputFilteringSceneIndexBase
 {
 public:
-    /// Creates a new locator caching scene index.
+    /// Creates a new HdDependencyForwardingSceneIndex followed by a
+    /// HdsiLocatorCachingSceneIndex.
+    ///
+    /// \see New() for parameter documentation
+    HD_API
+    static HdsiLocatorCachingSceneIndexRefPtr
+    AddDependencyForwardingAndCache(
+        HdSceneIndexBaseRefPtr const& inputScene,
+        HdDataSourceLocator const& locatorToCache,
+        TfToken const& primTypeToCache);
+
+    /// Creates a new HdsiLocatorCachingSceneIndex.
+    ///
+    /// \note AddDependencyForwardingAndLocatorCache() is recommended
+    /// for most uses.  See class notes regarding cache invalidation.
     ///
     /// \param inputScene The upstream input scene index to cache
     /// \param locatorToCache The data source locator to cache;
@@ -107,20 +163,11 @@ public:
     /// \param primTypeToCache If specified, caching only applies
     /// to prims of this data type; if empty token, caching applies
     /// to all prim types
-    static HdsiLocatorCachingSceneIndexRefPtr New(
-            HdSceneIndexBaseRefPtr const& inputScene,
-            HdDataSourceLocator const& locatorToCache,
-            TfToken const& primTypeToCache) {
-        if (locatorToCache.IsEmpty()) {
-            // This scene index is not intended for prim-level caching.
-            TF_CODING_ERROR("HdsiLocatorCachingSceneIndex requires "
-                            "a non-empty locator to cache.");
-            return nullptr;
-        }
-        return TfCreateRefPtr(
-            new HdsiLocatorCachingSceneIndex(
-                inputScene, locatorToCache, primTypeToCache));
-    }
+    HD_API
+    static HdsiLocatorCachingSceneIndexRefPtr
+    New(HdSceneIndexBaseRefPtr const& inputScene,
+        HdDataSourceLocator const& locatorToCache,
+        TfToken const& primTypeToCache);
 
     HD_API
     ~HdsiLocatorCachingSceneIndex() override;

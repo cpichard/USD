@@ -200,7 +200,7 @@ HdPrman_MatFiltSceneIndexPlugin::_AppendSceneIndex(
     // Cache the material prior to Matfilt operations, to avoid repeated access
     // to the underlying scene data (ex: USD) while they re-traverse the network
     // to apply each filter.
-    si = HdsiLocatorCachingSceneIndex::New(
+    si = HdsiLocatorCachingSceneIndex::AddDependencyForwardingAndCache(
         si, HdMaterialSchema::GetDefaultLocator(), HdPrimTypeTokens->material);
 #endif
 
