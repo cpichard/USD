@@ -182,6 +182,8 @@ HdPrman_MatFiltSceneIndexPlugin::GetInsertionPhase()
     return 100;
 }
 
+extern TfEnvSetting<bool> USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX;
+
 HdSceneIndexBaseRefPtr
 HdPrman_MatFiltSceneIndexPlugin::_AppendSceneIndex(
         const HdSceneIndexBaseRefPtr &inputScene,
@@ -197,11 +199,18 @@ HdPrman_MatFiltSceneIndexPlugin::_AppendSceneIndex(
     HdSceneIndexBaseRefPtr si = inputScene;
 
 #if HDSI_API_VERSION >= 19
-    // Cache the material prior to Matfilt operations, to avoid repeated access
-    // to the underlying scene data (ex: USD) while they re-traverse the network
-    // to apply each filter.
-    si = HdsiLocatorCachingSceneIndex::AddDependencyForwardingAndCache(
-        si, HdMaterialSchema::GetDefaultLocator(), HdPrimTypeTokens->material);
+    // XXX Avoid incompatibility between the below and Hydra1.
+    // This is a temporary measure until the Hydra1 codepath is
+    // retired from the tree, at which point this can be
+    // removed.
+    if (TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX)) {
+        // Cache the material prior to Matfilt operations, to avoid
+        // repeated access to the underlying scene data (ex: USD) while
+        // they re-traverse the network to apply each filter.
+        si = HdsiLocatorCachingSceneIndex::AddDependencyForwardingAndCache(
+            si, HdMaterialSchema::GetDefaultLocator(),
+            HdPrimTypeTokens->material);
+    }
 #endif
 
      // XXX: Hardcoded for now to match the legacy matfilt logic.

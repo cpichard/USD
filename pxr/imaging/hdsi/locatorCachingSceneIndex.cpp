@@ -15,7 +15,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-HdsiLocatorCachingSceneIndexRefPtr
+HdSceneIndexBaseRefPtr
 HdsiLocatorCachingSceneIndex::AddDependencyForwardingAndCache(
     HdSceneIndexBaseRefPtr const& inputScene,
     HdDataSourceLocator const& locatorToCache,

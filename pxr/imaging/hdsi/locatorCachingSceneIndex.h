@@ -145,7 +145,7 @@ public:
     ///
     /// \see New() for parameter documentation
     HD_API
-    static HdsiLocatorCachingSceneIndexRefPtr
+    static HdSceneIndexBaseRefPtr
     AddDependencyForwardingAndCache(
         HdSceneIndexBaseRefPtr const& inputScene,
         HdDataSourceLocator const& locatorToCache,
