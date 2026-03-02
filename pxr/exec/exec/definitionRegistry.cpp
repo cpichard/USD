@@ -779,6 +779,14 @@ Exec_DefinitionRegistry::_RegisterBuiltinComputations()
         std::make_unique<Exec_ComputeMetadataComputationDefinition>());
     ++numObjectComputations;
 
+    _RegisterBuiltinPrimComputation(
+        ExecBuiltinComputations->computePath,
+        std::make_unique<Exec_ComputePathComputationDefinition>());
+    _RegisterBuiltinAttributeComputation(
+        ExecBuiltinComputations->computePath,
+        std::make_unique<Exec_ComputePathComputationDefinition>());
+    ++numObjectComputations;
+
     // Make sure we registered all builtins.
     TF_VERIFY(_builtinStageComputationDefinitions.size() +
               _builtinPrimComputationDefinitions.size() +

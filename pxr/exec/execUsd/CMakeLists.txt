@@ -114,6 +114,26 @@ pxr_register_test(testExecUsdBasicCompilation
     DIFF_COMPARE testCompiler.out
 )
 
+pxr_build_test(testExecUsdBuiltinComputations
+    LIBRARIES
+        esf
+        exec
+        execUsd
+        plug
+        sdf
+        tf
+        usd
+        vdf
+    CPPFILES
+        testenv/testExecUsdBuiltinComputations.cpp
+)
+
+pxr_register_test(testExecUsdBuiltinComputations
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecUsdBuiltinComputations"
+    TESTENV testenv/testExecUsdBuiltinComputations
+    EXPECTED_RETURN_CODE 0
+)
+
 pxr_build_test(testExecUsdCallbacks
     LIBRARIES
         tf

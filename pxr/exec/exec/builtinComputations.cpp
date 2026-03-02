@@ -32,6 +32,8 @@ Exec_BuiltinComputationTokens::Exec_BuiltinComputationTokens(
             .SetIsInputConsumable(false)))
     , computeResolvedValue(
         registry._RegisterBuiltinComputation("computeResolvedValue"))
+    , computePath(
+        registry._RegisterBuiltinComputation("computePath"))
 
 {}
 

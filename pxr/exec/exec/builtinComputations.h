@@ -158,6 +158,26 @@ public:
     /// \hideinitializer
     const TfToken computeResolvedValue;
 
+    /// Computes the provider's scene path.
+    ///
+    /// \returns the path of the provider object, as an SdfPath.
+    ///
+    /// # Example
+    ///
+    /// ```{.cpp}
+    /// self.PrimComputation(_tokens->pathAsString)
+    ///     .Callback<std::string>(+[](const VdfContext &ctx) {
+    ///         return ctx.GetInputValue<SdfPath>(
+    ///             ExecBuiltinComputations->computePath).GetString();
+    ///     })
+    ///     .Inputs(
+    ///         Computation(ExecBuiltinComputations->computePath)
+    ///     );
+    /// ```
+    ///
+    /// \hideinitializer
+    const TfToken computePath;
+
     /// @} // Attribute computations
 
 private:
