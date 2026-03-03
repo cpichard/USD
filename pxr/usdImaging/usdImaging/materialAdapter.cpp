@@ -115,6 +115,9 @@ _CreateTerminalLocator(const TfToken& output)
     return HdMaterialSchema::GetDefaultLocator();
 }
 
+// Hash map used to track seen connections during notification processing.
+using _ConnectionSet = TfHashSet<UsdShadeConnectionSourceInfo, TfHash>;
+
 // Recusively check nodes starting at the terminal to find the dirty prim.
 // If the dirty prim is the source material also check the specific dirty
 // property.
@@ -123,10 +126,17 @@ _IsConnectionDirty(
     const UsdPrim& dirtyPrim,
     const TfTokenVector& dirtyProperties,
     const UsdShadeMaterial& material,
-    const UsdShadeConnectionSourceInfo& connection)
+    const UsdShadeConnectionSourceInfo& connection,
+    _ConnectionSet& seenConnections)
 {
-    if (!connection.IsValid())
+    if (seenConnections.find(connection) != seenConnections.end()) {
+        // Already visited this connection and determined it is not dirty.
         return false;
+    }
+    if (!connection.IsValid()) {
+        seenConnections.insert(connection);
+        return false;
+    }
 
     // If we reach the root material only dirty if we are connected to the
     // specific property which is dirty and don't recurse further.
@@ -145,6 +155,7 @@ _IsConnectionDirty(
                 }
             }
         }
+        seenConnections.insert(connection);
         return false;
     }
 
@@ -162,7 +173,7 @@ _IsConnectionDirty(
                  output.GetConnectedSources()) {
                 if (_IsConnectionDirty(
                         dirtyPrim, dirtyProperties, material,
-                        outputConnection)) {
+                        outputConnection, seenConnections)) {
                     return true;
                 }
             }
@@ -173,13 +184,14 @@ _IsConnectionDirty(
     for (UsdShadeInput& input : connection.source.GetInputs()) {
         for (UsdShadeConnectionSourceInfo& inputConnection :
              input.GetConnectedSources()) {
-            if (_IsConnectionDirty(
-                    dirtyPrim, dirtyProperties, material, inputConnection)) {
+            if (_IsConnectionDirty(dirtyPrim, dirtyProperties, material,
+                                   inputConnection, seenConnections)) {
                 return true;
             }
         }
     }
 
+    seenConnections.insert(connection);
     return false;
 }
 
@@ -201,7 +213,9 @@ UsdImagingMaterialAdapter::InvalidateImagingSubprim(
     for (UsdShadeOutput& output : material.GetOutputs()) {
         for (UsdShadeConnectionSourceInfo& connection :
              output.GetConnectedSources()) {
-            if (_IsConnectionDirty(prim, properties, material, connection)) {
+            _ConnectionSet seenConnections;
+            if (_IsConnectionDirty(prim, properties, material, connection,
+                                   seenConnections)) {
                 result.insert(_CreateTerminalLocator(output.GetBaseName()));
             }
         }
@@ -251,8 +265,9 @@ UsdImagingMaterialAdapter::InvalidateImagingSubprimFromDescendent(
         bool outputIsDirty = false;
         for (UsdShadeConnectionSourceInfo& connection :
              output.GetConnectedSources()) {
-            if (_IsConnectionDirty(
-                    descendentPrim, properties, material, connection)) {
+            _ConnectionSet seenConnections;
+            if (_IsConnectionDirty(descendentPrim, properties, material,
+                                   connection, seenConnections)) {
                 result.insert(_CreateTerminalLocator(output.GetBaseName()));
                 outputIsDirty = true;
                 break;
