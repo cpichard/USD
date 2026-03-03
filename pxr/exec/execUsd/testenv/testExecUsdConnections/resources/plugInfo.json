@@ -6,7 +6,7 @@
         {
             "Info": {
                 "Types": {
-                    "TestExecUsdConnectionTargetedObjectsCustomSchema": {
+                    "TestExecUsdConnectionsCustomSchema": {
                         "alias": {
                             "UsdSchemaBase": "CustomSchema"
                         },
@@ -19,7 +19,7 @@
                     }
                 }
             }, 
-            "Name": "testExecUsdConnectionTargetedObjects", 
+            "Name": "testExecUsdConnections", 
             "ResourcePath": ".", 
             "Type": "resource"
         }
