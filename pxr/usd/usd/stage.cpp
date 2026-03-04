@@ -90,6 +90,7 @@
 #include "pxr/base/work/utils.h"
 #include "pxr/base/work/withScopedParallelism.h"
 
+#include <tbb/concurrent_vector.h>
 #include <tbb/spin_rw_mutex.h>
 #include <tbb/spin_mutex.h>
 
@@ -7812,7 +7813,14 @@ UsdStage::_GetValueFromResolveInfoImpl(
     _ExtraResolveInfo const *curExtraResolveInfo = &extraResolveInfo;
 
     Usd_InterpolationSampleSeries composedSamples;
-    Usd_InterpolationSampleSeries curSamples;
+    Usd_InterpolationSampleSeries workingSamples;
+    // We always write into `curSamples`.  It initially points to
+    // `composedSamples` as an optimization since the common case is no
+    // composing values.  If we do find composing values, then `curSamples` is
+    // repointed to `workingSamples` for the remainder of the function, and we
+    // continually compose the weaker `workingSamples` into `composedSamples`.
+    Usd_InterpolationSampleSeries *curSamples = &composedSamples;
+    bool anyFinalSamplesMightCompose = true;
     
     ////////////////////////////////////////////////////////////////////////
     // Helper that mutates `val` by transforming it by the _FieldValueToStageXf,
@@ -7852,8 +7860,8 @@ UsdStage::_GetValueFromResolveInfoImpl(
 
     // Helper that returns true if `samples` contains any values that could
     // compose over others.
-    auto canAnyCompose = [](Usd_InterpolationSampleSeries const &samples) {
-        for (Usd_ValueTimeSample const &sample: samples) {
+    auto canAnyCompose = [&composedSamples]() {
+        for (Usd_ValueTimeSample const &sample: composedSamples) {
             if (sample.value.CanComposeOver()) {
                 return true;
             }
@@ -7862,15 +7870,20 @@ UsdStage::_GetValueFromResolveInfoImpl(
     };
 
     // Helper to compose two sets of samples
-    auto composeSamples = [](Usd_InterpolationSampleSeries &stronger,
-                             Usd_InterpolationSampleSeries const &weaker,
-                             double time) {
+    auto composeSamples = [&composedSamples](
+        Usd_InterpolationSampleSeries &&weaker, double time) {
 
+        // If weaker is composedSamples, then this is the first time through and
+        // we can do nothing.
+        if (&weaker == &composedSamples) {
+            return;
+        }
+        
         if (weaker.empty()) {
             return;
         }
-        if (stronger.empty()) {
-            stronger = weaker;
+        if (composedSamples.empty()) {
+            composedSamples = std::move(weaker);
             return;
         }
 
@@ -7878,7 +7891,7 @@ UsdStage::_GetValueFromResolveInfoImpl(
         TfSmallVector<Usd_ValueTimeSample, 4> merged;
 
         SdfComposeTimeSampleSeries(
-            stronger.cbegin(), stronger.cend(),
+            composedSamples.cbegin(), composedSamples.cend(),
             weaker.cbegin(), weaker.cend(),
             [](auto iter) { return iter->time; },
             [](auto iter) { return iter->value; },
@@ -7890,16 +7903,16 @@ UsdStage::_GetValueFromResolveInfoImpl(
             });
 
         // Now trim the merged samples to the (up to) closest two for time and
-        // leave the result in `stronger`.
-        stronger.clear();
+        // leave the result in `composedSamples`.
+        composedSamples.clear();
         if (merged.empty()) {
             return;
         }
         if (merged.size() == 1 || time <= merged.front().time) {
-            stronger.push_back(std::move(merged.front()));
+            composedSamples.push_back(std::move(merged.front()));
         }
         else if (time >= merged.back().time) {
-            stronger.push_back(std::move(merged.back()));
+            composedSamples.push_back(std::move(merged.back()));
         }
         else {
             auto iter = std::lower_bound(
@@ -7908,11 +7921,11 @@ UsdStage::_GetValueFromResolveInfoImpl(
                     return sample.time < t;
                 });
             if (iter->time == time) {
-                stronger.push_back(std::move(*iter));
+                composedSamples.push_back(std::move(*iter));
             }
             else {
-                stronger.push_back(std::move(*std::prev(iter)));
-                stronger.push_back(std::move(*iter));
+                composedSamples.push_back(std::move(*std::prev(iter)));
+                composedSamples.push_back(std::move(*iter));
             }
         }
     };
@@ -7920,7 +7933,12 @@ UsdStage::_GetValueFromResolveInfoImpl(
     // Walk the resolveInfo chain.
     for (; curResolveInfo && curExtraResolveInfo;
            curResolveInfo = curResolveInfo->GetNextWeakerInfo(),
-           curExtraResolveInfo = curExtraResolveInfo->nextWeaker.get()) {
+           curExtraResolveInfo = curExtraResolveInfo->nextWeaker.get(),
+             // After the first iteration, curSamples moves from composedSamples
+             // to workingSamples.
+             curSamples = &workingSamples) {
+
+        curSamples->clear();
 
         if (curResolveInfo->_source == UsdResolveInfoSourceSpline) {
             // Spline evaluation maps time-valued splines to the stage's time
@@ -7938,10 +7956,10 @@ UsdStage::_GetValueFromResolveInfoImpl(
                     time, attr, *curResolveInfo,
                     &curExtraResolveInfo->lowerSample,
                     &curExtraResolveInfo->upperSample,
-                    interpolator, &curSamples);
+                    interpolator, curSamples);
                 // Translate the values to the stage's namespace and timespace.
                 SdfPath specPath;
-                for (Usd_ValueTimeSample &sample: curSamples) {
+                for (Usd_ValueTimeSample &sample: *curSamples) {
                     xfValueToStage(sample.value, &specPath);
                 }
             }
@@ -7950,7 +7968,7 @@ UsdStage::_GetValueFromResolveInfoImpl(
                     time, attr, *curResolveInfo, curExtraResolveInfo->clipSet,
                     &curExtraResolveInfo->lowerSample,
                     &curExtraResolveInfo->upperSample,
-                    interpolator, &curSamples);
+                    interpolator, curSamples);
 
                 // For clips, there's more work to do to fetch the layer needed
                 // to do asset path resolution.  We only need it, though, if
@@ -7966,7 +7984,7 @@ UsdStage::_GetValueFromResolveInfoImpl(
                 };
                 
                 SdfPath specPath;
-                for (Usd_ValueTimeSample &sample: curSamples) {
+                for (Usd_ValueTimeSample &sample: *curSamples) {
                     // XXX Clips automatically transform time values to the
                     // stage's time, so skip transforming time-valued values.
                     // WBN to refactor to avoid this hacky bit.
@@ -7981,45 +7999,47 @@ UsdStage::_GetValueFromResolveInfoImpl(
             }
 
             // Compose the samples, updating composedSamples.
-            composeSamples(composedSamples, curSamples, time.GetValue());
+            composeSamples(std::move(*curSamples), time.GetValue());
             // If the samples cannot compose anymore, break out.
-            if (!canAnyCompose(composedSamples)) {
+            if (!canAnyCompose()) {
+                anyFinalSamplesMightCompose = false;
                 break;
             }
         }
         else if (curResolveInfo->_source == UsdResolveInfoSourceDefault) {
             SdfPath specPath = curResolveInfo->
                 _primPathInLayerStack.AppendProperty(attr.GetName());
-            Usd_InterpolationSampleSeries defaultSeries(1);
+            curSamples->resize(1);
             // Fetch a value from curExtraResolveInfo if we have one, otherwise
             // call Usd_HasDefault().
             if (!curExtraResolveInfo->
-                MoveDefaultOrFallbackValueTo(&defaultSeries.front().value)) {
+                MoveDefaultOrFallbackValueTo(&curSamples->front().value)) {
                 Usd_DefaultValueResult defValue = Usd_HasDefault(
                     curResolveInfo->_layer, specPath,
-                    &defaultSeries.front().value);
+                    &curSamples->front().value);
                 TF_VERIFY(defValue == Usd_DefaultValueResult::Found,
                           "Resolve info source default has no default value");
             }
             // Translate to the stage.
-            xfValueToStage(defaultSeries.front().value, &specPath);
+            xfValueToStage(curSamples->front().value, &specPath);
             // Compose samples over.
-            defaultSeries.front().time = -inf;
-            composeSamples(composedSamples, defaultSeries,
+            curSamples->front().time = -inf;
+            composeSamples(std::move(*curSamples),
                            time.IsNumeric() ? time.GetValue(): -inf);
             // If the samples cannot compose anymore, break out.
-            if (!canAnyCompose(composedSamples)) {
+            if (!canAnyCompose()) {
+                anyFinalSamplesMightCompose = false;
                 break;
             }
         }
         else if (curResolveInfo->_source == UsdResolveInfoSourceFallback) {
             VtValue fallbackValue;
-            Usd_InterpolationSampleSeries fallbackSeries(1);
+            curSamples->resize(1);
             if (!curExtraResolveInfo->
-                MoveDefaultOrFallbackValueTo(&fallbackSeries.front().value)) {
+                MoveDefaultOrFallbackValueTo(&curSamples->front().value)) {
                 const bool hasFallback = attr._Prim()->GetPrimDefinition()
                     .GetAttributeFallbackValue(
-                        attr.GetName(), &fallbackSeries.front().value);
+                        attr.GetName(), &curSamples->front().value);
                 TF_VERIFY(hasFallback,
                           "Resolve info source fallback has no fallback value");
             }
@@ -8028,8 +8048,8 @@ UsdStage::_GetValueFromResolveInfoImpl(
             // can always break out here.
             
             // Compose samples over the fallback.
-            fallbackSeries.front().time = -inf;
-            composeSamples(composedSamples, fallbackSeries,
+            curSamples->front().time = -inf;
+            composeSamples(std::move(*curSamples),
                            time.IsNumeric() ? time.GetValue() : -inf);
             break;
         }
@@ -8037,10 +8057,12 @@ UsdStage::_GetValueFromResolveInfoImpl(
 
     // Try to compose over the background to finalize the samples, then
     // interpolate.
-    for (Usd_ValueTimeSample &sample: composedSamples) {
-        if (std::optional<VtValue> composed =
-            VtValueTryComposeOver(sample.value, VtBackground)) {
-            sample.value = std::move(*composed);
+    if (anyFinalSamplesMightCompose) {
+        for (Usd_ValueTimeSample &sample: composedSamples) {
+            if (std::optional<VtValue> composed =
+                VtValueTryComposeOver(sample.value, VtBackground)) {
+                sample.value = std::move(*composed);
+            }
         }
     }
     
@@ -8049,7 +8071,7 @@ UsdStage::_GetValueFromResolveInfoImpl(
             Usd_Interpolate(&composedSamples, time.GetValue());
         }
         return
-            Usd_SetValue(result, composedSamples[0].value) &&
+            Usd_SetValue(result, std::move(composedSamples[0].value)) &&
             !Usd_ClearValueIfBlocked<SdfValueBlock>(result) &&
             m.IsClean();
     }
@@ -9040,9 +9062,12 @@ struct UsdStage::_ResolveInfoResolver
         } else {
             const std::type_info *valueType = &typeid(void);
 
+            // Grab a pointer to the _extraInfo's default or fallback storage,
+            // if it has one.  This will be null if there isn't one.
+            VtValue *defaultValueStore =
+                _extraInfo->GetDefaultOrFallbackStorage();
             Usd_DefaultValueResult defValue = Usd_HasDefault(
-                layer, specPath, _extraInfo->GetDefaultOrFallbackStorage(),
-                &valueType);
+                layer, specPath, defaultValueStore, &valueType);
             
             if (defValue == Usd_DefaultValueResult::Found) {
                 *foundOpinion = true;
@@ -9054,7 +9079,10 @@ struct UsdStage::_ResolveInfoResolver
                 // compose, add a next weaker resolve info to the chain and
                 // continue.  Otherwise just mark that the default can compose
                 // in the resolveInfo.
-                if (VtValueTypeCanComposeOver(*valueType)) {
+                if ((defaultValueStore &&
+                     defaultValueStore->CanComposeOver()) ||
+                    (!defaultValueStore &&
+                     VtValueTypeCanComposeOver(*valueType))) {
                     if (time) {
                         nextWeaker = _resolveInfo->_AddNextWeakerInfo();
                         nextWeakerExtra = _extraInfo->_AddNextWeakerInfo();
@@ -9118,9 +9146,11 @@ struct UsdStage::_ResolveInfoResolver
         // at the default time.  We never get here when resolving a value a
         // numeric time.
         const std::type_info *valueType = &typeid(void);
+        // Grab a pointer to the _extraInfo's default or fallback storage,
+        // if it has one.  This will be null if there isn't one.
+        VtValue *defaultValueStore = _extraInfo->GetDefaultOrFallbackStorage();
         Usd_DefaultValueResult defValue = Usd_HasDefault(
-            layer, specPath, _extraInfo->GetDefaultOrFallbackStorage(),
-            &valueType);
+            layer, specPath, defaultValueStore, &valueType);
 
         if (defValue == Usd_DefaultValueResult::Found) {
             _resolveInfo->_source = UsdResolveInfoSourceDefault;
@@ -9133,12 +9163,13 @@ struct UsdStage::_ResolveInfoResolver
 
             // If the default value's type could compose, add to the resolve
             // info chain and continue.
-            if (VtValueTypeCanComposeOver(*valueType)) {
+            if ((defaultValueStore && defaultValueStore->CanComposeOver()) ||
+                (!defaultValueStore && VtValueTypeCanComposeOver(*valueType))) {
                 _resolveInfo->_defaultCanCompose = true;
                 _resolveInfo = _resolveInfo->_AddNextWeakerInfo();
                 _extraInfo = _extraInfo->_AddNextWeakerInfo();
                 return false;
-            }            
+            }
             return true;
         }
         else if (defValue == Usd_DefaultValueResult::Blocked) {

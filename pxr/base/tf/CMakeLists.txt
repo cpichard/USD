@@ -455,6 +455,7 @@ pxr_build_test(testTf
         testenv/probe.cpp
         testenv/refPtr.cpp
         testenv/registryManager.cpp
+        testenv/registryManagerMultithreaded.cpp
         testenv/registryManagerUnload.cpp
         testenv/rwMutexes.cpp
         testenv/safeOutputFile.cpp

@@ -553,10 +553,10 @@ struct Exec_ComputationBuilderAttributeAccessor
     /// @{
 
     /// See
-    /// [ConnectionTargetedObjects()](#exec_registration::ConnectionTargetedObjects)
+    /// [Connections()](#exec_registration::Connections)
     template <typename ResultType>
     ValueSpecifier
-    ConnectionTargetedObjects(const TfToken &computationName)
+    Connections(const TfToken &computationName)
     {
         return ValueSpecifier(
             computationName,
@@ -1174,6 +1174,16 @@ AttributeValue(const TfToken &attributeName)
 /// input values from the computation \p computationName of type \p ResultType
 /// on the objects targeted by the attribute's connections.
 ///
+/// \note
+/// Conceptually, this input registration provides access to the owning
+/// attribute's connections, but as outlined in the paragraph above, in practice
+/// it requests the named computation from the objects that are targeted by
+/// those connections. The reason we choose "Connections" as the name, rather
+/// than "ConnectionTargetedObjects," is to allow for future expansion of USD to
+/// allow for value-transforming behaviors on attribute connections. This
+/// concept exists in Presto and is extremely useful for rigging, so there's a
+/// good chance it will be introduced in the future in USD and OpenExec.
+///
 /// The default input name is \p computationName; use `InputName` to specify a
 /// different input name.
 ///
@@ -1183,8 +1193,8 @@ AttributeValue(const TfToken &attributeName)
 /// EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(MySchemaType)
 /// {
 ///     // Register an attribute computation on the attribute 'myAttr' that
-///     // sums the results of the integer-valued 'computeValue' computations
-///     // on the objects targeted by myAttr's connections.
+///     // sums the results of the integer values flowing over myAttr's
+///     // connections from the objects targeted by those connections.
 ///     self.AttributeComputation(_tokens->myAttr, _tokens->computeSum)
 ///         .Callback<int>(+[](const VdfContext &ctx) {
 ///             int sum = 0;
@@ -1196,14 +1206,13 @@ AttributeValue(const TfToken &attributeName)
 ///             return sum;
 ///         })
 ///         .Inputs(
-///             ConnectionTargetedObjects<int>(
-///                 ExecBuiltinComputations->computeValue));
+///             Connections<int>(ExecBuiltinComputations->computeValue));
 /// }
 /// ```
 ///
 template <typename ResultType>
 auto
-ConnectionTargetedObjects(const TfToken &computationName)
+Connections(const TfToken &computationName)
 {
     return Exec_ComputationBuilderComputationValueSpecifier<
         Exec_ComputationBuilderProviderTypes::Attribute>(

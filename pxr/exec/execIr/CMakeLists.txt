@@ -1,4 +1,4 @@
-set(PXR_PREFIX )
+set(PXR_PREFIX pxr/exec)
 set(PXR_PACKAGE execIr)
 
 pxr_library(execIr
