@@ -56,7 +56,7 @@ public:
     /// 
     /// ```{.cpp}
     /// self.PrimComputation(_tokens->myComputation)
-    ///     .Callback<EfTime>( /* . . . */ )
+    ///     .Callback<EfTime>(&_MyCallback)
     ///     .Inputs(
     ///         Stage()
     ///             .Computation<EfTime>(ExecBuiltinComputations->computeTime)
@@ -79,8 +79,9 @@ public:
     /// Computes the provider attribute's value.
     ///
     /// \returns a value whose type is the provider attribute's scalar value
-    /// type. If the attribute has registered computeExpression, this may
-    /// produce a value of any type.
+    /// type. If the attribute has registered an
+    /// [attribute expression](#Exec_ComputationBuilder::AttributeExpression),
+    /// this may produce a value of any type.
     ///
     /// \note
     /// The computation provider must be an attribute.
@@ -89,7 +90,7 @@ public:
     /// 
     /// ```{.cpp}
     /// self.PrimComputation(_tokens->myComputation)
-    ///     .Callback<double>( /* . . . */ )
+    ///     .Callback<double>(&_MyCallback)
     ///     .Inputs(
     ///         Attribute(_tokens->myAttribute)
     ///             .Computation<double>(ExecBuiltinComputations->computeValue)
@@ -100,46 +101,12 @@ public:
     /// \hideinitializer
     const TfToken computeValue;
 
-    /// Computes the provider attribute's value by means of a user-defined
-    /// attribute computation.
-    ///
-    /// This computation is used to customize the result of computeValue for an
-    /// attribute. If an attribute defines a computeExpression computation, then
-    /// computeValue is an alias for that computation. computeExpression may be
-    /// defined for an attribute, but it may never be requested explicitly.
-    ///
-    /// \note
-    /// The computation may produce values of any type, and it need not consume
-    /// the attribute's authored value.
-    ///
-    /// # Example
-    ///
-    /// This example defines an attribute expression for a string-valued
-    /// attribute that produces the authored value in upper-case.
-    ///
-    /// ```{.cpp}
-    /// self.AttributeComputation(
-    ///     _tokens->myAttr,
-    ///     ExecBuiltinComputations->computeExpression)
-    ///     .Callback<std::string>(+[](const VdfContext &ctx) {
-    ///         std::string result = ctx.GetInputValue<std::string>(
-    ///             ExecBuiltinComputations->computeResolvedValue);
-    ///         std::transform(result.begin(), result.end(), ::toupper);
-    ///         return result;
-    ///     })
-    ///     .Inputs(
-    ///         Computation(ExecBuiltinComputations->computeResolvedValue)
-    ///     );
-    /// ```
-    ///
-    /// \hideinitializer
-    const TfToken computeExpression;
-
     /// Computes the provider attribute's resolved value as authored in scene
     /// description.
     ///
     /// This computation always produces the resolved value of an attribute,
-    /// even if an attribute has a registered computeExpression computation.
+    /// even if an attribute has registered an
+    /// [attribute expression](#Exec_ComputationBuilder::AttributeExpression).
     ///
     /// \returns a value whose type is the provider attribute's scalar value
     /// type.
@@ -148,7 +115,7 @@ public:
     ///
     /// ```{.cpp}
     /// self.PrimComputation(_tokens->myComputation)
-    ///     .Callback<double>( /* . . . */ )
+    ///     .Callback<double>(&_MyCallback)
     ///     .Inputs(
     ///         Attribute(_tokens->myAttribute)
     ///             .Computation(ExecBuiltinComputations->computeResolvedValue)

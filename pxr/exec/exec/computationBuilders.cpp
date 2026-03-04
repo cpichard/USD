@@ -356,6 +356,41 @@ Exec_AttributeComputationBuilder::~Exec_AttributeComputationBuilder()
 {
     _Data &data = _GetData();
 
+    // TODO: If the expression has a registered inverse, we can use this
+    // function to validate that the expression only uses inputs "approved" for
+    // invertible expressions.
+
+    Exec_DefinitionRegistry::RegistrationAccess::
+        _GetInstanceForRegistration().RegisterAttributeComputation(
+            data.attributeName,
+            data.schemaType,
+            data.computationName,
+            data.resultType,
+            std::move(data.callback),
+            std::move(data.inputKeys),
+            _GetDispatchesOntoSchemas());
+}
+
+//
+// Exec_AttributeExpressionBuilder
+//
+
+Exec_AttributeExpressionBuilder::Exec_AttributeExpressionBuilder(
+    const TfToken &attributeName,
+    const TfType schemaType)
+    : Exec_ComputationBuilderCRTPBase<Exec_AttributeExpressionBuilder>(
+        attributeName,
+        schemaType,
+        Exec_PrivateBuiltinComputations->computeExpression,
+        /* dispatched */ false,
+        /* dispatchesOntoSchemas */ {})
+{
+}
+
+Exec_AttributeExpressionBuilder::~Exec_AttributeExpressionBuilder()
+{
+    _Data &data = _GetData();
+
     Exec_DefinitionRegistry::RegistrationAccess::
         _GetInstanceForRegistration().RegisterAttributeComputation(
             data.attributeName,
@@ -398,6 +433,12 @@ Exec_ComputationBuilder::AttributeComputation(
 {
     return Exec_AttributeComputationBuilder(
         attributeName, _schemaType, computationName);
+}
+
+Exec_AttributeExpressionBuilder
+Exec_ComputationBuilder::AttributeExpression(const TfToken &attributeName)
+{
+    return Exec_AttributeExpressionBuilder(attributeName, _schemaType);
 }
 
 Exec_PrimComputationBuilder 

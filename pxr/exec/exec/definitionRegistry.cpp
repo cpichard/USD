@@ -351,7 +351,7 @@ Exec_DefinitionRegistry::_GetComputeValueDefinition(
     if (const Exec_ComputationDefinition *const expressionDefinition =
         _LookUpLocalAttributeComputation(
             providerAttribute,
-            ExecBuiltinComputations->computeExpression,
+            Exec_PrivateBuiltinComputations->computeExpression,
             journal)) {
         return expressionDefinition;
     }
