@@ -48,6 +48,14 @@ HdGpSceneIndexPlugin::_AppendSceneIndex(
     const HdSceneIndexBaseRefPtr &inputScene,
     const HdContainerDataSourceHandle &inputArgs)
 {
+    if (!TfGetEnvSetting(HDGP_INCLUDE_DEFAULT_RESOLVER)) {
+        // Guard here as well for hybrid/JSON-based scene index plugin
+        // ordering because the guarded registration above won't matter.
+        // If a plugInfo entry exists (which it does), the plugin will be
+        // considered for both loading and ordering.
+        return inputScene;
+    }
+
     if (inputArgs) {
         using _TokenDs = HdTypedSampledDataSource<TfToken>;
         if (_TokenDs::Handle tds =_TokenDs::Cast(
