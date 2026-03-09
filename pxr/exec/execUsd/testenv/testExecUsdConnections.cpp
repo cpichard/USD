@@ -58,7 +58,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
-    TestExecUsdConnectionTargetedObjectsCustomSchema)
+    TestExecUsdConnectionsCustomSchema)
 {
     // An attribute computation that computes the values of the string-valued
     // attributes targeted by the attribute's connections.
@@ -233,7 +233,7 @@ int main()
         .RegisterPlugins(TfAbsPath("resources"));
     ASSERT_EQ(testPlugins.size(), 1);
     ASSERT_EQ(
-        testPlugins[0]->GetName(), "testExecUsdConnectionTargetedObjects");
+        testPlugins[0]->GetName(), "testExecUsdConnections");
 
     TestAttributeConnections();
     TestConnectionsComputationNotFound();

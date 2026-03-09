@@ -121,6 +121,7 @@ public:
         friend class Exec_ComputationBuilder;
         friend class Exec_PrimComputationBuilder;
         friend class Exec_AttributeComputationBuilder;
+        friend class Exec_AttributeExpressionBuilder;
         friend struct Exec_ComputationBuilderConstantValueSpecifier;
 
         static Exec_DefinitionRegistry& _GetInstanceForRegistration() {

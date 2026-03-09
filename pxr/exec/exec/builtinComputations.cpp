@@ -24,12 +24,6 @@ Exec_BuiltinComputationTokens::Exec_BuiltinComputationTokens(
         "computeValue",
         Exec_BuiltinComputationTraits()
             .SetHasDefinition(false)))
-    , computeExpression(registry._RegisterBuiltinComputation(
-        "computeExpression",
-        Exec_BuiltinComputationTraits()
-            .SetHasDefinition(false)
-            .SetIsUserDefinable(true)
-            .SetIsInputConsumable(false)))
     , computeResolvedValue(
         registry._RegisterBuiltinComputation("computeResolvedValue"))
     , computePath(

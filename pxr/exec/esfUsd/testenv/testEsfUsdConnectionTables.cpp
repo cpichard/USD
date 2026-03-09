@@ -60,6 +60,7 @@ struct Fixture : TfWeakBase
     SdfLayerRefPtr payloadLayer;
     UsdStageRefPtr stage;
     std::shared_ptr<EsfUsdStageData> stageData;
+    EsfUsdStageData::ChangedPathSet changedTargetPaths;
     EsfJournal *const journal = nullptr;
 
     Fixture(SdfLayerRefPtr &&layerIn = {})
@@ -117,13 +118,21 @@ struct Fixture : TfWeakBase
             UsdStageConstPtr(stage));
     }
 
+    void AssertChangedTargets(
+        const std::set<SdfPath> &expected)
+    {
+        std::set<SdfPath> actual(
+            changedTargetPaths.begin(), changedTargetPaths.end());
+        ASSERT_EQ(actual, expected);
+
+        changedTargetPaths.clear();
+    }
+
     // Update the stage data in response to scene changes.
     void _DidObjectsChanged(
         const UsdNotice::ObjectsChanged &objectsChanged)
     {
         EsfUsdStageData &stageData = EsfUsdStageData::GetStageData(stage);
-
-        EsfUsdStageData::ChangedPathSet changedTargetPaths;
 
         for (const SdfPath &path : objectsChanged.GetResyncedPaths()) {
             stageData.UpdateForResync(path, &changedTargetPaths);
@@ -180,6 +189,8 @@ TestConnectionEdits(Fixture &fixture)
     fixture.stage->GetAttributeAtPath(SdfPath("/Prim.attr3"))
         .AddConnection(SdfPath("/Prim.attr2"));
 
+    fixture.AssertChangedTargets({SdfPath("/Prim.attr2")});
+
     ASSERT_EQ(
         attr3->GetConnections(fixture.journal),
         SdfPathVector({SdfPath("/Prim.attr2")}));
@@ -192,6 +203,8 @@ TestConnectionEdits(Fixture &fixture)
     fixture.stage->GetAttributeAtPath(SdfPath("/Prim.attr1"))
         .RemoveConnection(SdfPath("/Prim.attr2"));
 
+    fixture.AssertChangedTargets({SdfPath("/Prim.attr2")});
+
     ASSERT_EQ(attr1->GetConnections(fixture.journal).size(), 0);
 
     ASSERT_EQ(
@@ -201,6 +214,8 @@ TestConnectionEdits(Fixture &fixture)
     // Author another connection on attr3.
     fixture.stage->GetAttributeAtPath(SdfPath("/Prim.attr3"))
         .AddConnection(SdfPath("/Prim.attr1"));
+
+    fixture.AssertChangedTargets({SdfPath("/Prim.attr1")});
 
     ASSERT_EQ(
         attr3->GetConnections(fixture.journal),
@@ -218,6 +233,8 @@ TestConnectionEdits(Fixture &fixture)
     fixture.stage->GetAttributeAtPath(SdfPath("/Prim.attr3"))
         .SetConnections({SdfPath("/Prim.attr1"), SdfPath("/Prim.attr2")});
 
+    fixture.AssertChangedTargets({});
+
     ASSERT_EQ(
         attr3->GetConnections(fixture.journal),
         SdfPathVector({SdfPath("/Prim.attr1"), SdfPath("/Prim.attr2")}));
@@ -233,6 +250,8 @@ TestConnectionEdits(Fixture &fixture)
     // Author a connection to a prim.
     fixture.stage->GetAttributeAtPath(SdfPath("/Prim.attr1"))
         .AddConnection(SdfPath("/Prim"));
+
+    fixture.AssertChangedTargets({SdfPath("/Prim")});
 
     ASSERT_EQ(
         attr1->GetConnections(fixture.journal),
@@ -417,6 +436,8 @@ TestPrimResync(Fixture &fixture)
     fixture.stage->GetAttributeAtPath(SdfPath("/Prim.attr3"))
         .AddConnection(SdfPath("/Prim.attr2"));
 
+    fixture.AssertChangedTargets({SdfPath("/Prim.attr2")});
+
     ASSERT_EQ(
         attr3->GetConnections(fixture.journal),
         SdfPathVector({SdfPath("/Prim.attr2")}));
@@ -427,6 +448,8 @@ TestPrimResync(Fixture &fixture)
 
     // Unload the root prim
     fixture.stage->Unload(SdfPath("/Prim"));
+
+    fixture.AssertChangedTargets({SdfPath("/Prim.attr2")});
 
     TF_AXIOM(!attr1->IsValid(fixture.journal));
     TF_AXIOM(!attr2->IsValid(fixture.journal));
@@ -462,6 +485,8 @@ TestPrimResync(Fixture &fixture)
             #usda 1.0
         )usd");
     TF_AXIOM(importedLayer);
+
+    fixture.AssertChangedTargets({SdfPath("/Prim.attr2")});
     TF_AXIOM(!attr1->IsValid(fixture.journal));
     TF_AXIOM(!attr2->IsValid(fixture.journal));
     TF_AXIOM(!attr3->IsValid(fixture.journal));
@@ -541,6 +566,12 @@ TestMultiPrimResync(Fixture &unused)
     // Deactivate one branch.
     fixture.stage->GetPrimAtPath(SdfPath("/Prim/Parent2")).SetActive(false);
 
+    fixture.AssertChangedTargets(
+        {SdfPath("/Prim/Parent1.attr2"),
+         SdfPath("/Prim/Parent1/Child.attr2"),
+         SdfPath("/Prim/Parent2.attr2"),
+         SdfPath("/Prim/Parent2/Child.attr2")});
+
     ASSERT_EQ(
         attr1->GetConnections(fixture.journal),
         SdfPathVector(
@@ -559,12 +590,20 @@ TestMultiPrimResync(Fixture &unused)
     fixture.stage->GetAttributeAtPath(SdfPath("/Prim/Parent2.attr1"))
         .AddConnection(SdfPath("/Prim/Parent1/Child.attr2"));
 
+    fixture.AssertChangedTargets({});
+
     ASSERT_EQ(
         _MakePathSet(childAttr2->GetIncomingConnections(fixture.journal)),
         std::set<SdfPath>({SdfPath("/Prim/Parent1/Child.attr1")}));
 
     // Re-activate the branch.
     fixture.stage->GetPrimAtPath(SdfPath("/Prim/Parent2")).SetActive(true);
+
+    fixture.AssertChangedTargets(
+        {SdfPath("/Prim/Parent1.attr2"),
+         SdfPath("/Prim/Parent1/Child.attr2"),
+         SdfPath("/Prim/Parent2.attr2"),
+         SdfPath("/Prim/Parent2/Child.attr2")});
 
     ASSERT_EQ(
         attr1->GetConnections(fixture.journal),
@@ -591,6 +630,12 @@ TestMultiPrimResync(Fixture &unused)
 
     // De-activate the other branch
     fixture.stage->GetPrimAtPath(SdfPath("/Prim/Parent1")).SetActive(false);
+
+    fixture.AssertChangedTargets(
+        {SdfPath("/Prim/Parent1.attr2"),
+         SdfPath("/Prim/Parent1/Child.attr2"),
+         SdfPath("/Prim/Parent2.attr2"),
+         SdfPath("/Prim/Parent2/Child.attr2")});
 
     TF_AXIOM(!attr1->IsValid(fixture.journal));
     TF_AXIOM(!childAttr1->IsValid(fixture.journal));
@@ -644,6 +689,10 @@ TestMultiPrimResync(Fixture &unused)
             layer->GetAttributeAtPath(SdfPath("/Prim/Parent2/Child.attr1"));
         TF_AXIOM(attr);
         prim->RemoveProperty(attr);
+
+        fixture.AssertChangedTargets(
+            {SdfPath("/Prim/Parent1/Child.attr2"),
+             SdfPath("/Prim/Parent2/Child.attr2")});
 
         TF_AXIOM(!childAttr1->IsValid(fixture.journal));
 

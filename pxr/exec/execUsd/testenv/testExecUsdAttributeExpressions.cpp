@@ -54,10 +54,9 @@ TF_DEFINE_PRIVATE_TOKENS(
 EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
     TestExecUsdAttributeExpressionsCustomSchema)
 {
-    // The expression for attr prepends the authored value of attr with "expr:".
-    self.AttributeComputation(
-        _tokens->pluginExpressionAttr,
-        ExecBuiltinComputations->computeExpression)
+    // The expression for attr prepends the authored value of attr with
+    // "pluginExpr:".
+    self.AttributeExpression(_tokens->pluginExpressionAttr)
         .Callback<std::string>(+[](const VdfContext &ctx) {
             return "pluginExpr:" + ctx.GetInputValue<std::string>(
                 ExecBuiltinComputations->computeResolvedValue);

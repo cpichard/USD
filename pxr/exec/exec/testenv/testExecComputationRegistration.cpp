@@ -192,12 +192,14 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
     self.PrimComputation(ExecBuiltinComputations->computeTime);
 
     // Attempt to register a prim computation that explicitly consumes
-    // computeExpression as an input, which is not allowed.
+    // computeExpression as an input, which is not allowed. This is a private
+    // computation name, but a nefarious user could try to reproduce the token.
+    const TfToken computeExpression("__computeExpression");
     self.PrimComputation(_tokens->computeExpressionConsumer)
         .Callback<double>(+[](const VdfContext &ctx) { return 0.0; })
         .Inputs(
             Attribute(_tokens->attr)
-                .Computation<double>(ExecBuiltinComputations->computeExpression));
+                .Computation<double>(computeExpression));
 
     //
     // Test different kinds of computation inputs.
