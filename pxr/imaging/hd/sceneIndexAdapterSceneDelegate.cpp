@@ -85,6 +85,7 @@
 #include "pxr/imaging/hd/visibilitySchema.h"
 #include "pxr/imaging/hd/volumeFieldBindingSchema.h"
 #include "pxr/imaging/hd/volumeFieldSchema.h"
+#include "pxr/imaging/hd/volumeSchema.h"
 #include "pxr/imaging/hd/xformSchema.h"
 
 #include "pxr/imaging/hf/perfLog.h"
@@ -1013,6 +1014,31 @@ HdSceneIndexAdapterSceneDelegate::GetVolumeFieldDescriptors(
     }
 
     return result;
+}
+
+VtValue
+HdSceneIndexAdapterSceneDelegate::GetVolumeParamValue(
+        SdfPath const &id, TfToken const &paramName)
+{
+    TRACE_FUNCTION();
+
+    HdSceneIndexPrim prim = _GetInputPrim(id);
+    if (!prim.dataSource) {
+        return VtValue();
+    }
+
+    HdContainerDataSourceHandle volume =
+        HdContainerDataSource::Cast(
+            prim.dataSource->Get(HdVolumeSchemaTokens->volume));
+    if (volume) {
+        HdSampledDataSourceHandle valueDs = HdSampledDataSource::Cast(
+                volume->Get(paramName));
+        if (valueDs) {
+            return valueDs->GetValue(0);
+        }
+    }
+
+    return VtValue();
 }
 
 SdfPath

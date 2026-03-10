@@ -134,8 +134,11 @@
 //           through HdSceneIndexAdapterSceneDelegate, HdDirtyBitsTranslator,
 //           and HdRenderSettings; finish renaming shutterInterval to
 //           unionedSamplingInterval
+// 92 -> 93: Add HdVolumeSchema, HdSceneDelegate::GetVolumeParamValue(),
+//           HdChangeTracker::AddSprimRprimDependency(), and
+//           HdChangeTracker::RemoveSprimRprimDependency().
 
-#define HD_API_VERSION 92
+#define HD_API_VERSION 93
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 // 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.

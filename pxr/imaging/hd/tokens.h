@@ -249,6 +249,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (surface)                                   \
     (displacement)                              \
     (volume)                                    \
+    (volumefilter)                              \
     (light)                                     \
     (lightFilter)                               \
     (imageShader)
