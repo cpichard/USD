@@ -130,8 +130,12 @@
 // 90 -> 91: Add camera, disableMotionBlur, and disableDepthOfField to
 //           HdRenderSettingsSchema and rename shutterInterval to
 //           unionedSamplingInterval
+// 91 -> 92: Expose camera, disableMotionBlur, and disableDepthOfField
+//           through HdSceneIndexAdapterSceneDelegate, HdDirtyBitsTranslator,
+//           and HdRenderSettings; finish renaming shutterInterval to
+//           unionedSamplingInterval
 
-#define HD_API_VERSION 91
+#define HD_API_VERSION 92
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 // 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.

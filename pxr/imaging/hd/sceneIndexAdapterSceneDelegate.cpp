@@ -1662,11 +1662,30 @@ _GetRenderSettings(HdSceneIndexPrim prim, TfToken const &key)
         }
     }
 
-    if (key == HdRenderSettingsPrimTokens->shutterInterval) {
-        if (HdVec2dDataSourceHandle shutterIntervalDS =
-                rsSchema.GetUnionedSamplingInterval()) {
+    if (key == HdRenderSettingsPrimTokens->unionedSamplingInterval) {
+        if (HdVec2dDataSourceHandle unionedSamplingIntervalDS =
+            rsSchema.GetUnionedSamplingInterval()) {
+            return VtValue(unionedSamplingIntervalDS->GetTypedValue(0.f));
+        }
+    }
 
-            return VtValue(shutterIntervalDS->GetTypedValue(0));
+    if (key == HdRenderSettingsPrimTokens->camera) {
+        if (HdPathDataSourceHandle cameraDS = rsSchema.GetCamera()) {
+            return VtValue(cameraDS->GetTypedValue(0.f));
+        }
+    }
+
+    if (key == HdRenderSettingsPrimTokens->disableDepthOfField) {
+        if (HdBoolDataSourceHandle disableDepthOfFieldDS =
+            rsSchema.GetDisableDepthOfField()) {
+            return VtValue(disableDepthOfFieldDS->GetTypedValue(0.f));
+        }
+    }
+
+    if (key == HdRenderSettingsPrimTokens->disableMotionBlur) {
+        if (HdBoolDataSourceHandle disableMotionBlurDS =
+            rsSchema.GetDisableMotionBlur()) {
+            return VtValue(disableMotionBlurDS->GetTypedValue(0.f));
         }
     }
 
