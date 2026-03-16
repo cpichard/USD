@@ -510,7 +510,7 @@ Exec_DefinitionRegistry::_ValidateComputationRegistration(
 {
     if (schemaType.IsUnknown()) {
         TF_CODING_ERROR(
-            "Attempt to register computation '%s' using an unknown type.",
+            "Attempt to register computation '%s' using an unknown schema type.",
             computationName.GetText());
         return false;
     }

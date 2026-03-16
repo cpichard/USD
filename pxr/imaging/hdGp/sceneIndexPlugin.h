@@ -36,6 +36,10 @@ public:
         return 2;
     }
 
+    // Driven by the HDGP_INCLUDE_DEFAULT_RESOLVER env var.
+    HDGP_API
+    static bool IsEnabled();
+    
     HDGP_API
     HdGpSceneIndexPlugin();
 
@@ -43,6 +47,12 @@ protected:
     HdSceneIndexBaseRefPtr _AppendSceneIndex(
         const HdSceneIndexBaseRefPtr &inputScene,
         const HdContainerDataSourceHandle &inputArgs) override;
+    
+    // Utility function for derived classes to "force" append the procedural
+    // resolving scene index because _AppendSceneIndex uses the IsEnabled guard.
+    HdSceneIndexBaseRefPtr _AppendProceduralResolvingSceneIndex(
+        const HdSceneIndexBaseRefPtr &inputScene,
+        const HdContainerDataSourceHandle &inputArgs);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

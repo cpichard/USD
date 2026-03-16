@@ -30,7 +30,7 @@ TF_REGISTRY_FUNCTION(HdSceneIndexPlugin)
 {
     // For now, do not add the procedural resolving scene index by default but
     // allow activation of a default configured instance via envvar.
-    if (TfGetEnvSetting(HDGP_INCLUDE_DEFAULT_RESOLVER) == true) {
+    if (HdGpSceneIndexPlugin::IsEnabled()) {
 
         HdSceneIndexPluginRegistry::GetInstance().RegisterSceneIndexForRenderer(
             TfToken(), // empty token means all renderers
@@ -41,10 +41,35 @@ TF_REGISTRY_FUNCTION(HdSceneIndexPlugin)
     }
 }
 
+/* static */
+bool
+HdGpSceneIndexPlugin::IsEnabled()
+{
+    static bool isEnabled =
+        TfGetEnvSetting(HDGP_INCLUDE_DEFAULT_RESOLVER) == true;
+    return isEnabled;
+}
+
 HdGpSceneIndexPlugin::HdGpSceneIndexPlugin() = default;
 
 HdSceneIndexBaseRefPtr
 HdGpSceneIndexPlugin::_AppendSceneIndex(
+    const HdSceneIndexBaseRefPtr &inputScene,
+    const HdContainerDataSourceHandle &inputArgs)
+{
+    if (!IsEnabled()) {
+        // Guard here as well for hybrid/JSON-based scene index plugin
+        // ordering because the guarded registration above won't matter.
+        // If a plugInfo entry exists (which it does), the plugin will be
+        // considered for both loading and ordering.
+        return inputScene;
+    }
+
+    return _AppendProceduralResolvingSceneIndex(inputScene, inputArgs);
+}
+
+HdSceneIndexBaseRefPtr
+HdGpSceneIndexPlugin::_AppendProceduralResolvingSceneIndex(
     const HdSceneIndexBaseRefPtr &inputScene,
     const HdContainerDataSourceHandle &inputArgs)
 {
