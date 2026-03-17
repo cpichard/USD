@@ -205,7 +205,10 @@ _ValidateConnections(
         }
     }
 
-    for (const auto &[targetPath, actual] : actualIncoming) {
+    for (const auto &entry : actualIncoming) {
+        const SdfPath &targetPath = entry.first;
+        const std::set<SdfPath> &actual = entry.second;
+
         const UsdAttribute attr = stage->GetAttributeAtPath(targetPath);
 
         const ExecUsdRequest request = execSystem.BuildRequest({
