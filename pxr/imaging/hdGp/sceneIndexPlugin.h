@@ -36,10 +36,6 @@ public:
         return 2;
     }
 
-    // Driven by the HDGP_INCLUDE_DEFAULT_RESOLVER env var.
-    HDGP_API
-    static bool IsEnabled();
-    
     HDGP_API
     HdGpSceneIndexPlugin();
 
@@ -48,8 +44,10 @@ protected:
         const HdSceneIndexBaseRefPtr &inputScene,
         const HdContainerDataSourceHandle &inputArgs) override;
     
-    // Utility function for derived classes to "force" append the procedural
-    // resolving scene index because _AppendSceneIndex uses the IsEnabled guard.
+    bool _IsEnabled(
+        const HdContainerDataSourceHandle &inputArgs) const override;
+
+private:
     HdSceneIndexBaseRefPtr _AppendProceduralResolvingSceneIndex(
         const HdSceneIndexBaseRefPtr &inputScene,
         const HdContainerDataSourceHandle &inputArgs);
