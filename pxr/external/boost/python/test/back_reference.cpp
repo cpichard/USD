@@ -104,7 +104,7 @@ PXR_BOOST_PYTHON_MODULE(back_reference_ext)
         .def("set", &Y::set)
         ;
 
-    class_<Z,std::unique_ptr<Z> >("Z", init<int>())
+    class_<Z,std::shared_ptr<Z> >("Z", init<int>())
         .def("value", &Z::value)
         .def("set", &Z::set)
         ;
