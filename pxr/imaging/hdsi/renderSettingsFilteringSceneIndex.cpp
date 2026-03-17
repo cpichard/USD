@@ -321,7 +321,7 @@ _GetFilteredNamespacedSettings(
 
 bool
 _GetCameraShutterOpenAndClose(
-    const HdSceneIndexBaseRefPtr &si,
+    const HdSceneIndexBasePtr &si,
     const SdfPath cameraPath,
     GfVec2d *shutter)
 {
@@ -386,7 +386,7 @@ _GetShutterInfoFromProducts(
 
 HdVec2dDataSourceHandle
 _ComputeUnionedSamplingInterval(
-    const HdSceneIndexBaseRefPtr &si,
+    const HdSceneIndexBasePtr &si,
     const _ProductShutterInfoVec &shutterInfoVec)
 {
     GfVec2d result;
@@ -446,7 +446,7 @@ public:
 
     _RenderSettingsDataSource(
         const HdContainerDataSourceHandle &renderSettingsContainer,
-        const HdSceneIndexBaseRefPtr &si,
+        const HdSceneIndexBasePtr &si,
         const SdfPath &settingsPrimPath,
         const VtArray<TfToken> &namespacePrefixes)
     : _input(renderSettingsContainer)
@@ -515,7 +515,7 @@ public:
 
 private:
     const HdContainerDataSourceHandle _input;
-    const HdSceneIndexBaseRefPtr _si;
+    const HdSceneIndexBasePtr _si;
     const SdfPath _primPath;
     const VtArray<TfToken> _namespacePrefixes;
 };
@@ -527,7 +527,7 @@ public:
 
     _RenderSettingsPrimDataSource(
         const HdContainerDataSourceHandle &primDataSource,
-        const HdSceneIndexBaseRefPtr &si,
+        const HdSceneIndexBasePtr &si,
         const SdfPath &primPath,
         const VtArray<TfToken> namespacePrefixes)
     : _input(primDataSource)
@@ -577,7 +577,7 @@ public:
 
 private:
     const HdContainerDataSourceHandle _input;
-    const HdSceneIndexBaseRefPtr _si;
+    const HdSceneIndexBasePtr _si;
     const SdfPath _primPath;
     const VtArray<TfToken> _namespacePrefixes;
 };
