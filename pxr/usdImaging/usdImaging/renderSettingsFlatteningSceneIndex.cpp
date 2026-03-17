@@ -67,7 +67,7 @@ public:
 
 void _GetProductAndVarPaths(
     const HdContainerDataSourceHandle &settingsDs,
-    const HdSceneIndexBaseRefPtr &si,
+    const HdSceneIndexBasePtr &si,
     SdfPathVector *products,
     SdfPathVector *vars)
 {
@@ -144,7 +144,7 @@ void _GetProductAndVarPaths(
 static HdContainerDataSourceHandle
 _GetRenderSettingsDependenciesDataSource(
     const HdContainerDataSourceHandle &settingsDs,
-    const HdSceneIndexBaseRefPtr &si,
+    const HdSceneIndexBasePtr &si,
     const SdfPath &settingsPrimPath)
 {
     if (!settingsDs) {
@@ -459,7 +459,7 @@ public:
 
     _RenderSettingsDataSource(
         const HdContainerDataSourceHandle &settingsPrimDs,
-        const HdSceneIndexBaseRefPtr &si)
+        const HdSceneIndexBasePtr &si)
     : _input(settingsPrimDs)
     , _si(si)
     {
@@ -542,7 +542,7 @@ public:
 
 private:
     HdContainerDataSourceHandle _input;
-    const HdSceneIndexBaseRefPtr _si;
+    const HdSceneIndexBasePtr _si;
 };
 
 // Prim data source override that adds the flattened representation for
@@ -555,7 +555,7 @@ public:
 
     _RenderSettingsPrimDataSource(
         const HdContainerDataSourceHandle &input,
-        const HdSceneIndexBaseRefPtr &si,
+        const HdSceneIndexBasePtr &si,
         const SdfPath &primPath)
     : _input(input)
     , _si(si)
@@ -594,8 +594,8 @@ public:
 
 private:
     HdContainerDataSourceHandle _input;
-    const HdSceneIndexBaseRefPtr _si;
-    SdfPath _primPath;
+    const HdSceneIndexBasePtr _si;
+    const SdfPath _primPath;
 };
 
 } // anonymous namespace
