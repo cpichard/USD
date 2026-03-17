@@ -2985,9 +2985,6 @@ HdSceneIndexAdapterSceneDelegate::Sync(HdSyncRequestVector* request)
         return;
     }
 
-    // Drop per-thread scene index input prim cache
-    _inputPrimCache.clear();
-
     if (!_sceneDelegatesBuilt) {
         tbb::concurrent_unordered_set<HdSceneDelegate*> sds;
         _primCache.ParallelForEach(
@@ -3030,9 +3027,6 @@ HdSceneIndexAdapterSceneDelegate::PostSyncCleanup()
             sd->PostSyncCleanup();
         }
     }
-
-    // Drop per-thread scene index input prim cache
-    _inputPrimCache.clear();
 }
 
 // ----------------------------------------------------------------------------
