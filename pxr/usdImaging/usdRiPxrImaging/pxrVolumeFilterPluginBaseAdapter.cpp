@@ -50,7 +50,7 @@ _ResolveVolumeFilterShaderId(
 {
     static const TfToken volumefilterShaderId(
         SdfPath::JoinIdentifier(
-            HdMaterialTerminalTokens->volumefilter, _tokens->shaderId));
+            HdMaterialTerminalTokens->volumeFilter, _tokens->shaderId));
 
     if (!renderContext.IsEmpty()) {
         const TfToken attrName(
@@ -258,7 +258,7 @@ UsdRiPxrImagingVolumeFilterAdapter::GetMaterialResource(
 
     UsdImagingBuildHdMaterialNetworkFromTerminal(
         prim,
-        HdMaterialTerminalTokens->volumefilter,
+        HdMaterialTerminalTokens->volumeFilter,
         _GetShaderSourceTypes(),
         _GetMaterialRenderContexts(),
         &networkMap,
@@ -307,7 +307,7 @@ UsdRiPxrImagingVolumeFilterAdapter::GetImagingSubprimData(
                 UsdImagingDataSourceMaterial::New(
                     prim,
                     stageGlobals,
-                    HdMaterialTerminalTokens->volumefilter),
+                    HdMaterialTerminalTokens->volumeFilter),
                 prim)),
         UsdImagingDataSourcePrim::New(
             prim.GetPath(), prim, stageGlobals));
