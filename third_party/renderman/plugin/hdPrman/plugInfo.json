@@ -54,7 +54,7 @@
                         # phase=2, InsertionOrderAtEnd
                         "tags": ["hdPrman:phase2"],
                         "ordering": {
-                            "after": "hdPrman:phase1",
+                            "after": ["hdPrman:phase1", "hdGp:proceduralResolution", "hdPrman:extComp"],
                             "before": ["hdPrman:phase3", "hdPrman:motionBlur"],
                             "position": "lastBefore"
                         }
@@ -278,7 +278,7 @@
                         # phase=2, InsertionOrderAtStart
                         "tags": ["hdPrman:phase2"],
                         "ordering": {
-                            "after": "hdPrman:phase1",
+                            "after": ["hdPrman:phase1", "hdGp:proceduralResolution"],
                             "before": "hdPrman:matPrimvarTransfer",
                             "position": "firstAfter"
                         }
