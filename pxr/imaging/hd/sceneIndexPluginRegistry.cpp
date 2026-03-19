@@ -1033,6 +1033,10 @@ HdSceneIndexPluginRegistry::AppendSceneIndex(
     const std::string &renderInstanceId)
 {
     if (HdSceneIndexPlugin *plugin = _GetSceneIndexPlugin(sceneIndexPluginId)) {
+        if (!plugin->IsEnabled(inputArgs)) {
+            return inputScene;
+        }
+
         HdSceneIndexBaseRefPtr result =
             plugin->AppendSceneIndex(renderInstanceId, inputScene, inputArgs);
 
@@ -1330,7 +1334,13 @@ HdSceneIndexPluginRegistry::LoadAndGetSceneIndexPluginIds(
             // Skip callback-registered entries.
             continue;
         }
-        ret.push_back(entry.sceneIndexPluginId);
+        if (HdSceneIndexPlugin *plugin =
+                _GetSceneIndexPlugin(entry.sceneIndexPluginId)) {
+            if (!plugin->IsEnabled(entry.args)) {
+                continue;
+            }
+            ret.push_back(entry.sceneIndexPluginId);
+        }
     }
 
     return ret;

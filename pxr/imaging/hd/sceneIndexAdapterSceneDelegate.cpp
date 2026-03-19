@@ -347,6 +347,9 @@ HdSceneIndexAdapterSceneDelegate::PrimsAdded(
 {
     TRACE_FUNCTION();
 
+    TF_VERIFY(!GetRenderIndex().IsSyncAllInProgress(),
+        "Unsafe scene index invalidation detected during SyncAll()");
+
     // Drop per-thread scene index input prim cache
     _inputPrimCache.clear();
 
@@ -364,6 +367,9 @@ HdSceneIndexAdapterSceneDelegate::PrimsRemoved(
     const RemovedPrimEntries &entries)
 {
     TRACE_FUNCTION();
+
+    TF_VERIFY(!GetRenderIndex().IsSyncAllInProgress(),
+        "Unsafe scene index invalidation detected during SyncAll()");
 
     // Drop per-thread scene index input prim cache
     _inputPrimCache.clear();
@@ -428,6 +434,9 @@ HdSceneIndexAdapterSceneDelegate::PrimsDirtied(
     const DirtiedPrimEntries &entries)
 {
     TRACE_FUNCTION();
+
+    TF_VERIFY(!GetRenderIndex().IsSyncAllInProgress(),
+        "Unsafe scene index invalidation detected during SyncAll()");
 
     // Drop per-thread scene index input prim cache
     _inputPrimCache.clear();
@@ -2985,9 +2994,6 @@ HdSceneIndexAdapterSceneDelegate::Sync(HdSyncRequestVector* request)
         return;
     }
 
-    // Drop per-thread scene index input prim cache
-    _inputPrimCache.clear();
-
     if (!_sceneDelegatesBuilt) {
         tbb::concurrent_unordered_set<HdSceneDelegate*> sds;
         _primCache.ParallelForEach(
@@ -3030,9 +3036,6 @@ HdSceneIndexAdapterSceneDelegate::PostSyncCleanup()
             sd->PostSyncCleanup();
         }
     }
-
-    // Drop per-thread scene index input prim cache
-    _inputPrimCache.clear();
 }
 
 // ----------------------------------------------------------------------------

@@ -113,7 +113,7 @@ _PopulateVolumeFilterNodes(
         std::vector<riley::ShadingNode> filterNetworkNodes;
         if (!_PopulateNodesFromMaterialResource(
                 sceneDelegate, filterPath,
-                HdMaterialTerminalTokens->volumefilter,
+                HdMaterialTerminalTokens->volumeFilter,
                 &filterNetworkNodes)) {
             continue;
         }

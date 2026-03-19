@@ -382,6 +382,23 @@ PcpMapFunction::Create(const PathMap &sourceToTarget,
     return PcpMapFunction(begin, end, offset, hasRootIdentity);
 }
 
+PcpMapFunction
+PcpMapFunction::ImpliedClass(const PcpMapFunction& transferFunc,
+                             const PcpMapFunction& classArc)
+{
+    TfAutoMallocTag tag("Pcp", "PcpMapFunction::ImpliedClass");
+    TRACE_FUNCTION();
+
+    if (transferFunc.IsIdentity()) {
+        return classArc;
+    }
+
+    PcpMapFunction f = transferFunc.Compose(
+        classArc.Compose(transferFunc.GetInverse()));
+    f._data.hasRootIdentity = true;
+    return f;
+}
+
 bool
 PcpMapFunction::IsNull() const
 {

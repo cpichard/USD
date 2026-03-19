@@ -137,8 +137,9 @@
 // 92 -> 93: Add HdVolumeSchema, HdSceneDelegate::GetVolumeParamValue(),
 //           HdChangeTracker::AddSprimRprimDependency(), and
 //           HdChangeTracker::RemoveSprimRprimDependency().
+// 93 -> 94: Add HdSceneIndexPlugin::IsEnabled() and _IsEnabled().
 
-#define HD_API_VERSION 93
+#define HD_API_VERSION 94
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 // 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.
