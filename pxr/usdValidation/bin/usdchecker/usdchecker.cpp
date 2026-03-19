@@ -46,7 +46,7 @@ struct Args {
     std::string outFile = "stdout";
     StringVector variants;
     StringVector variantSets;
-    StringVector includeKeywords;
+    std::string includeKeywords;
     bool skipVariants = false;
     bool disableVariantValidationLimit = false;
     bool rootPackageOnly = false;
@@ -65,11 +65,11 @@ _Configure(CLI::App* app, Args& args) {
         ->type_name("FILE");
     // Add a new flag to only include validators from a specific keywords
     app->add_option(
-        "--includeKeywords", args.includeKeywords, 
+        "--includeKeywords", args.includeKeywords,
         "If specified, only validators from the included keywords are run. "
-        "Multiple keywords can be specified as a comma separated list or "
-        "by using the option multiple times. If not specified, all validators "
-        "are run.");
+        "Multiple keywords can be specified as a comma separated list. "
+        "If not specified, all validators are run.")
+        ->type_name("KEYWORDS");
     app->add_flag(
         "-s, --skipVariants", args.skipVariants, 
         "If specified, only the prims that are present in the default (i.e.\n"
@@ -543,14 +543,8 @@ _UsdChecker(const Args& args)
     if (args.includeKeywords.empty()) {
         metadata = validationReg.GetAllValidatorMetadata();
     } else {
-        StringVector allKeywords;
-        // at least one keyword in comma separated list should be present
-        for (const std::string &includedKeywordList : args.includeKeywords) {
-            StringVector keywords = TfStringTokenize(
-                includedKeywordList, ",");
-            allKeywords.insert(
-                allKeywords.end(), keywords.begin(), keywords.end());
-        }
+        const StringVector allKeywords = TfStringTokenize(
+            args.includeKeywords, ",");
         metadata = validationReg.GetValidatorMetadataForKeywords(
             TfToTokenVector(allKeywords));
     }
