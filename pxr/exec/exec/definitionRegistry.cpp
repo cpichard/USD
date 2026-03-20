@@ -331,7 +331,7 @@ Exec_DefinitionRegistry::_LookUpLocalAttributeComputation(
     const _ComposedPrimDefinition &composedPrimDef =
         _GetOrCreateComposedPrimDefinition(*providerPrim.Get(), journal);
 
-    const TfToken attributeName = providerAttribute.GetBaseName(journal);
+    const TfToken attributeName = providerAttribute.GetName(journal);
     const auto &compDefs = composedPrimDef.attributeComputationDefinitions;
     const auto it = compDefs.find({attributeName, computationName});
     if (it != compDefs.end()) {
