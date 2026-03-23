@@ -263,7 +263,7 @@ const TfTokenVector HdPrmanRenderDelegate::SUPPORTED_SPRIM_TYPES =
     HdPrimTypeTokens->diskLight,
     HdPrimTypeTokens->cylinderLight,
     HdPrimTypeTokens->sphereLight,
-#if USD_RI_PXR_IMAGING_API_VERSION >= 3
+#if USD_RI_PXR_IMAGING_API_VERSION >= 3 && _PRMANAPI_VERSION_MAJOR_ >= 27
     UsdRiPxrImagingPrimTypeTokens->volumeFilter,
 #endif
 #if PXR_VERSION <= 2211
