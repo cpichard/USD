@@ -964,6 +964,18 @@ struct Constant final
     /// - When computation registration is configured (also TBD), allowing
     ///   registrations for a single schema to be dynamic, depending on metadata
     ///   values that drive the configuration process
+    ///
+    /// # Value Types
+    ///
+    /// All computation input value types, including value types used to provide
+    /// constant inputs, must be known to the execution system. All types that
+    /// can be used to author attribute and metadata values in USD are known to
+    /// exec by default. User-defined types must be registered by calling
+    /// ExecTypeRegistry::RegisterType.
+    ///
+    /// \note
+    /// Types that are used for constant inputs must be hashable (see
+    /// VtIsHashable()).
     /// 
     /// # Simple Example
     ///
@@ -1612,6 +1624,14 @@ public:
     /// - `void` in which case \p ResultType must be explicitly specified as a
     ///   template parameter *and* the callback must call VdfContext::SetOutput
     ///   to provide the output value.
+    ///
+    /// # Result Types
+    ///
+    /// Note that the types used as computation result types (and as computation
+    /// input value types) must be known to the execution system. All types that
+    /// can be used to author attribute and metadata values in USD are known to
+    /// exec by default. User-defined types must be registered by calling
+    /// ExecTypeRegistry::RegisterType.
     ///
     /// # Example
     ///
