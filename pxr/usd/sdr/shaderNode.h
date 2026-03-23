@@ -43,28 +43,65 @@ TF_DECLARE_PUBLIC_TOKENS(SdrNodeFieldKey, SDR_API, SDR_NODE_FIELD_KEY_TOKENS);
 class SdrShaderNode
 {
 public:
-    /// Constructor
+
+    /// \name Constructors
+    ///
+    /// Constructors for SdrShaderNode
     ///
     /// \deprecated
-    /// The version of the SdrShaderNode constructor that
-    /// takes a `SdrTokenMap` as metadata is deprecated in favor of
-    /// the constructor taking SdrShaderNodeMetadata. Note that
+    /// The versions of the SdrShaderNode constructors that
+    /// take `SdrTokenMap` as metadata are deprecated in favor of
+    /// the constructor taking an explicit SdrShaderNodeMetadata. Note that
     /// SdrShaderNodeMetadata has an implicit constructor from
     /// the legacy `SdrTokenMap` metadata.
     /// \sa SdrShaderNodeMetadata::SdrShaderNodeMetadata(const SdrTokenMap&)
+    /// {@
+
+    /// Constructor
     SDR_API
     SdrShaderNode(
         const SdrIdentifier& identifier,
         const SdrVersion& version,
         const std::string& name,
         const TfToken& family,
-        const TfToken& context,
+        const TfToken& shadingSystem,
+        const std::string& definitionURI,
+        const std::string& implementationURI,
+        SdrShaderPropertyUniquePtrVec&& properties,
+        const SdrShaderNodeMetadata& metadata = SdrShaderNodeMetadata(),
+        const std::string &sourceCode = std::string()
+    ): SdrShaderNode(
+        identifier,
+        version,
+        name,
+        family,
+        metadata.GetContext(),
+        shadingSystem,
+        definitionURI,
+        implementationURI,
+        std::move(properties),
+        metadata,
+        sourceCode
+    ) {}
+
+    /// \deprecated
+    /// Deprecated in favor of the above constructor that expects the "context"
+    /// concept to be specified in metadata instead of as a direct constructor
+    /// argument.
+    SDR_API
+    SdrShaderNode(
+        const SdrIdentifier& identifier,
+        const SdrVersion& version,
+        const std::string& name,
+        const TfToken& family,
+        const TfToken& context, // deprecated
         const TfToken& shadingSystem,
         const std::string& definitionURI,
         const std::string& implementationURI,
         SdrShaderPropertyUniquePtrVec&& properties,
         const SdrShaderNodeMetadata& metadata = SdrShaderNodeMetadata(),
         const std::string &sourceCode = std::string());
+    /// @}
 
     /// Destructor.
     SDR_API
@@ -85,20 +122,6 @@ public:
     /// Gets the name of the family that the node belongs to. An empty token
     /// will be returned if the node does not belong to a family.
     const TfToken& GetFamily() const { return _family; }
-
-    /// Gets the context of the shader node.
-    ///
-    /// The context is the context that the node declares itself as having (or,
-    /// if a particular node does not declare a context, it will be assigned a
-    /// default context by the parser).
-    ///
-    /// As a concrete example from the `Sdr` library, a shader with a specific
-    /// source type may perform different duties vs. another shader with the
-    /// same source type. For example, one shader with a source type of
-    /// `SdrArgsParser::SourceType` may declare itself as having a context of
-    /// 'pattern', while another shader of the same source type may say it is
-    /// used for lighting, and thus has a context of 'light'.
-    const TfToken& GetContext() const { return _context; }
 
     /// Gets the shading system that this shader node originated from.
     ///
@@ -224,6 +247,35 @@ public:
     SDR_API
     const SdrShaderNodeMetadata& GetMetadataObject() const;
 
+    /// Gets the domain of the node.
+    ///
+    /// \sa SdrShaderNodeMetadata::GetDomain
+    const TfToken& GetDomain() const { return _domain; }
+
+    /// Gets the subdomain of the node if the subdomain metadata item exists.
+    ///
+    /// If the subdomain metadata doesn't exist, returns an empty TfToken.
+    ///
+    /// \sa SdrShaderNodeMetadata::GetSubdomain
+    const TfToken& GetSubdomain() const { return _subdomain; }
+
+    /// Gets the context of the node.
+    ///
+    /// Context describes a node's usage group within its subdomain.
+    /// \sa SdrShaderNodeMetadata::GetContext.
+    ///
+    /// If the context metadatda doesn't exist, returns an empty TfToken.
+    const TfToken& GetContext() const { return _context; }
+
+    /// Returns the role of this node.
+    ///
+    /// Role provides finer granularity for contexts that contain many nodes.
+    /// \sa SdrShaderNodeMetadata::GetRole
+    ///
+    /// If no role exists, returns the name of this node.
+    SDR_API
+    TfToken GetRole() const;
+
     /// The label assigned to this node, if any. Distinct from the name
     /// returned from `GetName()`. In the context of a UI, the label value
     /// might be used as the display name for the node instead of the name.
@@ -235,18 +287,11 @@ public:
     /// The category assigned to this node, if any. Distinct from the family
     /// returned from `GetFamily()`.
     ///
+    /// \deprecated
+    ///
     /// Returns an empty TfToken if no category is present.
     SDR_API
     const TfToken& GetCategory() const { return _category; }
-
-    /// Returns the role of this node. This is used to annotate the role that 
-    /// the shader node plays inside a shader network. We can tag certain
-    /// shaders to indicate their role within a shading network. We currently
-    /// tag primvar reading nodes, texture reading nodes and nodes that access
-    /// volume fields (like extinction or scattering). This is done to identify
-    /// resources used by a shading network.
-    SDR_API
-    TfToken GetRole() const;
 
     /// The help message assigned to this node, if any.
     ///
@@ -255,16 +300,10 @@ public:
     std::string GetHelp() const;
 
     /// The departments this node is associated with, if any.
+    ///
+    /// \deprecated
     SDR_API
     const SdrTokenVec& GetDepartments() const { return _departments; }
-
-    /// Gets the pages on which the node's properties reside (an aggregate of
-    /// the unique `SdrShaderProperty::GetPage()` values for all of the node's
-    /// properties). Nodes themselves do not reside on pages. In an example
-    /// scenario, properties might be divided into two pages, 'Simple' and
-    /// 'Advanced'.
-    SDR_API
-    const SdrTokenVec& GetPages() const { return _pages; }
 
     /// Gets the pages which should be opened or expanded by default.
     SDR_API
@@ -313,6 +352,14 @@ public:
 
     /// \name Aggregate Information
     /// @{
+
+    /// Gets the pages on which the node's properties reside (an aggregate of
+    /// the unique `SdrShaderProperty::GetPage()` values for all of the node's
+    /// properties). Nodes themselves do not reside on pages. In an example
+    /// scenario, properties might be divided into two pages, 'Simple' and
+    /// 'Advanced'.
+    SDR_API
+    const SdrTokenVec& GetPages() const { return _pages; }
 
     /// Gets the names of the properties on a certain page (one that was
     /// returned by `GetPages()`). To get properties that are not assigned to a
@@ -404,6 +451,8 @@ protected:
 
     // Stored metadata to support getter API on SdrShaderNode that
     // returns const ref.
+    TfToken _domain;
+    TfToken _subdomain;
     TfToken _label;
     TfToken _category;
     SdrTokenVec _departments;

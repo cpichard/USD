@@ -6,6 +6,7 @@
 //
 
 #include "pxr/pxr.h"
+#include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/refPtr.h"
 #include "pxr/usd/sdf/schema.h"
 #include "pxr/usd/sdr/debugCodes.h"
@@ -19,6 +20,13 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PUBLIC_TOKENS(SdrNodeFieldKey, SDR_NODE_FIELD_KEY_TOKENS);
+
+TF_DEFINE_ENV_SETTING(SDR_SHADER_NODE_LEGACY_GET_ROLE, true,
+    "When this environment variable is set to true, GetRole will return "
+    "a role if the node has a role, and otherwise the node's name by "
+    "default -- this is the legacy behavior of SdrShaderNode::GetRole. "
+    "When this environment variable is false, GetRole will return "
+    "a role if the node has a role, and an empty TfToken otherwise.");
 
 SdrShaderNode::SdrShaderNode(
     const SdrIdentifier& identifier,
@@ -69,6 +77,8 @@ SdrShaderNode::SdrShaderNode(
 
     // Store named metadata. These can be inlined to their corresponding
     // getters on SdrShaderNode once legacy metadata is removed.
+    _domain = _metadata.GetDomain();
+    _subdomain = _metadata.GetSubdomain();
     _label = _metadata.GetLabel();
     _category = _metadata.GetCategory();
     _departments = _metadata.GetDepartments();
@@ -228,7 +238,10 @@ SdrShaderNode::GetImplementationName() const
 TfToken
 SdrShaderNode::GetRole() const
 {
-    return _metadata.HasRole() ? _metadata.GetRole() : TfToken(GetName());
+    if (TfGetEnvSetting(SDR_SHADER_NODE_LEGACY_GET_ROLE)) {
+        return _metadata.HasRole() ? _metadata.GetRole() : TfToken(GetName());
+    }
+    return _metadata.GetRole();
 }
 
 SdrTokenVec
