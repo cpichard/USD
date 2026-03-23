@@ -119,7 +119,8 @@ Hgi::CreateResourceBindings(HgiResourceBindingsDesc const& desc)
 
         HGI_TEST_CODING_ERROR(
             bufDesc.resourceType == HgiBindResourceTypeUniformBuffer ||
-            bufDesc.resourceType == HgiBindResourceTypeStorageBuffer,
+            bufDesc.resourceType == HgiBindResourceTypeStorageBuffer ||
+            bufDesc.resourceType == HgiBindResourceTypeTessFactors,
             "%s.buffers[%u]: Unknown buffer type to bind",
                 NOT_EMPTY_NAME(desc.debugName), i);
         
