@@ -298,19 +298,19 @@ Exec_ComputationBuilderCRTPBase<Derived>::~Exec_ComputationBuilderCRTPBase()
 = default;
 
 // Explicit template instantiations.
-template class Exec_ComputationBuilderCRTPBase<Exec_PrimComputationBuilder>;
-template class Exec_ComputationBuilderCRTPBase<Exec_AttributeComputationBuilder>;
+template class Exec_ComputationBuilderCRTPBase<ExecPrimComputationBuilder>;
+template class Exec_ComputationBuilderCRTPBase<ExecAttributeComputationBuilder>;
 
 //
-// Exec_PrimComputationBuilder
+// ExecPrimComputationBuilder
 //
 
-Exec_PrimComputationBuilder::Exec_PrimComputationBuilder(
+ExecPrimComputationBuilder::ExecPrimComputationBuilder(
     const TfType schemaType,
     const TfToken &computationName,
     const bool dispatched,
     ExecDispatchesOntoSchemas &&dispatchesOntoSchemas)
-    : Exec_ComputationBuilderCRTPBase<Exec_PrimComputationBuilder>(
+    : Exec_ComputationBuilderCRTPBase<ExecPrimComputationBuilder>(
         /* attributeName */ TfToken(),
         schemaType,
         computationName,
@@ -319,7 +319,7 @@ Exec_PrimComputationBuilder::Exec_PrimComputationBuilder(
 {
 }
 
-Exec_PrimComputationBuilder::~Exec_PrimComputationBuilder()
+ExecPrimComputationBuilder::~ExecPrimComputationBuilder()
 {
     _Data &data = _GetData();
 
@@ -334,16 +334,16 @@ Exec_PrimComputationBuilder::~Exec_PrimComputationBuilder()
 }
 
 //
-// Exec_AttributeComputationBuilder
+// ExecAttributeComputationBuilder
 //
 
-Exec_AttributeComputationBuilder::Exec_AttributeComputationBuilder(
+ExecAttributeComputationBuilder::ExecAttributeComputationBuilder(
     const TfToken &attributeName,
     const TfType schemaType,
     const TfToken &computationName,
     const bool dispatched,
     ExecDispatchesOntoSchemas &&dispatchesOntoSchemas)
-    : Exec_ComputationBuilderCRTPBase<Exec_AttributeComputationBuilder>(
+    : Exec_ComputationBuilderCRTPBase<ExecAttributeComputationBuilder>(
         attributeName,
         schemaType,
         computationName,
@@ -352,7 +352,7 @@ Exec_AttributeComputationBuilder::Exec_AttributeComputationBuilder(
 {
 }
 
-Exec_AttributeComputationBuilder::~Exec_AttributeComputationBuilder()
+ExecAttributeComputationBuilder::~ExecAttributeComputationBuilder()
 {
     _Data &data = _GetData();
 
@@ -372,13 +372,13 @@ Exec_AttributeComputationBuilder::~Exec_AttributeComputationBuilder()
 }
 
 //
-// Exec_AttributeExpressionBuilder
+// ExecAttributeExpressionBuilder
 //
 
-Exec_AttributeExpressionBuilder::Exec_AttributeExpressionBuilder(
+ExecAttributeExpressionBuilder::ExecAttributeExpressionBuilder(
     const TfToken &attributeName,
     const TfType schemaType)
-    : Exec_ComputationBuilderCRTPBase<Exec_AttributeExpressionBuilder>(
+    : Exec_ComputationBuilderCRTPBase<ExecAttributeExpressionBuilder>(
         attributeName,
         schemaType,
         Exec_PrivateBuiltinComputations->computeExpression,
@@ -387,7 +387,7 @@ Exec_AttributeExpressionBuilder::Exec_AttributeExpressionBuilder(
 {
 }
 
-Exec_AttributeExpressionBuilder::~Exec_AttributeExpressionBuilder()
+ExecAttributeExpressionBuilder::~ExecAttributeExpressionBuilder()
 {
     _Data &data = _GetData();
 
@@ -403,62 +403,62 @@ Exec_AttributeExpressionBuilder::~Exec_AttributeExpressionBuilder()
 }
 
 //
-// Exec_ComputationBuilder
+// ExecComputationBuilder
 //
 
-Exec_ComputationBuilder::Exec_ComputationBuilder(
+ExecComputationBuilder::ExecComputationBuilder(
     const TfType schemaType)
     : _schemaType(schemaType)
 {
 }
 
-Exec_ComputationBuilder::~Exec_ComputationBuilder()
+ExecComputationBuilder::~ExecComputationBuilder()
 {
     Exec_DefinitionRegistry::RegistrationAccess::
         _GetInstanceForRegistration().SetComputationRegistrationComplete(
             _schemaType);
 }
 
-Exec_PrimComputationBuilder 
-Exec_ComputationBuilder::PrimComputation(
+ExecPrimComputationBuilder 
+ExecComputationBuilder::PrimComputation(
     const TfToken &computationName)
 {
-    return Exec_PrimComputationBuilder(_schemaType, computationName);
+    return ExecPrimComputationBuilder(_schemaType, computationName);
 }
 
-Exec_AttributeComputationBuilder 
-Exec_ComputationBuilder::AttributeComputation(
+ExecAttributeComputationBuilder 
+ExecComputationBuilder::AttributeComputation(
     const TfToken &attributeName,
     const TfToken &computationName)
 {
-    return Exec_AttributeComputationBuilder(
+    return ExecAttributeComputationBuilder(
         attributeName, _schemaType, computationName);
 }
 
-Exec_AttributeExpressionBuilder
-Exec_ComputationBuilder::AttributeExpression(const TfToken &attributeName)
+ExecAttributeExpressionBuilder
+ExecComputationBuilder::AttributeExpression(const TfToken &attributeName)
 {
-    return Exec_AttributeExpressionBuilder(attributeName, _schemaType);
+    return ExecAttributeExpressionBuilder(attributeName, _schemaType);
 }
 
-Exec_PrimComputationBuilder 
-Exec_ComputationBuilder::DispatchedPrimComputation(
+ExecPrimComputationBuilder 
+ExecComputationBuilder::DispatchedPrimComputation(
     const TfToken &computationName,
     ExecDispatchesOntoSchemas &&ontoSchemas)
 {
-    return Exec_PrimComputationBuilder(
+    return ExecPrimComputationBuilder(
         _schemaType,
         computationName,
         /* dispatched */ true,
         std::move(ontoSchemas));
 }
 
-Exec_AttributeComputationBuilder 
-Exec_ComputationBuilder::DispatchedAttributeComputation(
+ExecAttributeComputationBuilder 
+ExecComputationBuilder::DispatchedAttributeComputation(
     const TfToken &computationName,
     ExecDispatchesOntoSchemas &&ontoSchemas)
 {
-    return Exec_AttributeComputationBuilder(
+    return ExecAttributeComputationBuilder(
         /* attributeName */ TfToken(),
         _schemaType,
         computationName,

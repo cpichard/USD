@@ -122,7 +122,7 @@ public:
     ///
     EXECIR_API
     ExecIrControllerBuilder(
-        Exec_ComputationBuilder &self,
+        ExecComputationBuilder &self,
         Callback forwardCallback,
         Callback inverseCallback);
 
@@ -188,9 +188,9 @@ private:
     static const TfToken &_GetConstantInputName();
 
 private:
-    Exec_ComputationBuilder &_self;
-    Exec_PrimComputationBuilder _forwardComputeReg;
-    Exec_PrimComputationBuilder _inverseComputeReg;
+    ExecComputationBuilder &_self;
+    ExecPrimComputationBuilder _forwardComputeReg;
+    ExecPrimComputationBuilder _inverseComputeReg;
 };
 
 template <typename ValueType>

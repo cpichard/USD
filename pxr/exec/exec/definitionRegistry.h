@@ -118,10 +118,10 @@ public:
     ///
     class RegistrationAccess
     {
-        friend class Exec_ComputationBuilder;
-        friend class Exec_PrimComputationBuilder;
-        friend class Exec_AttributeComputationBuilder;
-        friend class Exec_AttributeExpressionBuilder;
+        friend class ExecComputationBuilder;
+        friend class ExecPrimComputationBuilder;
+        friend class ExecAttributeComputationBuilder;
+        friend class ExecAttributeExpressionBuilder;
         friend struct Exec_ComputationBuilderConstantValueSpecifier;
 
         static Exec_DefinitionRegistry& _GetInstanceForRegistration() {

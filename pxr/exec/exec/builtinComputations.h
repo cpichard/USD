@@ -80,7 +80,7 @@ public:
     ///
     /// \returns a value whose type is the provider attribute's scalar value
     /// type. If the attribute has registered an
-    /// [attribute expression](#Exec_ComputationBuilder::AttributeExpression),
+    /// [attribute expression](#ExecComputationBuilder::AttributeExpression),
     /// this may produce a value of any type.
     ///
     /// \note
@@ -106,7 +106,7 @@ public:
     ///
     /// This computation always produces the resolved value of an attribute,
     /// even if an attribute has registered an
-    /// [attribute expression](#Exec_ComputationBuilder::AttributeExpression).
+    /// [attribute expression](#ExecComputationBuilder::AttributeExpression).
     ///
     /// \returns a value whose type is the provider attribute's scalar value
     /// type.

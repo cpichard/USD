@@ -11,7 +11,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 ExecIrControllerBuilder::ExecIrControllerBuilder(
-    Exec_ComputationBuilder &self,
+    ExecComputationBuilder &self,
     Callback forwardCallback,
     Callback inverseCallback)
     : _self(self)
