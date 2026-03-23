@@ -183,6 +183,15 @@ struct _VtValueToRtParamList
         }
         return (*this)(v);
     }
+    bool operator()(const VtArray<GfVec2i> &vi) {
+        // Convert int->float
+        VtArray<GfVec2f> v;
+        v.resize(vi.size());
+        for (size_t i=0,n=vi.size(); i<n; ++i) {
+            v[i] = GfVec2f(vi[i]);
+        }
+        return (*this)(v);
+    }
     bool operator()(const VtArray<GfVec3f> &v) {
         if (role == HdPrimvarRoleTokens->color) {
             return params->SetColorArray(
@@ -215,6 +224,15 @@ struct _VtValueToRtParamList
         }
         return (*this)(v);
     }
+    bool operator()(const VtArray<GfVec3i> &vi) {
+        // int->float
+        VtArray<GfVec3f> v;
+        v.resize(vi.size());
+        for (size_t i=0,n=vi.size(); i<n; ++i) {
+            v[i] = GfVec3f(vi[i]);
+        }
+        return (*this)(v);
+    }
     bool operator()(const VtArray<GfVec4f> &v) {
         return params->SetFloatArray(
             name, reinterpret_cast<const float*>(v.cdata()), 4*v.size());
@@ -225,6 +243,15 @@ struct _VtValueToRtParamList
         v.resize(vd.size());
         for (size_t i=0,n=vd.size(); i<n; ++i) {
             v[i] = GfVec4f(vd[i]);
+        }
+        return (*this)(v);
+    }
+    bool operator()(const VtArray<GfVec4i> &vi) {
+        // int->float
+        VtArray<GfVec4f> v;
+        v.resize(vi.size());
+        for (size_t i=0,n=vi.size(); i<n; ++i) {
+            v[i] = GfVec4f(vi[i]);
         }
         return (*this)(v);
     }
