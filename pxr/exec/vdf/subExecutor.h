@@ -4,18 +4,16 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_EXEC_EF_EXECUTOR_H
-#define PXR_EXEC_EF_EXECUTOR_H
+#ifndef PXR_EXEC_VDF_SUB_EXECUTOR_H
+#define PXR_EXEC_VDF_SUB_EXECUTOR_H
 
 ///\file
 
 #include "pxr/pxr.h"
 
-#include "pxr/exec/ef/subExecutor.h"
-
 #include "pxr/base/tf/mallocTag.h"
 #include "pxr/base/trace/trace.h"
-#include "pxr/exec/vdf/dataManagerBasedExecutor.h"
+#include "pxr/exec/vdf/dataManagerBasedSubExecutor.h"
 #include "pxr/exec/vdf/executorFactory.h"
 #include "pxr/exec/vdf/executorInterface.h"
 #include "pxr/exec/vdf/request.h"
@@ -27,45 +25,55 @@ class VdfExecutorErrorLogger;
 class VdfSchedule;
 
 ///////////////////////////////////////////////////////////////////////////////
-///
-/// \class EfExecutor
-///
-/// \brief Executes a VdfNetwork to compute a requested set of values.
-///
-///
+//
+// \class VdfSubExecutor.
+//
+// \brief Executed a VdfNetwork to compute a requested set of value, and uses
+//        cached output values from a parent executor, if unavailable in the
+//        local data manager.
+//
 template <
     template <typename> class EngineType,
     typename DataManagerType>
-class EfExecutor : 
-    public VdfDataManagerBasedExecutor<DataManagerType, VdfExecutorInterface>
+class VdfSubExecutor : 
+    public VdfDataManagerBasedSubExecutor<DataManagerType, VdfExecutorInterface>
 {
-    // Base class type.
+    // Base type definition
     typedef
-        VdfDataManagerBasedExecutor<DataManagerType, VdfExecutorInterface>
+        VdfDataManagerBasedSubExecutor<DataManagerType, VdfExecutorInterface>
         Base;
 
-    // The speculation executor engine alias declaration, to be bound as a
+    // The speculation executor engine alias declaration, to be bound as a 
     // template template parameter.
     template <typename T>
     using SpeculationEngineType =
         typename EngineType<T>::SpeculationExecutorEngine;
 
     // Executor factory.
-    typedef 
+    typedef
         VdfExecutorFactory<
-            EfSubExecutor<EngineType, DataManagerType>,
+            VdfSubExecutor<EngineType, DataManagerType>,
             VdfSpeculationExecutor<SpeculationEngineType, DataManagerType>>
         _Factory;
 
 public:
 
-    /// Default constructor.
+    /// Default constructor
     ///
-    EfExecutor() : _engine(*this, &this->_dataManager) {}
+    VdfSubExecutor() :
+        _engine(*this, &this->_dataManager)
+    { }
 
-    /// Destructor.
+    /// Construct with a parent executor
     ///
-    virtual ~EfExecutor() {}
+    explicit VdfSubExecutor(const VdfExecutorInterface *parentExecutor) :
+        Base(parentExecutor),
+        _engine(*this, &this->_dataManager)
+    { }
+
+    /// Destructor
+    ///
+    virtual ~VdfSubExecutor() {}
 
     /// Factory construction.
     ///
@@ -73,20 +81,20 @@ public:
         return _factory;
     }
 
-private:
+protected:
 
-    // Run this executor with the given \p schedule and \p request.
-    //
+    /// Run this executor with the given \p schedule and \p request.
+    ///
     virtual void _Run(
         const VdfSchedule &schedule,
         const VdfRequest &computeRequest,
         VdfExecutorErrorLogger *errorLogger) override;
 
-    // Causes the DataManager to clear its temporary execution buffers.
-    //
-    virtual void _ClearData() override;
-
 private:
+    
+    /// Clears the data in the data manager.
+    ///
+    virtual void _ClearData() override;
 
     // The factory shared amongst executors of this type.
     //
@@ -95,37 +103,45 @@ private:
     // This is the engine that will do most of our hard work for us.
     //
     EngineType<DataManagerType> _engine;
+
 };
 
 ///////////////////////////////////////////////////////////////////////////////
 
 template <template <typename> class EngineType, typename DataManagerType>
-const typename EfExecutor<EngineType, DataManagerType>::_Factory
-    EfExecutor<EngineType, DataManagerType>::_factory;
+const typename VdfSubExecutor<EngineType, DataManagerType>::_Factory
+    VdfSubExecutor<EngineType, DataManagerType>::_factory;
 
 template <template <typename> class EngineType, typename DataManagerType>
 void
-EfExecutor<EngineType, DataManagerType>::_Run(
+VdfSubExecutor<EngineType, DataManagerType>::_Run(
     const VdfSchedule &schedule,
     const VdfRequest &computeRequest,
     VdfExecutorErrorLogger *errorLogger)
-{    
-    // If we have an empty request, bail.
+{
+    // If we have an empty request, bail out.
     if (computeRequest.IsEmpty()) {
         return;
     }
 
     TRACE_FUNCTION();
-    TfAutoMallocTag2 tag("Ef", "EfExecutor::Run");
+    TfAutoMallocTag2 tag("Ef", "VdfSubExecutor::Run");
 
     _engine.RunSchedule(schedule, computeRequest, errorLogger);
 }
 
 template <template <typename> class EngineType, typename DataManagerType>
 void
-EfExecutor<EngineType, DataManagerType>::_ClearData()
+VdfSubExecutor<EngineType, DataManagerType>::_ClearData()
 {
-    Base::_dataManager.Clear();
+    TRACE_FUNCTION();
+
+    // If the data manager is empty, don't even attempt to clear it.
+    if (!Base::_dataManager.IsEmpty()) {
+        Base::_dataManager.Clear();
+    }
+
+    Base::InvalidateTopologicalState();
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
