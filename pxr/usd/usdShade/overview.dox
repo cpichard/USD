@@ -516,7 +516,7 @@ registry:
     The type variations and shader version are optional parts of a shader 
     identifier (i.e. not all shader identifiers may include them). If present,
     the different parts of the identifier are delimited by an underscore.
-    Using \ref UsdShadeShaderDefUtils::SplitShaderIdentifier, a shader's 
+    Using \ref SdrFsHelpersSplitShaderIdentifier, a shader's 
     identifier can be split into the family name, implementation-name 
     of the shader node (which includes the family name and the type information),
     and the shader version. For example:

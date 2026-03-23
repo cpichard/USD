@@ -23,12 +23,16 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#define SDR_NODE_FIELD_KEY_TOKENS  \
-    ((Identifier, "_identifier"))     \
-    ((Name, "_name"))                 \
-    ((Family, "_family"))             \
-    ((SourceType, "_sourceType"))
+#define SDR_NODE_FIELD_KEY_TOKENS                  \
+    ((Identifier, "_identifier"))                  \
+    ((Name, "_name"))                              \
+    ((Family, "_family"))                          \
+    ((SourceType, "_sourceType")) /* deprecated */ \
+    ((ShadingSystem, "_shadingSystem"))
 
+/// \deprecated
+/// SdrNodeFieldKey->SourceType is deprecated in favor of
+/// SdrNodeFieldKey->ShadingSystem.
 TF_DECLARE_PUBLIC_TOKENS(SdrNodeFieldKey, SDR_API, SDR_NODE_FIELD_KEY_TOKENS);
 
 /// \class SdrShaderNode
@@ -55,7 +59,7 @@ public:
         const std::string& name,
         const TfToken& family,
         const TfToken& context,
-        const TfToken& sourceType,
+        const TfToken& shadingSystem,
         const std::string& definitionURI,
         const std::string& implementationURI,
         SdrShaderPropertyUniquePtrVec&& properties,
@@ -96,19 +100,22 @@ public:
     /// used for lighting, and thus has a context of 'light'.
     const TfToken& GetContext() const { return _context; }
 
-    /// Gets the type of source that this shader node originated from.
+    /// Gets the shading system that this shader node originated from.
     ///
-    /// Note that this is distinct from `GetContext()`, which is the type that
-    /// the node declares itself as having.
+    /// "Shading system" describes a system that usually has its own
+    /// standard and shading language
     ///
     /// As a concrete example from the `Sdr` library, several shader parsers
-    /// exist and operate on different types of shaders. In this scenario, each
-    /// distinct type of shader (OSL, Args, etc) is considered a different
-    /// _source_, even though they are all shaders. In addition, the shaders
-    /// under each source type may declare themselves as having a specific
-    /// context (shaders can serve different roles). See `GetContext()` for
-    /// more information on this.
-    const TfToken& GetSourceType() const { return _sourceType; }
+    /// exist and operate on shaders from different shading systems. In this
+    /// scenario, each distinct type of shader (OSL, Args, etc) is considered
+    /// a different _shading system_, even though they are all shaders.
+    const TfToken& GetShadingSystem() const { return _shadingSystem; }
+
+    /// Gets the type of source that this shader node originated from.
+    ///
+    /// \deprecated
+    /// Deprecated in favor of `GetShadingSystem`
+    const TfToken& GetSourceType() const { return _shadingSystem; }
 
     /// Gets the URI to the resource that provided this node's
     /// definition. Could be a path to a file, or some other resource
@@ -362,7 +369,8 @@ public:
     /// - SdrNodeFieldKey->Identifier -> VtValue holding TfToken
     /// - SdrNodeFieldKey->Name -> VtValue holding std::string
     /// - SdrNodeFieldKey->Family -> VtValue holding TfToken
-    /// - SdrNodeFieldKey->SourceType -> VtValue holding TfToken
+    /// - SdrNodeFieldKey->ShadingSystem -> VtValue holding TfToken
+    /// - (deprecated) SdrNodeFieldKey->SourceType -> VtValue holding TfToken
     ///
     /// Any requested data item that isn't a SdrNodeFieldKey will be looked
     /// for in this shader node's metadata.
@@ -381,7 +389,7 @@ protected:
     std::string _name;
     TfToken _family;
     TfToken _context;
-    TfToken _sourceType;
+    TfToken _shadingSystem;
     std::string _definitionURI;
     std::string _implementationURI;
     SdrShaderPropertyUniquePtrVec _properties;

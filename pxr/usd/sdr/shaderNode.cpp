@@ -26,7 +26,7 @@ SdrShaderNode::SdrShaderNode(
     const std::string& name,
     const TfToken& family,
     const TfToken& context,
-    const TfToken& sourceType,
+    const TfToken& shadingSystem,
     const std::string& definitionURI,
     const std::string& implementationURI,
     SdrShaderPropertyUniquePtrVec&& properties,
@@ -37,7 +37,7 @@ SdrShaderNode::SdrShaderNode(
       _name(name),
       _family(family),
       _context(context),
-      _sourceType(sourceType),
+      _shadingSystem(shadingSystem),
       _definitionURI(definitionURI),
       _implementationURI(implementationURI),
       _properties(std::move(properties)),
@@ -401,6 +401,8 @@ SdrShaderNode::GetDataForKey(const TfToken& key) const
         return VtValue(GetName());
     } else if (key == SdrNodeFieldKey->Family) {
         return VtValue(GetFamily());
+    } else if (key == SdrNodeFieldKey->ShadingSystem) {
+        return VtValue(GetShadingSystem());
     } else if (key == SdrNodeFieldKey->SourceType) {
         return VtValue(GetSourceType());
     }

@@ -30,7 +30,7 @@ _Repr(const SdrShaderNodeDiscoveryResult& x)
         TfPyRepr(x.name),
         TfPyRepr(x.family),
         TfPyRepr(x.discoveryType),
-        TfPyRepr(x.sourceType),
+        TfPyRepr(x.shadingSystem),
         TfPyRepr(x.uri),
         TfPyRepr(x.resolvedUri)
     };
@@ -149,7 +149,7 @@ void wrapShaderNodeDiscoveryResult()
                    arg("name"),
                    arg("family"),
                    arg("discoveryType"),
-                   arg("sourceType"),
+                   arg("shadingSystem"),
                    arg("uri"),
                    arg("resolvedUri"),
                    arg("sourceCode")=std::string(), 
@@ -164,7 +164,9 @@ void wrapShaderNodeDiscoveryResult()
                           return_value_policy<return_by_value>()))
         .add_property("discoveryType", make_getter(&This::discoveryType, 
                           return_value_policy<return_by_value>()))
-        .add_property("sourceType", make_getter(&This::sourceType, 
+        .add_property("sourceType", make_getter(&This::shadingSystem, 
+                          return_value_policy<return_by_value>()))
+        .add_property("shadingSystem", make_getter(&This::shadingSystem, 
                           return_value_policy<return_by_value>()))
         .add_property("uri", &This::uri)
         .add_property("resolvedUri", &This::resolvedUri)

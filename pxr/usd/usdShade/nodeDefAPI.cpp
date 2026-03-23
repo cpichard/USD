@@ -427,32 +427,42 @@ UsdShadeNodeDefAPI::GetSourceTypes() const
 }
 
 SdrShaderNodeConstPtr 
-UsdShadeNodeDefAPI::GetShaderNodeForSourceType(const TfToken &sourceType) const
+UsdShadeNodeDefAPI::GetShaderNodeForShadingSystem(
+    const TfToken &shadingSystem) const
 {
+    SdrRegistry& registry = SdrRegistry::GetInstance();
+
     TfToken implSource = GetImplementationSource();
     if (implSource == UsdShadeTokens->id) {
         TfToken shaderId;
         if (GetShaderId(&shaderId)) {
-            return SdrRegistry::GetInstance().GetShaderNodeByIdentifierAndType(
-                    shaderId, sourceType);
+            return registry.GetShaderNodeByIdentifierAndSystem(
+                    shaderId, shadingSystem);
         }
     } else if (implSource == UsdShadeTokens->sourceAsset) {
         SdfAssetPath sourceAsset;
-        if (GetSourceAsset(&sourceAsset, sourceType)) {
+        if (GetSourceAsset(&sourceAsset, shadingSystem)) {
             TfToken subIdentifier;
-            GetSourceAssetSubIdentifier(&subIdentifier, sourceType);
-            return SdrRegistry::GetInstance().GetShaderNodeFromAsset(
-                sourceAsset, _GetSdrMetadata(GetPrim()), subIdentifier, sourceType);
+            GetSourceAssetSubIdentifier(&subIdentifier, shadingSystem);
+            return registry.GetShaderNodeFromAsset(
+                sourceAsset, _GetSdrMetadata(GetPrim()),
+                subIdentifier, shadingSystem);
         }
     } else if (implSource == UsdShadeTokens->sourceCode) {
         std::string sourceCode;
-        if (GetSourceCode(&sourceCode, sourceType)) {
-            return SdrRegistry::GetInstance().GetShaderNodeFromSourceCode(
-                sourceCode, sourceType, _GetSdrMetadata(GetPrim()));
+        if (GetSourceCode(&sourceCode, shadingSystem)) {
+            return registry.GetShaderNodeFromSourceCode(
+                sourceCode, shadingSystem, _GetSdrMetadata(GetPrim()));
         }
     }
 
     return nullptr;
+}
+
+SdrShaderNodeConstPtr 
+UsdShadeNodeDefAPI::GetShaderNodeForSourceType(const TfToken &sourceType) const
+{
+    return GetShaderNodeForShadingSystem(sourceType);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
