@@ -430,13 +430,12 @@ SdrShaderNodeConstPtr
 UsdShadeNodeDefAPI::GetShaderNodeForShadingSystem(
     const TfToken &shadingSystem) const
 {
-    SdrRegistry& registry = SdrRegistry::GetInstance();
-
     TfToken implSource = GetImplementationSource();
     if (implSource == UsdShadeTokens->id) {
         TfToken shaderId;
         if (GetShaderId(&shaderId)) {
-            return registry.GetShaderNodeByIdentifierAndSystem(
+            return SdrRegistry::GetInstance()
+                .GetShaderNodeByIdentifierAndSystem(
                     shaderId, shadingSystem);
         }
     } else if (implSource == UsdShadeTokens->sourceAsset) {
@@ -444,14 +443,14 @@ UsdShadeNodeDefAPI::GetShaderNodeForShadingSystem(
         if (GetSourceAsset(&sourceAsset, shadingSystem)) {
             TfToken subIdentifier;
             GetSourceAssetSubIdentifier(&subIdentifier, shadingSystem);
-            return registry.GetShaderNodeFromAsset(
+            return SdrRegistry::GetInstance().GetShaderNodeFromAsset(
                 sourceAsset, _GetSdrMetadata(GetPrim()),
                 subIdentifier, shadingSystem);
         }
     } else if (implSource == UsdShadeTokens->sourceCode) {
         std::string sourceCode;
         if (GetSourceCode(&sourceCode, shadingSystem)) {
-            return registry.GetShaderNodeFromSourceCode(
+            return SdrRegistry::GetInstance().GetShaderNodeFromSourceCode(
                 sourceCode, shadingSystem, _GetSdrMetadata(GetPrim()));
         }
     }
