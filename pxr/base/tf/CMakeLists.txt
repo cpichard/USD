@@ -125,8 +125,10 @@ pxr_library(tf
         denseHashSet
         diagnostic
         diagnosticBase
+        diagnosticContainer
         diagnosticHelper
         diagnosticMgr
+        diagnosticTrap
         dl
         enum
         envSetting
@@ -216,6 +218,7 @@ pxr_library(tf
         declarePtrs.h
         delegatedCountPtr.h
         diagnosticLite.h
+        diagnosticTransport.h
         functionTraits.h
         functionRef.h
         hashmap.h
@@ -234,6 +237,7 @@ pxr_library(tf
         span.h
         staticData.h
         staticTokens.h
+        tryInvoke.h
         typeInfoMap.h
         type_Impl.h
 
@@ -290,6 +294,7 @@ pxr_library(tf
         wrapDebug.cpp
         wrapDiagnostic.cpp
         wrapDiagnosticBase.cpp
+        wrapDiagnosticTrap.cpp
         wrapEnum.cpp
         wrapEnvSetting.cpp
         wrapError.cpp
@@ -479,6 +484,7 @@ pxr_build_test(testTf
         testenv/stringUtils.cpp
         testenv/staticTokens.cpp
         testenv/token.cpp
+        testenv/tryInvoke.cpp
         testenv/delegatedCountPtr.cpp
         testenv/type.cpp
         testenv/typeMultipleInheritance.cpp
@@ -490,6 +496,7 @@ pxr_build_test(testTf
 pxr_test_scripts(
     testenv/testTfAtomicRenameUtil.py
     testenv/testTfCrashHandler.py
+    testenv/testTfDiagnosticTrap.py
     testenv/testTfFileUtils.py
     testenv/testTfMallocTagReport.py
     testenv/testTfNamedTemporaryFile.py
@@ -601,6 +608,16 @@ pxr_register_test(TfDelegate
     DIFF_COMPARE output.txt 
     TESTENV testenv/baseline/TfDelegate
     TESTENV_DEST TfDelegate/baseline
+)
+pxr_register_test(TfDiagnosticTransport
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDiagnosticTransport"
+)
+pxr_register_test(TfDiagnosticTrap
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDiagnosticTrap"
+)
+pxr_register_test(TfDiagnosticTrap_Python
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTfDiagnosticTrap"
 )
 pxr_register_test(TfError
     ENV TF_FATAL_VERIFY=0
@@ -733,6 +750,9 @@ pxr_register_test(TfStringUtils
 )
 pxr_register_test(TfToken
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfToken"
+)
+pxr_register_test(TfTryInvoke
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfTryInvoke"
 )
 pxr_register_test(TfDelegatedCountPtr
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfDelegatedCountPtr"
