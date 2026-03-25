@@ -65,6 +65,13 @@ PcpMapExpression::ImpliedClass(
         return classArc;
     }
 
+    if (transferFunc._node->key.op == _OpConstant &&
+        classArc._node->key.op == _OpConstant) {
+        // Apply constant folding.
+        return Constant(PcpMapFunction::ImpliedClass(
+                transferFunc.Evaluate(), classArc.Evaluate()));
+    }
+
     return PcpMapExpression( _Node::New(_OpImpliedClass, 
         transferFunc._node, classArc._node));
 }
