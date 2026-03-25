@@ -107,7 +107,7 @@ namespace UsdImagingGLEngine_Impl
 // plugin registration and tracking itself so that it can populate itself
 // during the callback.
 //
-struct _AppSceneIndices : std::enable_shared_from_this<_AppSceneIndices>
+struct _AppSceneIndices
 {
     HdsiSceneGlobalsSceneIndexRefPtr
         sceneGlobalsSceneIndex;
