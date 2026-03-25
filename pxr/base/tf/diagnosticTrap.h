@@ -87,21 +87,22 @@ public:
     TF_API void ClearStatuses();
     
     /// Erase all captured diagnostics for which \p pred returns true,
-    /// preserving the relative order of the remaining diagnostics.  Erased
-    /// diagnostics will not be re-posted.  The passed \p pred may accept any
-    /// subset of \c TfError, \c TfWarning, and \c TfStatus.  Diagnostics whose
-    /// type \p pred cannot accept are left untouched.  The \p pred may also
-    /// accept \c TfDiagnosticBase const & to match against all types uniformly.
-    /// This is safe to call during \c ForEach iteration.
+    /// preserving the relative order of the remaining diagnostics.  Return the
+    /// number of diagnostics erased.  Erased diagnostics will not be re-posted.
+    /// The passed \p pred may accept any subset of \c TfError, \c TfWarning,
+    /// and \c TfStatus.  Diagnostics whose type \p pred cannot accept are left
+    /// untouched.  The \p pred may also accept \c TfDiagnosticBase const & to
+    /// match against all types uniformly.  This is safe to call during \c
+    /// ForEach iteration.
     template <class Predicate>
-    void EraseMatching(Predicate &&pred) {
+    size_t EraseMatching(Predicate &&pred) {
         Tf_DiagnosticContainer result;
-        bool erased = false;
+        size_t erased = 0;
         auto it = _container.GetIterator();
         while (it.Next([&](auto const &d) {
             if (auto r = TfTryInvoke<bool>(std::forward<Predicate>(pred), d)) {
                 if (*r) {
-                    erased = true;
+                    ++erased;
                     return; // erase
                 }
             }
@@ -111,6 +112,7 @@ public:
             _container = std::move(result);
             _OnContentsChanged();
         }
+        return erased;
     }
     
     /// Return true if no diagnostics have been captured.

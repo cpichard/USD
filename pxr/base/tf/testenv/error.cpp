@@ -386,9 +386,9 @@ Test_TfDiagnosticTrap()
             TF_WARN("erase this warning");
             TF_STATUS("keep this status");
 
-            trap.EraseMatching([](TfWarning const &w) {
+            TF_AXIOM(trap.EraseMatching([](TfWarning const &w) {
                 return TfStringContains(w.GetCommentary(), "erase");
-            });
+            }) == 1);
 
             TF_AXIOM(trap.HasWarnings());
             TF_AXIOM(trap.GetWarnings().size() == 1);
@@ -407,9 +407,9 @@ Test_TfDiagnosticTrap()
             TF_STATUS("erase me");
             TF_WARN("keep me");
 
-            trap.EraseMatching([](TfDiagnosticBase const &d) {
+            TF_AXIOM(trap.EraseMatching([](TfDiagnosticBase const &d) {
                 return d.GetCommentary() == "erase me";
-            });
+            }) == 2);
 
             TF_AXIOM(trap.HasWarnings());
             TF_AXIOM(trap.GetWarnings().size() == 1);
