@@ -26,7 +26,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 #define SDR_NODE_FIELD_KEY_TOKENS                  \
     ((Identifier, "_identifier"))                  \
     ((Name, "_name"))                              \
-    ((Family, "_family"))                          \
+    ((Family, "_family")) /* deprecated */         \
+    ((Function, "_function"))                      \
     ((SourceType, "_sourceType")) /* deprecated */ \
     ((ShadingSystem, "_shadingSystem"))
 
@@ -63,7 +64,7 @@ public:
         const SdrIdentifier& identifier,
         const SdrVersion& version,
         const std::string& name,
-        const TfToken& family,
+        const TfToken& function,
         const TfToken& shadingSystem,
         const std::string& definitionURI,
         const std::string& implementationURI,
@@ -74,7 +75,7 @@ public:
         identifier,
         version,
         name,
-        family,
+        function,
         metadata.GetContext(),
         shadingSystem,
         definitionURI,
@@ -93,7 +94,7 @@ public:
         const SdrIdentifier& identifier,
         const SdrVersion& version,
         const std::string& name,
-        const TfToken& family,
+        const TfToken& function,
         const TfToken& context, // deprecated
         const TfToken& shadingSystem,
         const std::string& definitionURI,
@@ -121,7 +122,16 @@ public:
 
     /// Gets the name of the family that the node belongs to. An empty token
     /// will be returned if the node does not belong to a family.
-    const TfToken& GetFamily() const { return _family; }
+    ///
+    /// \deprecated in favor of SdrShaderNode::GetFunction
+    const TfToken& GetFamily() const { return _function; }
+
+    /// Gets the function that the node belongs to.
+    ///
+    /// One example of a function would be "add" -- multiple
+    /// specializations on argument types and version may be registered
+    /// under the same function but on different nodes.
+    const TfToken& GetFunction() const { return _function; }
 
     /// Gets the shading system that this shader node originated from.
     ///
@@ -415,7 +425,7 @@ public:
     /// return types for these special keys is as follows:
     /// - SdrNodeFieldKey->Identifier -> VtValue holding TfToken
     /// - SdrNodeFieldKey->Name -> VtValue holding std::string
-    /// - SdrNodeFieldKey->Family -> VtValue holding TfToken
+    /// - SdrNodeFieldKey->Function -> VtValue holding TfToken
     /// - SdrNodeFieldKey->ShadingSystem -> VtValue holding TfToken
     /// - (deprecated) SdrNodeFieldKey->SourceType -> VtValue holding TfToken
     ///
@@ -434,7 +444,7 @@ protected:
     SdrIdentifier _identifier;
     SdrVersion _version;
     std::string _name;
-    TfToken _family;
+    TfToken _function;
     TfToken _context;
     TfToken _shadingSystem;
     std::string _definitionURI;

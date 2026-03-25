@@ -40,6 +40,7 @@ void wrapShaderNode()
         .def("GetShaderVersion", &This::GetShaderVersion)
         .def("GetName", &This::GetName, copyRefPolicy)
         .def("GetFamily", &This::GetFamily, copyRefPolicy)
+        .def("GetFunction", &This::GetFunction, copyRefPolicy)
         .def("GetShadingSystem", &This::GetShadingSystem, copyRefPolicy)
         .def("GetSourceType", &This::GetSourceType, copyRefPolicy)
         .def("GetResolvedDefinitionURI", &This::GetResolvedDefinitionURI,
