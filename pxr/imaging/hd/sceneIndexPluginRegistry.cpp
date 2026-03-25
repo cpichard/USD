@@ -284,8 +284,12 @@ struct _ResolvedEntry
 std::ostream &
 operator<<(std::ostream &out, const _ResolvedEntry &entry)
 {
-    out << "plugin: " << entry.sceneIndexPluginId
-        << "\n\t phase: " << entry.phase
+    if (entry.sceneIndexPluginId.IsEmpty()) {
+        out << "callback-based entry";
+    } else {
+        out << "plugin: " << entry.sceneIndexPluginId;
+    }
+    out << "\n\t phase: " << entry.phase
         << "\n\t order: " << entry.order
         << "\n\t tags " << entry.tags
         << "\n\t insert after " << entry.ordering.afterTags
@@ -1240,6 +1244,23 @@ HdSceneIndexPluginRegistry::_LoadPluginsForRenderer(
     }
 }
 
+static void
+_PrintEntries(
+    const _ResolvedEntryList& entries,
+    const std::string &rendererDisplayName,
+    const std::string &appName)
+{
+    std::stringstream ss;
+    ss << "Resolved scene index plugin entries for renderer '" << rendererDisplayName
+       << "' and app '" << appName << "':\n";
+
+    for (const auto& entry : entries) {
+        ss << entry;
+    }
+    ss << "Total: " << entries.size() << " entries.\n";
+    TfDebug::Helper().Msg("%s", ss.str().c_str());
+}
+
 HdSceneIndexBaseRefPtr
 HdSceneIndexPluginRegistry::AppendSceneIndicesForRenderer(
     const std::string &rendererDisplayName,
@@ -1262,6 +1283,10 @@ HdSceneIndexPluginRegistry::AppendSceneIndicesForRenderer(
 
     const _ResolvedEntryList orderedEntries =
         _impl->ComputeOrderedEntriesForRenderer({rendererDisplayName, appName});
+
+    if (TfDebug::IsEnabled(HD_SCENE_INDEX_PLUGIN_REGISTRY)) {
+        _PrintEntries(orderedEntries, rendererDisplayName, appName);
+    }
 
     HdSceneIndexBaseRefPtr result = inputScene;
 
