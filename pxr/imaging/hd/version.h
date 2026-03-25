@@ -140,8 +140,9 @@
 // 93 -> 94: Add HdSceneIndexPlugin::IsEnabled() and _IsEnabled().
 // 94 -> 95: Add HdRenderDelegate::GetShadingSystems to replace deprecated
 //           HdRenderDelegate::GetShaderSourceTypes
+// 95 -> 96: Added HdVisitSampledDataSourceType and HdCopySampledDataSourceType.
 
-#define HD_API_VERSION 95
+#define HD_API_VERSION 96
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 // 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.

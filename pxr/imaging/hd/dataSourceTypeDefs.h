@@ -13,7 +13,11 @@
 #include "pxr/imaging/hd/dataSourceLocator.h"
 #include "pxr/imaging/hd/types.h"
 
+#include "pxr/base/gf/bbox3d.h"
+#include "pxr/base/gf/matrix3f.h"
+#include "pxr/base/gf/matrix4f.h"
 #include "pxr/base/gf/matrix4d.h"
+#include "pxr/base/gf/quatf.h"
 #include "pxr/base/gf/vec2f.h"
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/vt/array.h"
