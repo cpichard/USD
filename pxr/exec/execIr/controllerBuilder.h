@@ -144,7 +144,7 @@ public:
     ///
     template <typename ValueType>
     void
-    NoninvertibleInputAttribute(
+    NonInvertibleInputAttribute(
         const TfToken &attributeName);
 
     /// Registers an invertible output attribute; the output is inverible if \p
@@ -208,7 +208,7 @@ ExecIrControllerBuilder::InvertibleInputAttribute(
 
 template <typename ValueType>
 void
-ExecIrControllerBuilder::NoninvertibleInputAttribute(
+ExecIrControllerBuilder::NonInvertibleInputAttribute(
     const TfToken &attributeName)
 {
     using namespace exec_registration;
