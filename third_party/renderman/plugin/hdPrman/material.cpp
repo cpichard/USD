@@ -5,32 +5,40 @@
 // https://openusd.org/license.
 //
 #include "hdPrman/material.h"
+
 #include "hdPrman/debugCodes.h"
 #include "hdPrman/renderParam.h"
 #include "hdPrman/utils.h"
 
-#include "pxr/base/gf/vec3f.h"
-#include "pxr/usd/sdf/types.h"
-#if PXR_VERSION >= 2311
-#include "pxr/base/tf/hash.h"
-#endif
-#include "pxr/base/tf/getenv.h"
-#include "pxr/base/tf/envSetting.h"
-#include "pxr/base/tf/scopeDescription.h"
-#include "pxr/base/tf/staticData.h"
-#include "pxr/base/tf/staticTokens.h"
 #include "pxr/imaging/hd/light.h"
 #include "pxr/imaging/hd/rprim.h"
 #include "pxr/imaging/hd/sceneDelegate.h"
-#include "pxr/imaging/hf/diagnostic.h"
-#include "RiTypesHelper.h"
+#include "pxr/imaging/hd/version.h"
 
+#include "pxr/usd/sdf/types.h"
 #include "pxr/usd/sdr/declare.h"
+#include "pxr/usd/sdr/registry.h"
 #include "pxr/usd/sdr/shaderNode.h"
 #include "pxr/usd/sdr/shaderProperty.h"
-#include "pxr/usd/sdr/registry.h"
+
+#include "pxr/base/gf/vec3f.h"
+#include "pxr/base/tf/envSetting.h"
+#include "pxr/base/tf/getenv.h"
+#include "pxr/base/tf/scopeDescription.h"
+#include "pxr/base/tf/staticData.h"
+#include "pxr/base/tf/staticTokens.h"
+
+#include "pxr/pxr.h"
+
+#include <prmanapi.h>
+#include <RiTypesHelper.h>
+
 #if PXR_VERSION <= 2308
 #include <boost/functional/hash.hpp>
+#endif
+
+#if PXR_VERSION >= 2311
+#include "pxr/base/tf/hash.h"
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -90,7 +98,7 @@ struct _HashMaterial {
 #if PXR_VERSION >= 2311
         size_t v = TfHash()(mat.primvars);
         for (auto const& node: mat.nodes) {
-            v = TfHash::Combine(v, 
+            v = TfHash::Combine(v,
                 node.first, node.second.nodeTypeId, node.second.parameters);
             for (auto const& input: node.second.inputConnections) {
                 v = TfHash::Combine(v, input.first);
@@ -101,8 +109,8 @@ struct _HashMaterial {
             }
         }
         for (auto const& term: mat.terminals) {
-            v = TfHash::Combine(v, 
-                term.first, 
+            v = TfHash::Combine(v,
+                term.first,
                 term.second.upstreamNode, term.second.upstreamOutputName);
         }
         return v;
@@ -325,7 +333,7 @@ _ConvertNodes(
         }
     }
 
-    // Ignore nodes of id "PrimvarPass". This node is a workaround for 
+    // Ignore nodes of id "PrimvarPass". This node is a workaround for
     // UsdPreviewSurface materials and is not a registered shader node.
     if (node.nodeTypeId == _tokens->PrimvarPass) {
         return true;
@@ -370,7 +378,7 @@ _ConvertNodes(
         if (node.nodeTypeId == _tokens->PxrDisplace)
             sn.type = riley::ShadingNode::Type::k_Displacement;
         else
-            sn.type = riley::ShadingNode::Type::k_Pattern;        
+            sn.type = riley::ShadingNode::Type::k_Pattern;
     }
     else if (sdrEntry->GetContext() == SdrNodeContext->Displacement)
     {
@@ -381,7 +389,7 @@ _ConvertNodes(
         sn.type = riley::ShadingNode::Type::k_Light;
     } else if (sdrEntry->GetContext() == SdrNodeContext->LightFilter) {
         sn.type = riley::ShadingNode::Type::k_LightFilter;
-#if HD_API_VERSION >= 93
+#if _PRMANAPI_VERSION_MAJOR_ >= 27 && HD_API_VERSION >= 93
     } else if (sdrEntry->GetContext() == SdrNodeContext->VolumeFilter) {
         sn.type = riley::ShadingNode::Type::k_VolumeFilter;
 #endif
@@ -400,8 +408,11 @@ _ConvertNodes(
     }
     if (sn.type == riley::ShadingNode::Type::k_Displacement ||
         sn.type == riley::ShadingNode::Type::k_Light ||
-        sn.type == riley::ShadingNode::Type::k_LightFilter ||
-        sn.type == riley::ShadingNode::Type::k_VolumeFilter) {
+        sn.type == riley::ShadingNode::Type::k_LightFilter
+#if _PRMANAPI_VERSION_MAJOR_ >= 27 && HD_API_VERSION >= 93
+        || sn.type == riley::ShadingNode::Type::k_VolumeFilter
+#endif
+    ) {
         // Except for Displacement;
         // in that case let the renderer choose, since RIS
         // can only use a cpp Displacement shader and XPU
@@ -471,7 +482,7 @@ _ConvertNodes(
             if (propType == SdrPropertyTypes->Float) {
                 sn.params.SetFloatArray(name, v.data(), 2);
                 ok = true;
-            } 
+            }
         } else if (param.second.IsHolding<GfVec3f>()) {
             GfVec3f v = param.second.UncheckedGet<GfVec3f>();
             if (propType == SdrPropertyTypes->Color) {
@@ -495,7 +506,7 @@ _ConvertNodes(
             if (propType == SdrPropertyTypes->Float) {
                 sn.params.SetFloatArray(name, v.data(), 4);
                 ok = true;
-            } 
+            }
         } else if (param.second.IsHolding<VtArray<GfVec3f>>()) {
             const VtArray<GfVec3f>& v =
                 param.second.UncheckedGet<VtArray<GfVec3f>>();
@@ -624,7 +635,7 @@ _ConvertNodes(
                     path,
                     !isLight, // only flip if NOT a light
                     _IsWriteAsset(node.nodeTypeId, name),
-                    isLight ? _tokens->light.GetText() : 
+                    isLight ? _tokens->light.GetText() :
                     _tokens->material.GetText());
                 if(!ustr.Empty()) {
                     sn.params.SetString(name, ustr);
@@ -646,7 +657,7 @@ _ConvertNodes(
                 param.second.UncheckedGet<SdfAssetPath>(),
                 !isLight, // only flip if NOT a light
                 _IsWriteAsset(node.nodeTypeId, name),
-                isLight ? _tokens->light.GetText() : 
+                isLight ? _tokens->light.GetText() :
                           _tokens->material.GetText());
 
             sn.params.SetString(name, v);
@@ -691,7 +702,7 @@ _ConvertNodes(
         RtUString name(downstreamProp->GetImplementationName().c_str());
         TfToken const propType = downstreamProp->GetType();
 
-        // Gather input (or inputs, for array-valued inputs) for shader 
+        // Gather input (or inputs, for array-valued inputs) for shader
         // property.
         std::vector<RtUString> inputRefs;
 
@@ -704,7 +715,7 @@ _ConvertNodes(
                     e.upstreamNode.GetText(), id.GetText());
                 continue;
             }
-            // Ignore nodes of id "PrimvarPass". This node is a workaround for 
+            // Ignore nodes of id "PrimvarPass". This node is a workaround for
             // UsdPreviewSurface materials and is not a registered shader node.
             if (upstreamNode->nodeTypeId == _tokens->PrimvarPass) {
                 continue;
@@ -739,7 +750,7 @@ _ConvertNodes(
             }
             inputRefs.push_back(inputRef);
         }
-        
+
         // Establish the Riley connection.
         size_t const numInputRefs = inputRefs.size();
         if (numInputRefs > 0) {
@@ -833,7 +844,7 @@ _ConvertNodes(
 
     return true;
 }
-    
+
 bool
 HdPrman_ConvertHdMaterialNetwork2ToRmanNodes(
     SdfPath const& id,
@@ -850,7 +861,7 @@ HdPrman_ConvertHdMaterialNetwork2ToRmanNodes(
     return _ConvertNodes(
         id, network, nodePath, result, &visitedNodes, elideDefaults);
 }
-    
+
 // Debug helper
 void
 HdPrman_DumpNetwork(HdMaterialNetwork2 const& network, SdfPath const& id)
@@ -888,7 +899,7 @@ void
 HdPrmanMaterial::Sync(HdSceneDelegate *sceneDelegate,
                       HdRenderParam   *renderParam,
                       HdDirtyBits     *dirtyBits)
-{  
+{
     HD_TRACE_FUNCTION();
 
     HdPrman_RenderParam *param =
@@ -967,7 +978,7 @@ HdPrmanMaterial::_SyncToRileyWithLock(
         std::vector<riley::ShadingNode> nodes;
         nodes.reserve(_materialNetwork.nodes.size());
         bool materialFound = false, displacementFound = false;
-        
+
         for (auto const& terminal: _materialNetwork.terminals) {
             if (HdPrman_ConvertHdMaterialNetwork2ToRmanNodes(
                     id, _materialNetwork, terminal.second.upstreamNode, &nodes)) {

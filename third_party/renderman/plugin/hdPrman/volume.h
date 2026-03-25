@@ -7,12 +7,15 @@
 #ifndef EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_HD_PRMAN_VOLUME_H
 #define EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_HD_PRMAN_VOLUME_H
 
-#include "pxr/pxr.h"
 #include "hdPrman/gprim.h"
+
 #include "pxr/imaging/hd/field.h"
+#include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hd/volume.h"
 
-#include "Riley.h"
+#include "pxr/pxr.h"
+
+#include <prmanapi.h>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -112,8 +115,8 @@ protected:
         std::vector<RtPrimVarList> *geomSubsetPrimvars) override;
 
     void _AddPrimvars(RtPrimVarList*) const override;
-    
-    const std::vector<riley::CoordinateSystemId>& 
+
+    const std::vector<riley::CoordinateSystemId>&
     _GetAdditionalCoordSysIds() const override;
 
     riley::MaterialId
@@ -128,10 +131,13 @@ protected:
 
 private:
     bool _isMeshLight;
+
+#if _PRMANAPI_VERSION_MAJOR_ >= 27 && HD_API_VERSION >= 93
     SdfPathVector _volumeFilterPaths;
     std::vector<RtUString> _volumeFilterNodeNames;
     std::vector<riley::VolumeFilterId> _volumeFilterIds;
     std::vector<riley::CoordinateSystemId> _volumeFilterCoordSysIds;
+#endif
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

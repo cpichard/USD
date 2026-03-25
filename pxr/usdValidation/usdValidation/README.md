@@ -137,11 +137,18 @@ A custom validator must implement a validator task function
 [UsdValidatePrimTaskFn](@ref UsdValidatePrimTaskFn()))
 which gets passed to the registry during registration, and called when the
 validator's test is run. Validators should implement the task function at the
-appropriate or desired granularity level. For example, if the validation logic 
-can be succinctly defined to be applied to a prim, the UsdValidatePrimTaskFn
-function should be implemented, rather than implementing a 
-UsdValidateStageTaskFn or UsdValidateLayerTaskFn that has to traverse the 
-stage/layer to validate the prim.
+appropriate granularity level. For example, if the validation logic 
+can be succinctly defined to be applied to a prim, implement 
+UsdValidatePrimTaskFn rather than UsdValidateStageTaskFn or 
+UsdValidateLayerTaskFn. Using too broad a granularity can impact performance 
+&mdash; for instance, a validator task that only needs to operate at the prim 
+level but is implemented as a stage task may incur unnecessary stage traversal 
+each time it runs.
+
+Similarly, when a prim-level validator only applies to prims of a specific 
+schema type, ensure `schemaTypes` is set appropriately. This allows the 
+validation framework to skip non-matching prims and avoid unnecessary 
+validator invocations.
 
 ### Plugin Validators
 

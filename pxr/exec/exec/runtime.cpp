@@ -13,10 +13,9 @@
 #include "pxr/exec/ef/maskedSubExecutor.h"
 #include "pxr/exec/ef/pageCacheExecutor.h"
 #include "pxr/exec/ef/pageCacheStorage.h"
-#include "pxr/exec/ef/subExecutor.h"
 #include "pxr/exec/ef/time.h"
-#include "pxr/exec/ef/timeInterval.h"
 #include "pxr/exec/ef/timeInputNode.h"
+#include "pxr/exec/ef/timeInterval.h"
 #include "pxr/exec/vdf/dataManagerHashTable.h"
 #include "pxr/exec/vdf/dataManagerVector.h"
 #include "pxr/exec/vdf/executorErrorLogger.h"
@@ -30,6 +29,7 @@
 #include "pxr/exec/vdf/parallelSpeculationExecutorEngine.h"
 #include "pxr/exec/vdf/pullBasedExecutorEngine.h"
 #include "pxr/exec/vdf/schedule.h"
+#include "pxr/exec/vdf/subExecutor.h"
 #include "pxr/exec/vdf/typedVector.h"
 #include "pxr/exec/vdf/types.h"
 
@@ -237,12 +237,12 @@ Exec_Runtime::ComputeWithOverrides(
     // efficiently on a single-threaded executor engine.
     std::unique_ptr<VdfExecutorInterface> subExecutor;
     if (VdfIsParallelEvaluationEnabled() && !schedule.IsSmallSchedule()) {
-        using ExecutorType = EfSubExecutor<
+        using ExecutorType = VdfSubExecutor<
             VdfParallelExecutorEngine, VdfParallelDataManagerVector>;
         subExecutor = std::make_unique<ExecutorType>(_overridesExecutor.get());
     }
     else {
-        using ExecutorType = EfSubExecutor<
+        using ExecutorType = VdfSubExecutor<
             VdfPullBasedExecutorEngine, VdfDataManagerHashTable>;
         subExecutor = std::make_unique<ExecutorType>(_overridesExecutor.get());
     }

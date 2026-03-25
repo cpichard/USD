@@ -98,8 +98,8 @@ _FsHelpersExamineFiles(
                 // Discovery type
                 discoveryType,
 
-                // Source type
-                context ? context->GetSourceType(discoveryType) : TfToken(),
+                // Shading system
+                context ? context->GetShadingSystem(discoveryType) : TfToken(),
 
                 // URI
                 uri,

@@ -134,20 +134,22 @@ public:
     SdrStringVec GetShaderNodeNames(const TfToken& family = TfToken()) const;
 
     /// Get the shader node with the specified \p identifier, and an optional
-    /// \p sourceTypePriority list specifying the set of node SOURCE types (see
-    /// `SdrShaderNode::GetSourceType()`) that should be searched.
+    /// \p shadingSystemPriority list specifying the set of node shading
+    /// systems (see `SdrShaderNode::GetShadingSystem()`) that should be
+    /// searched.
     ///
-    /// If no sourceTypePriority is specified, the first encountered node with 
-    /// the specified identifier will be returned (first is arbitrary) if found.
+    /// If no shadingSystemPriority is specified, the first encountered node
+    /// with the specified identifier will be returned (first is arbitrary)
+    /// if found.
     /// 
-    /// If a sourceTypePriority list is specified, then this will iterate 
-    /// through each source type and try to find a node matching by identifier.
-    /// This is equivalent to calling
-    /// SdrRegistry::GetShaderNodeByIdentifierAndType for each source type
+    /// If a shadingSystemPriority list is specified, then this will iterate 
+    /// through each shading system and try to find a node matching by
+    /// identifier. This is equivalent to calling
+    /// SdrRegistry::GetShaderNodeByIdentifierAndSystem for each shading system
     /// until a node is found.
     /// 
-    /// Nodes of the same identifier but different source type can exist
-    /// in the registry. If a node 'Foo' with source types 'abc' and 'xyz'
+    /// Nodes of the same identifier but different shading system can exist
+    /// in the registry. If a node 'Foo' with shading systems 'abc' and 'xyz'
     /// exist in the registry, and you want to make sure the 'abc' version
     /// is fetched before the 'xyz' version, the priority list would be
     /// specified as ['abc', 'xyz']. If the 'abc' version did not exist in
@@ -157,18 +159,31 @@ public:
     SDR_API
     SdrShaderNodeConstPtr GetShaderNodeByIdentifier(
         const SdrIdentifier& identifier,
-        const SdrTokenVec& typePriority = SdrTokenVec());
+        const SdrTokenVec& shadingSystemPriority = SdrTokenVec());
+
+    /// Get the shader node with the specified \p identifier and
+    /// \p shadingSystem. 
+    ///
+    /// If there is no matching node for shadingSystem, nullptr is returned.
+    SDR_API
+    SdrShaderNodeConstPtr GetShaderNodeByIdentifierAndSystem(
+        const SdrIdentifier& identifier,
+        const TfToken& shadingSystem);
 
     /// Get the shader node with the specified \p identifier and \p sourceType. 
     /// If there is no matching node for the sourceType, nullptr is returned.
+    ///
+    /// \deprecated
+    /// Deprecated in favor of GetShaderNodeByIdentifierAndSystem
     SDR_API
     SdrShaderNodeConstPtr GetShaderNodeByIdentifierAndType(
         const SdrIdentifier& identifier,
         const TfToken& nodeType);
 
-    /// Get the shader node with the specified name.  An optional priority list
-    /// specifies the set of node SOURCE types
-    /// (\sa SdrShaderNode::GetSourceType()) that should be searched and in what
+    /// Get the shader node with the specified name.
+    /// 
+    /// An optional priority list specifies the list of node shading systems
+    /// (\sa SdrShaderNode::GetShadingSystem()) that should be searched in
     /// order.
     ///
     /// Optionally, a filter can be specified to consider just the default
@@ -179,7 +194,22 @@ public:
     SDR_API
     SdrShaderNodeConstPtr GetShaderNodeByName(
         const std::string& name,
-        const SdrTokenVec& typePriority = SdrTokenVec(),
+        const SdrTokenVec& shadingSystemPriority = SdrTokenVec(),
+        SdrVersionFilter filter = SdrVersionFilterDefaultOnly);
+
+    /// A convenience wrapper around \c GetShaderNodeByName().
+    ///
+    /// Instead of providing a priority list, an exact shading system is
+    /// specified, and `nullptr` is returned if a node with the exact
+    /// identifier and shading system does not exist.
+    ///
+    /// Optionally, a filter can be specified to consider just the default
+    /// versions of nodes matching \p name (the default) or all versions
+    /// of the nodes.
+    SDR_API
+    SdrShaderNodeConstPtr GetShaderNodeByNameAndSystem(
+        const std::string& name,
+        const TfToken& shadingSystem,
         SdrVersionFilter filter = SdrVersionFilterDefaultOnly);
 
     /// A convenience wrapper around \c GetShaderNodeByName(). Instead of
@@ -190,6 +220,9 @@ public:
     /// Optionally, a filter can be specified to consider just the default
     /// versions of nodes matching \p name (the default) or all versions
     /// of the nodes.
+    ///
+    /// \deprecated
+    /// Deprecated in favor of GetShaderNodeByNameAndSystem
     SDR_API
     SdrShaderNodeConstPtr GetShaderNodeByNameAndType(
         const std::string& name,
@@ -200,7 +233,7 @@ public:
     /// the registry.
     /// 
     /// Nodes created from an asset using this API can be looked up by the 
-    /// unique identifier and sourceType of the returned node, or by URI, 
+    /// unique identifier and shadingSystem of the returned node, or by URI, 
     /// which will be set to the unresolved asset path value.
     /// 
     /// \p metadata contains additional metadata needed for parsing and 
@@ -212,7 +245,7 @@ public:
     /// particular definition in the asset file if the asset contains multiple
     /// node definitions.
     ///
-    /// \p sourceType is optional, and it is only needed to indicate a
+    /// \p shadingSystem is optional, and it is only needed to indicate a
     /// particular type if the asset file is capable of representing a node
     /// definition of multiple source types.
     ///
@@ -223,11 +256,11 @@ public:
         const SdfAssetPath &shaderAsset,
         const SdrTokenMap &metadata=SdrTokenMap(),
         const TfToken &subIdentifier=TfToken(),
-        const TfToken &sourceType=TfToken());
+        const TfToken &shadingSystem=TfToken());
 
     /// Parses the given \p sourceCode string, constructs a SdrShaderNode from
     /// it and adds it to the registry. The parser to be used is determined
-    /// by the specified \p sourceType.
+    /// by the specified \p shadingSystem.
     /// 
     /// Nodes created from source code using this API can be looked up by the 
     /// unique identifier and sourceType of the returned node.
@@ -239,15 +272,15 @@ public:
     /// 
     /// Returns a valid node if the given source code is parsed successfully 
     /// using the parser plugins that is registered for the specified 
-    /// \p sourceType.
+    /// \p shadingSystem.
     SDR_API
     SdrShaderNodeConstPtr GetShaderNodeFromSourceCode(
         const std::string &sourceCode,
-        const TfToken &sourceType,
+        const TfToken &shadingSystem,
         const SdrTokenMap &metadata=SdrTokenMap());
 
     /// Get all shader nodes matching the given identifier (multiple nodes of
-    /// the same identifier, but different source types, may exist). If no
+    /// the same identifier, but different shading systems, may exist). If no
     /// nodes match the identifier, an empty vector is returned.
     SDR_API
     SdrShaderNodePtrVec GetShaderNodesByIdentifier(const SdrIdentifier& identifier);
@@ -283,17 +316,25 @@ public:
     SDR_API
     SdrShaderNodePtrVec GetAllShaderNodes();
 
+    /// Get a sorted list of all shader node shading systems that may be present
+    /// on the nodes in the registry.
+    ///
+    /// Shading systems originate from the discovery process, but there is no
+    /// guarantee that the discovered shading systems will also have a registered
+    /// parser plugin.  The actual supported shading systems here depend on the
+    /// parsers that are available.  Also note that some parser plugins may not
+    /// advertise a shading system.
+    ///
+    /// See the documentation for `SdrParserPlugin` and
+    /// `SdrShaderNode::GetShadingSystem()` for more information.
+    SDR_API
+    SdrTokenVec GetAllShaderNodeShadingSystems() const;
+
     /// Get a sorted list of all shader node source types that may be present
     /// on the nodes in the registry.
     ///
-    /// Source types originate from the discovery process, but there is no
-    /// guarantee that the discovered source types will also have a registered
-    /// parser plugin.  The actual supported source types here depend on the
-    /// parsers that are available.  Also note that some parser plugins may not
-    /// advertise a source type.
-    ///
-    /// See the documentation for `SdrParserPlugin` and
-    /// `SdrShaderNode::GetSourceType()` for more information.
+    /// \deprecated
+    /// Deprecated in favor of GetAllShaderNodeShadingSystems
     SDR_API
     SdrTokenVec GetAllShaderNodeSourceTypes() const;
 
@@ -334,7 +375,7 @@ private:
         std::unordered_map<TfToken, SdrParserPlugin*, TfToken::HashFunctor>;
 
     // Node cache data structure, stored SdrShaderNodes keyed by
-    // identifier and source type.
+    // identifier and shading system.
     using _ShaderNodeMapKey = std::pair<SdrIdentifier, TfToken>;
     using _ShaderNodeMap =
         std::unordered_map<_ShaderNodeMapKey, SdrShaderNodeUniquePtr, TfHash>;
@@ -392,16 +433,18 @@ private:
     SdrShaderNodeConstPtr _ParseNodeFromAssetOrSourceCode(
         SdrParserPlugin &parser, SdrShaderNodeDiscoveryResult &&dr);
 
-    // Implementation helper for getting the first node of the given sourceType 
-    // in the range of node discovery results for a paricular identifier.
-    SdrShaderNodeConstPtr _GetNodeInIdentifierRangeWithSourceType(
-        _DiscoveryResultsByIdentifierRange range, const TfToken& sourceType);
+    // Implementation helper for getting the first node of the given
+    // shadingSystem in the range of node discovery results for a paricular
+    // identifier.
+    SdrShaderNodeConstPtr _GetNodeInIdentifierRangeWithShadingSystem(
+        _DiscoveryResultsByIdentifierRange range,
+        const TfToken& shadingSystem);
 
-    // Implementation helper for getting the first node of the given sourceType 
-    // and matching the given version filter in the range of node discovery 
-    // results for a paricular name.
-    SdrShaderNodeConstPtr _GetNodeInNameRangeWithSourceType(
-        _DiscoveryResultPtrsByNameRange range, const TfToken& sourceType,
+    // Implementation helper for getting the first node of the given
+    // shadingSystem and matching the given version filter in the range
+    // of node discovery results for a paricular name.
+    SdrShaderNodeConstPtr _GetNodeInNameRangeWithShadingSystem(
+        _DiscoveryResultPtrsByNameRange range, const TfToken& shadingSystem,
         SdrVersionFilter filter);
 
     // Thread-safe find of a shader node in the cache by key.
@@ -444,10 +487,10 @@ private:
     _DiscoveryResultsByIdentifier _discoveryResultsByIdentifier;
     _DiscoveryResultPtrsByName _discoveryResultPtrsByName;
 
-    // Set of all possible source types as determined by the existing discovery
-    // results. Populated along with the discovery result multimaps. If 
-    // accessing or mutating, _discoveryResultMutex should be used.
-    TfToken::Set _allSourceTypes;
+    // Set of all possible shading systems as determined by the existing
+    // discovery results. Populated along with the discovery result multimaps.
+    // If accessing or mutating, _discoveryResultMutex should be used.
+    TfToken::Set _allShadingSystems;
 
     // Maps a node's identifier and source type to a node instance. If accessing
     // or mutating, _nodeMapMutex should be used.

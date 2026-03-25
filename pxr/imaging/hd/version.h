@@ -138,8 +138,10 @@
 //           HdChangeTracker::AddSprimRprimDependency(), and
 //           HdChangeTracker::RemoveSprimRprimDependency().
 // 93 -> 94: Add HdSceneIndexPlugin::IsEnabled() and _IsEnabled().
+// 94 -> 95: Add HdRenderDelegate::GetShadingSystems to replace deprecated
+//           HdRenderDelegate::GetShaderSourceTypes
 
-#define HD_API_VERSION 94
+#define HD_API_VERSION 95
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 // 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.

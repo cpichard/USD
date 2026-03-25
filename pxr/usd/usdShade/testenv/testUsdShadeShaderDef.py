@@ -110,8 +110,10 @@ class TestUsdShadeShaderDef(unittest.TestCase):
 
             self.assertEqual(assetIdentifierInputNames[0], 'primvarFile')
             self.assertEqual(n.GetMetadata(), 
-                    {'primvars': '$primvarName',
-                     'role': 'primvar'})
+                    {'domain': 'rendering',
+                     'primvars': '$primvarName',
+                     'role': 'primvar',
+                     'sdrUsdEncodingVersion': '-1'})
             self.assertEqual(n.GetShaderInputNames(), 
                 ['fallback', 'float2Val', 'float3Val', 
                  'float4Val', 'int2Val', 'int3Val', 'int4Val', 'normalVector', 

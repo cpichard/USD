@@ -6,31 +6,36 @@
 //
 #include "hdPrman/volume.h"
 
-#include "hdPrman/renderParam.h"
-#include "hdPrman/instancer.h"
 #include "hdPrman/material.h"
+#include "hdPrman/renderParam.h"
 #include "hdPrman/rixStrings.h"
 #include "hdPrman/volumeFilter.h"
-#include "pxr/usd/sdf/types.h"
-#include "pxr/usd/usdVol/tokens.h"
+
+#include "pxr/imaging/hd/version.h"
+
 #include "pxr/usdImaging/usdRiPxrImaging/tokens.h"
 #include "pxr/usdImaging/usdRiPxrImaging/version.h"
 #include "pxr/usdImaging/usdVolImaging/tokens.h"
-#include "pxr/base/gf/matrix4f.h"
-#include "pxr/base/gf/matrix4d.h"
+
+#include "pxr/usd/sdf/types.h"
+#include "pxr/usd/usdVol/tokens.h"
+
 #include "pxr/base/js/json.h"
 #include "pxr/base/js/types.h"
 #include "pxr/base/js/value.h"
 #include "pxr/base/tf/fileUtils.h"
 
+#include "pxr/pxr.h"
+
+#include <prmanapi.h>
+#include <Riley.h>
+#include <RiTypesHelper.h>
+#include <RixPredefinedStrings.hpp>
+#include <RixShadingUtils.h>
+
 #ifdef PXR_OPENVDB_SUPPORT_ENABLED
 #include "pxr/imaging/hioOpenVDB/utils.h"
 #endif
-
-#include "Riley.h"
-#include "RiTypesHelper.h"
-#include "RixShadingUtils.h"
-#include "RixPredefinedStrings.hpp"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -48,7 +53,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (volumeFilter)
 );
 
-#if HD_API_VERSION >= 93
+#if _PRMANAPI_VERSION_MAJOR_ >= 27 && HD_API_VERSION >= 93
 // XXX -- This function is a stripped-down version of the one in
 //        hdPrman/light.cpp.
 static bool
@@ -159,7 +164,7 @@ _PopulateVolumeFilterNodes(
         volumeFilterNodes->push_back(*filter);
     }
 }
-#endif
+#endif // _PRMANAPI_VERSION_MAJOR_ >= 27 && HD_API_VERSION >= 93
 
 HdPrman_Field::HdPrman_Field(TfToken const& typeId, SdfPath const& id)
     : HdField(id), _typeId(typeId)
@@ -200,6 +205,7 @@ HdPrman_Volume::HdPrman_Volume(SdfPath const& id, const bool isMeshLight)
 void
 HdPrman_Volume::Finalize(HdRenderParam *renderParam)
 {
+#if _PRMANAPI_VERSION_MAJOR_ >= 27 && HD_API_VERSION >= 93
     if (!_volumeFilterIds.empty()) {
         auto* param = static_cast<HdPrman_RenderParam*>(renderParam);
         riley::Riley* riley = param->AcquireRiley();
@@ -210,7 +216,7 @@ HdPrman_Volume::Finalize(HdRenderParam *renderParam)
     }
     _volumeFilterPaths.clear();
     _volumeFilterNodeNames.clear();
-
+#endif
     BASE::Finalize(renderParam);
 }
 
@@ -220,7 +226,7 @@ HdPrman_Volume::Sync(HdSceneDelegate *sceneDelegate,
                      HdDirtyBits     *dirtyBits,
                      TfToken const   &reprToken)
 {
-#if HD_API_VERSION >= 93
+#if _PRMANAPI_VERSION_MAJOR_ >= 27 && HD_API_VERSION >= 93
     const SdfPath& id = GetId();
 
     auto* param = static_cast<HdPrman_RenderParam*>(renderParam);
@@ -271,7 +277,7 @@ HdPrman_Volume::Sync(HdSceneDelegate *sceneDelegate,
             _volumeFilterNodeNames.push_back(filterNode.handle);
         }
     }
-#endif
+#endif // _PRMANAPI_VERSION_MAJOR_ >= 27 && HD_API_VERSION >= 93
 
     BASE::Sync(sceneDelegate, renderParam, dirtyBits, reprToken);
 }
@@ -876,17 +882,23 @@ HdPrman_Volume::_AddPrimvars(RtPrimVarList* primvars) const
     if (!primvars) {
         return;
     }
+#if _PRMANAPI_VERSION_MAJOR_ >= 27 && HD_API_VERSION >= 93
     // Add volume filters to the primvars.
     static const RtUString us_volumeFilters("volume:filters");
     primvars->SetStringArray(
         us_volumeFilters,
         _volumeFilterNodeNames.data(), _volumeFilterNodeNames.size());
+#endif
 }
 
-const std::vector<riley::CoordinateSystemId>& 
+const std::vector<riley::CoordinateSystemId>&
 HdPrman_Volume::_GetAdditionalCoordSysIds() const
 {
+#if _PRMANAPI_VERSION_MAJOR_ >= 27 && HD_API_VERSION >= 93
     return _volumeFilterCoordSysIds;
+#else
+    return { };
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

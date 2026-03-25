@@ -40,7 +40,7 @@ namespace SdrShaderNodeQueryUtils {
 ///
 /// where the SdrShaderNodeConstPtr container is a VtValue holding
 /// std::vector<SdrShaderNodeConstPtr> and is sorted alphabetically by
-/// node identifier, then sourceType.
+/// node identifier, then shadingSystem.
 ///
 /// Values are stringified by SdrShaderNodeQueryResult::GetStringifiedValues.
 ///

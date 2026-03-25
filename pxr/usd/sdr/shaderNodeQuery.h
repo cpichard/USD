@@ -270,7 +270,7 @@ public:
     /// S is not constant, and may vary from row to row.
     ///
     /// Each SdrShaderNodePtrVec is sorted alphabetically by identifier,
-    /// then sourceType.
+    /// then shadingSystem.
     ///
     /// If the query had no calls to SelectDistinct, returns an empty vector.
     SDR_API
@@ -279,7 +279,7 @@ public:
     /// Returns all shader nodes that match the constraints of the query.
     ///
     /// The resulting SdrShaderNodePtrVec is sorted alphabetically by identifier,
-    /// then sourceType.
+    /// then shadingSystem.
     SDR_API
     SdrShaderNodePtrVec GetAllShaderNodes() const;
 
