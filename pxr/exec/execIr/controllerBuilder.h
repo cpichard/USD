@@ -185,6 +185,7 @@ public:
 
 private:
     // Returns a private token used to name constant inputs.
+    EXECIR_API
     static const TfToken &_GetConstantInputName();
 
 private:

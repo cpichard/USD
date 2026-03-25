@@ -36,20 +36,40 @@ pxr_library(execIr
 # Tests
 #
 
-pxr_build_test(testExecIrBasic
+pxr_build_test(testExecIrController
     LIBRARIES
-        gf
-        tf
         exec
         execIr
         execUsd
+        plug
         sdf
+        tf
         usd
+        vdf
     CPPFILES
-        testenv/testExecIrBasic.cpp
+        testenv/testExecIrController.cpp
 )
 
-pxr_register_test(testExecIrBasic
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecIrBasic"
+pxr_register_test(testExecIrController
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecIrController"
+    TESTENV testenv/testExecIrController
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_build_test(testExecIrFkController
+    LIBRARIES
+        exec
+        execIr
+        execUsd
+        gf
+        sdf
+        tf
+        usd
+    CPPFILES
+        testenv/testExecIrFkController.cpp
+)
+
+pxr_register_test(testExecIrFkController
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecIrFkController"
     EXPECTED_RETURN_CODE 0
 )
