@@ -461,6 +461,7 @@ pxr_build_test(testTf
         testenv/iterator.cpp
         testenv/mallocTag.cpp
         testenv/meta.cpp
+        testenv/mutexes.cpp
         testenv/notice.cpp
         testenv/pathUtils.cpp
         testenv/patternMatcher.cpp
@@ -729,6 +730,12 @@ pxr_register_test(TfSetenv
 )
 pxr_register_test(TfSmallVector
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfSmallVector"
+)
+pxr_register_test(TfSpinMutex
+  COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfSpinMutex"
+)
+pxr_register_test(TfSpinRWMutex
+  COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfSpinRWMutex"
 )
 pxr_register_test(TfStacked
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfStacked"
