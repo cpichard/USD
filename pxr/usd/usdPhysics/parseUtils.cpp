@@ -2494,12 +2494,13 @@ void _FinalizeArticulations(const UsdStageWeakPtr stage,
                         workLambda);
 }
 
-bool LoadUsdPhysicsFromRange(const UsdStageWeakPtr stage,
+bool UsdPhysicsLoadStageFromPrimRange(
+    const UsdStageWeakPtr& stage,
     const std::vector<SdfPath>& includePaths,
     UsdPhysicsReportFn reportFn,
     const VtValue& userData,
     const std::vector<SdfPath>* excludePaths,
-    const CustomUsdPhysicsTokens* customPhysicsTokens,
+    const UsdPhysicsCustomTokens* customPhysicsTokens,
     const std::vector<SdfPath>* simulationOwners)
 {
     bool retVal = true;
