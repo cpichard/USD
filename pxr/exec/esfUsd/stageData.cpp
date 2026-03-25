@@ -14,6 +14,7 @@
 
 #include "pxr/base/tf/diagnosticLite.h"
 #include "pxr/base/tf/mallocTag.h"
+#include "pxr/base/tf/notice.h"
 #include "pxr/base/tf/scopeDescription.h"
 #include "pxr/base/trace/trace.h"
 #include "pxr/base/work/loops.h"
@@ -45,6 +46,12 @@ struct _Hash {
 
 } // anonymous namespace
 
+// TODO: The fact that we need to store stage data in a global table and do
+// lookups to query connections is unfortunate. A better way to address this is
+// to increase the size of all EsfObjects so they can hold a pointer to stage
+// data. We're choosing not to do that for now, however, because the current
+// plan is for UsdStage to compute incoming connection (and relationship
+// tagets), and if that happens, then we can remove this machinery altogether.
 using _StageDataTable =
     tbb::concurrent_hash_map<
         UsdStageConstPtr, std::weak_ptr<EsfUsdStageData>, _Hash>;
@@ -56,13 +63,15 @@ EsfUsdStageData::~EsfUsdStageData() = default;
 EsfUsdStageData::EsfUsdStageData(
     const UsdStageConstPtr &stage)
     : _stage(stage)
+    , _noticeListener(std::make_unique<_NoticeListener>(this))
 {
     _PopulateConnectionTables();
 }
 
 std::shared_ptr<EsfUsdStageData>
 EsfUsdStageData::RegisterStage(
-    const UsdStageConstPtr &stage)
+    const UsdStageConstPtr &stage,
+    const ListenerBase *const newListener)
 {
     TfAutoMallocTag tag("Exec", __ARCH_PRETTY_FUNCTION__);
 
@@ -72,7 +81,11 @@ EsfUsdStageData::RegisterStage(
     // shared_ptr, then return it.
     if (_StageDataTable::const_accessor accessor;
         stageDataTable.find(accessor, stage)) {
-        if (ptr = accessor->second.lock()) {
+        if ((ptr = accessor->second.lock())) {
+            {
+                std::lock_guard lock(ptr->_listenersMutex);
+                ptr->_listeners.push_back(newListener);
+            }
             return ptr;
         }
     }
@@ -83,7 +96,7 @@ EsfUsdStageData::RegisterStage(
 
     // If we get a non-null pointer here, there's already a stage data entry,
     // so we just return the shared_ptr.
-    if (ptr = accessor->second.lock()) {
+    if ((ptr = accessor->second.lock())) {
         return ptr;
     }
 
@@ -91,8 +104,23 @@ EsfUsdStageData::RegisterStage(
     // we hold a write lock for the entry. Create the stage data and store it
     // in the map.
     ptr.reset(new EsfUsdStageData(stage));
+    {
+        std::lock_guard lock(ptr->_listenersMutex);
+        ptr->_listeners.push_back(newListener);
+    }
     accessor->second = ptr;
     return ptr;
+}
+
+void
+EsfUsdStageData::Unregister(
+    const ListenerBase *const listener)
+{
+    std::lock_guard lock(_listenersMutex);
+    const auto it = std::find(_listeners.begin(), _listeners.end(), listener);
+    if (TF_VERIFY(it != _listeners.end())) {
+        _listeners.erase(it);
+    }
 }
 
 EsfUsdStageData &
@@ -148,11 +176,11 @@ EsfUsdStageData::_PopulateConnectionTables()
                 continue;
             }
 
-            const SdfPath ownerPath = attr.GetPath();
+            SdfPath ownerPath = attr.GetPath();
             for (const SdfPath &targetPath : targetPaths) {
                 incoming[targetPath].push_back(ownerPath);
             }
-            outgoing.emplace(ownerPath, std::move(targetPaths));
+            outgoing.emplace(std::move(ownerPath), std::move(targetPaths));
         }
     });
 }
@@ -213,7 +241,7 @@ EsfUsdStageData::_GetIncomingConnections(
 }
 
 void
-EsfUsdStageData::UpdateForChangedAttributeConnections(
+EsfUsdStageData::_UpdateForChangedAttributeConnections(
     const SdfPath &attrPath,
     ChangedPathSet *const incomingConnectionsChanged)
 {
@@ -286,7 +314,7 @@ EsfUsdStageData::UpdateForChangedAttributeConnections(
 }
 
 void
-EsfUsdStageData::UpdateForResync(
+EsfUsdStageData::_UpdateForResync(
     const SdfPath &resyncedPath,
     ChangedPathSet *const incomingConnectionsChanged)
 {
@@ -299,7 +327,7 @@ EsfUsdStageData::UpdateForResync(
     }
 
     if (resyncedPath.IsPropertyPath()) {
-        UpdateForChangedAttributeConnections(
+        _UpdateForChangedAttributeConnections(
             resyncedPath, incomingConnectionsChanged);
         return;
     }
@@ -610,5 +638,81 @@ EsfUsdStageData::_RemoveIncomingTableEntries(
         }
     }
 }
+
+void
+EsfUsdStageData::_Notify(
+    const UsdNotice::ObjectsChanged &objectsChanged,
+    const ChangedPathSet &changedTargetPaths) const
+{
+    std::lock_guard lock(_listenersMutex);
+    for (const ListenerBase *const listener : _listeners) {
+        if (listener) {
+            listener->_DidObjectsChanged(objectsChanged, changedTargetPaths);
+        }
+    }
+}
+
+// TfNotice requires that notice listeners implement TfWeakPtrFacace.
+class EsfUsdStageData::_NoticeListener : public TfWeakBase
+{
+public:
+    // Subscribe to notices in the constructor.
+    _NoticeListener(
+        EsfUsdStageData *const stageData)
+        : _stageData(stageData)
+        , _objectsChangedNoticeKey(
+            TfNotice::Register(
+                TfCreateWeakPtr(this),
+                &EsfUsdStageData::_NoticeListener::_DidObjectsChanged,
+                UsdStageConstPtr(_stageData->_GetStage())))
+    {}
+
+    // Revoke notice subscriptions in the destructor, being careful to make sure
+    // we wait on any threads that are invoking the listener.
+    ~_NoticeListener() {
+        TfNotice::RevokeAndWait(_objectsChangedNoticeKey);
+    }
+
+private:
+    void _DidObjectsChanged(
+        const UsdNotice::ObjectsChanged &objectsChanged);
+
+    EsfUsdStageData *const _stageData;
+    TfNotice::Key _objectsChangedNoticeKey;
+};
+
+void
+EsfUsdStageData::_NoticeListener::_DidObjectsChanged(
+    const UsdNotice::ObjectsChanged &objectsChanged)
+{
+    TRACE_FUNCTION();
+
+    // Collect paths of targeted objects whose incoming attribute connections
+    // have been added and/or removed.
+    EsfUsdStageData::ChangedPathSet changedTargetPaths;
+
+    for (const SdfPath &path : objectsChanged.GetResyncedPaths()) {
+        _stageData->_UpdateForResync(path, &changedTargetPaths);
+    }
+
+    for (const SdfPath &path :
+             objectsChanged.GetResolvedAssetPathsResyncedPaths()) {
+        _stageData->_UpdateForResync(path, &changedTargetPaths);
+    }
+
+    for (const SdfPath &path : objectsChanged.GetChangedInfoOnlyPaths()) {
+        if (const TfTokenVector changedFields =
+                objectsChanged.GetChangedFields(path);
+            std::find(changedFields.begin(), changedFields.end(),
+                      SdfFieldKeys->ConnectionPaths) != changedFields.end()) {
+            _stageData->_UpdateForChangedAttributeConnections(
+                path, &changedTargetPaths);
+        }
+    }
+
+    _stageData->_Notify(objectsChanged, changedTargetPaths);
+}
+
+EsfUsdStageData::ListenerBase::~ListenerBase() = default;
 
 PXR_NAMESPACE_CLOSE_SCOPE

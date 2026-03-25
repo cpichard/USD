@@ -16,6 +16,7 @@
 #include "pxr/base/tf/declarePtrs.h"
 #include "pxr/base/tf/hash.h"
 #include "pxr/usd/sdf/path.h"
+#include "pxr/usd/usd/notice.h"
 
 #ifdef TBB_PREVIEW_CONCURRENT_ORDERED_CONTAINERS
 #include <tbb/concurrent_map.h>
@@ -30,6 +31,8 @@
 #include <tbb/concurrent_vector.h>
 
 #include <memory>
+#include <mutex>
+#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -54,6 +57,30 @@ class EsfUsdStageData
 
 public:
 
+    /// A concurrent set of paths, used to indicate the set of targets for which
+    /// incoming connections have changed.
+    ///
+    using ChangedPathSet = tbb::concurrent_unordered_set<SdfPath, TfHash>;
+
+    /// The base class for listeners defined by clients in order to be notified
+    /// of scene changes.
+    ///
+    class ESFUSD_API_TYPE ListenerBase {
+    public:
+        ESFUSD_API
+        virtual ~ListenerBase();
+
+    private:
+        friend EsfUsdStageData;
+
+        /// Called to communicate scene changes to a client liseter.
+        ///
+        virtual void _DidObjectsChanged(
+            const UsdNotice::ObjectsChanged &objectsChanged,
+            const ChangedPathSet &changedTargetPaths) const = 0;
+    };
+    
+
     ESFUSD_API
     ~EsfUsdStageData();
 
@@ -61,9 +88,18 @@ public:
     /// returning a strong reference the client must hold until the cached data
     /// is no longer needed.
     ///
+    /// \p listener will be notified of scene changes.
+    ///
     ESFUSD_API
     static std::shared_ptr<EsfUsdStageData> RegisterStage(
-        const UsdStageConstPtr &stage);
+        const UsdStageConstPtr &stage,
+        const ListenerBase *listener);
+
+    /// Notifies that \p listener no longer needs to be informed of changes.
+    ///
+    ESFUSD_API
+    void Unregister(
+        const ListenerBase *listener);
 
     /// Get the cached stage data for \p stage.
     ///
@@ -76,30 +112,6 @@ public:
     ESFUSD_API
     static EsfUsdStageData &GetStageData(
         const UsdStageConstPtr &stage);
-
-    /// A concurent set of paths, used to indicate the set of targets for which
-    /// incoming connections have changed.
-    ///
-    using ChangedPathSet = tbb::concurrent_unordered_set<SdfPath, TfHash>;
-
-    /// Updates attribute connection caches for connections owned by the
-    /// attribute at \p attrPath.
-    ///
-    /// Populates \p incomingConnectionsChanged with the paths of objects whose
-    /// incoming connection paths have changed.
-    ///
-    ESFUSD_API
-    void UpdateForChangedAttributeConnections(
-        const SdfPath &attrPath,
-        ChangedPathSet *incomingConnectionsChanged);
-
-    /// Updates attribute connection caches for connections owned by attribute
-    /// at or under \p resyncedPath.
-    ///
-    ESFUSD_API
-    void UpdateForResync(
-        const SdfPath &resyncedPath,
-        ChangedPathSet *incomingConnectionsChanged);
 
     /// Returns the paths of all objects that are targets of connections owned
     /// by the attribute at \p attrPath.
@@ -118,6 +130,8 @@ public:
         const SdfPath &targetPath);
 
 private:
+    const UsdStageConstPtr &_GetStage() const { return _stage; }
+
     const SdfPathVector &_GetOutgoingConnections(
         const SdfPath &targetPath);
 
@@ -168,6 +182,23 @@ private:
         SdfPathVector *addedTargetPaths,
         SdfPathVector *removedTargetPaths) const;
 
+    // Updates attribute connection caches for connections owned by the
+    // attribute at \p attrPath.
+    //
+    // Populates \p incomingConnectionsChanged with the paths of objects whose
+    // incoming connection paths have changed.
+    //
+    void _UpdateForChangedAttributeConnections(
+        const SdfPath &attrPath,
+        ChangedPathSet *incomingConnectionsChanged);
+
+    // Updates attribute connection caches for connections owned by attribute
+    // at or under \p resyncedPath.
+    //
+    void _UpdateForResync(
+        const SdfPath &resyncedPath,
+        ChangedPathSet *incomingConnectionsChanged);
+
     // Updates outgoing and incoming connection tables for any changes to the
     // given prim.
     //
@@ -190,12 +221,24 @@ private:
         tbb::concurrent_vector<SdfPath> *ownerAttrsToRemove) const;
 
     // Removes the entries indicated by \p incomingToRemove from _incoming.
-    //
     void _RemoveIncomingTableEntries(
         const _IncomingPathTable &incomingToRemove);
 
+    // Notifies all listeners of changes.
+    void _Notify(
+        const UsdNotice::ObjectsChanged &objectsChanged,
+        const ChangedPathSet &changedTargetPaths) const;
+
 private:
     const UsdStageConstPtr _stage;
+
+    // Used to listen for change notification from the stage.
+    class _NoticeListener;
+    const std::unique_ptr<_NoticeListener> _noticeListener;
+
+    // Registered listeners, used to communicate change notfication to clients.
+    std::vector<const ListenerBase *> _listeners;
+    mutable std::mutex _listenersMutex;
 
     _OutgoingPathTable _outgoing;
 

@@ -14,7 +14,6 @@
 #include "pxr/base/tf/preprocessorUtilsLite.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/stringUtils.h"
-#include "pxr/base/tf/weakBase.h"
 #include "pxr/exec/esf/attribute.h"
 #include "pxr/exec/esf/stage.h"
 #include "pxr/usd/sdf/attributeSpec.h"
@@ -22,7 +21,6 @@
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/sdf/primSpec.h"
 #include "pxr/usd/usd/attribute.h"
-#include "pxr/usd/usd/notice.h"
 #include "pxr/usd/usd/stage.h"
 
 #include <algorithm>
@@ -54,20 +52,17 @@ _MakePathSet(const SdfPathVector &paths) {
 namespace
 {
 
-struct Fixture : TfWeakBase
+class Fixture
 {
-    // Hold onto the payload layer when it is unloaded.
-    SdfLayerRefPtr payloadLayer;
+public:
     UsdStageRefPtr stage;
-    std::shared_ptr<EsfUsdStageData> stageData;
-    EsfUsdStageData::ChangedPathSet changedTargetPaths;
     EsfJournal *const journal = nullptr;
 
     Fixture(SdfLayerRefPtr &&layerIn = {})
     {
-        payloadLayer = SdfLayer::CreateAnonymous(".usda");
+        _payloadLayer = SdfLayer::CreateAnonymous(".usda");
         {
-            const bool importedLayer = payloadLayer->ImportFromString(R"usd(
+            const bool importedLayer = _payloadLayer->ImportFromString(R"usd(
             #usda 1.0
             def Scope "Prim" (
             ) {
@@ -80,11 +75,11 @@ struct Fixture : TfWeakBase
         }
 
         // If a layer was passed in, use that as the root layer. Otherwise, use
-        // a default layer that payloads in payloadLayer.
+        // a default layer that payloads in _payloadLayer.
         //
         // The stage takes ownership of the root layer.
         const SdfLayerRefPtr rootLayer =
-            [&layerIn, &payloadLayer=payloadLayer]
+            [&layerIn, &payloadLayer=_payloadLayer]
         {
             if (layerIn) {
                 return layerIn;
@@ -107,48 +102,65 @@ struct Fixture : TfWeakBase
         stage = UsdStage::Open(rootLayer);
         TF_AXIOM(stage);
 
-        stageData = EsfUsdStageData::RegisterStage(stage);
+        for (auto &listener : _listeners) {
+            listener.reset(new _NoticeListener(stage));
+        }
 
         const UsdPrim prim = stage->GetPrimAtPath(SdfPath("/Prim"));
         TF_AXIOM(prim && prim.IsLoaded());
-
-        TfNotice::Register(
-            TfCreateWeakPtr(this),
-            &Fixture::_DidObjectsChanged,
-            UsdStageConstPtr(stage));
     }
 
     void AssertChangedTargets(
         const std::set<SdfPath> &expected)
     {
-        std::set<SdfPath> actual(
-            changedTargetPaths.begin(), changedTargetPaths.end());
-        ASSERT_EQ(actual, expected);
-
-        changedTargetPaths.clear();
+        for (auto &listener : _listeners) {
+            listener->AssertChangedTargets(expected);
+        }
     }
 
-    // Update the stage data in response to scene changes.
-    void _DidObjectsChanged(
-        const UsdNotice::ObjectsChanged &objectsChanged)
+private:
+    // Hold onto the payload layer when it is unloaded.
+    SdfLayerRefPtr _payloadLayer;
+
+    class _NoticeListener;
+
+    // We create multiple listeners (and stage datas) in order to verify that
+    // they all are notified about connection target changes.
+    std::array<std::unique_ptr<_NoticeListener>, 1> _listeners;
+
+    class _NoticeListener : public EsfUsdStageData::ListenerBase
     {
-        EsfUsdStageData &stageData = EsfUsdStageData::GetStageData(stage);
+    public:
+        _NoticeListener(const UsdStageRefPtr &stage)
+            : _stageData(EsfUsdStageData::RegisterStage(stage, this))
+        {}
 
-        for (const SdfPath &path : objectsChanged.GetResyncedPaths()) {
-            stageData.UpdateForResync(path, &changedTargetPaths);
+        ~_NoticeListener() override = default;
+
+        void AssertChangedTargets(
+            const std::set<SdfPath> &expected)
+        {
+            std::set<SdfPath> actual(
+                _changedTargetPaths.begin(), _changedTargetPaths.end());
+            ASSERT_EQ(actual, expected);
+
+            _changedTargetPaths.clear();
         }
 
-        for (const SdfPath &path : objectsChanged.GetChangedInfoOnlyPaths()) {
-            const TfTokenVector changedFields =
-                objectsChanged.GetChangedFields(path);
-            if (std::find(
-                    changedFields.begin(), changedFields.end(),
-                    SdfFieldKeys->ConnectionPaths) != changedFields.end()) {
-                stageData.UpdateForChangedAttributeConnections(
-                    path, &changedTargetPaths);
-            }
+    private:
+        // Update the stage data in response to scene changes.
+        void _DidObjectsChanged(
+            const UsdNotice::ObjectsChanged &objectsChanged,
+            const EsfUsdStageData::ChangedPathSet &newChangedTargetPaths)
+            const override
+        {
+            _changedTargetPaths = newChangedTargetPaths;
         }
-    }
+
+    private:
+        mutable EsfUsdStageData::ChangedPathSet _changedTargetPaths;
+        const std::shared_ptr<EsfUsdStageData> _stageData;
+    };
 };
 
 } // anonymous namespace

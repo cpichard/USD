@@ -109,7 +109,8 @@ struct Fixture
         stage = UsdStage::Open(rootLayer);
         TF_AXIOM(stage);
 
-        stageData = EsfUsdStageData::RegisterStage(stage);
+        stageData =
+            EsfUsdStageData::RegisterStage(stage, /* listener */ nullptr);
         TF_AXIOM(stageData);
     }
 };
