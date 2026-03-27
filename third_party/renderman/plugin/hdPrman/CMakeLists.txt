@@ -158,6 +158,7 @@ pxr_plugin(${PXR_PACKAGE}
         implicitSurfaceSceneIndexPlugin
         materialPrimvarTransferSceneIndexPlugin
         motionBlurSceneIndexPlugin
+        particleFieldConversionSceneIndexPlugin
         pinnedCurveExpandingSceneIndexPlugin
         previewSurfacePrimvarsSceneIndexPlugin
         renderBuffer

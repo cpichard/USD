@@ -141,8 +141,9 @@
 // 94 -> 95: Add HdRenderDelegate::GetShadingSystems to replace deprecated
 //           HdRenderDelegate::GetShaderSourceTypes
 // 95 -> 96: Added HdVisitSampledDataSourceType and HdCopySampledDataSourceType.
+// 96 -> 97: Added HdsiParticleFieldConversionSceneIndex
 
-#define HD_API_VERSION 96
+#define HD_API_VERSION 97
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 // 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.

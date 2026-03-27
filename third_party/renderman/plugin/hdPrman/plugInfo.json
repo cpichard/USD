@@ -308,6 +308,19 @@
                             "after": ["hdPrman:phase113", "hdPrman:matFilt"],
                             "position": "firstAfter"
                         }
+                    },
+                    "HdPrman_ParticleFieldConversionSceneIndexPlugin" : {
+                        "bases": ["HdSceneIndexPlugin"],
+                        "loadWithRenderer": ["RenderMan RIS", "RenderMan XPU", "RenderMan XPU - CPU", "RenderMan XPU - GPU"],
+                        "priority": 0,
+                        "displayName": "Prman Particle Field Conversion Scene Index",
+
+                        # phase=1, InsertionOrderAtStart
+                        "tags": ["hdPrman:phase1"],
+                        "ordering": {
+                            "before": ["hdPrman:phase2", "hdPrman:matFilt", "hdPrman:matResolve"],
+                            "position": "firstAfter"
+                        }
                     }
                 }
             },
