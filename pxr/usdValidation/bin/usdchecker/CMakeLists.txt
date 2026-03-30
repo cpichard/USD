@@ -177,3 +177,9 @@ pxr_register_test(testUsdChecker22
     TESTENV testenv/testUsdChecker
     EXPECTED_RETURN_CODE 0
 )
+
+pxr_register_test(testUsdChecker23
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdchecker bad/badImageableConnectableMaterialDesc.usda"
+    TESTENV testenv/testUsdChecker
+    EXPECTED_RETURN_CODE 1
+)
