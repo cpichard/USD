@@ -611,6 +611,7 @@ HD_DECLARE_DATASOURCE_HANDLES(_PrimvarDataSource);
 ////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////
 
+#if HD_API_VERSION < 96
 /// \class _Visitor
 ///
 /// VtVisitValue visitor for constructing the right type of typed data source
@@ -640,6 +641,7 @@ struct _Visitor
             samplesSource, key, primPath, primType, primvarsSource);
     }
 };
+#endif
 
 HdDataSourceBaseHandle
 _PrimvarDataSource::Get(const TfToken &name)
@@ -652,9 +654,23 @@ _PrimvarDataSource::Get(const TfToken &name)
 
     if (name == HdPrimvarSchemaTokens->primvarValue) {
         if (const auto source = HdSampledDataSource::Cast(result)) {
-            return VtVisitValue(source->GetValue(0.0f),
-                _Visitor { source, _primvarName, _primPath,
-                    _primType, _primvarsSource });
+#if HD_API_VERSION >= 96
+            return HdCopySampledDataSourceType<
+                _MotionBlurTypedSampledDataSource,
+                _MotionBlurUntypedSampledDataSource>(
+                source, source, _primvarName, _primPath, _primType,
+                _primvarsSource);
+#else
+            if (_primvarName == HdPrimvarsSchemaTokens->points) {
+                return _MotionBlurTypedSampledDataSource<VtVec3fArray>::New(
+                    source, _primvarName, _primPath,
+                    _primType, _primvarsSource);
+            } else {
+                return VtVisitValue(source->GetValue(0.0f),
+                    _Visitor { source, _primvarName, _primPath,
+                        _primType, _primvarsSource });
+            }
+#endif
         }
     }
 
@@ -802,9 +818,17 @@ _XformDataSource::Get(const TfToken& name)
 
     if (name == HdXformSchemaTokens->matrix) {
         if (const auto source = HdSampledDataSource::Cast(result)) {
+#if HD_API_VERSION >= 96
+            return HdCopySampledDataSourceType<
+                _MotionBlurTypedSampledDataSource,
+                _MotionBlurUntypedSampledDataSource>(
+                source, source, name, _primPath, _primType,
+                _primvarsSource);
+#else
             return VtVisitValue(source->GetValue(0.0f),
                 _Visitor { source, name, _primPath,
                     _primType, _primvarsSource });
+#endif
         }
     }
     return result;

@@ -32,7 +32,7 @@ SdrShaderNode::SdrShaderNode(
     const SdrIdentifier& identifier,
     const SdrVersion& version,
     const std::string& name,
-    const TfToken& family,
+    const TfToken& function,
     const TfToken& context,
     const TfToken& shadingSystem,
     const std::string& definitionURI,
@@ -43,7 +43,7 @@ SdrShaderNode::SdrShaderNode(
     : _identifier(identifier),
       _version(version),
       _name(name),
-      _family(family),
+      _function(function),
       _context(context),
       _shadingSystem(shadingSystem),
       _definitionURI(definitionURI),
@@ -140,10 +140,10 @@ std::string
 SdrShaderNode::GetInfoString() const
 {
     return TfStringPrintf(
-        "%s (context: '%s', version: '%s', family: '%s'); definition URI: '%s';"
+        "%s (context: '%s', version: '%s', function: '%s'); definition URI: '%s';"
         " implementation URI: '%s'",
         SdrGetIdentifierString(_identifier).c_str(), _context.GetText(),
-        _version.GetString().c_str(), _family.GetText(), 
+        _version.GetString().c_str(), _function.GetText(), 
         _definitionURI.c_str(), _implementationURI.c_str()
     );
 }
@@ -414,6 +414,8 @@ SdrShaderNode::GetDataForKey(const TfToken& key) const
         return VtValue(GetName());
     } else if (key == SdrNodeFieldKey->Family) {
         return VtValue(GetFamily());
+    } else if (key == SdrNodeFieldKey->Function) {
+        return VtValue(GetFunction());
     } else if (key == SdrNodeFieldKey->ShadingSystem) {
         return VtValue(GetShadingSystem());
     } else if (key == SdrNodeFieldKey->SourceType) {

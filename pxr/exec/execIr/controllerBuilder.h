@@ -144,7 +144,7 @@ public:
     ///
     template <typename ValueType>
     void
-    NoninvertibleInputAttribute(
+    NonInvertibleInputAttribute(
         const TfToken &attributeName);
 
     /// Registers an invertible output attribute; the output is inverible if \p
@@ -185,6 +185,7 @@ public:
 
 private:
     // Returns a private token used to name constant inputs.
+    EXECIR_API
     static const TfToken &_GetConstantInputName();
 
 private:
@@ -207,7 +208,7 @@ ExecIrControllerBuilder::InvertibleInputAttribute(
 
 template <typename ValueType>
 void
-ExecIrControllerBuilder::NoninvertibleInputAttribute(
+ExecIrControllerBuilder::NonInvertibleInputAttribute(
     const TfToken &attributeName)
 {
     using namespace exec_registration;

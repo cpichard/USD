@@ -98,6 +98,11 @@ class SdfAssetPath;
 /// that may each be preferable depending on the scenario and how
 /// to best express the intent of the light setup.
 /// 
+/// <b>Encapsulation</b>
+/// 
+/// A prim with LightAPI applied must not be parented under a
+/// UsdShadeConnectable prim. See \ref usdLux_Encapsulation for details.
+/// 
 ///
 /// For any described attribute \em Fallback \em Value or \em Allowed \em Values below
 /// that are text/tokens, the actual token is published and defined in \ref UsdLuxTokens.

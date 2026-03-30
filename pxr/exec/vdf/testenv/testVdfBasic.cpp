@@ -268,7 +268,7 @@ EmptyOutputProducer(const VdfContext &context)
     if (context.HasInputValue<int>(_tokens->input1)) {
         context.SetOutput(context.GetInputValue<int>(_tokens->input1));
     } else {
-        context.SetEmptyOutput<int>();
+        context.SetEmptyOutput();
     }
 }
 

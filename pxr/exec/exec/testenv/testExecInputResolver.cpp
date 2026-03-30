@@ -233,7 +233,8 @@ private:
         TF_AXIOM(layer);
         UsdStageRefPtr usdStage = UsdStage::Open(layer);
         TF_AXIOM(usdStage);
-        _stageData = EsfUsdStageData::RegisterStage(usdStage);
+        _stageData =
+            EsfUsdStageData::RegisterStage(usdStage, /* listener */ nullptr);
         TF_AXIOM(_stageData);
         return EsfUsdSceneAdapter::AdaptStage(usdStage);
     }

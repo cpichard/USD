@@ -104,6 +104,11 @@ class "LightAPI" (
     include the desired objects.  These are complementary approaches
     that may each be preferable depending on the scenario and how
     to best express the intent of the light setup.
+
+    <b>Encapsulation</b>
+
+    A prim with LightAPI applied must not be parented under a
+    UsdShadeConnectable prim. See \\ref usdLux_Encapsulation for details.
     """
     customData = {
         dictionary extraPlugInfo = {
@@ -1004,6 +1009,11 @@ class LightFilter "LightFilter" (
 
     Linking is specified as a collection (UsdCollectionAPI) which can
     be accessed via GetFilterLinkCollection().
+
+    <b>Encapsulation</b>
+
+    UsdLuxLightFilter must not be parented under a UsdShadeMaterial.
+    See \\ref usdLux_Encapsulation for more details.
     """
     customData = {
         dictionary extraPlugInfo = {

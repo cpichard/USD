@@ -35,7 +35,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrFkController)
     builder.InvertibleInputAttribute<double>(ExecIrTokens->rzToken);
     builder.InvertibleInputAttribute<double>(ExecIrTokens->rspinToken);
 
-    builder.NoninvertibleInputAttribute<GfMatrix4d>(
+    builder.NonInvertibleInputAttribute<GfMatrix4d>(
         ExecIrTokens->parentSpaceToken);
 
     builder.InvertibleOutputAttribute<GfMatrix4d>(ExecIrTokens->outSpaceToken);

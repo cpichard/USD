@@ -72,7 +72,7 @@ SdrParserPlugin::GetInvalidShaderNode(const SdrShaderNodeDiscoveryResult& dr)
             dr.identifier,
             dr.version,
             dr.name,
-            dr.family,
+            dr.function,
             TfToken("unknown discovery type"),
             TfToken("unknown shading system"),
             dr.resolvedUri,

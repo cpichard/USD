@@ -11,6 +11,7 @@ pxr_library(hdsi
         sdf
         cameraUtil
         usdShade
+        usdVol
         geomUtil
         hf
         hd
@@ -35,6 +36,7 @@ pxr_library(hdsi
         materialRenderContextFilteringSceneIndex
         nodeIdentifierResolvingSceneIndex
         nurbsApproximatingSceneIndex
+        particleFieldConversionSceneIndex
         prefixPathPruningSceneIndex
         pinnedCurveExpandingSceneIndex
         primManagingSceneIndexObserver

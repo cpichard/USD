@@ -116,7 +116,7 @@ public:
 
     /// Takes the specified `SdrShaderNodeDiscoveryResult` instance, which was a
     /// result of the discovery process, and generates a new `SdrShaderNode`.
-    /// The node's name, shading system, and family must match.
+    /// The node's name, shading system, and function must match.
     SDR_API
     virtual SdrShaderNodeUniquePtr ParseShaderNode(
         const SdrShaderNodeDiscoveryResult& discoveryResult) = 0;

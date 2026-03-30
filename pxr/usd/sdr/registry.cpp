@@ -105,28 +105,28 @@ template <typename T> struct _SdrObjectAccess { };
 template <> struct _SdrObjectAccess<SdrShaderNodeDiscoveryResult> {
     typedef SdrShaderNodeDiscoveryResult Type;
     static const std::string& GetName(const Type& x) { return x.name; }
-    static const TfToken& GetFamily(const Type& x) { return x.family; }
+    static const TfToken& GetFunction(const Type& x) { return x.function; }
     static SdrVersion GetShaderVersion(const Type& x) { return x.version; }
 };
 template <> struct _SdrObjectAccess<SdrShaderNodeUniquePtr> {
     typedef SdrShaderNodeUniquePtr Type;
     static const std::string& GetName(const Type& x) { return x->GetName(); }
-    static const TfToken& GetFamily(const Type& x) { return x->GetFamily(); }
+    static const TfToken& GetFunction(const Type& x) { return x->GetFunction(); }
     static SdrVersion GetShaderVersion(const Type& x) { return x->GetShaderVersion(); }
 };
 
 template <typename T>
 static
 bool
-_MatchesFamilyAndFilter(
+_MatchesFunctionAndFilter(
     const T& object,
-    const TfToken& family,
+    const TfToken& function,
     SdrVersionFilter filter)
 {
     using Access = _SdrObjectAccess<T>;
 
-    // Check the family.
-    if (!family.IsEmpty() && family != Access::GetFamily(object)) {
+    // Check the function.
+    if (!function.IsEmpty() && function != Access::GetFunction(object)) {
         return false;
     }
 
@@ -209,24 +209,24 @@ _ValidateNode(const SdrShaderNodeUniquePtr &newNode,
         !(newNode->GetIdentifier() == dr.identifier &&
           newNode->GetName() == dr.name &&
           newNode->GetShaderVersion() == dr.version &&
-          newNode->GetFamily() == dr.family &&
+          newNode->GetFunction() == dr.function &&
           newNode->GetShadingSystem() == dr.shadingSystem)) {
         TF_RUNTIME_ERROR(
                "Parsed node %s:%s:%s:%s:%s doesn't match discovery result "
                "created for asset @%s@ - "
                "%s:%s:%s:%s:%s: "
-               "(identifier:version:name:family:shading system); "
+               "(identifier:version:name:function:shading system); "
                "discarding.",
                SdrGetIdentifierString(newNode->GetIdentifier()).c_str(),
                newNode->GetShaderVersion().GetString().c_str(),
                newNode->GetName().c_str(),
-               newNode->GetFamily().GetText(),
+               newNode->GetFunction().GetText(),
                newNode->GetShadingSystem().GetText(),
                dr.resolvedUri.c_str(),
                SdrGetIdentifierString(dr.identifier).c_str(),
                dr.version.GetString().c_str(),
                dr.name.c_str(),
-               dr.family.GetText(),
+               dr.function.GetText(),
                dr.shadingSystem.GetText());
         return false;
     }
@@ -410,7 +410,7 @@ SdrRegistry::GetSearchURIs() const
 
 SdrIdentifierVec
 SdrRegistry::GetShaderNodeIdentifiers(
-    const TfToken& family,
+    const TfToken& function,
     SdrVersionFilter filter) const
 {
     //
@@ -425,7 +425,7 @@ SdrRegistry::GetShaderNodeIdentifiers(
 
     for (const auto& it : _discoveryResultsByIdentifier) {
         const SdrShaderNodeDiscoveryResult& dr = it.second;
-        if (_MatchesFamilyAndFilter(dr, family, filter)) {
+        if (_MatchesFunctionAndFilter(dr, function, filter)) {
             // Since the discovery results are keyed by identifier in a
             // multimap, any duplicate idenitfiers will show up in order so we
             // only have to check the last identifier we added to avoid
@@ -440,7 +440,7 @@ SdrRegistry::GetShaderNodeIdentifiers(
 }
 
 SdrStringVec
-SdrRegistry::GetShaderNodeNames(const TfToken& family) const
+SdrRegistry::GetShaderNodeNames(const TfToken& function) const
 {
     //
     // This should not trigger a parse because node names come directly from
@@ -454,7 +454,7 @@ SdrRegistry::GetShaderNodeNames(const TfToken& family) const
 
     for (const auto& it : _discoveryResultPtrsByName) {
         const SdrShaderNodeDiscoveryResult& dr = *(it.second);
-        if (family.IsEmpty() || dr.family == family) {
+        if (function.IsEmpty() || dr.function == function) {
             // Since the discovery results are keyed by name in a multimap, any
             // duplicate names will show up in order so we only have to check
             // the last name we added to avoid duplicates. 
@@ -579,7 +579,7 @@ SdrRegistry::GetShaderNodeFromAsset(
     SdrShaderNodeDiscoveryResult dr(identifier,
                                     SdrVersion(), /* use an invalid version */
                                     /* name */ TfGetBaseName(resolvedUri),
-                                    /*family*/ TfToken(), 
+                                    /*function*/ TfToken(), 
                                     discoveryType, 
                                     /* shadingSystem */ thisShadingSystem,
                                     /* uri */ shaderAsset.GetAssetPath(),
@@ -633,7 +633,7 @@ SdrRegistry::GetShaderNodeFromSourceCode(
     SdrShaderNodeDiscoveryResult dr(identifier, 
                                     SdrVersion(), /* use an invalid version */
                                     /* name */ identifier, 
-                                    /*family*/ TfToken(), 
+                                    /*function*/ TfToken(), 
                                     // XXX: Setting discoveryType also to
                                     // shadingSystem. Do ParserPlugins rely on
                                     // it? If yes, should they?
@@ -677,7 +677,7 @@ SdrRegistry::GetShaderNodeByName(
         // that passes the version filter regardless of source type.
         for (auto it = range.first; it != range.second; ++ it) {
             const SdrShaderNodeDiscoveryResult &dr = *(it->second);
-            if (!_MatchesFamilyAndFilter(dr, TfToken(), filter)) {
+            if (!_MatchesFunctionAndFilter(dr, TfToken(), filter)) {
                 continue;
             }
             if (SdrShaderNodeConstPtr node = _FindOrParseNodeInCache(dr)) {
@@ -766,7 +766,7 @@ SdrRegistry::GetShaderNodesByName(
 
     for (auto it = range.first; it != range.second; ++ it) {
         const SdrShaderNodeDiscoveryResult &dr = *(it->second);
-        if (!_MatchesFamilyAndFilter(dr, TfToken(), filter)) {
+        if (!_MatchesFunctionAndFilter(dr, TfToken(), filter)) {
             continue;
         }
         if (SdrShaderNodeConstPtr node =
@@ -783,6 +783,14 @@ SdrRegistry::GetShaderNodesByFamily(
     const TfToken& family,
     SdrVersionFilter filter)
 {
+    return GetShaderNodesByFunction(family, filter);
+}
+
+SdrShaderNodePtrVec
+SdrRegistry::GetShaderNodesByFunction(
+    const TfToken& function,
+    SdrVersionFilter filter)
+{
     // Locking the discovery results for the entire duration of the parse is a
     // bit heavy-handed, but it needs to be 100% guaranteed that the results
     // are not modified while they are being iterated over.
@@ -793,7 +801,7 @@ SdrRegistry::GetShaderNodesByFamily(
     std::unique_lock<std::mutex> nmLock(_nodeMapMutex);
 
     // This method does a multi-threaded "bulk parse" of all discovered nodes
-    // (or a partial parse if a family is specified). It's possible that another
+    // (or partial parse if function is specified). It's possible that another
     // node access method (potentially triggering a parse) could be called in
     // another thread during bulk parse. In that scenario, the worst that should
     // happen is that one of the parses (either from the other method, or this
@@ -818,7 +826,7 @@ SdrRegistry::GetShaderNodesByFamily(
             WorkParallelForEach(_discoveryResultsByIdentifier.begin(),
                                 _discoveryResultsByIdentifier.end(),
                 [&](const _DiscoveryResultsByIdentifier::value_type &val) {
-                    if (_MatchesFamilyAndFilter(val.second, family, filter)) {
+                    if (_MatchesFunctionAndFilter(val.second, function, filter)) {
                         _FindOrParseNodeInCache(val.second);
                     }
                 });
@@ -832,7 +840,7 @@ SdrRegistry::GetShaderNodesByFamily(
     SdrShaderNodeConstPtrVec nodeVec;
     nodeVec.reserve(_nodeMap.size());
     for (const auto& nodePair : _nodeMap) {
-        if (_MatchesFamilyAndFilter(nodePair.second, family, filter)) {
+        if (_MatchesFunctionAndFilter(nodePair.second, function, filter)) {
             nodeVec.push_back(nodePair.second.get());
         }
     }
@@ -1160,7 +1168,7 @@ SdrRegistry::_RunDiscoveryPlugins(const DiscoveryPluginRefPtrVec& discoveryPlugi
     size_t num_plugins = discoveryPlugins.size();
     std::vector<SdrShaderNodeDiscoveryResultVec> results_vec(num_plugins);
 
-    // Discover nodes in parallel. Following the pattern in GetNodesByFamily,
+    // Discover nodes in parallel. Following the pattern in GetNodesByFunction,
     // pre-emptively release the Python GIL here to avoid
     // deadlocks since the code running in the worker threads may call into
     // Python and try to take the GIL when discovering nodes. We also need
@@ -1258,7 +1266,7 @@ SdrRegistry::_GetNodeInNameRangeWithShadingSystem(
         if (dr.shadingSystem != shadingSystem) {
             continue;
         }
-        if (!_MatchesFamilyAndFilter(dr, TfToken(), filter)) {
+        if (!_MatchesFunctionAndFilter(dr, TfToken(), filter)) {
             continue;
         }
         if (SdrShaderNodeConstPtr node = _FindOrParseNodeInCache(dr)) {

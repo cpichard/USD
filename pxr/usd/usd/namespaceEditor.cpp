@@ -500,12 +500,22 @@ UsdNamespaceEditor::ApplyEdits()
 bool 
 UsdNamespaceEditor::CanApplyEdits(std::string *whyNot) const
 {
+    CanApplyResult ret = CanApplyEdits();
+    if (!ret.errors.empty()) {
+        *whyNot = _GetErrorString(ret.errors);
+    }
+    return bool(ret);
+}
+
+UsdNamespaceEditor::CanApplyResult
+UsdNamespaceEditor::CanApplyEdits() const
+{
     TRACE_FUNCTION();
 
     _ProcessEditsIfNeeded();
     TF_VERIFY(_processedEdit);
 
-    return _processedEdit->CanApply(whyNot);
+    return _processedEdit->CanApply();
 }
 
 SdfLayerHandleVector
@@ -516,8 +526,8 @@ UsdNamespaceEditor::GetLayersToEdit() {
     // edit if needed, which is why we don't have to process it here.
     std::string errorMsg;
     if (!CanApplyEdits(&errorMsg)) {
-        TF_CODING_ERROR(TfStringPrintf("Cannot get layers to edit because edit "
-            "cannot be applied due to the following errors: %s", errorMsg.c_str()));
+        TF_CODING_ERROR("Cannot get layers to edit because edit "
+            "cannot be applied due to the following errors: %s", errorMsg.c_str());
         return SdfLayerHandleVector();
     }
     
@@ -748,7 +758,8 @@ bool
 _IsValidPropertyToEdit(
     const UsdPrim &prim,
     const TfToken &propertyName, 
-    std::string *whyNot = nullptr) 
+    std::string *whyNot = nullptr,
+    std::string *warning = nullptr) 
 {
     // Property to edit must exist
     if (!prim.HasProperty(propertyName)) {
@@ -772,7 +783,7 @@ _IsValidPropertyToEdit(
         }
         return false;
     }
-    // Property to edit must not be a built-in schema property
+    // Property to edit must not be a built-in schema property.
     if (prim.GetPrimDefinition().GetPropertyDefinition(propertyName)) {
         if (whyNot) {
             *whyNot = "The property to edit is a built-in property of its prim";
@@ -1305,12 +1316,13 @@ UsdNamespaceEditor::_EditProcessor::_GatherTargetListOpEdits()
                 });
         }
 
-        // If the any of the targets require relocates, store this as a target
-        // list op error in the processed edit.
+        // If any of the targets require relocates, we can't fix them up.
+        // Errors in fixing up targets do not prevent us from applying namespace
+        // edits, but we report them as warnings.
         if (!targetsRequireRelocates.empty()) {
             const bool isAttribute = 
                 _stage->GetObjectAtPath(propertyPath).Is<UsdAttribute>();
-            _processedEdit->targetPathListOpErrors.push_back(TfStringPrintf(
+            _processedEdit->warnings.push_back(TfStringPrintf(
                 "Fixing the %s paths %s for the %s at '%s' would require "
                 "'%s'to be relocated but we do not introduce relocates for %s.",
                 isAttribute ? "connection" : "relationship",
@@ -1326,21 +1338,18 @@ UsdNamespaceEditor::_EditProcessor::_GatherTargetListOpEdits()
     }
 }
 
-bool 
-UsdNamespaceEditor::_ProcessedEdit::CanApply(std::string *whyNot) const
+UsdNamespaceEditor::CanApplyResult
+UsdNamespaceEditor::_ProcessedEdit::CanApply() const
 {
     // Only errors that prevent the object from being moved or deleted in stage
     // namespace prevent the edits from being applied. Errors in edits like 
     // relationship target or connection path fixups do not prevent the rest
-    // of the edits from being applied.
-    if (!errors.empty()) {
-        if (whyNot) {
-            *whyNot = _GetErrorString(errors);
-        }
-        return false;
-    }
+    // of the edits from being applied and are reported as warnings instead.
+    CanApplyResult result;
+    result.warnings = warnings;  
+    result.errors = errors;
 
-    return true;
+    return result;
 }
 
 static bool 
@@ -1417,10 +1426,16 @@ UsdNamespaceEditor::_ProcessedEdit::Apply()
 
     // This is to try to preemptively prevent partial edits when if any of the 
     // necessary specs can't be renamed.
-    if (std::string errorMsg; !CanApply(&errorMsg)) {
-        TF_CODING_ERROR(TfStringPrintf("Failed to apply edits to the stage "
-            "because of the following errors: %s", errorMsg.c_str()));
+    CanApplyResult result = CanApply();
+    if (!result) {
+        TF_CODING_ERROR("Failed to apply edits to the stage "
+            "because of the following errors: %s", 
+            _GetErrorString(result.errors).c_str());
         return false;
+    } else if (!result.warnings.empty()) {
+        TF_WARN(
+            "Encountered warnings when applying namespace edit: %s", 
+            _GetErrorString(result.warnings).c_str());
     }
 
     // For both prim and property edits, the dependent stage edits are always 
@@ -1473,14 +1488,6 @@ UsdNamespaceEditor::_ProcessedEdit::Apply()
         }
     }
 
-    // Errors in fixing up targets do not prevent us from applying namespace
-    // edits, but we report them as warnings.
-    if (!targetPathListOpErrors.empty()) {
-        TF_WARN("Failed to update the following targets and/or connections for "
-            "the namespace edit: %s",
-            _GetErrorString(targetPathListOpErrors).c_str());
-    }
-
     return true;
 }
 
@@ -1513,13 +1520,12 @@ UsdNamespaceEditor::_EditProcessor::_GatherDependentStageEdits()
             addRelocatesToLayerStack, _editTarget.GetLayer(), 
             dependentCaches);
 
-    // XXX: We may want an option to allow users to treat warnings as errors or
-    // to return warning as part of calling CanApplyEdits. But for now we just
-    // emit the warnings.
-    if (!_processedEdit->dependentStageNamespaceEdits.warnings.empty()) {
-        TF_WARN("Encountered warnings processing dependent namespace edits: %s",
-            TfStringJoin(_processedEdit->dependentStageNamespaceEdits.warnings, 
-                         "\n  ").c_str());
+    // Copy any warnings encountered into the processed edit.
+    std::vector<std::string>& dependentStageWarnings = 
+        _processedEdit->dependentStageNamespaceEdits.warnings;
+    if (!dependentStageWarnings.empty()) {
+        _processedEdit->warnings.insert(_processedEdit->warnings.end(), 
+            dependentStageWarnings.begin(), dependentStageWarnings.end());
     }
 }
 

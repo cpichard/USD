@@ -41,13 +41,13 @@ class SdrShaderNodeQueryResult;
 /// from the nodes satisfying given constraints. For example:
 /// \code
 /// SdrShaderNodeQuery query2 = SdrShaderNodeQuery()
-///     .SelectDistinct(SdrNodeFieldKey->Family)
+///     .SelectDistinct(SdrNodeFieldKey->Function)
 ///     .SelectDistinct(TfToken("customMetadataItem"))
 ///     .NodeHasValueFor(TfToken("customMetadataItem"))
 /// \endcode
 ///
 /// In this case, SdrRegistry::RunQuery(query2) would return a result
-/// containing distinct combinations of the requested family field and
+/// containing distinct combinations of the requested function field and
 /// "customMetadataItem" values, along with the nodes satisfying said
 /// combinations under the given constraint that the node must have
 /// "customMetadataItem" defined in its metadata.

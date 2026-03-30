@@ -245,7 +245,9 @@ class TestUsdNamespaceEditorTargetPathFixup(unittest.TestCase):
         })
    
     def _ApplyCompareAndReset(self, editor, rootContents, sub1Contents, sub2Contents):
-        self.assertTrue(editor.CanApplyEdits())
+        result = editor.CanApplyEdits()
+        self.assertTrue(result)
+        self.assertFalse(result.warnings)
         self.assertTrue(editor.ApplyEdits())
         self._VerifyLayerContents(self.rootLayer, rootContents)
         self._VerifyLayerContents(self.sub1Layer, sub1Contents)
@@ -2409,6 +2411,7 @@ class TestUsdNamespaceEditorTargetPathFixup(unittest.TestCase):
 
         # Rename /Root/A to Moved_A
         self.assertTrue(editor.MovePrimAtPath("/Root/A", "/Root/Moved_A"))
+        self.assertEqual(len(editor.CanApplyEdits().warnings), 0)
         self.assertTrue(editor.ApplyEdits())
 
         # Verify the prim was renamed.
@@ -2443,6 +2446,7 @@ class TestUsdNamespaceEditorTargetPathFixup(unittest.TestCase):
 
         # Rename /Root/B to Moved_B
         self.assertTrue(editor.MovePrimAtPath("/Root/B", "/Root/Moved_B"))
+        self.assertEqual(len(editor.CanApplyEdits().warnings), 0)
         self.assertTrue(editor.ApplyEdits())
 
         # Verify that B is now also renamed.
@@ -2479,6 +2483,7 @@ class TestUsdNamespaceEditorTargetPathFixup(unittest.TestCase):
 
         # Rename /Root/C to Moved_C
         self.assertTrue(editor.MovePrimAtPath("/Root/C", "/Root/Moved_C"))
+        self.assertEqual(len(editor.CanApplyEdits().warnings), 2)
         self.assertTrue(editor.ApplyEdits())
 
         # Verify that C is now also renamed.
@@ -2519,6 +2524,7 @@ class TestUsdNamespaceEditorTargetPathFixup(unittest.TestCase):
 
         # Delete /Root/Moved_A
         self.assertTrue(editor.DeletePrimAtPath("/Root/Moved_A"))
+        self.assertEqual(len(editor.CanApplyEdits().warnings), 0)
         self.assertTrue(editor.ApplyEdits())
 
         # Verify Moved_A is no longer a prim
@@ -2570,7 +2576,9 @@ class TestUsdNamespaceEditorTargetPathFixup(unittest.TestCase):
 
             # Reparent and rename /Root/PrimA -> /Foo
             self.assertTrue(editor.MovePrimAtPath("/Root/PrimA", "/Foo"))
-            self.assertTrue(editor.CanApplyEdits())
+            result = editor.CanApplyEdits()
+            self.assertTrue(result)
+            self.assertFalse(result.warnings)
             self.assertTrue(editor.ApplyEdits())
             
             self._VerifyLayerContents(layer, {

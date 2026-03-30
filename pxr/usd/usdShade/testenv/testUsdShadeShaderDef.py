@@ -98,7 +98,7 @@ class TestUsdShadeShaderDef(unittest.TestCase):
         for n in nodes:
             self.assertEqual(n.GetShaderVersion(), Sdr.Version(2, 0))
             self.assertTrue(n.IsValid())
-            self.assertEqual(n.GetFamily(), 'Primvar')
+            self.assertEqual(n.GetFunction(), 'Primvar')
             self.assertEqual(n.GetIdentifier(), 'Primvar_float_2')
             self.assertEqual(n.GetImplementationName(), 'Primvar_float')
             self.assertEqual(n.GetRole(), Sdr.NodeRole.Primvar)

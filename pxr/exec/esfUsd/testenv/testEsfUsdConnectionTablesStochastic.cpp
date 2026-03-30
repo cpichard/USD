@@ -16,7 +16,6 @@
 #include "pxr/base/tf/pxrCLI11/CLI11.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/token.h"
-#include "pxr/base/tf/weakBase.h"
 #include "pxr/base/trace/aggregateNode.h"
 #include "pxr/base/trace/collector.h"
 #include "pxr/base/trace/reporter.h"
@@ -28,7 +27,6 @@
 #include "pxr/usd/sdf/primSpec.h"
 #include "pxr/usd/sdf/types.h"
 #include "pxr/usd/usd/attribute.h"
-#include "pxr/usd/usd/notice.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/stage.h"
 
@@ -433,7 +431,7 @@ private:
     std::vector<std::pair<std::string, size_t>> _stats;
 };
 
-class Test : public TfWeakBase
+class Test
 {
 public:
     Test(unsigned numStages, unsigned numMutations,
@@ -458,11 +456,6 @@ public:
             UsdStageRefPtr stage = UsdStage::Open(layer);
             TF_AXIOM(stage);
 
-            TfNotice::Register(
-                TfCreateWeakPtr(this),
-                &Test::_DidObjectsChanged,
-                UsdStageConstPtr(stage));
-
             stages.push_back(std::move(stage));
         }
         _memMetrics.RecordMetric("mem_stages_populated");
@@ -479,7 +472,8 @@ public:
                 [&stages, &stageData]
                 (const unsigned i)
             {
-                stageData[i] = EsfUsdStageData::RegisterStage(stages[i]);
+                stageData[i] = EsfUsdStageData::RegisterStage(
+                    stages[i], /* listener */ nullptr);
             });
         }
         _memMetrics.RecordMetric("mem_stage_data_populated");
@@ -543,30 +537,6 @@ private:
     void _PopulateLayer(const SdfLayerHandle &layer, SdfPathVector *attrPaths) {
         _AddPrimHierarchy(
             layer, "Root", _branchingFactor, _treeDepth, attrPaths);
-    }
-
-    void _DidObjectsChanged(
-        const UsdNotice::ObjectsChanged &objectsChanged)
-    {
-        EsfUsdStageData &stageData =
-            EsfUsdStageData::GetStageData(objectsChanged.GetStage());
-
-        EsfUsdStageData::ChangedPathSet changedTargetPaths;
-
-        for (const SdfPath &path : objectsChanged.GetResyncedPaths()) {
-            stageData.UpdateForResync(path, &changedTargetPaths);
-        }
-
-        for (const SdfPath &path : objectsChanged.GetChangedInfoOnlyPaths()) {
-            const TfTokenVector changedFields =
-                objectsChanged.GetChangedFields(path);
-            if (std::find(
-                    changedFields.begin(), changedFields.end(),
-                    SdfFieldKeys->ConnectionPaths) != changedFields.end()) {
-                stageData.UpdateForChangedAttributeConnections(
-                    path, &changedTargetPaths);
-            }
-        }
     }
 
 private:

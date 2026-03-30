@@ -43,10 +43,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// registry will begin the parsing process on an as-needed basis. See
 /// `SdrShaderNodeDiscoveryResult` for the information that can be retrieved
 /// without triggering a parse.
-///
-/// Some methods in this library may allow for a "family" to be provided. A
-/// family is simply a generic grouping which is optional.
-///
 class SdrRegistry : public TfWeakBase
 {
 public:
@@ -114,24 +110,24 @@ public:
     /// Get identifiers of all the shader nodes that the registry is aware of.
     ///
     /// This will not run the parsing plugins on the nodes that have been
-    /// discovered, so this method is relatively quick. Optionally, a "family"
-    /// name can be specified to only get the identifiers of nodes that belong
-    /// to that family and a filter can be specified to get just the default
-    /// version (the default) or all versions of the node.
+    /// discovered, so this method is relatively quick. Optionally, "function"
+    /// can be specified to only get the identifiers of nodes that belong
+    /// to that function group and a filter can be specified to get just the
+    /// default version (the default) or all versions of the node.
     SDR_API
     SdrIdentifierVec
-    GetShaderNodeIdentifiers(const TfToken& family = TfToken(),
+    GetShaderNodeIdentifiers(const TfToken& function = TfToken(),
                              SdrVersionFilter filter =
                              SdrVersionFilterDefaultOnly) const;
 
     /// Get the names of all the shader nodes that the registry is aware of.
     ///
     /// This will not run the parsing plugins on the nodes that have been
-    /// discovered, so this method is relatively quick. Optionally, a "family"
-    /// name can be specified to only get the names of nodes that belong to
-    /// that family.
+    /// discovered, so this method is relatively quick. Optionally, "function"
+    /// can be specified to only get the names of nodes that belong to
+    /// that function group.
     SDR_API
-    SdrStringVec GetShaderNodeNames(const TfToken& family = TfToken()) const;
+    SdrStringVec GetShaderNodeNames(const TfToken& function = TfToken()) const;
 
     /// Get the shader node with the specified \p identifier, and an optional
     /// \p shadingSystemPriority list specifying the set of node shading
@@ -298,8 +294,18 @@ public:
     /// that fall under a specified family and/or the default version.
     ///
     /// Note that this will parse \em all nodes that the registry is aware of
-    /// (unless a family is specified), so this may take some time to run
+    /// (unless a function is specified), so this may take some time to run
     /// the first time it is called.
+    SDR_API
+    SdrShaderNodePtrVec GetShaderNodesByFunction(
+        const TfToken& function = TfToken(),
+        SdrVersionFilter filter = SdrVersionFilterDefaultOnly);
+
+    /// Get all shader nodes, optionally restricted to the nodes
+    /// that fall under a specified family and/or the default version.
+    ///
+    /// \deprecated
+    /// Deprecated in favor of SdrRegistry::GetShaderNodesByFunction
     SDR_API
     SdrShaderNodePtrVec GetShaderNodesByFamily(
         const TfToken& family = TfToken(),

@@ -607,32 +607,6 @@ public:
 
 // -----------------------------------------------------------------------------
 
-struct _PrimvarSourceTypeVisitor
-{
-    const TfToken& name;
-    const HdSampledDataSourceHandle& source;
-    const SdfPath& primPath;
-    const HdContainerDataSourceHandle& primSource;
-    const HdSceneIndexBasePtr& inputSceneIndex;
-
-    template <typename T>
-    HdDataSourceBaseHandle
-    operator()(const T&)
-    {
-        return _TypedValueDataSource<T>::New(
-            name, source, primPath, primSource, inputSceneIndex);
-    }
-
-    HdDataSourceBaseHandle
-    operator()(const VtValue&)
-    {
-        return _UntypedValueDataSource::New(
-            name, source, primPath, primSource, inputSceneIndex);
-    }
-};
-
-// -----------------------------------------------------------------------------
-
 class _PrimvarDataSource final
   : public HdContainerDataSource
 {
@@ -671,12 +645,10 @@ public:
         HdDataSourceBaseHandle ds = _source->Get(name);
         if (ds && name == HdPrimvarSchemaTokens->primvarValue) {
             if (const auto source = HdSampledDataSource::Cast(ds)) {
-                // XXX: source is sampled at time 0 only to determine its type
-                return VtVisitValue(
-                    source->GetValue(0.0f),
-                    _PrimvarSourceTypeVisitor {
-                        _name, source, _primPath,
-                        _primSource, _inputSceneIndex });
+                return HdCopySampledDataSourceType<
+                    _TypedValueDataSource, _UntypedValueDataSource>(
+                    source, _name, source, _primPath, _primSource,
+                    _inputSceneIndex);
             }
         }
         return ds;
