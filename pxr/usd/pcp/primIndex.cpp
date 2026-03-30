@@ -2229,6 +2229,7 @@ _EvalRefOrPayloadArcs(PcpNodeRef node,
         }
 
         const bool isNegativeScale = layerOffset.GetScale() < 0.0;
+        const bool isInternal = refOrPayload.GetAssetPath().empty();
 
         // Validate layer offset in original reference or payload.
         if (isNegativeScale ||
@@ -2247,9 +2248,11 @@ _EvalRefOrPayloadArcs(PcpNodeRef node,
 
             // Don't set fail, just reset the offset.
             layerOffset = SdfLayerOffset();
-        } else {
+        } else if (!isInternal) {
             // Apply the layer stack offset for the introducing layer to the 
-            // reference or payload's layer offset.
+            // reference or payload's layer offset. This should only be done
+            // in cases where the ref or payload is not internal, thus avoiding
+            // a double scale during map function composition.
             layerOffset = info.sourceLayerStackOffset * layerOffset;
         }
 
@@ -2263,7 +2266,6 @@ _EvalRefOrPayloadArcs(PcpNodeRef node,
         SdfLayerRefPtr layer;
         PcpLayerStackRefPtr layerStack;
 
-        const bool isInternal = refOrPayload.GetAssetPath().empty();
         if (isInternal) {
             layer = node.GetLayerStack()->GetIdentifier().rootLayer;
             layerStack = node.GetLayerStack();

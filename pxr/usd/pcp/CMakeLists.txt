@@ -493,6 +493,14 @@ pxr_register_test(testPcpMuseum_ImpliedArcsAndInstancing
     DIFF_COMPARE compositionResults_ImpliedArcsAndInstancing.txt
 )
 
+pxr_register_test(testPcpMuseum_InternalReferenceInOffsetSublayer
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults --usd InternalReferenceInOffsetSublayer/root.usda" 
+    TESTENV testenv/testPcpMuseum_InternalReferenceInOffsetSublayer.testenv
+    STDOUT_REDIRECT compositionResults_InternalReferenceInOffsetSublayer.txt
+    DIFF_COMPARE compositionResults_InternalReferenceInOffsetSublayer.txt
+)
+
 pxr_register_test(testPcpMuseum_ImpliedAndAncestralInherits_ComplexEvaluation
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults --usd ImpliedAndAncestralInherits_ComplexEvaluation/root.usda" 
