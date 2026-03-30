@@ -14,6 +14,7 @@
 #include "pxr/base/tf/diagnosticLite.h"
 
 #include <atomic>
+#include <utility>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
