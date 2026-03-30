@@ -5114,8 +5114,8 @@ class AppController(QtCore.QObject):
                 mrEvent = QtGui.QMouseEvent(QtCore.QEvent.Type.MouseButtonRelease,
                                             QtGui.QCursor.pos(),
                                             QtCore.Qt.MouseButton.RightButton,
-                                            QtCore.Qt.MouseButtons(QtCore.Qt.MouseButton.RightButton),
-                                            QtCore.Qt.KeyboardModifiers())
+                                            QtCore.Qt.MouseButton.RightButton,
+                                            QtCore.Qt.KeyboardModifier.NoModifier)
                 QtWidgets.QApplication.sendEvent(self._stageView, mrEvent)
 
     def onRollover(self, path, instanceIndex, topLevelPath, topLevelInstanceIndex, modifiers):
