@@ -2355,7 +2355,7 @@ class TestUsdNamespaceEditorTargetPathFixup(unittest.TestCase):
         # prim that is speculatively targeted by /Model/B. Also provides an
         # over to A that adds targets to /Root/C.
         rootLayer = Sdf.Layer.CreateAnonymous("root.usda")
-        rootLayer.ImportFromString('''#usda 1.0
+        rootLayerString = '''#usda 1.0
             def "Root" (
                 references = @''' + refLayer.identifier + '''@</Model>
             )
@@ -2373,7 +2373,8 @@ class TestUsdNamespaceEditorTargetPathFixup(unittest.TestCase):
                     append int a_attr.connect = [</Root/C.c_attr>]
                 }
             }
-        ''')
+        '''
+        rootLayer.ImportFromString(rootLayerString)
 
         # Create a stage and editor.
         stage = Usd.Stage.Open(rootLayer)
@@ -2408,6 +2409,46 @@ class TestUsdNamespaceEditorTargetPathFixup(unittest.TestCase):
         self.assertEqual(
             stage.GetAttributeAtPath("/Root/C.c_attr").GetConnections(),
             ["/Root/A.a_attr", "/Root/B.b_attr"])
+        
+        # Rename /Root to /Moved_Root
+        # This is to check that editing a parent of a referenced connection
+        # does not produce any warnings.
+        self.assertTrue(editor.MovePrimAtPath("/Root", "/Moved_Root"))
+        self.assertEqual(len(editor.CanApplyEdits().warnings), 0)
+        self.assertTrue(editor.ApplyEdits())
+
+        # Verify the prim was renamed and retains children.
+        self.assertEqual(stage.GetPrimAtPath("/Moved_Root").GetChildrenNames(), 
+                         ["A", "B", "C"])
+        # Verify no relocates
+        self.assertEqual(rootLayer.relocates, [])
+
+        # /Moved_Root/A properties have been updated to target Moved_A
+        self.assertEqual(
+            stage.GetRelationshipAtPath("/Moved_Root/A.a_rel").GetTargets(),
+            ["/Moved_Root/B", "/Moved_Root/C"])
+        self.assertEqual(
+            stage.GetAttributeAtPath("/Moved_Root/A.a_attr").GetConnections(),
+            ["/Moved_Root/B.b_attr", "/Moved_Root/C.c_attr"])
+
+        # /Moved_Root/B properties have been updated to target Moved_A
+        self.assertEqual(
+            stage.GetRelationshipAtPath("/Moved_Root/B.b_rel").GetTargets(),
+            ["/Moved_Root/A", "/Moved_Root/C"])
+        self.assertEqual(
+            stage.GetAttributeAtPath("/Moved_Root/B.b_attr").GetConnections(),
+            ["/Moved_Root/A.a_attr", "/Moved_Root/C.c_attr"])
+
+        # /Moved_Root/C properties have been updated to target Moved_A
+        self.assertEqual(
+            stage.GetRelationshipAtPath("/Moved_Root/C.c_rel").GetTargets(),
+            ["/Moved_Root/A", "/Moved_Root/B"])
+        self.assertEqual(
+            stage.GetAttributeAtPath("/Moved_Root/C.c_attr").GetConnections(),
+            ["/Moved_Root/A.a_attr", "/Moved_Root/B.b_attr"])
+
+        # Reset edit for the following tests
+        rootLayer.ImportFromString(rootLayerString)
 
         # Rename /Root/A to Moved_A
         self.assertTrue(editor.MovePrimAtPath("/Root/A", "/Root/Moved_A"))
