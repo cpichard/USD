@@ -43,8 +43,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 //              UsdImagingCollectionMaterial BindingsSchema in favor of
 //              UsdImagingMaterialBindingsSchema and 
 //              UsdImagingMaterialBindingSchema.
+// Version 22 - Deprecates UsdImagingPrimAdapter::_GetShaderSourceTypes
+//              in favor of added UsdImagingPrimAdapter::_GetShadingSystems
 
-#define USD_IMAGING_API_VERSION 21
+#define USD_IMAGING_API_VERSION 22
 
 
 PXR_NAMESPACE_CLOSE_SCOPE
