@@ -16,9 +16,12 @@ how geometry is associated with the light through
 Note that a prim with LightAPI applied is considered a connectable prim for 
 UsdShade networks, and should follow the rules for 
 [UsdShade node encapsulation](https://openusd.org/release/api/usd_shade_page_front.html#UsdShadeEncapsulation).
-Additionally, a prim with LightAPI applied must not have a connectable parent. 
-Lights cannot reside inside a UsdShade NodeGraph, UsdShade Material, UsdLux 
-LightFilter, or any other connectable container.
+Additionally, a prim with LightAPI applied must not have a connectable parent.
+Lights cannot reside inside a UsdShade NodeGraph, UsdShade Material, UsdLux
+LightFilter, or any other connectable container, with the exception of prims 
+which themselves have LightAPI applied (i.e. are lights), as some light concepts 
+require to be parented under other lights (PortalLight under DomeLight as an 
+example).
 
 ```{contents}
 :depth: 2
