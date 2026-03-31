@@ -38,12 +38,13 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_ENV_SETTING(HD_SCENE_INDEX_PLUGIN_ORDERING_POLICY_DEFAULT,
-    "CppRegistrationOnly",
+    "Hybrid",
     "Default policy for ordering scene index plugins. Options are: "
     "{CppRegistrationOnly, JsonMetadataOnly, Hybrid}. "
-    "The default is CppRegistrationOnly, which means the order of plugins is "
-    "determined solely by the insertion phase/order arguments of the C++ "
-    "registration API."
+    "The default is 'Hybrid', which means the order of plugins is "
+    "determined by a combination of the insertion phase/order arguments to the "
+    "C++ registration API and the tags and ordering fields in the JSON "
+    "metadata."
 );
 
 TF_DEFINE_PUBLIC_TOKENS(HdSceneIndexPluginRegistryTokens,
