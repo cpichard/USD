@@ -136,8 +136,18 @@ struct UsdUtils_ComputeAllDependenciesClient
             SdfLayerRefPtr dependencyLayer = SdfLayer::FindOrOpen(anchoredPath);
             if (dependencyLayer) {
                 layers.insert(dependencyLayer);
+
+                // Note: for layers we also want to include any additional asset
+                // dependencies.
+                const std::set<std::string> externalAssetDependencies = 
+                    dependencyLayer->GetExternalAssetDependencies();
+
+                for (const auto& dependency : externalAssetDependencies) {
+                    assets.insert(dependency);
+                }
             } else {
-                TF_WARN("Failed to open dependency layer: %s (%s)", dependency.c_str(), anchoredPath.c_str());
+                TF_WARN("Failed to open dependency layer: %s (%s)", 
+                    dependency.c_str(), anchoredPath.c_str());
             }
         }
         else {
