@@ -2704,8 +2704,8 @@ UsdImagingGLEngine::_PreSetTime(const UsdImagingGLRenderParams& params)
 
     if (UseUsdImagingSceneIndex()) {
         // The UsdImagingStageSceneIndex has no complexity opinion.
-        // We force the value here upon all prims.
-        _displayStyleSceneIndex->SetRefineLevel({true, refineLevel});
+        // We provide a fallback value here for all prims.
+        _displayStyleSceneIndex->SetRefineLevelFallback(refineLevel);
 
         _ScopedHydraNoticeBatch noticeBatch(
                 _postInstancingNoticeBatchingSceneIndex);

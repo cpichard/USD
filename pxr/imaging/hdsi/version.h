@@ -18,7 +18,8 @@
 // 16 -> 17: Introducing HdsiMaterialRenderContextFilteringSceneIndex.
 // 17 -> 18: Introducing ComposeFn in HdsiMaterialPrimvarTransferSceneIndex.
 // 18 -> 19: Introducing HdsiLocatorCachingSceneIndex
+// 19 -> 20: Updated LegacyDisplayStyleOverrideSceneIndex refineLevelFallback
 
-#define HDSI_API_VERSION 19
+#define HDSI_API_VERSION 20
 
 #endif // PXR_IMAGING_HDSI_VERSION_H
