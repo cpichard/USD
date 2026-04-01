@@ -95,8 +95,9 @@ namespace {
 
 object const& make_instance_reduce_function()
 {
-    static object result(&instance_reduce);
-    return result;
+    // Intentionally leak to avoid unsafe refcount operations during shutdown.
+    static object* result = new object(&instance_reduce);
+    return *result;
 }
 
 }} // namespace PXR_BOOST_NAMESPACE::python
