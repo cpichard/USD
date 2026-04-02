@@ -4,9 +4,9 @@ def Xform "prototype" (
     active = false
 )
 {
-    def Sphere "sphere"
+    def Cube "cube"
     {
-        double radius = 5.0
+        double size = 10.0
         float3[] extent = [(-5.0, -5.0, -5.0), (5.0, 5.0, 5.0)]
     }
 }

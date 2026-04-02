@@ -93,7 +93,7 @@ def _testMakePrimInstanceable(appController):
 
     appController._dataModel.stage.GetRootLayer().Clear()
 
-    appController._dataModel.stage.GetRootLayer().subLayerPaths = ["usd-10752/sphere.usda"]
+    appController._dataModel.stage.GetRootLayer().subLayerPaths = ["usd-10752/cube.usda"]
     appController._takeShot("primNotInstanceable.png")
 
     appController._dataModel.stage.GetPrimAtPath('/instance').SetInstanceable(True)
