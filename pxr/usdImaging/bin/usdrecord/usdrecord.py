@@ -350,21 +350,21 @@ def main() -> int:
         glWidget = _SetupOpenGLContext(args.imageWidth, args.imageWidth)
 
     # Determine Hydra renderer plugin to use. 
-    rendererPluginName = ''
+    rendererName = ''
     if args.rendererPlugin:
         # Renderer plugin was specified on the command-line.
-        rendererPluginName = args.rendererPlugin
+        rendererName = args.rendererPlugin
     elif args.rpPrimPath:
         # Check render pass prim for a renderer plugin name.
         renderPass = UsdRender.Pass(usdStage.GetPrimAtPath(args.rpPrimPath))
         hydraAPI = UsdHydra.RenderPassAPI(renderPass)
         if hydraAPI:
-            rendererPluginName = hydraAPI.GetHydraRendererPluginNameAttr().Get()
+            rendererName = hydraAPI.GetHydraRendererNameAttr().Get()
     rendererPluginId = UsdAppUtils.rendererArgs.GetPluginIdFromArgument(
-        rendererPluginName) or ''
-    if rendererPluginName and not rendererPluginId:
+        rendererName) or ''
+    if rendererName and not rendererPluginId:
         _Err('Could not find renderer plugin named "{}"'  
-            .format(rendererPluginName))
+            .format(rendererName))
         return 1
 
     # Initialize FrameRecorder 
