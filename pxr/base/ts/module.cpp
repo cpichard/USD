@@ -29,7 +29,4 @@ TF_WRAP_MODULE
     TF_WRAP(TsTest_Types);
 #endif
 
-#ifdef TS_BUILD_ANIMX_TEST_FRAMEWORK
-    TF_WRAP(TsTest_AnimXEvaluator);
-#endif
 }

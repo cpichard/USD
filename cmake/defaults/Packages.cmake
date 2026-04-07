@@ -303,10 +303,6 @@ if(PXR_ENABLE_OSL_SUPPORT)
     add_definitions(-DPXR_OSL_SUPPORT_ENABLED)
 endif()
 
-if (PXR_BUILD_ANIMX_TESTS)
-    find_package(AnimX REQUIRED)
-endif()
-
 # ----------------------------------------------
 
 # Try and find Imath or fallback to OpenEXR
