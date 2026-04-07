@@ -362,10 +362,6 @@ def main() -> int:
             rendererName = hydraAPI.GetHydraRendererNameAttr().Get()
     rendererPluginId = UsdAppUtils.rendererArgs.GetPluginIdFromArgument(
         rendererName) or ''
-    if rendererName and not rendererPluginId:
-        _Err('Could not find renderer plugin named "{}"'  
-            .format(rendererName))
-        return 1
 
     # Initialize FrameRecorder 
     frameRecorder = UsdAppUtils.FrameRecorder(
