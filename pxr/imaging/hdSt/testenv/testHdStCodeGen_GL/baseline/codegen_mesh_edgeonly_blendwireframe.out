@@ -1126,7 +1126,6 @@ out VertexData {
     vec3 Neye;
 } outData;
 out vec4 gsPatchCoord;
-out noperspective vec3 hd_barycentricCoord;
 in flat ivec4 vs_interstageDrawingCoord0[HD_NUM_PRIMITIVE_VERTS];
 out flat ivec4 gs_interstageDrawingCoord0;
 in flat ivec4 vs_interstageDrawingCoord1[HD_NUM_PRIMITIVE_VERTS];
@@ -1283,10 +1282,6 @@ void ProcessSamplingTransforms(MAT4 instanceModelViewInverse) {
 FORWARD_DECL(vec4 GetPatchCoord(int index));
 void ProcessPrimvarsOut(int index) {
   vec2 localST = GetPatchCoord(index).xy;
-  const vec3 coords[3] = vec3[](
-   vec3(1,0,0), vec3(0,1,0), vec3(0,0,1)
-  );
-  hd_barycentricCoord = coords[index];
   hd_drawingCoord dc = GetDrawingCoord();
   gs_interstageDrawingCoord0[0] = dc.modelCoord;
   gs_interstageDrawingCoord0[1] = dc.constantCoord;
@@ -1778,6 +1773,7 @@ void main(void)
 #extension GL_NV_shader_buffer_load : require
 #extension GL_NV_gpu_shader5 : require
 #extension GL_ARB_bindless_texture : require
+#extension GL_NV_fragment_shader_barycentric: require
 #define REF(space,type) inout type
 #define FORWARD_DECL(func_decl) func_decl;
 #define ATOMIC_LOAD(a) (a)
@@ -1811,6 +1807,7 @@ struct hgi_dmat3 { double m00, m01, m02,
 // //////// Global Structs ////////
 
 // //////// Global Member Declarations ////////
+vec3 hd_BaryCoordNoPersp = gl_BaryCoordNoPerspNV;
 
 // //////// Global Function Definitions ////////
 
@@ -1929,7 +1926,6 @@ in VertexData {
     vec3 Neye;
 } inData;
 layout (location = 0) out vec4 colorOut;
-in noperspective vec3 hd_barycentricCoord;
 in flat ivec4 gs_interstageDrawingCoord0;
 in flat ivec4 gs_interstageDrawingCoord1;
 in flat ivec4 gs_interstageDrawingCoord2;
@@ -1986,7 +1982,7 @@ float HdGetScalar_widths() { return HdGet_widths(0); }
 #define HD_SHADER_SUPPORTS_DOUBLE_PRECISION
 #define HD_MINUS_ONE_TO_ONE_DEPTH_RANGE
 vec3 GetBarycentricCoord() {
-  return hd_barycentricCoord;
+  return hd_BaryCoordNoPersp;
 }
 int GetPrimitiveID() {
   return gl_PrimitiveID;
@@ -4163,7 +4159,6 @@ out VertexData {
     vec3 Neye;
 } outData;
 out vec4 gsPatchCoord;
-out noperspective vec3 hd_barycentricCoord;
 in flat ivec4 vs_interstageDrawingCoord0[HD_NUM_PRIMITIVE_VERTS];
 out flat ivec4 gs_interstageDrawingCoord0;
 in flat ivec4 vs_interstageDrawingCoord1[HD_NUM_PRIMITIVE_VERTS];
@@ -4320,10 +4315,6 @@ void ProcessSamplingTransforms(MAT4 instanceModelViewInverse) {
 FORWARD_DECL(vec4 GetPatchCoord(int index));
 void ProcessPrimvarsOut(int index) {
   vec2 localST = GetPatchCoord(index).xy;
-  const vec3 coords[4] = vec3[](
-   vec3(1,0,0), vec3(0,1,0), vec3(0,0,1), vec3(0,1,0)
-  );
-  hd_barycentricCoord = coords[index];
   hd_drawingCoord dc = GetDrawingCoord();
   gs_interstageDrawingCoord0[0] = dc.modelCoord;
   gs_interstageDrawingCoord0[1] = dc.constantCoord;
@@ -4844,6 +4835,7 @@ void main(void)
 #extension GL_NV_shader_buffer_load : require
 #extension GL_NV_gpu_shader5 : require
 #extension GL_ARB_bindless_texture : require
+#extension GL_NV_fragment_shader_barycentric: require
 #define REF(space,type) inout type
 #define FORWARD_DECL(func_decl) func_decl;
 #define ATOMIC_LOAD(a) (a)
@@ -4877,6 +4869,7 @@ struct hgi_dmat3 { double m00, m01, m02,
 // //////// Global Structs ////////
 
 // //////// Global Member Declarations ////////
+vec3 hd_BaryCoordNoPersp = gl_BaryCoordNoPerspNV;
 
 // //////// Global Function Definitions ////////
 
@@ -4995,7 +4988,6 @@ in VertexData {
     vec3 Neye;
 } inData;
 layout (location = 0) out vec4 colorOut;
-in noperspective vec3 hd_barycentricCoord;
 in flat ivec4 gs_interstageDrawingCoord0;
 in flat ivec4 gs_interstageDrawingCoord1;
 in flat ivec4 gs_interstageDrawingCoord2;
@@ -5052,7 +5044,7 @@ float HdGetScalar_widths() { return HdGet_widths(0); }
 #define HD_SHADER_SUPPORTS_DOUBLE_PRECISION
 #define HD_MINUS_ONE_TO_ONE_DEPTH_RANGE
 vec3 GetBarycentricCoord() {
-  return hd_barycentricCoord;
+  return hd_BaryCoordNoPersp;
 }
 int GetPrimitiveID() {
   return gl_PrimitiveID;
