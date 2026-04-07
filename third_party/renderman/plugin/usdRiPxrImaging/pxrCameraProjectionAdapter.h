@@ -4,8 +4,10 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_CAMERA_PROJECTION_ADAPTER_H
-#define PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_CAMERA_PROJECTION_ADAPTER_H
+#ifndef EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_CAMERA_PROJECTION_ADAPTER_H
+#define EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_CAMERA_PROJECTION_ADAPTER_H
+
+#include "usdRiPxrImaging/api.h"
 
 #include "pxr/imaging/hd/dataSource.h"
 #include "pxr/imaging/hd/dataSourceLocator.h"
@@ -13,7 +15,6 @@
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 #include "pxr/usdImaging/usdImaging/sceneIndexPrimAdapter.h"
 #include "pxr/usdImaging/usdImaging/types.h"
-#include "pxr/usdImaging/usdRiPxrImaging/api.h"
 
 #include "pxr/usd/usd/prim.h"
 
@@ -67,4 +68,4 @@ public:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_CAMERA_PROJECTION_ADAPTER_H
+#endif // EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_CAMERA_PROJECTION_ADAPTER_H

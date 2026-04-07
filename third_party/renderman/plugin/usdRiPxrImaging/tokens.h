@@ -4,10 +4,10 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_USD_IMAGING_USD_RI_PXR_IMAGING_TOKENS_H
-#define PXR_USD_IMAGING_USD_RI_PXR_IMAGING_TOKENS_H
+#ifndef EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_TOKENS_H
+#define EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_TOKENS_H
 
-#include "pxr/usdImaging/usdRiPxrImaging/api.h"
+#include "usdRiPxrImaging/api.h"
 
 #include "pxr/base/tf/staticTokens.h"
 
@@ -59,4 +59,4 @@ TF_DECLARE_PUBLIC_TOKENS(
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif //PXR_USD_IMAGING_USD_RI_PXR_IMAGING_TOKENS_H
+#endif // EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_TOKENS_H

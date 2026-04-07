@@ -4,14 +4,16 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_AOV_LIGHT_ADAPTER_H
-#define PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_AOV_LIGHT_ADAPTER_H
+#ifndef EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_AOV_LIGHT_ADAPTER_H
+#define EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_AOV_LIGHT_ADAPTER_H
 
 /// \file
 
-#include "pxr/pxr.h"
-#include "pxr/usdImaging/usdRiPxrImaging/api.h"
+#include "usdRiPxrImaging/api.h"
+
 #include "pxr/usdImaging/usdImaging/lightAdapter.h"
+
+#include "pxr/pxr.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -54,7 +56,7 @@ public:
 
     USDRIPXRIMAGING_API
     bool IsSupported(UsdImagingIndexProxy const* index) const override;
-    
+
 protected:
     void _RemovePrim(SdfPath const& cachePath,
                      UsdImagingIndexProxy* index) override final;
@@ -62,4 +64,4 @@ protected:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_AOV_LIGHT_ADAPTER_H
+#endif // EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_AOV_LIGHT_ADAPTER_H

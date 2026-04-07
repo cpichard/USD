@@ -4,8 +4,19 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#include "pxr/usdImaging/usdRiPxrImaging/pxrVolumeFilterPluginBaseAdapter.h"
-#include "pxr/usdImaging/usdRiPxrImaging/tokens.h"
+#include "usdRiPxrImaging/pxrVolumeFilterPluginBaseAdapter.h"
+
+#include "usdRiPxrImaging/tokens.h"
+
+#include "pxr/imaging/hd/containerDataSourceEditor.h"
+#include "pxr/imaging/hd/light.h"
+#include "pxr/imaging/hd/material.h"
+#include "pxr/imaging/hd/materialNetworkSchema.h"
+#include "pxr/imaging/hd/materialNodeSchema.h"
+#include "pxr/imaging/hd/materialSchema.h"
+#include "pxr/imaging/hd/overlayContainerDataSource.h"
+#include "pxr/imaging/hd/retainedDataSource.h"
+#include "pxr/imaging/hd/tokens.h"
 
 #include "pxr/usdImaging/usdImaging/dataSourceMaterial.h"
 #include "pxr/usdImaging/usdImaging/dataSourcePrim.h"
@@ -13,18 +24,11 @@
 #include "pxr/usdImaging/usdImaging/indexProxy.h"
 #include "pxr/usdImaging/usdImaging/materialParamUtils.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
-#include "pxr/imaging/hd/containerDataSourceEditor.h"
-#include "pxr/imaging/hd/materialNetworkSchema.h"
-#include "pxr/imaging/hd/materialNodeSchema.h"
-#include "pxr/imaging/hd/materialSchema.h"
-#include "pxr/imaging/hd/overlayContainerDataSource.h"
-#include "pxr/imaging/hd/retainedDataSource.h"
-#include "pxr/imaging/hd/tokens.h"
-#include "pxr/imaging/hd/light.h"
-#include "pxr/imaging/hd/material.h"
-#include "pxr/usd/ar/resolverScopedCache.h"
+
 #include "pxr/usd/ar/resolverContextBinder.h"
+#include "pxr/usd/ar/resolverScopedCache.h"
 #include "pxr/usd/sdf/path.h"
+
 #include "pxr/base/tf/stringUtils.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -263,7 +267,7 @@ UsdRiPxrImagingVolumeFilterAdapter::GetMaterialResource(
         _GetMaterialRenderContexts(),
         &networkMap,
         time);
-    
+
     // XXX -- Fix shader ID here too?
 
     return VtValue(networkMap);

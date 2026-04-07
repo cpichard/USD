@@ -4,15 +4,15 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#include "pxr/usdImaging/usdRiPxrImaging/pxrVolumeAPIAdapter.h"
-
-#include "pxr/usdImaging/usdImaging/dataSourceMaterial.h"
-#include "pxr/usdImaging/usdImaging/primAdapter.h"
+#include "usdRiPxrImaging/pxrVolumeAPIAdapter.h"
 
 #include "pxr/imaging/hd/materialSchema.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/volumeSchema.h"
+
+#include "pxr/usdImaging/usdImaging/dataSourceMaterial.h"
+#include "pxr/usdImaging/usdImaging/primAdapter.h"
 
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/stringUtils.h"

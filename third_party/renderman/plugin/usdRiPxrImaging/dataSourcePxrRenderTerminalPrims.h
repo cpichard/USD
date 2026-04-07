@@ -5,25 +5,27 @@
 // https://openusd.org/license.
 //
 
-#ifndef PXR_USD_IMAGING_USD_RI_PXR_IMAGING_DATA_SOURCE_RENDER_TERMINAL_PRIMS_H
-#define PXR_USD_IMAGING_USD_RI_PXR_IMAGING_DATA_SOURCE_RENDER_TERMINAL_PRIMS_H
+#ifndef EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_DATA_SOURCE_RENDER_TERMINAL_PRIMS_H
+#define EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_DATA_SOURCE_RENDER_TERMINAL_PRIMS_H
+
+#include "usdRiPxrImaging/api.h"
+
+#include "pxr/imaging/hd/dataSource.h"
+#include "pxr/imaging/hd/materialNodeParameterSchema.h"
+#include "pxr/imaging/hd/materialNodeSchema.h"
+#include "pxr/imaging/hd/retainedDataSource.h"
 
 #include "pxr/usdImaging/usdImaging/dataSourcePrim.h"
 
-#include "pxr/imaging/hd/dataSource.h"
-#include "pxr/imaging/hd/materialNodeSchema.h"
-#include "pxr/imaging/hd/materialNodeParameterSchema.h"
-#include "pxr/imaging/hd/retainedDataSource.h"
-#include "pxr/usdImaging/usdRiPxrImaging/api.h"
-
+#include "pxr/pxr.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class UsdRiPxrImaging_DataSourceRenderTerminalPrim
 ///
-/// A prim data source representing Render Terminal prims inheriting from 
-///     PxrDisplayFilterPluginBase, 
-///     PxrIntegratorPluginBase, 
+/// A prim data source representing Render Terminal prims inheriting from
+///     PxrDisplayFilterPluginBase,
+///     PxrIntegratorPluginBase,
 ///     PxrSampleFilterPluginBase
 ///
 template <typename TerminalSchema>
@@ -119,14 +121,14 @@ _ComputeResourceDS(
         HdMaterialNodeSchema::Builder()
             .SetParameters(
                 HdRetainedContainerDataSource::New(
-                    paramsNames.size(), 
+                    paramsNames.size(),
                     paramsNames.data(),
                     paramsValues.data()))
             .SetNodeIdentifier(
                 HdRetainedTypedSampledDataSource<TfToken>::New(
                     _GetNodeTypeId(prim, shaderId, primType)))
         .Build();
-    
+
     return nodeDS;
 }
 
@@ -145,7 +147,7 @@ UsdRiPxrImaging_DataSourceRenderTerminalPrim(
 }
 
 template <typename TerminalSchema>
-TfTokenVector 
+TfTokenVector
 UsdRiPxrImaging_DataSourceRenderTerminalPrim<TerminalSchema>::GetNames()
 {
     // Note: Skip properties on UsdImagingDataSourcePrim.
@@ -153,12 +155,12 @@ UsdRiPxrImaging_DataSourceRenderTerminalPrim<TerminalSchema>::GetNames()
 }
 
 template <typename TerminalSchema>
-HdDataSourceBaseHandle 
+HdDataSourceBaseHandle
 UsdRiPxrImaging_DataSourceRenderTerminalPrim<TerminalSchema>::Get(
     const TfToken & name)
 {
     if (name == TerminalSchema::GetSchemaToken()) {
-        return 
+        return
             HdRetainedContainerDataSource::New(
                 TfToken("resource"),
                 _ComputeResourceDS(_GetUsdPrim(), _shaderId, name));
@@ -193,4 +195,4 @@ UsdRiPxrImaging_DataSourceRenderTerminalPrim<TerminalSchema>::Invalidate(
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // PXR_USD_IMAGING_USD_RI_PXR_IMAGING_DATA_SOURCE_RENDER_TERMINAL_PRIMS_H
+#endif // EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_DATA_SOURCE_RENDER_TERMINAL_PRIMS_H

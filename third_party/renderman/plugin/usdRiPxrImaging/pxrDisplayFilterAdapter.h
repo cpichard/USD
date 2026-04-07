@@ -1,36 +1,38 @@
 //
-// Copyright 2023 Pixar
+// Copyright 2022 Pixar
 //
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_INTEGRATOR_ADAPTER_H
-#define PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_INTEGRATOR_ADAPTER_H
+#ifndef EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_DISPLAY_FILTER_ADAPTER_H
+#define EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_DISPLAY_FILTER_ADAPTER_H
 
-/// \file usdRiPxrImaging/pxrIntegratorAdapter.h
+/// \file usdRiPxrImaging/pxrDisplayFilterAdapter.h
+
+#include "usdRiPxrImaging/api.h"
+
+#include "pxr/usdImaging/usdImaging/primAdapter.h"
 
 #include "pxr/pxr.h"
-#include "pxr/usdImaging/usdRiPxrImaging/api.h"
-#include "pxr/usdImaging/usdImaging/primAdapter.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 
-/// \class UsdRiPxrImagingIntegratorAdapter
+/// \class UsdRiPxrImagingDisplayFilterAdapter
 ///
-/// Delegate support for Integrator Prims.
+/// Delegate support for Display Filter Prims.
 ///
-class UsdRiPxrImagingIntegratorAdapter : public UsdImagingPrimAdapter
+class UsdRiPxrImagingDisplayFilterAdapter : public UsdImagingPrimAdapter
 {
 public:
     using BaseAdapter = UsdImagingPrimAdapter;
 
-    UsdRiPxrImagingIntegratorAdapter()
+    UsdRiPxrImagingDisplayFilterAdapter()
         : UsdImagingPrimAdapter()
     {}
 
     USDRIPXRIMAGING_API
-    ~UsdRiPxrImagingIntegratorAdapter() override;
+    ~UsdRiPxrImagingDisplayFilterAdapter() override;
 
     // ---------------------------------------------------------------------- //
     /// \name Scene Index Support
@@ -79,7 +81,7 @@ public:
     void TrackVariability(UsdPrim const& prim,
                           SdfPath const& cachePath,
                           HdDirtyBits* timeVaryingBits,
-                          UsdImagingInstancerContext const* 
+                          UsdImagingInstancerContext const*
                           instancerContext = nullptr) const override;
 
 
@@ -89,11 +91,11 @@ public:
                        SdfPath const& cachePath,
                        UsdTimeCode time,
                        HdDirtyBits requestedBits,
-                       UsdImagingInstancerContext const* 
+                       UsdImagingInstancerContext const*
                        instancerContext = nullptr) const override;
 
     // ---------------------------------------------------------------------- //
-    /// \name Change Processing 
+    /// \name Change Processing
     // ---------------------------------------------------------------------- //
 
     /// Returns a bit mask of attributes to be udpated, or
@@ -130,4 +132,4 @@ protected:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_INTEGRATOR_ADAPTER_H
+#endif // EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_DISPLAY_FILTER_ADAPTER_H

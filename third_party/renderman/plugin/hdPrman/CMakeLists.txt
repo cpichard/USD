@@ -80,7 +80,6 @@ pxr_plugin(${PXR_PACKAGE}
         hio
         TBB::tbb
         usdRi
-        usdRiPxrImaging
         usdVol
         usdVolImaging
         ${optionalLibs}
@@ -250,7 +249,6 @@ else()
             usd
             usdImaging
             usdRender
-            usdRiPxrImaging
             ${PXRCORE_LIBRARY}
             ${PRMAN_LIBRARY}
         CPPFILES

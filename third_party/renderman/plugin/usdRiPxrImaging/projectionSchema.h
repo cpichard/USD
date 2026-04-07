@@ -15,12 +15,12 @@
 /* **                                                                      ** */
 /* ************************************************************************** */
 
-#ifndef PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PROJECTION_SCHEMA_H
-#define PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PROJECTION_SCHEMA_H
+#ifndef EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PROJECTION_SCHEMA_H
+#define EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PROJECTION_SCHEMA_H
 
 /// \file
 
-#include "pxr/usdImaging/usdRiPxrImaging/api.h"
+#include "usdRiPxrImaging/api.h"
 #include "pxr/imaging/hd/materialNodeSchema.h"
 
 #include "pxr/imaging/hd/schema.h"
@@ -70,7 +70,7 @@ public:
     /// @{
 
     USDRIPXRIMAGING_API
-    HdMaterialNodeSchema GetResource() const; 
+    HdMaterialNodeSchema GetResource() const;
 
     /// @}
 
@@ -101,7 +101,7 @@ public:
     /// Prim-level relative data source locator to locate resource.
     USDRIPXRIMAGING_API
     static const HdDataSourceLocator &GetResourceLocator();
-    /// @} 
+    /// @}
 
     /// \name Schema construction
     /// @{
@@ -120,7 +120,7 @@ public:
     );
 
     /// \class UsdRiPxrImagingProjectionSchema::Builder
-    /// 
+    ///
     /// Utility class for setting sparse sets of child data source fields to be
     /// filled as arguments into BuildRetained. Because all setter methods
     /// return a reference to the instance, this can be used in the "builder

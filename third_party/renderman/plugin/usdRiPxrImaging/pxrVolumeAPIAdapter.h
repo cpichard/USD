@@ -4,10 +4,12 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_VOLUME_API_ADAPTER_H
-#define PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_VOLUME_API_ADAPTER_H
+#ifndef EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_VOLUME_API_ADAPTER_H
+#define EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_VOLUME_API_ADAPTER_H
 
 /// \file
+
+#include "usdRiPxrImaging/api.h"
 
 #include "pxr/usdImaging/usdImaging/apiSchemaAdapter.h"
 
@@ -18,20 +20,20 @@ class UsdRiPxrImagingVolumeAPIAdapter : public UsdImagingAPISchemaAdapter
 public:
     using BaseAdapter = UsdImagingAPISchemaAdapter;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     TfToken GetImagingSubprimType(
         UsdPrim const& prim,
         TfToken const& subprim,
         TfToken const& appliedInstanceName) override;
-    
-    USDIMAGING_API
+
+    USDRIPXRIMAGING_API
     HdContainerDataSourceHandle GetImagingSubprimData(
         UsdPrim const& prim,
         TfToken const& subprim,
         TfToken const& appliedInstanceName,
         const UsdImagingDataSourceStageGlobals &stageGlobals) override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     HdDataSourceLocatorSet InvalidateImagingSubprim(
         UsdPrim const& prim,
         TfToken const& subprim,

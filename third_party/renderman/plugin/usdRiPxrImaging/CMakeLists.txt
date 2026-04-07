@@ -1,4 +1,4 @@
-set(PXR_PREFIX pxr/usdImaging)
+set(PXR_PREFIX pxr/imaging)
 set(PXR_PACKAGE usdRiPxrImaging)
 
 pxr_library(usdRiPxrImaging
@@ -29,7 +29,9 @@ pxr_library(usdRiPxrImaging
         pxrCameraProjectionAPIAdapter
         pxrDisplayFilterAdapter
         pxrIntegratorAdapter
+        pxrVolumeAPIAdapter
         pxrSampleFilterAdapter
+        pxrVolumeFilterPluginBaseAdapter
         tokens
 
     PRIVATE_CLASSES
@@ -45,4 +47,11 @@ pxr_library(usdRiPxrImaging
     RESOURCE_FILES
         plugInfo.json
 )
+
+if(TARGET usdRiPxrImaging)
+    target_include_directories(${PXR_PACKAGE}
+        PRIVATE
+            "${PROJECT_BINARY_DIR}/include/pxr/imaging"
+    )
+endif()
 

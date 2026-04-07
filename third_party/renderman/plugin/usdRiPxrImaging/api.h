@@ -4,8 +4,8 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_USD_IMAGING_USD_RI_PXR_IMAGING_API_H
-#define PXR_USD_IMAGING_USD_RI_PXR_IMAGING_API_H
+#ifndef EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_API_H
+#define EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_API_H
 
 #include "pxr/base/arch/export.h"
 
@@ -27,4 +27,4 @@
 #   define USDRIPXRIMAGING_LOCAL ARCH_HIDDEN
 #endif
 
-#endif // PXR_USD_IMAGING_USD_RI_PXR_IMAGING_API_H
+#endif // EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_API_H

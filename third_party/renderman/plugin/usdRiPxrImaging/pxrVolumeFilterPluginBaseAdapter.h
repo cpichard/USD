@@ -4,14 +4,17 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_VOLUME_FILTER_PLUGIN_BASE_ADAPTER_H
-#define PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_VOLUME_FILTER_PLUGIN_BASE_ADAPTER_H
+#ifndef EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_VOLUME_FILTER_PLUGIN_BASE_ADAPTER_H
+#define EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_VOLUME_FILTER_PLUGIN_BASE_ADAPTER_H
 
 /// \file usdRiPxrImaging/volumeFilterAdapter.h
 
-#include "pxr/pxr.h"
+#include "usdRiPxrImaging/api.h"
+
 #include "pxr/usdImaging/usdImaging/api.h"
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
+
+#include "pxr/pxr.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -29,16 +32,16 @@ public:
         : UsdImagingPrimAdapter()
     {}
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     ~UsdRiPxrImagingVolumeFilterAdapter() override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     SdfPath Populate(UsdPrim const& prim,
                      UsdImagingIndexProxy* index,
                      UsdImagingInstancerContext const*
                          instancerContext = NULL) override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     bool IsSupported(UsdImagingIndexProxy const* index) const override;
 
     // ---------------------------------------------------------------------- //
@@ -46,7 +49,7 @@ public:
     // ---------------------------------------------------------------------- //
 
     /// Thread Safe.
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     void TrackVariability(UsdPrim const& prim,
                           SdfPath const& cachePath,
                           HdDirtyBits* timeVaryingBits,
@@ -54,7 +57,7 @@ public:
                               instancerContext = NULL) const override;
 
     /// Thread Safe.
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     void UpdateForTime(UsdPrim const& prim,
                        SdfPath const& cachePath,
                        UsdTimeCode time,
@@ -68,23 +71,23 @@ public:
 
     /// Returns a bit mask of attributes to be updated, or
     /// HdChangeTracker::AllDirty if the entire prim must be resynchronized.
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     HdDirtyBits ProcessPropertyChange(UsdPrim const& prim,
                                       SdfPath const& cachePath,
                                       TfToken const& propertyName) override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     void MarkDirty(UsdPrim const& prim,
                    SdfPath const& cachePath,
                    HdDirtyBits dirty,
                    UsdImagingIndexProxy* index) override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     void MarkTransformDirty(UsdPrim const& prim,
                             SdfPath const& cachePath,
                             UsdImagingIndexProxy* index) override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     void MarkVisibilityDirty(UsdPrim const& prim,
                              SdfPath const& cachePath,
                              UsdImagingIndexProxy* index) override;
@@ -93,7 +96,7 @@ public:
     /// \name Utilities
     // ---------------------------------------------------------------------- //
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     VtValue GetMaterialResource(UsdPrim const &prim,
                                 SdfPath const& cachePath,
                                 UsdTimeCode time) const override;
@@ -102,30 +105,30 @@ public:
     /// \name Scene Index Support
     // ---------------------------------------------------------------------- //
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     TfTokenVector GetImagingSubprims(UsdPrim const& prim) override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     TfToken GetImagingSubprimType(
             UsdPrim const& prim, TfToken const& subprim) override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     HdContainerDataSourceHandle GetImagingSubprimData(
             UsdPrim const& prim,
             TfToken const& subprim,
             const UsdImagingDataSourceStageGlobals &stageGlobals) override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     HdDataSourceLocatorSet InvalidateImagingSubprim(
             UsdPrim const& prim,
             TfToken const& subprim,
             TfTokenVector const& properties,
             UsdImagingPropertyInvalidationType invalidationType) override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     PopulationMode GetPopulationMode() override;
 
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     HdDataSourceLocatorSet InvalidateImagingSubprimFromDescendent(
             UsdPrim const& prim,
             UsdPrim const& descendentPrim,
@@ -134,7 +137,7 @@ public:
             UsdImagingPropertyInvalidationType invalidationType) override;
 
 protected:
-    USDIMAGING_API
+    USDRIPXRIMAGING_API
     void _RemovePrim(SdfPath const& cachePath,
                      UsdImagingIndexProxy* index) override;
 
@@ -142,4 +145,4 @@ protected:
 
 PXR_NAMESPACE_CLOSE_SCOPE
 
-#endif // PXR_USD_IMAGING_USD_RI_PXR_IMAGING_PXR_VOLUME_FILTER_PLUGIN_BASE_ADAPTER_H
+#endif // EXT_RMANPKG_PLUGIN_RENDERMAN_PLUGIN_USD_RI_PXR_IMAGING_PXR_VOLUME_FILTER_PLUGIN_BASE_ADAPTER_H

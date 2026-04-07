@@ -4,16 +4,19 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#include "pxr/usdImaging/usdRiPxrImaging/pxrDisplayFilterAdapter.h"
-#include "pxr/usdImaging/usdRiPxrImaging/pxrRenderTerminalHelper.h"
-#include "pxr/usdImaging/usdRiPxrImaging/dataSourcePxrRenderTerminalPrims.h"
-#include "pxr/usdImaging/usdImaging/delegate.h"
-#include "pxr/usdImaging/usdImaging/indexProxy.h"
-#include "pxr/usdImaging/usdImaging/tokens.h"
+#include "usdRiPxrImaging/pxrDisplayFilterAdapter.h"
+
+#include "usdRiPxrImaging/dataSourcePxrRenderTerminalPrims.h"
+#include "usdRiPxrImaging/pxrRenderTerminalHelper.h"
 
 #include "pxr/imaging/hd/displayFilterSchema.h"
 #include "pxr/imaging/hd/material.h"
 #include "pxr/imaging/hd/tokens.h"
+
+#include "pxr/usdImaging/usdImaging/delegate.h"
+#include "pxr/usdImaging/usdImaging/indexProxy.h"
+#include "pxr/usdImaging/usdImaging/tokens.h"
+
 #include "pxr/base/gf/vec4f.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -63,7 +66,7 @@ UsdRiPxrImagingDisplayFilterAdapter::GetImagingSubprimData(
     const UsdImagingDataSourceStageGlobals &stageGlobals)
 {
     if (subprim.IsEmpty()) {
-        return 
+        return
             UsdRiPxrImaging_DataSourceRenderTerminalPrim<HdDisplayFilterSchema>::
                 New(prim.GetPath(), prim,
                     _tokens->riDisplayFilterShaderId, stageGlobals);
@@ -103,7 +106,7 @@ UsdRiPxrImagingDisplayFilterAdapter::IsSupported(
 
 SdfPath
 UsdRiPxrImagingDisplayFilterAdapter::Populate(
-    UsdPrim const& prim, 
+    UsdPrim const& prim,
     UsdImagingIndexProxy* index,
     UsdImagingInstancerContext const* instancerContext)
 {
@@ -126,14 +129,14 @@ UsdRiPxrImagingDisplayFilterAdapter::_RemovePrim(
     index->RemoveSprim(HdPrimTypeTokens->displayFilter, cachePath);
 }
 
-void 
+void
 UsdRiPxrImagingDisplayFilterAdapter::TrackVariability(
     UsdPrim const& prim,
     SdfPath const& cachePath,
     HdDirtyBits* timeVaryingBits,
     UsdImagingInstancerContext const* instancerContext) const
 {
-    // If any of the DisplayFilter attributes are time varying 
+    // If any of the DisplayFilter attributes are time varying
     // we will assume all DisplayFilter params are time-varying.
     const std::vector<UsdAttribute> &attrs = prim.GetAttributes();
     TF_FOR_ALL(attrIter, attrs) {
@@ -146,13 +149,13 @@ UsdRiPxrImagingDisplayFilterAdapter::TrackVariability(
 
 // Thread safe.
 //  * Populate dirty bits for the given \p time.
-void 
+void
 UsdRiPxrImagingDisplayFilterAdapter::UpdateForTime(
     UsdPrim const& prim,
-    SdfPath const& cachePath, 
+    SdfPath const& cachePath,
     UsdTimeCode time,
     HdDirtyBits requestedBits,
-    UsdImagingInstancerContext const* 
+    UsdImagingInstancerContext const*
     instancerContext) const
 {
 }
@@ -160,7 +163,7 @@ UsdRiPxrImagingDisplayFilterAdapter::UpdateForTime(
 HdDirtyBits
 UsdRiPxrImagingDisplayFilterAdapter::ProcessPropertyChange(
     UsdPrim const& prim,
-    SdfPath const& cachePath, 
+    SdfPath const& cachePath,
     TfToken const& propertyName)
 {
     return HdChangeTracker::AllDirty;

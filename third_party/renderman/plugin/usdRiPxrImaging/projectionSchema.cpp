@@ -15,7 +15,7 @@
 /* **                                                                      ** */
 /* ************************************************************************** */
 
-#include "pxr/usdImaging/usdRiPxrImaging/projectionSchema.h"
+#include "usdRiPxrImaging/projectionSchema.h"
 
 #include "pxr/imaging/hd/retainedDataSource.h"
 

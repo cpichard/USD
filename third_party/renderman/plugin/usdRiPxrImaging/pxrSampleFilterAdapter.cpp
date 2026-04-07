@@ -1,85 +1,90 @@
 //
-// Copyright 2023 Pixar
+// Copyright 2022 Pixar
 //
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#include "pxr/usdImaging/usdRiPxrImaging/pxrIntegratorAdapter.h"
-#include "pxr/usdImaging/usdRiPxrImaging/pxrRenderTerminalHelper.h"
-#include "pxr/usdImaging/usdRiPxrImaging/dataSourcePxrRenderTerminalPrims.h"
+#include "usdRiPxrImaging/pxrSampleFilterAdapter.h"
+
+#include "usdRiPxrImaging/dataSourcePxrRenderTerminalPrims.h"
+#include "usdRiPxrImaging/pxrRenderTerminalHelper.h"
+
+#include "pxr/imaging/hd/material.h"
+#include "pxr/imaging/hd/sampleFilterSchema.h"
+#include "pxr/imaging/hd/tokens.h"
+
 #include "pxr/usdImaging/usdImaging/delegate.h"
 #include "pxr/usdImaging/usdImaging/indexProxy.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
 
-#include "pxr/imaging/hd/integratorSchema.h"
-#include "pxr/imaging/hd/material.h"
-#include "pxr/imaging/hd/tokens.h"
 #include "pxr/base/gf/vec4f.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
-    ((riIntegratorShaderId, "ri:integrator:shaderId"))
+    ((riSampleFilterShaderId, "ri:sampleFilter:shaderId"))
 );
 
 
 TF_REGISTRY_FUNCTION(TfType)
 {
-    using Adapter = UsdRiPxrImagingIntegratorAdapter;
+    using Adapter = UsdRiPxrImagingSampleFilterAdapter;
     TfType t = TfType::Define<Adapter, TfType::Bases<Adapter::BaseAdapter> >();
     t.SetFactory< UsdImagingPrimAdapterFactory<Adapter> >();
 }
 
-UsdRiPxrImagingIntegratorAdapter::~UsdRiPxrImagingIntegratorAdapter() = default;
+UsdRiPxrImagingSampleFilterAdapter::
+~UsdRiPxrImagingSampleFilterAdapter() = default;
+
 
 // -------------------------------------------------------------------------- //
 // 2.0 Prim adapter API
 // -------------------------------------------------------------------------- //
 
 TfTokenVector
-UsdRiPxrImagingIntegratorAdapter::GetImagingSubprims(UsdPrim const& prim)
+UsdRiPxrImagingSampleFilterAdapter::GetImagingSubprims(UsdPrim const& prim)
 {
     return { TfToken() };
 }
 
 TfToken
-UsdRiPxrImagingIntegratorAdapter::GetImagingSubprimType(
+UsdRiPxrImagingSampleFilterAdapter::GetImagingSubprimType(
     UsdPrim const& prim,
     TfToken const& subprim)
 {
     if (subprim.IsEmpty()) {
-        return HdPrimTypeTokens->integrator;
+        return HdPrimTypeTokens->sampleFilter;
     }
     return TfToken();
 }
 
 HdContainerDataSourceHandle
-UsdRiPxrImagingIntegratorAdapter::GetImagingSubprimData(
+UsdRiPxrImagingSampleFilterAdapter::GetImagingSubprimData(
     UsdPrim const& prim,
     TfToken const& subprim,
     const UsdImagingDataSourceStageGlobals &stageGlobals)
 {
     if (subprim.IsEmpty()) {
-        return 
-            UsdRiPxrImaging_DataSourceRenderTerminalPrim<HdIntegratorSchema>::New(
-                prim.GetPath(), prim,
-                _tokens->riIntegratorShaderId, stageGlobals);
+        return
+            UsdRiPxrImaging_DataSourceRenderTerminalPrim<HdSampleFilterSchema>::
+                New(prim.GetPath(), prim,
+                    _tokens->riSampleFilterShaderId, stageGlobals);
     }
 
     return nullptr;
 }
 
 HdDataSourceLocatorSet
-UsdRiPxrImagingIntegratorAdapter::InvalidateImagingSubprim(
+UsdRiPxrImagingSampleFilterAdapter::InvalidateImagingSubprim(
     UsdPrim const& prim,
     TfToken const& subprim,
     TfTokenVector const& properties,
     const UsdImagingPropertyInvalidationType invalidationType)
 {
     if (subprim.IsEmpty()) {
-        return 
-            UsdRiPxrImaging_DataSourceRenderTerminalPrim<HdIntegratorSchema>::
+        return
+            UsdRiPxrImaging_DataSourceRenderTerminalPrim<HdSampleFilterSchema>::
             Invalidate(
                 prim, subprim, properties, invalidationType);
     }
@@ -92,16 +97,16 @@ UsdRiPxrImagingIntegratorAdapter::InvalidateImagingSubprim(
 // -------------------------------------------------------------------------- //
 
 bool
-UsdRiPxrImagingIntegratorAdapter::IsSupported(
+UsdRiPxrImagingSampleFilterAdapter::IsSupported(
     UsdImagingIndexProxy const* index) const
 {
-    bool supported = index->IsSprimTypeSupported(HdPrimTypeTokens->integrator);
+    bool supported = index->IsSprimTypeSupported(HdPrimTypeTokens->sampleFilter);
     return supported;
 }
 
 SdfPath
-UsdRiPxrImagingIntegratorAdapter::Populate(
-    UsdPrim const& prim, 
+UsdRiPxrImagingSampleFilterAdapter::Populate(
+    UsdPrim const& prim,
     UsdImagingIndexProxy* index,
     UsdImagingInstancerContext const* instancerContext)
 {
@@ -110,29 +115,29 @@ UsdRiPxrImagingIntegratorAdapter::Populate(
         return cachePath;
     }
 
-    index->InsertSprim(HdPrimTypeTokens->integrator, cachePath, prim);
+    index->InsertSprim(HdPrimTypeTokens->sampleFilter, cachePath, prim);
     HD_PERF_COUNTER_INCR(UsdImagingTokens->usdPopulatedPrimCount);
 
     return cachePath;
 }
 
 void
-UsdRiPxrImagingIntegratorAdapter::_RemovePrim(
+UsdRiPxrImagingSampleFilterAdapter::_RemovePrim(
     SdfPath const& cachePath,
     UsdImagingIndexProxy* index)
 {
-    index->RemoveSprim(HdPrimTypeTokens->integrator, cachePath);
+    index->RemoveSprim(HdPrimTypeTokens->sampleFilter, cachePath);
 }
 
-void 
-UsdRiPxrImagingIntegratorAdapter::TrackVariability(
+void
+UsdRiPxrImagingSampleFilterAdapter::TrackVariability(
     UsdPrim const& prim,
     SdfPath const& cachePath,
     HdDirtyBits* timeVaryingBits,
     UsdImagingInstancerContext const* instancerContext) const
 {
-    // If any of the Integrator attributes are time varying 
-    // we will assume all Integrator params are time-varying.
+    // If any of the SampleFilter attributes are time varying
+    // we will assume all SampleFilter params are time-varying.
     const std::vector<UsdAttribute> &attrs = prim.GetAttributes();
     TF_FOR_ALL(attrIter, attrs) {
         const UsdAttribute& attr = *attrIter;
@@ -144,28 +149,28 @@ UsdRiPxrImagingIntegratorAdapter::TrackVariability(
 
 // Thread safe.
 //  * Populate dirty bits for the given \p time.
-void 
-UsdRiPxrImagingIntegratorAdapter::UpdateForTime(
+void
+UsdRiPxrImagingSampleFilterAdapter::UpdateForTime(
     UsdPrim const& prim,
-    SdfPath const& cachePath, 
+    SdfPath const& cachePath,
     UsdTimeCode time,
     HdDirtyBits requestedBits,
-    UsdImagingInstancerContext const* 
+    UsdImagingInstancerContext const*
     instancerContext) const
 {
 }
 
 HdDirtyBits
-UsdRiPxrImagingIntegratorAdapter::ProcessPropertyChange(
+UsdRiPxrImagingSampleFilterAdapter::ProcessPropertyChange(
     UsdPrim const& prim,
-    SdfPath const& cachePath, 
+    SdfPath const& cachePath,
     TfToken const& propertyName)
 {
     return HdChangeTracker::AllDirty;
 }
 
 void
-UsdRiPxrImagingIntegratorAdapter::MarkDirty(
+UsdRiPxrImagingSampleFilterAdapter::MarkDirty(
     UsdPrim const& prim,
     SdfPath const& cachePath,
     HdDirtyBits dirty,
@@ -174,25 +179,24 @@ UsdRiPxrImagingIntegratorAdapter::MarkDirty(
     index->MarkSprimDirty(cachePath, dirty);
 }
 
-
 VtValue
-UsdRiPxrImagingIntegratorAdapter::Get(
+UsdRiPxrImagingSampleFilterAdapter::Get(
     UsdPrim const& prim,
     SdfPath const& cachePath,
     TfToken const& key,
     UsdTimeCode time,
     VtIntArray *outIndices) const
 {
-    if (key == HdIntegratorSchemaTokens->resource) {
+    if (key == HdSampleFilterSchemaTokens->resource) {
         return VtValue(
             UsdRiPxrImagingRenderTerminalHelper::CreateHdMaterialNode2(
                 prim,
-                _tokens->riIntegratorShaderId,
-                HdPrimTypeTokens->integrator));
+                _tokens->riSampleFilterShaderId,
+                HdPrimTypeTokens->sampleFilter));
     }
 
     TF_CODING_ERROR(
-        "Property %s not supported for Integrator by UsdImaging, path: %s",
+        "Property %s not supported for SampleFilter by UsdImaging, path: %s",
         key.GetText(), cachePath.GetText());
     return VtValue();
 }

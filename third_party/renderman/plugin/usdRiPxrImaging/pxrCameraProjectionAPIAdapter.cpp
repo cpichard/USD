@@ -4,35 +4,35 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#include "pxr/usdImaging/usdRiPxrImaging/pxrCameraProjectionAPIAdapter.h"
+#include "usdRiPxrImaging/pxrCameraProjectionAPIAdapter.h"
 
-#include "pxr/base/tf/staticTokens.h"
-#include "pxr/base/vt/value.h"
+#include "pxr/imaging/hd/cameraSchema.h"
 #include "pxr/imaging/hd/dataSource.h"
 #include "pxr/imaging/hd/dataSourceLocator.h"
-#include "pxr/imaging/hd/cameraSchema.h"
 #include "pxr/imaging/hd/dataSourceTypeDefs.h"
 #include "pxr/imaging/hd/dependenciesSchema.h"
 #include "pxr/imaging/hd/dependencySchema.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
 
+#include "pxr/usdImaging/usdImaging/apiSchemaAdapter.h"
+#include "pxr/usdImaging/usdImaging/dataSourceMapped.h"
+#include "pxr/usdImaging/usdImaging/dataSourceStageGlobals.h"
+#include "pxr/usdImaging/usdImaging/types.h"
+
 #include "pxr/usd/sdf/path.h"
+#include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/relationship.h"
 #include "pxr/usd/usdRi/tokens.h"
 #include "pxr/usd/usdShade/connectableAPIBehavior.h"
 #include "pxr/usd/usdShade/input.h"
 #include "pxr/usd/usdShade/output.h"
 #include "pxr/usd/usdShade/tokens.h"
-#include "pxr/usdImaging/usdImaging/apiSchemaAdapter.h"
-#include "pxr/usdImaging/usdImaging/dataSourceStageGlobals.h"
-#include "pxr/usdImaging/usdImaging/types.h"
-#include "pxr/usdImaging/usdImaging/dataSourceMapped.h"
-
-#include "pxr/usd/usd/prim.h"
 
 #include "pxr/base/tf/registryManager.h"
+#include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/type.h"
+#include "pxr/base/vt/value.h"
 
 #include "pxr/pxr.h"
 
@@ -69,13 +69,13 @@ TfToken
 _AttrName()
 {
     static const TfToken attrName = TfToken(SdfPath::JoinIdentifier(
-        TfToken(UsdShadeTokens->outputs.GetString() + 
+        TfToken(UsdShadeTokens->outputs.GetString() +
                 UsdRiTokens->renderContext.GetString()),
         _tokens->projection));
     return attrName;
 }
 
-bool 
+bool
 _RelInSchema()
 {
     using UsdPropertyDefinition = UsdPrimDefinition::Property;
@@ -95,9 +95,9 @@ _RelInSchema()
 // relationship or the now deprecated outputs:ri:projection attribute
 // connection.
 // We only fallback to the attribute connection if:
-// - LEGACY_PXR_CAMERA_PROJECTION_TERMINAL_ALLOWED_AND_WARN is true 
+// - LEGACY_PXR_CAMERA_PROJECTION_TERMINAL_ALLOWED_AND_WARN is true
 //   the relationship spec is not found on the prim, or if relationship spec is
-//   found, but relationship is not authored on the prim, in which case we warn 
+//   found, but relationship is not authored on the prim, in which case we warn
 //   and use the attribute connection.
 //
 class _ProjectionPathDataSource final : public HdTypedSampledDataSource<SdfPath>
@@ -204,7 +204,7 @@ UsdRiPxrImagingCameraProjectionAPIAdapter::GetImagingSubprimData(
     std::vector<HdDataSourceBaseHandle> sources;
 
     if (projectionDs) {
-        const SdfPath projectionPath = 
+        const SdfPath projectionPath =
             HdPathDataSource::Cast(projectionDs)->GetTypedValue(0.f);
         if (!projectionPath.IsEmpty()) {
             auto pathDs = HdRetainedTypedSampledDataSource<SdfPath>::New(
@@ -220,7 +220,7 @@ UsdRiPxrImagingCameraProjectionAPIAdapter::GetImagingSubprimData(
         }
     }
 
-    HdContainerDataSourceHandle dependenciesDs = 
+    HdContainerDataSourceHandle dependenciesDs =
         HdDependenciesSchema::BuildRetained(
             names.size(),
             names.data(),

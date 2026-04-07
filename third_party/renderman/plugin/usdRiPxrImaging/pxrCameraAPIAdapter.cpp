@@ -5,12 +5,12 @@
 // https://openusd.org/license.
 //
 
-#include "pxr/usdImaging/usdRiPxrImaging/pxrCameraAPIAdapter.h"
-
-#include "pxr/usdImaging/usdImaging/dataSourceMapped.h"
+#include "usdRiPxrImaging/pxrCameraAPIAdapter.h"
 
 #include "pxr/imaging/hd/cameraSchema.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
+
+#include "pxr/usdImaging/usdImaging/dataSourceMapped.h"
 
 #include "pxr/usd/usd/primDefinition.h"
 #include "pxr/usd/usd/schemaRegistry.h"
@@ -27,7 +27,7 @@ _SplitNamespace(const TfToken &name)
 {
     static const char namespaceDelimiter =
         SdfPathTokens->namespaceDelimiter.GetText()[0];
-    
+
     const std::string &str = name.GetString();
     const size_t i = str.find(namespaceDelimiter);
     if (i == std::string::npos) {

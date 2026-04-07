@@ -7,7 +7,8 @@
 [
     dict(
         SCHEMA_NAME = 'ALL_SCHEMAS',
-        LIBRARY_PATH = 'pxr/usdImaging/usdRiPxrImaging',
+        LIBRARY_PATH = 'ext/rmanpkg/plugin/renderman/plugin/usdRiPxrImaging',
+        INCLUDE_PATH = 'usdRiPxrImaging',
     ),
 
     #--------------------------------------------------------------------------

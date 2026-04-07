@@ -4,16 +4,17 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#include "pxr/usdImaging/usdRiPxrImaging/pxrCameraProjectionAdapter.h"
+#include "usdRiPxrImaging/pxrCameraProjectionAdapter.h"
+
+#include "usdRiPxrImaging/dataSourcePxrRenderTerminalPrims.h"
+#include "usdRiPxrImaging/projectionSchema.h"
+#include "usdRiPxrImaging/tokens.h"
 
 #include "pxr/imaging/hd/dataSource.h"
 #include "pxr/imaging/hd/dataSourceLocator.h"
 
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 #include "pxr/usdImaging/usdImaging/types.h"
-#include "pxr/usdImaging/usdRiPxrImaging/dataSourcePxrRenderTerminalPrims.h"
-#include "pxr/usdImaging/usdRiPxrImaging/projectionSchema.h"
-#include "pxr/usdImaging/usdRiPxrImaging/tokens.h"
 
 #include "pxr/base/tf/registryManager.h"
 #include "pxr/base/tf/staticTokens.h"
@@ -83,7 +84,7 @@ UsdRiPxrImagingCameraProjectionAdapter::InvalidateImagingSubprim(
     const TfTokenVector& properties,
     const UsdImagingPropertyInvalidationType invalidationType)
 {
-    return 
+    return
         UsdRiPxrImaging_DataSourceRenderTerminalPrim
             <UsdRiPxrImagingProjectionSchema>::
                 Invalidate( prim, subprim, properties, invalidationType);
