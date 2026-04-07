@@ -209,8 +209,10 @@ HdPrman_Volume::Finalize(HdRenderParam *renderParam)
     if (!_volumeFilterIds.empty()) {
         auto* param = static_cast<HdPrman_RenderParam*>(renderParam);
         riley::Riley* riley = param->AcquireRiley();
-        for (const auto& filterId : _volumeFilterIds) {
-            riley->DeleteVolumeFilter(filterId);
+        if (riley) {
+            for (const auto& filterId : _volumeFilterIds) {
+                riley->DeleteVolumeFilter(filterId);
+            }
         }
         _volumeFilterIds.clear();
     }
