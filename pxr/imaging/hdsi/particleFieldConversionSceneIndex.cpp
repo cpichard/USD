@@ -22,6 +22,8 @@
 #include "pxr/imaging/hd/materialBindingsSchema.h"
 #include "pxr/imaging/hd/materialBindingSchema.h"
 
+#include <array>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 const static SdfPath __DefaultParticleFieldMaterial 

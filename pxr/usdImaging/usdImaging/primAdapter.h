@@ -796,7 +796,13 @@ protected:
     USDIMAGING_API
     bool _IsPrimvarFilteringNeeded() const;
 
-    // Returns the shader source type from the render delegate.
+    /// Returns the shading systems from the render delegate.
+    USDIMAGING_API
+    TfTokenVector _GetShadingSystems() const;
+
+    /// Returns the shader source type from the render delegate.
+    ///
+    /// \deprecated in favor of _GetShadingSystems
     USDIMAGING_API
     TfTokenVector _GetShaderSourceTypes() const;
 

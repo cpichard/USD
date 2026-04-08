@@ -13,8 +13,6 @@
 
 #include "pxr/imaging/hd/version.h"
 
-#include "pxr/usdImaging/usdRiPxrImaging/tokens.h"
-#include "pxr/usdImaging/usdRiPxrImaging/version.h"
 #include "pxr/usdImaging/usdVolImaging/tokens.h"
 
 #include "pxr/usd/sdf/types.h"
@@ -135,11 +133,7 @@ _PopulateVolumeFilterNodes(
 
         // Look up volume filter ID
         if (HdSprim* sprim = sceneDelegate->GetRenderIndex().GetSprim(
-#if USD_RI_PXR_IMAGING_API_VERSION >= 3
-                UsdRiPxrImagingPrimTypeTokens->volumeFilter, filterPath)) {
-#else
                 _tokens->volumeFilter, filterPath)) {
-#endif
             if (auto* volumeFilter = dynamic_cast<HdPrman_VolumeFilter*>(sprim)) {
                 volumeFilter->SyncToRiley(sceneDelegate, param, riley);
                 coordsysIds->push_back(volumeFilter->GetCoordSysId());
@@ -209,8 +203,10 @@ HdPrman_Volume::Finalize(HdRenderParam *renderParam)
     if (!_volumeFilterIds.empty()) {
         auto* param = static_cast<HdPrman_RenderParam*>(renderParam);
         riley::Riley* riley = param->AcquireRiley();
-        for (const auto& filterId : _volumeFilterIds) {
-            riley->DeleteVolumeFilter(filterId);
+        if (riley) {
+            for (const auto& filterId : _volumeFilterIds) {
+                riley->DeleteVolumeFilter(filterId);
+            }
         }
         _volumeFilterIds.clear();
     }

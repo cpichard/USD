@@ -959,12 +959,17 @@ UsdImagingPrimAdapter::_IsPrimvarFilteringNeeded() const
         IsPrimvarFilteringNeeded();
 }
 
+TfTokenVector 
+UsdImagingPrimAdapter::_GetShadingSystems() const
+{
+    return _delegate->GetRenderIndex().GetRenderDelegate()->
+            GetShadingSystems();
+}
 
 TfTokenVector 
 UsdImagingPrimAdapter::_GetShaderSourceTypes() const
 {
-    return _delegate->GetRenderIndex().GetRenderDelegate()->
-            GetShaderSourceTypes();
+    return _GetShadingSystems();
 }
 
 bool 

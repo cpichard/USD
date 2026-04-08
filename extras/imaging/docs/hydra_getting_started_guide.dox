@@ -49,8 +49,6 @@ stages:
   \image html legacy_scene_delegate_emulation.png
 
 - The switch from the HdxTaskController to the HdxTaskControllerSceneIndex.
-  This can be disabled by setting the now deprecated
-  \c USDIMAGINGGL_ENGINE_ENABLE_TASK_SCENE_INDEX to \c false.
 - The switch from UsdImagingDelegate to the usd imaging scene indices.
   This can be disabled by setting \c USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX to
   \c false.

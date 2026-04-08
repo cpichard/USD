@@ -77,10 +77,6 @@ TF_DEFINE_ENV_SETTING(
     "Issue a deprecation warning when USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX "
     "is overriden to false.");
 
-/// \deprecated. Will always use task controller scene index in the future.
-TF_DEFINE_ENV_SETTING(USDIMAGINGGL_ENGINE_ENABLE_TASK_SCENE_INDEX, true,
-                      "Use Scene Index API for task controller");
-
 /// \deprecated. Will always use HdRenderer in the future.
 TF_DEFINE_ENV_SETTING(
     USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_OBSERVER_RENDERER, true,
@@ -261,8 +257,7 @@ bool
 _GetUseTaskControllerSceneIndex()
 {
     static bool result =
-        HdRenderIndex::IsSceneIndexEmulationEnabled() &&
-        TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_TASK_SCENE_INDEX);
+        HdRenderIndex::IsSceneIndexEmulationEnabled();
 
     return result;
 }
@@ -2709,8 +2704,8 @@ UsdImagingGLEngine::_PreSetTime(const UsdImagingGLRenderParams& params)
 
     if (UseUsdImagingSceneIndex()) {
         // The UsdImagingStageSceneIndex has no complexity opinion.
-        // We force the value here upon all prims.
-        _displayStyleSceneIndex->SetRefineLevel({true, refineLevel});
+        // We provide a fallback value here for all prims.
+        _displayStyleSceneIndex->SetRefineLevelFallback(refineLevel);
 
         _ScopedHydraNoticeBatch noticeBatch(
                 _postInstancingNoticeBatchingSceneIndex);

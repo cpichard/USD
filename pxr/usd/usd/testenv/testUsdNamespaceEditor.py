@@ -1676,6 +1676,29 @@ class TestUsdNamespaceEditor(unittest.TestCase):
         # since there are no specs across the ancestral reference.
         _VerifyCanEditPrimAtPath("/PrimWithReference/B/B_Root_Child")
 
+        # Relocates sources and targets are updated when edits that implicitly 
+        # affect them are applied.
+        if allowRelocatesAuthoring:
+            # Author an edit that will create a relocates arc.
+            self.assertTrue(editor.MovePrimAtPath("/PrimWithReference/B", 
+                                                  "/PrimWithReference/Moved_B"))
+            self._ApplyEditWithVerification(editor)
+            # Verify a relocate was authored.
+            self.assertEqual(rootLayer.relocates, [
+            (Sdf.Path("/PrimWithReference/B"), 
+                Sdf.Path("/PrimWithReference/Moved_B"))
+            ])
+
+            # Author an edit to an ancestor of the relocates source
+            self.assertTrue(editor.MovePrimAtPath("/PrimWithReference", 
+                                                  "/Moved_PrimWithReference"))
+            self._ApplyEditWithVerification(editor)
+            # Verify the relocate was updated.
+            self.assertEqual(rootLayer.relocates, [
+            (Sdf.Path("/Moved_PrimWithReference/B"), 
+                Sdf.Path("/Moved_PrimWithReference/Moved_B"))
+            ])
+
         # A prim with a subroot prim reference behaves the same way as a prim
         # with a root prim reference.
         _VerifyCanEditPrimAtPath("/PrimWithSubrootReference")

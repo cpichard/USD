@@ -27,6 +27,7 @@
 
 #include <iterator>
 #include <map>
+#include <optional>
 #include <ostream>
 #include <queue>
 #include <set>
@@ -37,12 +38,13 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_ENV_SETTING(HD_SCENE_INDEX_PLUGIN_ORDERING_POLICY_DEFAULT,
-    "CppRegistrationOnly",
+    "Hybrid",
     "Default policy for ordering scene index plugins. Options are: "
     "{CppRegistrationOnly, JsonMetadataOnly, Hybrid}. "
-    "The default is CppRegistrationOnly, which means the order of plugins is "
-    "determined solely by the insertion phase/order arguments of the C++ "
-    "registration API."
+    "The default is 'Hybrid', which means the order of plugins is "
+    "determined by a combination of the insertion phase/order arguments to the "
+    "C++ registration API and the tags and ordering fields in the JSON "
+    "metadata."
 );
 
 TF_DEFINE_PUBLIC_TOKENS(HdSceneIndexPluginRegistryTokens,
@@ -216,7 +218,6 @@ operator<<(std::ostream &out, const TfTokenVector &tokens)
 std::ostream &
 operator<<(std::ostream &out, const _JsonEntry::_InsertionPosition &position)
 {
-    out << "position: ";
     switch (position) {
         case _JsonEntry::_InsertionPosition::FirstAfter:
             out << "FirstAfter";
@@ -294,7 +295,7 @@ operator<<(std::ostream &out, const _ResolvedEntry &entry)
         << "\n\t tags " << entry.tags
         << "\n\t insert after " << entry.ordering.afterTags
         << "\n\t insert before " << entry.ordering.beforeTags
-        << "\n\t insertion position" << entry.ordering.position
+        << "\n\t position" << entry.ordering.position
         << "\n";
     return out;
 }
@@ -322,6 +323,77 @@ using _VisitedSet = std::set<HdSceneIndexBaseRefPtr>;
 using _StringPair = std::pair<std::string, std::string>;
 
 } // anon
+
+// Utilities for cycle detection and graph manipulation.
+namespace _GraphUtil
+{
+
+using AdjacencyList = std::vector<std::set<size_t>>;
+using Edge = std::pair<size_t, size_t>;
+using Edges = std::vector<Edge>;
+
+struct CycleResult
+{
+    bool HasCycle() const {
+        return backEdges.has_value() && !backEdges->empty();
+    }
+
+    std::optional<Edges> backEdges;
+};
+
+CycleResult
+DetectCycles(const AdjacencyList &adjacencyList)
+{
+    // Perform DFS and track back edges to detect cycles.
+    std::vector<bool> visited(adjacencyList.size(), false);
+    std::vector<bool> onStack(adjacencyList.size(), false);
+    Edges backEdges;
+
+    std::function<void(size_t)> dfs = [&](size_t node) {
+        visited[node] = true;
+        onStack[node] = true;
+
+        for (size_t neighbor : adjacencyList[node]) {
+            if (!visited[neighbor]) {
+                dfs(neighbor);
+            } else if (onStack[neighbor]) {
+                // Found a back edge, which indicates a cycle.
+                backEdges.emplace_back(node, neighbor);
+            }
+        }
+
+        onStack[node] = false;
+    };
+
+    for (size_t i = 0; i < adjacencyList.size(); ++i) {
+        if (!visited[i]) {
+            dfs(i);
+        }
+    }
+
+    return {CycleResult{std::move(backEdges)}};
+}
+
+AdjacencyList
+IsolateVertex(const AdjacencyList &adjacencyList, size_t vertexToIsolate)
+{
+    AdjacencyList modifiedList;
+
+    for (size_t i = 0; i < adjacencyList.size(); ++i) {
+        if (i == vertexToIsolate) {
+            modifiedList.push_back({});
+            continue;
+        }
+
+        std::set<size_t> modifiedNeighbors = adjacencyList[i];
+        modifiedNeighbors.erase(vertexToIsolate);
+        modifiedList.push_back(std::move(modifiedNeighbors));
+    }
+
+    return modifiedList;
+}
+
+} // namespace _GraphUtil
 
 struct HdSceneIndexPluginRegistry::_Impl
 {
@@ -553,6 +625,110 @@ HdSceneIndexPluginRegistry::_Impl::_ComputeOrderedEntries(
         }
     }
 
+    // Check if the graph has any cycles. If it does, try to recover by
+    // attempting to find a single plugin whose isolation (removing all edges to
+    // and from that plugin) breaks all cycles.
+    // If such a plugin is found, compute the topological ordering for the
+    // resulting acyclic graph and return that as the resolved ordering.
+    // If no such plugin is found, fall back to registration-based ordering,
+    // which does not honor any ordering constraints specified in JSON metadata,
+    // but is guaranteed to be cycle-free.
+    // Provide sufficient debug information to help identify the problematic
+    // plugin so the user can fix it.
+    // 
+    const auto cycleResult = _GraphUtil::DetectCycles(successors);
+    if (cycleResult.HasCycle()) {
+        TF_WARN(
+            "Detected a cycle in the scene index plugin ordering constraints "
+            "for renderer '%s' & app '%s' for ordering policy '%s'. "
+            "The scene index plugins may not be run in the intended order.\n"
+            "%s",
+            rendererAndApp.first.c_str(), rendererAndApp.second.c_str(),
+            TfEnum::GetName(orderingPolicy).c_str(),
+            !TfDebug::IsEnabled(HD_SCENE_INDEX_PLUGIN_ORDERING)
+            ? "Please use the debug flag HD_SCENE_INDEX_PLUGIN_ORDERING to get "
+              "more information.\n"
+            : "");
+
+        if (TfDebug::IsEnabled(HD_SCENE_INDEX_PLUGIN_ORDERING)) {
+            std::stringstream ss;
+            ss  << "Detected " << cycleResult.backEdges.value().size()
+                << " cycle(s) in plugin ordering constraints for renderer '"
+                << rendererAndApp.first << "' & app '" << rendererAndApp.second
+                << "'." << std::endl;
+            TfDebug::Helper().Msg("%s", ss.str().c_str());
+        }
+
+        // The typical error case is one plugin introducing a cycle.
+        // See if isolating that plugin (removing all edges to and from that
+        // plugin) breaks all cycles.
+        std::optional<size_t> cycleBreakingVertex;
+        std::set<size_t> isolatedVertices;
+        for (const auto &[from, to] : cycleResult.backEdges.value()) {
+            for (size_t vertex : {from, to}) {
+                if (isolatedVertices.count(vertex) > 0) {
+                    continue;
+                }
+                isolatedVertices.insert(vertex);
+            
+                // Check if isolating the vertex breaks all cycles.
+                const auto modifiedSuccessors =
+                    _GraphUtil::IsolateVertex(successors, vertex);
+                const auto modifiedCycleResult =
+                    _GraphUtil::DetectCycles(modifiedSuccessors);
+                if (!modifiedCycleResult.HasCycle()) {
+                    cycleBreakingVertex = vertex;
+                    break;
+                }
+            }
+        }
+
+        if (!cycleBreakingVertex) {
+             TF_DEBUG(HD_SCENE_INDEX_PLUGIN_ORDERING).Msg(
+                "Failed to find a single plugin whose isolation breaks all "
+                "cycles in the plugin ordering constraints. Falling back to "
+                "registration-based ordering, which does not honor any "
+                "ordering constraints specified in JSON metadata.\n");
+            
+            const auto regEntries =
+                _ComputeOrderedEntriesFromRegistration(rendererAndApp);
+            return _ResolvedEntryList(regEntries.begin(), regEntries.end());
+        }
+
+        if (TfDebug::IsEnabled(HD_SCENE_INDEX_PLUGIN_ORDERING)) {
+            std::stringstream ss;
+            ss  << "Isolating plugin '"
+                << entries[*cycleBreakingVertex].sceneIndexPluginId
+                << "' breaks all cycles in the plugin ordering constraints. "
+                << "Its ordering constrains will be ignored and it will be "
+                << "positioned towards the end."
+                << "Please check the ordering-related metadata ";
+            
+            if (orderingPolicy == PluginOrderingPolicy::Hybrid) {
+                ss << "and the registration insertion phase ";
+            }
+            ss << "for this plugin.\n\n";
+
+            if (orderingPolicy == PluginOrderingPolicy::Hybrid) {
+                ss  << "Registration + JSON entry for the plugin:\n"
+                    << entries[*cycleBreakingVertex] << "\n";
+            }
+
+            TfDebug::Helper().Msg("%s", ss.str().c_str());
+        }
+        
+        successors =
+            _GraphUtil::IsolateVertex(successors, *cycleBreakingVertex);
+        
+        // Recompute in-degrees for the resulting graph,
+        std::fill(inDegree.begin(), inDegree.end(), 0);
+        for (size_t fromIndex = 0; fromIndex < successors.size(); ++fromIndex) {
+            for (size_t toIndex : successors[fromIndex]) {
+                inDegree[toIndex]++;
+            }
+        }
+    }
+
     // Topological sort using Kahn's algorithm.
     // First, partition entries into those with zero in-degree that are 
     // connected to other entries (i.e. have non-empty successor sets) and those
@@ -630,40 +806,16 @@ HdSceneIndexPluginRegistry::_Impl::_ComputeOrderedEntries(
         sortedEntries.push_back(entries[index]);
     }
 
-    if (sortedEntries.size() != entries.size()) {
-        const auto &[rendererDisplayName, appName] = rendererAndApp;
-
-        TF_WARN(
-            "Detected a cycle in the scene index plugin ordering constraints "
-            "for renderer '%s' & app '%s'. The ordering constraints will be "
-            "ignored, and the plugins will be run in an arbitrary order.\n"
-            "Please use the debug flag HD_SCENE_INDEX_PLUGIN_REGISTRY to "
-            "get more information.",
-            rendererDisplayName.c_str(), appName.c_str());
+    if (!TF_VERIFY(sortedEntries.size() == entries.size(),
+            "Topological ordering for the ordering policy %s failed to sort "
+            "all entries for renderer '%s' and app '%s'. "
+            "Falling back to registration-based ordering.",
+            TfEnum::GetName(orderingPolicy).c_str(),
+            rendererAndApp.first.c_str(), rendererAndApp.second.c_str())) {
         
-        if (TfDebug::IsEnabled(HD_SCENE_INDEX_PLUGIN_REGISTRY)) {
-            std::stringstream ss;
-            ss << "Partial ordering generated before detecting the cycle:\n";
-            for (const _ResolvedEntry& entry : sortedEntries) {
-                ss << entry;
-            }
-            ss << "\nRemaining entries that were not sorted:\n";
-            for (const _ResolvedEntry& entry : entries) {
-                if (std::find_if(sortedEntries.begin(), sortedEntries.end(),
-                        [&](const _ResolvedEntry& sortedEntry) {
-                            return sortedEntry.sceneIndexPluginId ==
-                                entry.sceneIndexPluginId;
-                        }) == sortedEntries.end()) {
-                    ss << entry;
-                }
-            }
-
-            TfDebug::Helper().Msg("%s", ss.str().c_str());
-        }
-
-        // Could consider returning the partially sorted list here instead of 
-        // ignoring the ordering constraints entirely...
-        return entries;
+        const auto regEntries =
+            _ComputeOrderedEntriesFromRegistration(rendererAndApp);
+        return _ResolvedEntryList(regEntries.begin(), regEntries.end());
     }
 
     return sortedEntries;
@@ -749,6 +901,11 @@ HdSceneIndexPluginRegistry::_Impl::_ComposeRegistrationAndJsonEntries(
             composedEntry.ordering.position =
                 regEntry.ordering.position;
         }
+
+        // Also copy over registration-specific fields to the composed entry.
+        composedEntry.args = regEntry.args;
+        composedEntry.phase = regEntry.phase;
+        composedEntry.order = regEntry.order;
     }
 
     return composedEntries;
@@ -1284,7 +1441,7 @@ HdSceneIndexPluginRegistry::AppendSceneIndicesForRenderer(
     const _ResolvedEntryList orderedEntries =
         _impl->ComputeOrderedEntriesForRenderer({rendererDisplayName, appName});
 
-    if (TfDebug::IsEnabled(HD_SCENE_INDEX_PLUGIN_REGISTRY)) {
+    if (TfDebug::IsEnabled(HD_SCENE_INDEX_PLUGIN_ORDERING)) {
         _PrintEntries(orderedEntries, rendererDisplayName, appName);
     }
 

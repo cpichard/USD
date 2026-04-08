@@ -99,9 +99,12 @@ class SdfAssetPath;
 /// to best express the intent of the light setup.
 /// 
 /// <b>Encapsulation</b>
-/// 
 /// A prim with LightAPI applied must not be parented under a
-/// UsdShadeConnectable prim. See \ref usdLux_Encapsulation for details.
+/// UsdShadeConnectable prim, with the exception of prims which themselves have
+/// UsdLuxLightAPI applied. Some lighting scenarios require light prims to be 
+/// parented under other light prims. For example, a DomeLight might contain
+/// PortalLight children to refine the lighting for a particular scene.
+/// 
 /// 
 ///
 /// For any described attribute \em Fallback \em Value or \em Allowed \em Values below

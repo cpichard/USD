@@ -72,22 +72,24 @@ has a built-in UsdLuxLightAPI.
 
 \subsection usdLux_Encapsulation Encapsulation Rules
 
-UsdLux lights and light filters are connectable prims and follow the generic
-\ref UsdShadeEncapsulation "UsdShade encapsulation rules". In addition, the 
-following rules apply:
+UsdLux lights and light filters are connectable container prims and follow the 
+generic \ref UsdShadeEncapsulation "UsdShade encapsulation rules". In addition,
+the following rules apply:
 
-- A prim with UsdLuxLightAPI applied (i.e. a light) must not have a
-  connectable parent.  Lights cannot reside inside a UsdShadeNodeGraph,
-  UsdShadeMaterial, UsdLuxLightFilter, or any other connectable container.
+- A prim with UsdLuxLightAPI applied (i.e. a light) must not have a connectable
+  parent (UsdShadeNodeGraph, UsdShadeMaterial, UsdLuxLightFilter etc). With the
+  exception of prims which themselves have UsdLuxLightAPI applied (i.e. are
+  lights), as some light concepts benefit from parenting lights inside other 
+  lights, such as PortalLights nested under a DomeLight that consumes them as 
+  modifiers to its sampling.
 
-- A UsdLuxLightFilter is a connectable container and may have connectable 
-  children, such as shaders that implement the filter. While the order of 
-  application of LightFilters is expressed via the LightAPI's light:filters 
-  relationship, LightFilters may also be nested inside other LightFilters to 
-  indicate they only apply to that one LightFilter's contribution in the 
-  filter-chain. While LightFilters can (and are encouraged to be) nested inside 
-  light prims (with UsdLuxLightAPI applied), they cannot be nested under 
-  unrelated connectable container prims like UsdShadeMaterial.
+- For UsdLuxLightFilter, while the order of application of LightFilters is 
+  expressed via the LightAPI's light:filters relationship, LightFilters may also 
+  be nested inside other LightFilters to indicate they only apply to that one 
+  LightFilter's contribution in the filter-chain. While LightFilters can (and 
+  are encouraged to be) nested inside light prims (with UsdLuxLightAPI applied), 
+  they cannot be nested under unrelated connectable container prims like 
+  UsdShadeMaterial.
 
 \subsection usdLux_Geometry Geometry
 

@@ -40,9 +40,6 @@
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/sdr/registry.h"
 
-#include "pxr/usdImaging/usdRiPxrImaging/tokens.h"
-#include "pxr/usdImaging/usdRiPxrImaging/version.h"
-
 #include "pxr/base/gf/vec3f.h"
 #include "pxr/base/gf/vec4f.h"
 #include "pxr/base/tf/diagnostic.h"
@@ -209,6 +206,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (__FnKat_bbox)
     (viewerMouseClick)
     ((houdiniInteractive, "houdini:interactive"))
+    (volumeFilter)
 );
 
 TF_DEFINE_PUBLIC_TOKENS(HdPrmanRenderSettingsTokens,
@@ -263,8 +261,8 @@ const TfTokenVector HdPrmanRenderDelegate::SUPPORTED_SPRIM_TYPES =
     HdPrimTypeTokens->diskLight,
     HdPrimTypeTokens->cylinderLight,
     HdPrimTypeTokens->sphereLight,
-#if USD_RI_PXR_IMAGING_API_VERSION >= 3 && _PRMANAPI_VERSION_MAJOR_ >= 27
-    UsdRiPxrImagingPrimTypeTokens->volumeFilter,
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+    _tokens->volumeFilter,
 #endif
 #if PXR_VERSION <= 2211
     HdPrmanTokens->meshLight,
@@ -568,8 +566,8 @@ HdPrmanRenderDelegate::CreateSprim(TfToken const& typeId,
         sprim = new HdPrmanMaterial(sprimId);
     } else if (typeId == HdPrimTypeTokens->coordSys) {
         sprim = new HdPrmanCoordSys(sprimId);
-#if USD_RI_PXR_IMAGING_API_VERSION >= 3
-    } else if (typeId == UsdRiPxrImagingPrimTypeTokens->volumeFilter) {
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+    } else if (typeId == _tokens->volumeFilter) {
         sprim = new HdPrman_VolumeFilter(sprimId);
 #endif
     } else if (typeId == HdPrimTypeTokens->lightFilter) {
@@ -630,8 +628,8 @@ HdPrmanRenderDelegate::CreateFallbackSprim(TfToken const& typeId)
         return new HdPrmanCoordSys(SdfPath::EmptyPath());
     } else if (typeId == HdPrimTypeTokens->lightFilter) {
         return new HdPrmanLightFilter(SdfPath::EmptyPath(), typeId);
-#if USD_RI_PXR_IMAGING_API_VERSION >= 3
-    } else if (typeId == UsdRiPxrImagingPrimTypeTokens->volumeFilter) {
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+    } else if (typeId == _tokens->volumeFilter) {
         return new HdPrman_VolumeFilter(SdfPath::EmptyPath());
 #endif
     } else if (typeId == HdPrimTypeTokens->light ||

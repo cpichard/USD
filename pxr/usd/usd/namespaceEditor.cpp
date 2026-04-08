@@ -1282,7 +1282,7 @@ UsdNamespaceEditor::_EditProcessor::_GatherTargetListOpEdits()
 
         // For target paths that are contributed by specs that originate across
         // arcs below the root node, we can't edit these specs directly. 
-        // Instead we'd need relocates to map these paths. In this case we find
+        // Instead we'd need relocates to map these paths. In this case we 
         // compose the target list, excluding the root node opinions, to see if 
         // any of them would be affected by the namespace edit and therefore 
         // require a relocates
@@ -1298,6 +1298,21 @@ UsdNamespaceEditor::_EditProcessor::_GatherTargetListOpEdits()
             if (specInfo.originatingNode.IsRootNode()) {
                 break;
             }
+
+            SdfPath pathAtIntroduction = rIt->originatingNode.GetPathAtIntroduction();
+            SdfPath translatedPathAtIntroduction = 
+                rIt->originatingNode.GetMapToRoot().MapSourceToTarget(
+                pathAtIntroduction);
+
+            // Before we check whether the target requires relocates, first check
+            // whether the edit could possibly affect anything across this 
+            // composition arc. If the edit is strictly to the source prim of 
+            // the composition arc or its ancestors, that edit will not 
+            // affect any paths coming from the target of the arc since they are 
+            // outside the scope of that arc. If so, we can skip this property spec.
+            if (translatedPathAtIntroduction.HasPrefix(_editDesc.oldPath)) {
+                continue;
+            } 
 
             // Apply each list op, translating the paths into stage namespace.
             rIt->GetTargetListOp().ApplyOperations(&targetsRequireRelocates,
