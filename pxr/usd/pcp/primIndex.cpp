@@ -3101,38 +3101,18 @@ _EvalImpliedRelocations(
 ////////////////////////////////////////////////////////////////////////
 // Class-based Arcs
 
-// Walk over the child nodes of parent, looking for an existing inherit
-// node.
+// Return child node of given parent with the given site, or PcpNodeRef()
+// if no such node exists.
 static PcpNodeRef
 _FindMatchingChild(const PcpNodeRef& parent,
-                   const PcpArcType parentArcType,
-                   const PcpLayerStackSite& site,
-                   const PcpArcType arcType,
-                   const PcpMapExpression & mapToParent,
-                   int depthBelowIntroduction)
+                   const PcpLayerStackSite& site)
 {
     // Arbitrary-order traversal.
     TF_FOR_ALL(childIt, Pcp_GetChildrenRange(parent)) {
         const PcpNodeRef& child = *childIt;
-
-        // XXX:RelocatesSourceNodes: This somewhat arcane way of comparing
-        // inherits arc "identity" is necessary to handle the way implied
-        // inherits map across relocation source nodes.  In particular,
-        // comparing only the sites there would give us a collision, because
-        // the sites for implied inherits under relocates sources are
-        // not necessarily meaningful.
-        if (parentArcType == PcpArcTypeRelocate) {
-            if (child.GetArcType() == arcType &&
-                child.GetMapToParent().Evaluate() == mapToParent.Evaluate() &&
-                child.GetOriginNode().GetDepthBelowIntroduction()
-                == depthBelowIntroduction) {
-                return child;
-            }
-        }
-        else {
-            if (child.GetSite() == site) {
-                return child;
-            }
+        if (child.GetLayerStack() == site.layerStack &&
+            child.GetPath() == site.path) {
+            return child;
         }
     }
     return PcpNodeRef();
@@ -3280,10 +3260,34 @@ _AddClassBasedArc(
     // Check if there are multiple inherits with the same site.
     // For example, this might be an implied inherit that was also
     // broken down explicitly.
-    if (PcpNodeRef child = _FindMatchingChild(
-            parent, parentArcType, inheritSite, arcType, inheritMap,
-            origin.GetDepthBelowIntroduction())) {
+    auto findMatchingChild = [&]() {
+        if (parentArcType != PcpArcTypeRelocate) {
+            return _FindMatchingChild(parent, inheritSite);
+        }
 
+        // XXX:RelocatesSourceNodes: This somewhat arcane way of comparing
+        // inherits arc "identity" is necessary to handle the way implied
+        // inherits map across relocation source nodes.  In particular,
+        // comparing only the sites there would give us a collision, because
+        // the sites for implied inherits under relocates sources are
+        // not necessarily meaningful.
+        const int depthBelowIntroduction = origin.GetDepthBelowIntroduction();
+        const PcpMapExpression& mapToParent = inheritMap;
+        TF_FOR_ALL(childIt, Pcp_GetChildrenRange(parent)) {
+            const PcpNodeRef& child = *childIt;
+            if (child.GetArcType() == arcType &&
+                child.GetOriginNode().GetDepthBelowIntroduction()
+                    == depthBelowIntroduction &&
+                child.GetMapToParent().Evaluate()
+                    == mapToParent.Evaluate()) {
+                return child;
+            }
+        }
+        
+        return PcpNodeRef();
+    };
+
+    if (PcpNodeRef child = findMatchingChild()) {
         PCP_INDEXING_MSG(
             indexer, parent, child,
             TfEnum::GetDisplayName(arcType).c_str(),
@@ -3839,11 +3843,7 @@ _PropagateNodeToRoot(
     PcpNodeRef parentNode = srcNode.GetRootNode();
     const PcpMapExpression& mapToParent = srcNode.GetMapToRoot();
 
-    PcpNodeRef newNode = _FindMatchingChild(
-        parentNode, srcNode.GetArcType(),
-        srcNode.GetSite(), srcNode.GetArcType(),
-        mapToParent, srcNode.GetDepthBelowIntroduction());
-
+    PcpNodeRef newNode = _FindMatchingChild(parentNode, srcNode.GetSite());
     if (!newNode) {
         _ArcOptions opts;
         opts.skipDuplicateNodes = true;
