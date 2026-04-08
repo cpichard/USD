@@ -20,8 +20,8 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-static ExecIrResult _Compute(const VdfContext &ctx);
-static ExecIrResult _Invert(const VdfContext &ctx);
+static ExecIrResult _Compute(const VdfContext &);
+static ExecIrResult _Invert(const VdfContext &);
 
 EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrFkController)
 {
@@ -76,8 +76,15 @@ _Compute(const VdfContext &ctx)
 static ExecIrResult
 _Invert(const VdfContext &ctx)
 {
-    const GfMatrix4d &posedSpace =
-        ctx.GetInputValue<GfMatrix4d>(ExecIrTokens->outSpaceToken);
+    ExecIrResult resultMap;
+
+    // TODO: The controller code should do the check for missing invertible
+    // output values so that the client code doesn't need to.
+    const GfMatrix4d *const posedSpace =
+        ctx.GetInputValuePtr<GfMatrix4d>(ExecIrTokens->outSpaceToken);
+    if (!posedSpace) {
+        return resultMap;
+    }
 
     const GfMatrix4d startingSpace =
         ExecIr_UtilsComputeStandardStartingSpace(ctx);
@@ -88,7 +95,6 @@ _Invert(const VdfContext &ctx)
         ExecIr_UtilsComputeStandardRotationOrientation(ctx, startingSpace)
     };
 
-    ExecIrResult resultMap;
-    ExecIr_UtilsInvert(ctx, posedSpace, params, &resultMap);
+    ExecIr_UtilsInvert(ctx, *posedSpace, params, &resultMap);
     return resultMap;
 }

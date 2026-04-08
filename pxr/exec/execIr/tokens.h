@@ -17,10 +17,18 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#define EXEC_IR_TOKENS                          \
-    (forwardCompute)                            \
-    (inverseCompute)                            \
+#define EXEC_IR_COMPUTATION_TOKENS              \
+    (computeDesiredValue)                       \
+    (explicitDesiredValue)                      \
                                                 \
+    (computeInvertedForwardValue)               \
+    (forwardCompute)                            \
+    (inverseCompute)
+
+TF_DECLARE_PUBLIC_TOKENS(
+    ExecIrComputationTokens, EXECIR_API, EXEC_IR_COMPUTATION_TOKENS);
+
+#define EXEC_IR_TOKENS                          \
     ((parentSpaceToken, "ParentIn:Space"))      \
                                                 \
     ((defaultSpaceToken, "In:DefaultSpace"))    \

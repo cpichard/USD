@@ -25,6 +25,7 @@
 #include "pxr/usd/usd/stage.h"
 
 #include <iostream>
+#include <utility>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -41,25 +42,33 @@ PXR_NAMESPACE_USING_DIRECTIVE
         }                                                                      \
     }()
 
+struct _EnsureNoErrors {
+    ~_EnsureNoErrors() {
+        TF_VERIFY(mark.IsClean());
+    }
+
+    TfErrorMark mark;
+};
+
 static void
 Test_IrForwardCompute()
 {
+    _EnsureNoErrors mark;
+
     const SdfLayerRefPtr layer = SdfLayer::CreateAnonymous(".usda");
     layer->ImportFromString(
         R"usda(
         #usda 1.0
 
-        def Scope "Root" (
-            kind = "component"
-        )
-        {
+        def Scope "Root" {
             def IrFkController "FkController" {
-                double In:Rx = 90.0
-                double In:Ry = -90.0
-                double In:Rz = 90.0
-                double In:Tx = 1.0
-                double In:Ty = 2.0
-                double In:Tz = 3.0
+                double In:Rx =    90.0
+                double In:Ry =   -90.0
+                double In:Rz =    90.0
+                double In:Rspin =  0.0
+                double In:Tx =     1.0
+                double In:Ty =     2.0
+                double In:Tz =     3.0
             }
         }
         )usda");
@@ -77,24 +86,18 @@ Test_IrForwardCompute()
     });
     TF_AXIOM(request.IsValid());
 
-    execSystem.PrepareRequest(request);
-    TF_AXIOM(request.IsValid());
-
+    // Compute forward to get the output value produced by the authored scene.
     {
-        TfErrorMark mark;
-
         ExecUsdCacheView cache = execSystem.Compute(request);
         const VtValue value = cache.Get(0);
         TF_AXIOM(!value.IsEmpty());
 
         ASSERT_CLOSE(
             value.Get<GfMatrix4d>(),
-            GfMatrix4d(0, 0, 1, 0,
+            GfMatrix4d(0,  0, 1, 0,
                        0, -1, 0, 0,
-                       1, 0, 0, 0,
-                       1, 2, 3, 1));
-
-        TF_AXIOM(mark.IsClean());
+                       1,  0, 0, 0,
+                       1,  2, 3, 1));
     }
 
     // Now set the parent space and compute again.
@@ -112,30 +115,25 @@ Test_IrForwardCompute()
         TF_AXIOM(!value.IsEmpty());
         ASSERT_CLOSE(
             value.Get<GfMatrix4d>(),
-            GfMatrix4d(0, 0, 1, 0,
+            GfMatrix4d(0,  0, 1, 0,
                        0, -1, 0, 0,
-                       1, 0, 0, 0,
-                       2, 3, 4, 1));
+                       1,  0, 0, 0,
+                       2,  3, 4, 1));
     }
 }
 
 static void
 Test_IrInverseCompute()
 {
+    _EnsureNoErrors mark;
+
     const SdfLayerRefPtr layer = SdfLayer::CreateAnonymous(".usda");
     layer->ImportFromString(
         R"usda(
         #usda 1.0
 
-        def Scope "Root" (
-            kind = "component"
-        )
-        {
+        def Scope "Root" {
             def IrFkController "FkController" {
-                matrix4d Out:Space = ((0,  0, 1, 0),
-                                      (0, -1, 0, 0),
-                                      (1,  0, 0, 0),
-                                      (1,  2, 3, 1))
             }
         }
         )usda");
@@ -146,42 +144,85 @@ Test_IrInverseCompute()
     const UsdPrim prim = usdStage->GetPrimAtPath(SdfPath("/Root/FkController"));
     TF_AXIOM(prim);
 
-    ExecUsdSystem execSystem(usdStage);
-    const ExecUsdRequest request = execSystem.BuildRequest({
-        ExecUsdValueKey{prim, ExecIrTokens->inverseCompute}
-    });
-    TF_AXIOM(request.IsValid());
+    const UsdAttribute outSpace = prim.GetAttribute(ExecIrTokens->outSpaceToken);
+    TF_AXIOM(outSpace);
 
-    execSystem.PrepareRequest(request);
-    TF_AXIOM(request.IsValid());
+    const std::vector<UsdAttribute> inputAttributes = {
+        prim.GetAttribute(ExecIrTokens->rxToken),
+        prim.GetAttribute(ExecIrTokens->ryToken),
+        prim.GetAttribute(ExecIrTokens->rzToken),
+        prim.GetAttribute(ExecIrTokens->rspinToken),
 
-    {
-        TfErrorMark mark;
-
-        ExecUsdCacheView cache = execSystem.Compute(request);
-        const VtValue value = cache.Get(0);
-        TF_AXIOM(!value.IsEmpty());
-        const ExecIrResult valueMap =
-            value.Get<ExecIrResult>();
-
-        const std::vector<std::pair<const char *, double>> expected{{
-            {"In:Rx", 90.0},
-            {"In:Ry", -90.0},
-            {"In:Rz", 90.0},
-            {"In:Tx", 1.0},
-            {"In:Ty", 2.0},
-            {"In:Tz", 3.0},
-        }};
-        for (const auto &entry : expected) {
-            const auto it = valueMap.find(TfToken(entry.first));
-            TF_AXIOM(it != valueMap.end());
-            ASSERT_CLOSE(it->second.Get<double>(), entry.second);
-        }
-
-        TF_AXIOM(mark.IsClean());
+        prim.GetAttribute(ExecIrTokens->txToken),
+        prim.GetAttribute(ExecIrTokens->tyToken),
+        prim.GetAttribute(ExecIrTokens->tzToken),
+    };
+    for (const UsdAttribute &attr : inputAttributes) {
+        TF_AXIOM(attr);
     }
 
-    // Now set the parent space and compute again.
+    ExecUsdSystem execSystem(usdStage);
+
+    std::vector<ExecUsdValueKey> valueKeys;
+    for (const UsdAttribute &attr : inputAttributes) {
+        valueKeys.emplace_back(
+            attr, ExecIrComputationTokens->computeDesiredValue);
+    }
+    const ExecUsdRequest request = execSystem.BuildRequest(std::move(valueKeys));
+    TF_AXIOM(request.IsValid());
+
+    // Perform an inverse compute, to get the values of the invertible inputs
+    // that produce the desired value for the output space.
+    {
+        const GfMatrix4d desiredOutSpaceValue(0,  0, 1, 0,
+                                              0, -1, 0, 0,
+                                              1,  0, 0, 0,
+                                              1,  2, 3, 1);
+        ExecUsdValueOverrideVector overrides {
+            {{outSpace, ExecIrComputationTokens->explicitDesiredValue},
+             VtValue(desiredOutSpaceValue)}
+        };
+        ExecUsdCacheView cache =
+            execSystem.ComputeWithOverrides(request, std::move(overrides));
+
+        // Expected input values in the same order as the value keys in the
+        // request.
+        const std::vector<double> expectedInputValues{
+            90.0, -90.0, 90.0, 0.0,    1.0, 2.0, 3.0,
+        };
+        for (unsigned int index=0; index<expectedInputValues.size(); ++index) {
+            ASSERT_CLOSE(
+                cache.Get(index).Get<double>(),
+                expectedInputValues[index]);
+        }
+    }
+
+    // Compute with a different desired value.
+    {
+        const GfMatrix4d desiredOutSpaceValue( 0,  0, -1, 0,
+                                               0,  1,  0, 0,
+                                               1,  0,  0, 0,
+                                              10, 20, 30, 1);
+        ExecUsdValueOverrideVector overrides {
+            {{outSpace, ExecIrComputationTokens->explicitDesiredValue},
+             VtValue(desiredOutSpaceValue)}
+        };
+        ExecUsdCacheView cache =
+            execSystem.ComputeWithOverrides(request, std::move(overrides));
+
+        // Expected input values in the same order as the value keys in the
+        // request.
+        const std::vector<double> expectedInputValues{
+            0.0, 90.0, 0.0, 0.0,    10.0, 20.0, 30.0,
+        };
+        for (unsigned int index=0; index<expectedInputValues.size(); ++index) {
+            ASSERT_CLOSE(
+                cache.Get(index).Get<double>(),
+                expectedInputValues[index]);
+        }
+    }
+
+    // Now set the parent space and compute the inverse again.
     {
         const UsdAttribute parentSpace =
             prim.GetAttribute(ExecIrTokens->parentSpaceToken);
@@ -191,25 +232,149 @@ Test_IrInverseCompute()
                                    0, 0, 1, 0,
                                    1, 1, 1, 1));
 
-        ExecUsdCacheView cache = execSystem.Compute(request);
-        const VtValue value = cache.Get(0);
-        TF_AXIOM(!value.IsEmpty());
-        const ExecIrResult valueMap =
-            value.Get<ExecIrResult>();
+        const GfMatrix4d desiredOutSpaceValue( 0,  0, -1, 0,
+                                               0,  1,  0, 0,
+                                               1,  0,  0, 0,
+                                              10, 20, 30, 1);
+        ExecUsdValueOverrideVector overrides {
+            {{outSpace, ExecIrComputationTokens->explicitDesiredValue},
+             VtValue(desiredOutSpaceValue)}
+        };
+        ExecUsdCacheView cache =
+            execSystem.ComputeWithOverrides(request, std::move(overrides));
 
-        const std::vector<std::pair<const char *, double>> expected{{
-            {"In:Rx", 90.0},
-            {"In:Ry", -90.0},
-            {"In:Rz", 90.0},
-            {"In:Tx", 0.0},
-            {"In:Ty", 1.0},
-            {"In:Tz", 2.0},
-        }};
-        for (const auto &entry : expected) {
-            const auto it = valueMap.find(TfToken(entry.first));
-            TF_AXIOM(it != valueMap.end());
-            ASSERT_CLOSE(it->second.Get<double>(), entry.second);
+        // Expected input values in the same order as the value keys in the
+        // request.
+        const std::vector<double> expectedInputValues{
+            0.0, 90.0, 0.0, 0.0,    9.0, 19.0, 29.0,
+        };
+        for (unsigned int index=0; index<expectedInputValues.size(); ++index) {
+            ASSERT_CLOSE(
+                cache.Get(index).Get<double>(),
+                expectedInputValues[index]);
         }
+    }
+}
+
+static void
+Test_DependentFkControllers()
+{
+    _EnsureNoErrors mark;
+
+    // Create a scene with two fkControllers, where the child controller's
+    // parent space is connected to the output of the parent controller.
+    const SdfLayerRefPtr layer = SdfLayer::CreateAnonymous(".usda");
+    layer->ImportFromString(
+        R"usda(
+        #usda 1.0
+
+        def Scope "Root" {
+            def IrFkController "Parent" {
+            }
+
+            def IrFkController "Child" {
+                matrix4d ParentIn:Space.connect = </Root/Parent.Out:Space>
+            }
+        }
+        )usda");
+
+    const UsdStageConstRefPtr usdStage = UsdStage::Open(layer);
+    TF_AXIOM(usdStage);
+
+    const UsdPrim parent = usdStage->GetPrimAtPath(SdfPath("/Root/Parent"));
+    const UsdPrim child = usdStage->GetPrimAtPath(SdfPath("/Root/Child"));
+    TF_AXIOM(parent && child);
+
+    const UsdAttribute parentOutSpace =
+        parent.GetAttribute(ExecIrTokens->outSpaceToken);
+    const UsdAttribute childOutSpace =
+        child.GetAttribute(ExecIrTokens->outSpaceToken);
+    TF_AXIOM(parentOutSpace && childOutSpace);
+
+    const std::vector<UsdAttribute> inputAttributes = {
+        parent.GetAttribute(ExecIrTokens->rxToken),
+        parent.GetAttribute(ExecIrTokens->ryToken),
+        parent.GetAttribute(ExecIrTokens->rzToken),
+        parent.GetAttribute(ExecIrTokens->rspinToken),
+
+        parent.GetAttribute(ExecIrTokens->txToken),
+        parent.GetAttribute(ExecIrTokens->tyToken),
+        parent.GetAttribute(ExecIrTokens->tzToken),
+
+        child.GetAttribute(ExecIrTokens->rxToken),
+        child.GetAttribute(ExecIrTokens->ryToken),
+        child.GetAttribute(ExecIrTokens->rzToken),
+        child.GetAttribute(ExecIrTokens->rspinToken),
+
+        child.GetAttribute(ExecIrTokens->txToken),
+        child.GetAttribute(ExecIrTokens->tyToken),
+        child.GetAttribute(ExecIrTokens->tzToken),
+    };
+    for (const UsdAttribute &attr : inputAttributes) {
+        TF_AXIOM(attr);
+    }
+
+    ExecUsdSystem execSystem(usdStage);
+
+    const ExecUsdRequest outputRequest = execSystem.BuildRequest({
+            ExecUsdValueKey{
+                parentOutSpace, ExecBuiltinComputations->computeValue},
+            ExecUsdValueKey{
+                childOutSpace, ExecBuiltinComputations->computeValue},
+        });
+    TF_AXIOM(outputRequest.IsValid());
+
+    std::vector<ExecUsdValueKey> valueKeys;
+    for (const UsdAttribute &attr : inputAttributes) {
+        valueKeys.emplace_back(
+            attr, ExecIrComputationTokens->computeDesiredValue);
+    }
+    const ExecUsdRequest inputRequest =
+        execSystem.BuildRequest(std::move(valueKeys));
+    TF_AXIOM(inputRequest.IsValid());
+
+    const GfMatrix4d desiredParentOutSpaceValue(0,  0, 1, 0,
+                                                0, -1, 0, 0,
+                                                1,  0, 0, 0,
+                                                0,  0, 0, 1);
+    GfMatrix4d desiredChildOutSpaceValue = desiredParentOutSpaceValue;
+    desiredChildOutSpaceValue.SetTranslateOnly({1, 2, 3});
+
+    // Expected input values in the same order as the value keys in the request.
+    const std::vector<double> expectedInputValues{
+        90.0, -90.0, 90.0, 0.0,    0.0,  0.0, 0.0,
+        0.0,   0.0,   0.0, 0.0,    3.0, -2.0, 1.0,
+    };
+
+    {
+        ExecUsdValueOverrideVector overrides {
+            {{parentOutSpace, ExecIrComputationTokens->explicitDesiredValue},
+             VtValue(desiredParentOutSpaceValue)},
+            {{childOutSpace, ExecIrComputationTokens->explicitDesiredValue},
+             VtValue(desiredChildOutSpaceValue)},
+        };
+        ExecUsdCacheView cache =
+            execSystem.ComputeWithOverrides(inputRequest, std::move(overrides));
+
+        for (unsigned int index=0; index<expectedInputValues.size(); ++index) {
+            ASSERT_CLOSE(
+                cache.Get(index).Get<double>(),
+                expectedInputValues[index]);
+        }
+    }
+
+    // Author the expected input values and confirm we get the desired output
+    // values.
+    {
+        int index = 0;
+        for (const UsdAttribute &attr : inputAttributes) {
+            attr.Set(expectedInputValues[index++]);
+        }
+
+        ExecUsdCacheView cache = execSystem.Compute(outputRequest);
+
+        ASSERT_CLOSE(cache.Get(0).Get<GfMatrix4d>(), desiredParentOutSpaceValue);
+        ASSERT_CLOSE(cache.Get(1).Get<GfMatrix4d>(), desiredChildOutSpaceValue);
     }
 }
 
@@ -217,4 +382,5 @@ int main(int argc, char **argv)
 {
     Test_IrForwardCompute();
     Test_IrInverseCompute();
+    Test_DependentFkControllers();
 }
