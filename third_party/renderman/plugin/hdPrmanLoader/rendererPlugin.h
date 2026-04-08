@@ -51,6 +51,10 @@ public:
         std::string * reasonWhyNot = nullptr) const override;
 #endif
 
+#if HD_API_VERSION >= 90
+    HdContainerDataSourceHandle GetSceneIndexInputArgs() const override;
+#endif
+
 protected:
 
     HDPRMANLOADER_API
