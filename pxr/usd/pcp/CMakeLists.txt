@@ -1256,6 +1256,14 @@ pxr_register_test(testPcpMuseum_TrickyMultipleRelocationsAndClasses2
     DIFF_COMPARE compositionResults_TrickyMultipleRelocationsAndClasses2.txt 
 )
 
+pxr_register_test(testPcpMuseum_TrickyMultipleRelocationsAndClasses3
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults --usd TrickyMultipleRelocationsAndClasses3/root.usda" 
+    TESTENV testenv/testPcpMuseum_TrickyMultipleRelocationsAndClasses3.testenv
+    STDOUT_REDIRECT compositionResults_TrickyMultipleRelocationsAndClasses3.txt
+    DIFF_COMPARE compositionResults_TrickyMultipleRelocationsAndClasses3.txt 
+)
+
 pxr_register_test(testPcpMuseum_TrickyNonLocalVariantSelection
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults --usd TrickyNonLocalVariantSelection/root.usda" 
