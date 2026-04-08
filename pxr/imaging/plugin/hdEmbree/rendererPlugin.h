@@ -28,6 +28,8 @@ class HdEmbreeRendererPlugin final : public HdRendererPlugin
 public:
     HdEmbreeRendererPlugin() = default;
 
+    HdContainerDataSourceHandle GetSceneIndexInputArgs() const override;
+    
     /// Construct a new render delegate of type HdEmbreeRenderDelegate.
     /// Embree render delegates own the embree scene object, so a new render
     /// delegate should be created for each instance of HdRenderIndex.
