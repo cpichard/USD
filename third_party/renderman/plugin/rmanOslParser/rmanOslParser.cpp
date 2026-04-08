@@ -322,10 +322,8 @@ RmanOslParserPlugin::Parse(const NdrNodeDiscoveryResult& discoveryResult)
     // Set Sdr context if it's not already set in metadata, and if it's
     // a semantically valid context defined by USD 26.05.
     if (metadata.find(SdrNodeMetadata->Context) == metadata.end()) {
-        TfToken context = _getSdrContextFromSchemaBase(metadata);
-        if (context != _tokens->shadingSystem) {
-            metadata[SdrNodeMetadata->Context] = context;
-        }
+        metadata[SdrNodeMetadata->Context] = 
+            _getSdrContextFromSchemaBase(metadata);
     }
 #endif
 
@@ -388,6 +386,8 @@ RmanOslParserPlugin::_getSdrContextFromSchemaBase(
     }
     
     // fallback to shadingSystem as default context
+    // NOTE: This fallback will be removed and trigger a change in behavior
+    // in SdrShaderNode::GetContext in an upcoming release.
     return _tokens->shadingSystem;
 }
 
