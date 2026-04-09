@@ -658,7 +658,10 @@ TestRegistrationErrors()
     // The errors that are emitted because of conflicting plugins aren't stable
     // because order can vary, so they are not included among the expected error
     // messages here.
-    EXPECTED_ERRORS(expected, 8, {
+    EXPECTED_ERRORS(expected, 9, {
+        "Attempt to build computations for unknown schema type name "
+        "'TestUnknownSchemaType'.",
+
         "Attempt to register computation 'unknownSchemaTypeComputation' using "
         "an unknown schema type.",
 

@@ -33,6 +33,7 @@
 #include "pxr/usd/sdf/path.h"
 
 #include <memory>
+#include <string>
 #include <type_traits>
 #include <utility>
 
@@ -1323,10 +1324,9 @@ public:
     // Only schema computation registration functions should create computation
     // builders.
     struct ConstructionAccess {
+        EXEC_API
         static ExecComputationBuilder
-        Construct(TfType schemaType) {
-            return ExecComputationBuilder(schemaType);
-        }
+        Construct(const std::string &schemaTypeName);
     };
 
     /// \addtogroup group_Exec_ComputationRegistrations
