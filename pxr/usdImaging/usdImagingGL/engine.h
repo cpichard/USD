@@ -845,7 +845,8 @@ private:
 
     bool _CreateSceneIndicesAndRenderer(
         HdRendererPluginHandle const &plugin,
-        HdContainerDataSourceHandle const &sceneIndexInputArgs);
+        HdContainerDataSourceHandle const &sceneIndexInputArgs,
+        bool hasRendererPluginSceneIndexInputArgs);
 
     void _DestroyHydraObjects();
 

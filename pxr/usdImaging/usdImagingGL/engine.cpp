@@ -88,11 +88,6 @@ TF_DEFINE_ENV_SETTING(
     "Use caching scene index (also requires "
     "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_OBSERVER_RENDERER)");
 
-TF_DEFINE_ENV_SETTING(
-    USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_INPUT_ARGS, false,
-    "Use HdRendererPlugin::GetSceneIndexInputArgs to configure scene indices. "
-    "Requires a renderer such as Storm to implement the new API.");
-
 namespace UsdImagingGLEngine_Impl
 {
 
@@ -267,15 +262,6 @@ _IsEnabledTerminalCachingSceneIndex()
 {
     static bool result =
         TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_CACHING_SCENE_INDEX);
-
-    return result;
-}
-
-bool
-_IsEnabledSceneIndexInputArgs()
-{
-    static bool result =
-        TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_INPUT_ARGS);
 
     return result;
 }
@@ -1636,9 +1622,12 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
         return false;
     }
 
+    HdContainerDataSourceHandle const rendererPluginSceneIndexInputArgs =
+        plugin->GetSceneIndexInputArgs();
+    
     HdContainerDataSourceHandle const sceneIndexInputArgs =
         HdOverlayContainerDataSource::OverlayedContainerDataSources(
-            plugin->GetSceneIndexInputArgs(),
+            rendererPluginSceneIndexInputArgs,
             HdRetainedContainerDataSource::New(
                 UsdImagingUsdSceneIndexInputArgsSchema::GetSchemaToken(),
                 UsdImagingUsdSceneIndexInputArgsSchema::Builder()
@@ -1657,7 +1646,13 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
 
         TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-        if (!_CreateSceneIndicesAndRenderer(plugin, sceneIndexInputArgs)) {
+        const bool hasRendererPluginSceneIndexInputArgs(
+            rendererPluginSceneIndexInputArgs);
+
+        if (!_CreateSceneIndicesAndRenderer(
+                plugin,
+                sceneIndexInputArgs,
+                hasRendererPluginSceneIndexInputArgs)) {
             return false;
         }
     } else {
@@ -1688,7 +1683,8 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
 bool
 UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(
     HdRendererPluginHandle const &plugin,
-    HdContainerDataSourceHandle const &sceneIndexInputArgs)
+    HdContainerDataSourceHandle const &sceneIndexInputArgs,
+    const bool hasRendererPluginSceneIndexInputArgs)
 {
     TRACE_FUNCTION();
 
@@ -1774,7 +1770,7 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(
 
         HdRenderIndexAdapterSceneIndexRefPtr adapter;
 
-        if (_IsEnabledSceneIndexInputArgs()) {
+        if (hasRendererPluginSceneIndexInputArgs) {
             adapter = HdRenderIndexAdapterSceneIndex::New(
                 sceneIndexInputArgs);
         } else {
