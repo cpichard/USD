@@ -1657,7 +1657,9 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
 
         TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-        return _CreateSceneIndicesAndRenderer(plugin, sceneIndexInputArgs);
+        if (!_CreateSceneIndicesAndRenderer(plugin, sceneIndexInputArgs)) {
+            return false;
+        }
     } else {
         if (_renderDelegate && _renderDelegate.GetPluginId() == resolvedId) {
             return true;
@@ -1672,6 +1674,12 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
         }
         _SetRenderDelegateAndRestoreState(
             std::move(renderDelegate), sceneIndexInputArgs);
+    }
+
+    if (_allowAsynchronousSceneProcessing) {
+        if (HdSceneIndexBaseRefPtr const si = _GetTerminalSceneIndex()) {
+            si->SystemMessage(HdSystemMessageTokens->asyncAllow, nullptr);
+        }
     }
 
     return true;
@@ -1984,12 +1992,6 @@ UsdImagingGLEngine::_SetRenderDelegate(
 
         _sceneDelegate->SetDisplayUnloadedPrimsWithBounds(
             _displayUnloadedPrimsWithBounds);
-    }
-
-    if (_allowAsynchronousSceneProcessing) {
-        if (HdSceneIndexBaseRefPtr const si = _GetTerminalSceneIndex()) {
-            si->SystemMessage(HdSystemMessageTokens->asyncAllow, nullptr);
-        }
     }
 
     if (_GetUseTaskControllerSceneIndex()) {

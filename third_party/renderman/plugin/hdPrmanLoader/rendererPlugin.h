@@ -52,6 +52,7 @@ public:
 #endif
 
 #if HD_API_VERSION >= 90
+    HDPRMANLOADER_API
     HdContainerDataSourceHandle GetSceneIndexInputArgs() const override;
 #endif
 
