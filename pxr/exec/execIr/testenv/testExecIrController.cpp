@@ -118,7 +118,7 @@ _AddOne_InverseCompute(const VdfContext &ctx)
 
     // TODO: The controller code should do the check for missing invertible
     // output values so that the client code doesn't need to.
-    if (!ctx.HasInputValue<double>(_tokens->output)) {
+    if (!ctx.HasInputValue(_tokens->output)) {
         return result;
     }
     const double output = ctx.GetInputValue<double>(_tokens->output);
@@ -281,7 +281,7 @@ _Add_InverseCompute(const VdfContext &ctx)
 
     // TODO: The controller code should do the check for missing invertible
     // output values so that the client code doesn't need to.
-    if (!ctx.HasInputValue<double>(_tokens->output)) {
+    if (!ctx.HasInputValue(_tokens->output)) {
         return result;
     }
 
@@ -697,7 +697,7 @@ _AddWithClamp_InverseCompute(const VdfContext &ctx)
 
     // TODO: The controller code should do the check for missing invertible
     // output values so that the client code doesn't need to.
-    if (!ctx.HasInputValue<double>(_tokens->output)) {
+    if (!ctx.HasInputValue(_tokens->output)) {
         return result;
     }
 

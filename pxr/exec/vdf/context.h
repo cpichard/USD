@@ -87,15 +87,27 @@ public:
     inline const T *
     GetInputValuePtr(const TfToken &name, const T *defPtr) const;
 
-    /// Returns true, if there are input values from the input named \c name
-    /// of type \c T.  
+    /// Returns `true` if there are input values from the input named \p name
+    /// of type \p T.
+    ///
+    /// \warning
+    /// If the input spec has a data type that is not \p T, a fatal error is
+    /// emitted.
+    ///
+    /// \deprecated
+    /// This funcion is deprecated in favor of the untemplated overload.
     ///
     template<typename T>
     inline bool HasInputValue(const TfToken &name) const;
 
-    /// Returns true if the output named \p outputName is requested by at least
-    /// one downstream node, or false if there are no consumers for the output
-    /// or if \p outputName isn't a valid output on this node.
+    /// Returns `true` if there are input values from the input named \p name.
+    ///
+    VDF_API
+    bool HasInputValue(const TfToken &name) const;
+
+    /// Returns `true` if the output named \p outputName is requested by at
+    /// least one downstream node, or `false` if there are no consumers for the
+    /// output or if \p outputName isn't a valid output on this node.
     ///
     /// This can be used by the node callback to avoid computing expensive
     /// outputs that are not needed.
