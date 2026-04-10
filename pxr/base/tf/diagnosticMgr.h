@@ -15,6 +15,7 @@
 #include "pxr/base/tf/diagnosticLite.h"
 #include "pxr/base/tf/error.h"
 #include "pxr/base/tf/singleton.h"
+#include "pxr/base/tf/smallVector.h"
 #include "pxr/base/tf/spinRWMutex.h"
 #include "pxr/base/tf/status.h"
 #include "pxr/base/tf/stringUtils.h"
@@ -23,6 +24,7 @@
 #include "pxr/base/tf/enum.h"
 #include "pxr/base/tf/api.h"
 
+#include "pxr/base/arch/align.h"
 #include "pxr/base/arch/inttypes.h"
 #include "pxr/base/arch/attributes.h"
 #include "pxr/base/arch/functionLite.h"
@@ -247,7 +249,9 @@ public:
 
     /// Return true if an instance of TfErrorMark exists in the current thread
     /// of execution, false otherwise.
-    bool HasActiveErrorMark() { return _errorMarkCounts.local() > 0; }
+    bool HasActiveErrorMark() {
+        return _markCountsAndTrapStacks.local().markCount > 0;
+    }
 
 #if !defined(doxygen)
     //
@@ -384,10 +388,14 @@ private:
     ErrorIterator _GetErrorMarkBegin(size_t mark, size_t *nErrors);
 
     // Invoked by ErrorMark ctor.
-    inline void _CreateErrorMark() { ++_errorMarkCounts.local(); }
+    inline void _CreateErrorMark() {
+        ++_markCountsAndTrapStacks.local().markCount;
+    }
 
     // Invoked by ErrorMark dtor.
-    inline bool _DestroyErrorMark() { return --_errorMarkCounts.local() == 0; }
+    inline bool _DestroyErrorMark() {
+        return --_markCountsAndTrapStacks.local().markCount == 0;
+    }
 
     // Invoked by TfDiagnosticTrap constructor.
     void _PushTrap(TfDiagnosticTrap *trap);
@@ -431,10 +439,6 @@ private:
    
     mutable TfSpinRWMutex _delegatesMutex;
 
-    // Thread-local stack of active diagnostic traps, innermost last.
-    tbb::enumerable_thread_specific<
-        std::vector<TfDiagnosticTrap*>> _scopedTrapStack;
-    
     // Global serial number for sorting.
     std::atomic<size_t> _nextSerial;
 
@@ -462,11 +466,27 @@ private:
     // Thread-specific log text for trapped diagnostics.
     tbb::enumerable_thread_specific<_LogTextBuffer> _trappedDiagnosticsLogText;
 
-    // Thread-specific error mark counts.  Use a native key for best performance
-    // here.
+    // Store as many trap pointers locally as we can in a cache line, minus the
+    // size needed for the error mark count.
+    static constexpr size_t _TrapStackLocalCap =
+        TfComputeSmallVectorLocalCapacityForTotalSize<
+        TfDiagnosticTrap*, ARCH_CACHE_LINE_SIZE - sizeof(size_t)>();
+    
+    // Struct containing thread-local error mark count, and stack of active
+    // diagnostic traps, innermost last.
+    struct _MarkCountAndTrapStack {
+        size_t markCount = 0;
+        TfSmallVector<TfDiagnosticTrap*, _TrapStackLocalCap> trapStack;
+    };
+
+    static_assert(sizeof(_MarkCountAndTrapStack) == ARCH_CACHE_LINE_SIZE);
+    
+    // Thread-specific error mark counts & trap stacks.  Use a native key for
+    // best performance here.
     tbb::enumerable_thread_specific<
-        size_t, tbb::cache_aligned_allocator<size_t>,
-        tbb::ets_key_per_instance> _errorMarkCounts;
+        _MarkCountAndTrapStack,
+        tbb::cache_aligned_allocator<_MarkCountAndTrapStack>,
+        tbb::ets_key_per_instance> _markCountsAndTrapStacks;
 
     bool _quiet;
 

@@ -344,6 +344,20 @@ Test_TfDiagnosticTrap()
             mark.Clear();
         }
 
+        // TfErrorMark interaction - trapped errors reposted under an active
+        // mark are caught by the mark.
+        {
+            TfDiagnosticTrap trap;
+            TF_RUNTIME_ERROR("trapped error");
+            TfErrorMark mark;
+            TF_AXIOM(mark.IsClean());
+            TF_AXIOM(trap.HasErrors());
+            trap.Dismiss();
+            TF_AXIOM(!mark.IsClean());
+            TF_AXIOM(!trap.HasErrors());
+            mark.Clear();
+        }
+
         // ForEach with type-specific callable -- only matching types visited.
         {
             TfDiagnosticTrap trap;

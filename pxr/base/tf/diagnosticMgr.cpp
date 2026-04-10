@@ -174,7 +174,6 @@ TfDiagnosticMgr::TfDiagnosticMgr()
         return TfStringPrintf("Thread %s Pending Diagnostics",
                               TfStringify(std::this_thread::get_id()).c_str());
     })
-    , _errorMarkCounts(static_cast<size_t>(0))
     , _quiet(false)
 {
     _nextSerial = 0;
@@ -306,13 +305,13 @@ TfDiagnosticMgr::_ForEachDelegate(Fn const &fn) const
 void
 TfDiagnosticMgr::_PushTrap(TfDiagnosticTrap *trap)
 {
-    _scopedTrapStack.local().push_back(trap);
+    _markCountsAndTrapStacks.local().trapStack.push_back(trap);
 }
 
 void
 TfDiagnosticMgr::_PopTrap(TfDiagnosticTrap *trap)
 {
-    auto &stack = _scopedTrapStack.local();
+    auto &stack = _markCountsAndTrapStacks.local().trapStack;
     if (TF_VERIFY(!stack.empty() && stack.back() == trap)) {
         stack.pop_back();
     }
@@ -329,7 +328,7 @@ TfDiagnosticMgr::_PopTrap(TfDiagnosticTrap *trap)
 inline TfDiagnosticTrap *
 TfDiagnosticMgr::_GetActiveTrap()
 {
-    auto &stack = _scopedTrapStack.local();
+    auto &stack = _markCountsAndTrapStacks.local().trapStack;
     return stack.empty() ? nullptr : stack.back();
 }
 
@@ -682,7 +681,7 @@ TfDiagnosticMgr::_AppendTrappedDiagnosticsLogText(TfDiagnosticBase const &d)
 void
 TfDiagnosticMgr::_RebuildTrappedDiagnosticsLogText()
 {
-    auto const &stack = _scopedTrapStack.local();
+    auto const &stack = _markCountsAndTrapStacks.local().trapStack;
     _trappedDiagnosticsLogText.local()
         .Update([&](std::vector<std::string> &log) {
             log.clear();
