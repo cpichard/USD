@@ -54,7 +54,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class UsdPrim;
 class HdRenderIndex;
-class HdxTaskController;
 class UsdImagingDelegate;
 class HdRendererCreateArgsSchema;
 
@@ -779,11 +778,6 @@ protected:
     USDIMAGINGGL_API
     HdEngine *_GetHdEngine();
 
-    /// \deprecated The HdxTaskController is replaced by the
-    ///             HdxTaskControllerSceneIndex.
-    USDIMAGINGGL_API
-    HdxTaskController *_GetTaskController() const;
-
     USDIMAGINGGL_API
     HdSelectionSharedPtr _GetSelection() const;
 
@@ -815,7 +809,6 @@ protected:
     /* Hydra 1.0 */
     HdPluginRenderDelegateUniqueHandle _renderDelegate;
     std::unique_ptr<HdRenderIndex> _renderIndex;
-    std::unique_ptr<HdxTaskController> _taskController;
 
     SdfPath const _sceneDelegateId;
 

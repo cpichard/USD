@@ -146,8 +146,11 @@
 //           HdRendererPluginRegistry::GetDefaultPluginId,
 //           HdRendererPlugin::IsSupported and CreateRenderer and
 //           HdRenderDelegateAdapterRenderer c'tor.
+// 98 -> 99: Removing HdRenderIndex::IsSceneIndexEmulationEnabled() and
+//           UsdImagingGLEngine::_GetTaskController().
+//           Emulation is now always enabled.
 
-#define HD_API_VERSION 98
+#define HD_API_VERSION 99
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 // 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.

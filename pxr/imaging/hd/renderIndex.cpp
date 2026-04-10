@@ -51,12 +51,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-// \deprecated.
-//
-// Future version will always enable scene index emulation!
-//
-TF_DEFINE_ENV_SETTING(HD_ENABLE_SCENE_INDEX_EMULATION, true,
-                      "Enable scene index emulation in the render index.");
 TF_DEFINE_ENV_SETTING(HD_ENABLE_TERMINAL_CACHING_SCENE_INDEX, false,
                   "Enable terminal HdCachingSceneIndex in the render index.");
 
@@ -66,13 +60,6 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((postMerging, "Post-Merging Notice Batching Scene Index"))
 );
 
-
-static bool
-_IsEnabledSceneIndexEmulation()
-{
-    static bool enabled = TfGetEnvSetting(HD_ENABLE_SCENE_INDEX_EMULATION);
-    return enabled;
-}
 
 static bool
 _IsEnabledTerminalCachingSceneIndex()
@@ -144,12 +131,6 @@ private:
 
 // -------------------------------------------------------------------------- //
 
-bool
-HdRenderIndex::IsSceneIndexEmulationEnabled()
-{
-    return _IsEnabledSceneIndexEmulation();
-}
-
 HdRenderIndex::HdRenderIndex(
     HdRenderDelegate *renderDelegate,
     HdDriverVector const& drivers,
@@ -193,54 +174,50 @@ HdRenderIndex::HdRenderIndex(
 
         _tracker._SetDisableEmulationAPI(true);
     } else {
-        // If we need to emulate a scene index we create the 
-        // data structures now.
-        if (_IsEnabledSceneIndexEmulation()) {
-            _emulationSceneIndex = HdLegacyPrimSceneIndex::New();
+        _emulationSceneIndex = HdLegacyPrimSceneIndex::New();
 
-            _tracker._SetTargetSceneIndex(get_pointer(_emulationSceneIndex));
+        _tracker._SetTargetSceneIndex(get_pointer(_emulationSceneIndex));
 
-            // The legacy prim scene index holds prims contributed from
-            // upstream scene delegates.  Convert any legacy subsets
-            // to HdGeomSubsetSchema.  Since legacy prims are typically
-            // populated iteratively, use notice batching upstream from
-            // scanning for geom subsets.
-            _finalEmulationSceneIndex =
-                HdLegacyGeomSubsetSceneIndex::New(
-                    _emulationBatchingCtx->Append(_emulationSceneIndex));
+        // The legacy prim scene index holds prims contributed from
+        // upstream scene delegates.  Convert any legacy subsets
+        // to HdGeomSubsetSchema.  Since legacy prims are typically
+        // populated iteratively, use notice batching upstream from
+        // scanning for geom subsets.
+        _finalEmulationSceneIndex =
+            HdLegacyGeomSubsetSceneIndex::New(
+                _emulationBatchingCtx->Append(_emulationSceneIndex));
 
-            if (createFrontEndEmulationOnly) {
-                return;
-            }
-
-            _mergingSceneIndex = HdMergingSceneIndex::New();
-
-            _mergingSceneIndex->AddInputScene(
-                _finalEmulationSceneIndex,
-                SdfPath::AbsoluteRootPath());
-
-            HdSceneIndexBaseRefPtr sceneIndex = _mergingSceneIndex;
-
-            sceneIndex =
-                _mergingBatchingCtx->Append(sceneIndex);
-
-            const std::string &rendererDisplayName =
-                renderDelegate->GetRendererDisplayName();
-
-            if (!rendererDisplayName.empty()) {
-                sceneIndex =
-                    HdSceneIndexPluginRegistry::GetInstance()
-                        .AppendSceneIndicesForRenderer(
-                            rendererDisplayName, sceneIndex,
-                            instanceName, appName);
-            }
-
-            if (_IsEnabledTerminalCachingSceneIndex()) {
-                sceneIndex = HdCachingSceneIndex::New(sceneIndex);
-            }
-
-            _terminalSceneIndex = sceneIndex;
+        if (createFrontEndEmulationOnly) {
+            return;
         }
+
+        _mergingSceneIndex = HdMergingSceneIndex::New();
+
+        _mergingSceneIndex->AddInputScene(
+            _finalEmulationSceneIndex,
+            SdfPath::AbsoluteRootPath());
+
+        HdSceneIndexBaseRefPtr sceneIndex = _mergingSceneIndex;
+
+        sceneIndex =
+            _mergingBatchingCtx->Append(sceneIndex);
+
+        const std::string &rendererDisplayName =
+            renderDelegate->GetRendererDisplayName();
+
+        if (!rendererDisplayName.empty()) {
+            sceneIndex =
+                HdSceneIndexPluginRegistry::GetInstance()
+                    .AppendSceneIndicesForRenderer(
+                        rendererDisplayName, sceneIndex,
+                        instanceName, appName);
+        }
+
+        if (_IsEnabledTerminalCachingSceneIndex()) {
+            sceneIndex = HdCachingSceneIndex::New(sceneIndex);
+        }
+
+        _terminalSceneIndex = sceneIndex;
     }
 
     if (_terminalSceneIndex) {
@@ -341,9 +318,10 @@ HdRenderIndex::InsertSceneIndex(
 {
     TRACE_FUNCTION();
 
-    if (!_IsEnabledSceneIndexEmulation()) {
-        TF_WARN("Unable to add scene index at prefix %s because emulation is off.",
-                scenePathPrefix.GetText());
+    if (!_mergingSceneIndex) {
+        TF_CODING_ERROR(
+            "HdRenderIndex::InsertSceneIndex called but render index was "
+            "constructed given a terminal scene index.");
         return;
     }
 
@@ -376,7 +354,10 @@ HdRenderIndex::RemoveSceneIndex(
 {
     TRACE_FUNCTION();
 
-    if (!_IsEnabledSceneIndexEmulation()) {
+    if (!_mergingSceneIndex) {
+        TF_CODING_ERROR(
+            "HdRenderIndex::RemoveSceneIndex called but render index was "
+            "constructed given a terminal scene index.");
         return;
     }
 
@@ -1610,9 +1591,7 @@ HdRenderIndex::SyncAll(HdTaskSharedPtrVector *tasks,
     // an Update call; run this before legacy Hydra prim sync.
     //
 
-    if (_IsEnabledSceneIndexEmulation()) {
-        _renderDelegate->Update();
-    }
+    _renderDelegate->Update();
 
     //
     ////////////////////////////////////////////////////////////////////////////

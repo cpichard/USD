@@ -47,7 +47,6 @@
 #include "pxr/imaging/hdsi/sceneGlobalsSceneIndex.h"
 #include "pxr/imaging/hdx/pickTask.h"
 #include "pxr/imaging/hdx/task.h"
-#include "pxr/imaging/hdx/taskController.h"
 #include "pxr/imaging/hdx/taskControllerSceneIndex.h"
 #include "pxr/imaging/hdx/tokens.h"
 
@@ -249,15 +248,6 @@ _GetSceneIndexObserverRenderer()
 }
 
 bool
-_GetUseTaskControllerSceneIndex()
-{
-    static bool result =
-        HdRenderIndex::IsSceneIndexEmulationEnabled();
-
-    return result;
-}
-
-bool
 _IsEnabledTerminalCachingSceneIndex()
 {
     static bool result =
@@ -419,7 +409,6 @@ UsdImagingGLEngine::_DestroyHydraObjects()
         TRACE_SCOPE("Destroying engine and task controller");
 
         _engine = nullptr;
-        _taskController = nullptr;
     }
 
     {
@@ -600,22 +589,18 @@ UsdImagingGLEngine::PrepareBatch(
 void
 UsdImagingGLEngine::_PrepareRender(const UsdImagingGLRenderParams &params)
 {
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+
     TfTokenVector renderTags;
     _ComputeRenderTags(params, &renderTags);
-
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetFreeCameraClipPlanes(params.clipPlanes);
-        _taskControllerSceneIndex->SetRenderTags(renderTags);
-        _taskControllerSceneIndex->SetRenderParams(
-            _MakeHydraUsdImagingGLRenderParams(params));
-    } else if (_taskController) {
-        _taskController->SetFreeCameraClipPlanes(params.clipPlanes);
-        _taskController->SetRenderTags(renderTags);
-        _taskController->SetRenderParams(
-            _MakeHydraUsdImagingGLRenderParams(params));
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+            
+    _taskControllerSceneIndex->SetFreeCameraClipPlanes(params.clipPlanes);
+    _taskControllerSceneIndex->SetRenderTags(renderTags);
+    _taskControllerSceneIndex->SetRenderParams(
+        _MakeHydraUsdImagingGLRenderParams(params));
 }
 
 void
@@ -741,18 +726,17 @@ UsdImagingGLEngine::_SetBBoxParams(
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+    
     HdxBoundingBoxTaskParams params;
     params.bboxes = bboxes;
     params.color = bboxLineColor;
     params.dashSize = bboxLineDashSize;
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetBBoxParams(params);
-    } else if (_taskController) {
-        _taskController->SetBBoxParams(params);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetBBoxParams(params);
 }
 
 void
@@ -764,17 +748,15 @@ UsdImagingGLEngine::RenderBatch(
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     _UpdateHydraCollection(&_renderCollection, paths, params);
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetCollection(_renderCollection);
-    } else if (_taskController) {
-        _taskController->SetCollection(_renderCollection);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
-
+    _taskControllerSceneIndex->SetCollection(_renderCollection);
 
     _PrepareRender(params);
 
@@ -786,26 +768,14 @@ UsdImagingGLEngine::RenderBatch(
     // XXX App sets the clear color via 'params' instead of setting up Aovs
     // that has clearColor in their descriptor. So for now we must pass this
     // clear color to the color AOV.
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetEnableSelection(params.highlight);
+    _taskControllerSceneIndex->SetEnableSelection(params.highlight);
 
-        HdAovDescriptor colorAovDesc =
-            _taskControllerSceneIndex->GetRenderOutputSettings(HdAovTokens->color);
-        if (colorAovDesc.format != HdFormatInvalid) {
-            colorAovDesc.clearValue = VtValue(params.clearColor);
-            _taskControllerSceneIndex->SetRenderOutputSettings(
-                HdAovTokens->color, colorAovDesc);
-        }
-    } else if (_taskController) {
-        _taskController->SetEnableSelection(params.highlight);
-
-        HdAovDescriptor colorAovDesc =
-            _taskController->GetRenderOutputSettings(HdAovTokens->color);
-        if (colorAovDesc.format != HdFormatInvalid) {
-            colorAovDesc.clearValue = VtValue(params.clearColor);
-            _taskController->SetRenderOutputSettings(
-                HdAovTokens->color, colorAovDesc);
-        }
+    HdAovDescriptor colorAovDesc =
+        _taskControllerSceneIndex->GetRenderOutputSettings(HdAovTokens->color);
+    if (colorAovDesc.format != HdFormatInvalid) {
+        colorAovDesc.clearValue = VtValue(params.clearColor);
+        _taskControllerSceneIndex->SetRenderOutputSettings(
+            HdAovTokens->color, colorAovDesc);
     }
 
     _UpdateDomeLightCameraVisibility();
@@ -819,11 +789,7 @@ UsdImagingGLEngine::RenderBatch(
     } else if (_engine) {
         _engine->SetTaskContextData(HdxTokens->selectionState, selectionValue);
     }
-    if (_taskControllerSceneIndex) {
-        _Execute(params, _taskControllerSceneIndex->GetRenderingTaskPaths());
-    } else if (_taskController) {
-        _Execute(params, _taskController->GetRenderingTaskPaths());
-    }
+    _Execute(params, _taskControllerSceneIndex->GetRenderingTaskPaths());
 }
 
 void
@@ -858,6 +824,7 @@ UsdImagingGLEngine::IsConverged() const
             TF_CODING_ERROR("No task controller scene index.");
             return true;
         }
+
         if (HdLegacyRenderControlInterface * const renderControl =
                 _renderer->GetLegacyRenderControl()) {
             return renderControl->AreTasksConverged(
@@ -865,18 +832,14 @@ UsdImagingGLEngine::IsConverged() const
         }
         return true;
     } else if (_renderIndex) {
-        if (_taskControllerSceneIndex) {
-            return _engine->AreTasksConverged(
-                _renderIndex.get(),
-                _taskControllerSceneIndex->GetRenderingTaskPaths());
-        } else if (_taskController) {
-            return _engine->AreTasksConverged(
-                _renderIndex.get(),
-                _taskController->GetRenderingTaskPaths());
-        } else {
-            TF_CODING_ERROR("No task controller or task controller scene index.");
+        if (!_taskControllerSceneIndex) {
+            TF_CODING_ERROR("No task controller scene index.");
             return true;
         }
+
+        return _engine->AreTasksConverged(
+            _renderIndex.get(),
+            _taskControllerSceneIndex->GetRenderingTaskPaths());
     }
 
     return true;
@@ -929,15 +892,14 @@ UsdImagingGLEngine::SetRenderViewport(GfVec4d const& viewport)
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetRenderViewport(viewport);
-    } else if (_taskController) {
-        _taskController->SetRenderViewport(viewport);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetRenderViewport(viewport);
 }
 
 void
@@ -947,15 +909,14 @@ UsdImagingGLEngine::SetFraming(CameraUtilFraming const& framing)
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetFraming(framing);
-    } else if (_taskController) {
-        _taskController->SetFraming(framing);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetFraming(framing);
 }
 
 void
@@ -966,15 +927,14 @@ UsdImagingGLEngine::SetOverrideWindowPolicy(
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetOverrideWindowPolicy(policy);
-    } else if (_taskController) {
-        _taskController->SetOverrideWindowPolicy(policy);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetOverrideWindowPolicy(policy);
 }
 
 void
@@ -984,15 +944,14 @@ UsdImagingGLEngine::SetRenderBufferSize(GfVec2i const& size)
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetRenderBufferSize(size);
-    } else if (_taskController) {
-        _taskController->SetRenderBufferSize(size);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetRenderBufferSize(size);
 }
 
 void
@@ -1022,15 +981,14 @@ UsdImagingGLEngine::SetCameraPath(SdfPath const& id)
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+    
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetCameraPath(id);
-    } else if (_taskController) {
-        _taskController->SetCameraPath(id);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetCameraPath(id);
 
     // The camera that is set for viewing will also be used for
     // time sampling.
@@ -1055,20 +1013,18 @@ UsdImagingGLEngine::SetCameraState(const GfMatrix4d& viewMatrix,
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+    
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     SdfPath freeCameraPath;
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
-        freeCameraPath = _taskControllerSceneIndex->GetFreeCameraPath();
+    _taskControllerSceneIndex->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
+    freeCameraPath = _taskControllerSceneIndex->GetFreeCameraPath();
 
-    } else if (_taskController) {
-        _taskController->SetFreeCameraMatrices(viewMatrix, projectionMatrix);
-        freeCameraPath = _taskController->GetFreeCameraPath();
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
     if (UseUsdImagingSceneIndex()) {
         if (_appSceneIndices) {
             if (auto& sgsi = _appSceneIndices->sceneGlobalsSceneIndex) {
@@ -1087,15 +1043,14 @@ UsdImagingGLEngine::SetLightingState(GlfSimpleLightingContextPtr const &src)
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+    
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetLightingState(src);
-    } else if (_taskController) {
-        _taskController->SetLightingState(src);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetLightingState(src);
 }
 
 void
@@ -1108,6 +1063,11 @@ UsdImagingGLEngine::SetLightingState(
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+    
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     // we still use _lightingContextForOpenGLState for convenience, but
@@ -1120,15 +1080,8 @@ UsdImagingGLEngine::SetLightingState(
     _lightingContextForOpenGLState->SetSceneAmbient(sceneAmbient);
     _lightingContextForOpenGLState->SetUseLighting(lights.size() > 0);
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetLightingState(
-            _lightingContextForOpenGLState);
-    } else if (_taskController) {
-        _taskController->SetLightingState(
-            _lightingContextForOpenGLState);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetLightingState(
+        _lightingContextForOpenGLState);
 }
 
 //----------------------------------------------------------------------------
@@ -1236,17 +1189,16 @@ UsdImagingGLEngine::SetSelectionColor(GfVec4f const& color)
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+    
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     _selectionColor = color;
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetSelectionColor(_selectionColor);
-    } else if (_taskController) {
-        _taskController->SetSelectionColor(_selectionColor);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetSelectionColor(_selectionColor);
 }
 
 //----------------------------------------------------------------------------
@@ -1338,6 +1290,11 @@ UsdImagingGLEngine::TestIntersection(
         return false;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return true;
+    }
+    
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     PrepareBatch(root, params);
@@ -1373,14 +1330,7 @@ UsdImagingGLEngine::TestIntersection(
         _engine->SetTaskContextData(
                 HdxPickTokens->pickParams, vtPickCtxParams);
     }
-    if (_taskControllerSceneIndex) {
-        _Execute(params, _taskControllerSceneIndex->GetPickingTaskPaths());
-    } else if (_taskController) {
-        _Execute(params, _taskController->GetPickingTaskPaths());
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
-
+    _Execute(params, _taskControllerSceneIndex->GetPickingTaskPaths());
 
     // return false if there were no hits
     if (allHits.size() == 0) {
@@ -1830,6 +1780,11 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
     HdPluginRenderDelegateUniqueHandle &&renderDelegate,
     HdContainerDataSourceHandle const &sceneIndexInputArgs)
 {
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+
     // Pull old scene/task controller state. Note that the scene index/delegate
     // may not have been created, if this is the first time through this
     // function, so we guard for null and use default values for xform/vis.
@@ -1851,13 +1806,7 @@ UsdImagingGLEngine::_SetRenderDelegateAndRestoreState(
     }
     _selTracker->SetSelection(selection);
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetSelectionColor(_selectionColor);
-    } else if (_taskController) {
-        _taskController->SetSelectionColor(_selectionColor);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetSelectionColor(_selectionColor);
 }
 
 SdfPath
@@ -1988,28 +1937,21 @@ UsdImagingGLEngine::_SetRenderDelegate(
             _displayUnloadedPrimsWithBounds);
     }
 
-    if (_GetUseTaskControllerSceneIndex()) {
-        const SdfPath taskControllerPath =
-            _ComputeControllerPath(_renderDelegate);
-        HdxTaskControllerSceneIndex::Parameters params {
-            taskControllerPath,
-            [renderDelegate = _renderDelegate.Get()](const TfToken &name) {
-                return renderDelegate->GetDefaultAovDescriptor(name); },
-            _renderIndex.get()->GetRenderDelegate()->RequiresStormTasks(),
-            _gpuEnabled
-        };
-        _taskControllerSceneIndex = HdxTaskControllerSceneIndex::New(params);
-        _taskControllerSceneIndex->SetSelectionColor(_selectionColor);
-        _renderIndex->InsertSceneIndex(
-            _taskControllerSceneIndex,
-            taskControllerPath,
-            /* needsPrefixing = */ false);
-    } else {
-        _taskController = std::make_unique<HdxTaskController>(
-            _renderIndex.get(),
-            _ComputeControllerPath(_renderDelegate),
-            _gpuEnabled);
-    }
+    const SdfPath taskControllerPath =
+        _ComputeControllerPath(_renderDelegate);
+    HdxTaskControllerSceneIndex::Parameters params {
+        taskControllerPath,
+        [renderDelegate = _renderDelegate.Get()](const TfToken &name) {
+            return renderDelegate->GetDefaultAovDescriptor(name); },
+        _renderIndex.get()->GetRenderDelegate()->RequiresStormTasks(),
+        _gpuEnabled
+    };
+    _taskControllerSceneIndex = HdxTaskControllerSceneIndex::New(params);
+    _taskControllerSceneIndex->SetSelectionColor(_selectionColor);
+    _renderIndex->InsertSceneIndex(
+        _taskControllerSceneIndex,
+        taskControllerPath,
+        /* needsPrefixing = */ false);
 
     // The task context holds on to resources in the render
     // deletegate, so we want to destroy it first and thus
@@ -2067,6 +2009,11 @@ UsdImagingGLEngine::SetRendererAov(TfToken const &id)
         return false;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return true;
+    }
+    
     if (_renderIndex) {
         if (!_renderIndex->IsBprimTypeSupported(
                 HdPrimTypeTokens->renderBuffer)) {
@@ -2076,13 +2023,7 @@ UsdImagingGLEngine::SetRendererAov(TfToken const &id)
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetRenderOutputs({id});
-    } else if (_taskController) {
-        _taskController->SetRenderOutputs({id});
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetRenderOutputs({id});
     return true;
 }
 
@@ -2093,6 +2034,11 @@ UsdImagingGLEngine::SetRendererAovs(TfTokenVector const &ids)
         return false;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return true;
+    }
+    
     if (_renderIndex) {
         if (!_renderIndex->IsBprimTypeSupported(
                 HdPrimTypeTokens->renderBuffer)) {
@@ -2102,13 +2048,7 @@ UsdImagingGLEngine::SetRendererAovs(TfTokenVector const &ids)
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetRenderOutputs(ids);
-    } else if (_taskController) {
-        _taskController->SetRenderOutputs(ids);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetRenderOutputs(ids);
     return true;
 }
 
@@ -2155,19 +2095,15 @@ UsdImagingGLEngine::GetAovRenderBuffer(TfToken const& name) const
         }
         return nullptr;
     } else if (_renderIndex) {
-        if (_taskControllerSceneIndex) {
-            const SdfPath path =
-                _taskControllerSceneIndex->GetRenderBufferPath(name);
-            return dynamic_cast<HdRenderBuffer*>(
-                _renderIndex->GetBprim(
-                    HdPrimTypeTokens->renderBuffer, path));
-        } else if (_taskController) {
-            return _taskController->GetRenderOutput(name);
-        } else {
-            TF_CODING_ERROR(
-                "No task controller or task controller scene index.");
+        if (!_taskControllerSceneIndex) {
+            TF_CODING_ERROR("No task controller scene index.");
             return nullptr;
         }
+        const SdfPath path =
+            _taskControllerSceneIndex->GetRenderBufferPath(name);
+        return dynamic_cast<HdRenderBuffer*>(
+            _renderIndex->GetBprim(
+                HdPrimTypeTokens->renderBuffer, path));
     }
 
     return nullptr;
@@ -2363,16 +2299,14 @@ UsdImagingGLEngine::SetEnablePresentation(bool enabled)
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+    
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetEnablePresentation(enabled);
-    } else if (_taskController) {
-        _taskController->SetEnablePresentation(enabled);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
-
+    _taskControllerSceneIndex->SetEnablePresentation(enabled);
 }
 
 void
@@ -2384,16 +2318,15 @@ UsdImagingGLEngine::SetPresentationOutput(
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+    
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     _userFramebuffer = framebuffer;
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetPresentationOutput(api, framebuffer);
-    } else if (_taskController) {
-        _taskController->SetPresentationOutput(api, framebuffer);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetPresentationOutput(api, framebuffer);
 }
 
 // ---------------------------------------------------------------------
@@ -2554,6 +2487,11 @@ UsdImagingGLEngine::SetColorCorrectionSettings(
         return;
     }
 
+    if (!_taskControllerSceneIndex) {
+        TF_CODING_ERROR("No task controller scene index.");
+        return;
+    }
+    
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     HdxColorCorrectionTaskParams hdParams;
@@ -2563,13 +2501,7 @@ UsdImagingGLEngine::SetColorCorrectionSettings(
     hdParams.colorspaceOCIO = ocioColorSpace.GetString();
     hdParams.looksOCIO = ocioLook.GetString();
 
-    if (_taskControllerSceneIndex) {
-        _taskControllerSceneIndex->SetColorCorrectionParams(hdParams);
-    } else if (_taskController) {
-        _taskController->SetColorCorrectionParams(hdParams);
-    } else {
-        TF_CODING_ERROR("No task controller or task controller scene index.");
-    }
+    _taskControllerSceneIndex->SetColorCorrectionParams(hdParams);
 }
 
 bool
@@ -2919,12 +2851,6 @@ UsdImagingGLEngine::_GetHdEngine()
     return _engine.get();
 }
 
-HdxTaskController *
-UsdImagingGLEngine::_GetTaskController() const
-{
-    return _taskController.get();
-}
-
 HdSceneIndexBaseRefPtr
 UsdImagingGLEngine::_GetTerminalSceneIndex() const
 {
@@ -3003,7 +2929,6 @@ bool
 UsdImagingGLEngine::UseUsdImagingSceneIndex()
 {
     static bool result =
-        HdRenderIndex::IsSceneIndexEmulationEnabled() &&
         TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX);
 
     // Provide a single-shot deprecation notice.
