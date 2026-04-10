@@ -1599,9 +1599,15 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
     HdRendererPluginRegistry &registry =
         HdRendererPluginRegistry::GetInstance();
 
-    HdRendererCreateArgs rendererCreateArgs;
-    rendererCreateArgs.gpuEnabled = _gpuEnabled;
-    rendererCreateArgs.hgi = _hgi.get();
+    const HdRendererCreateArgsSchema rendererCreateArgs(
+        HdRendererCreateArgsSchema::Builder()
+            .SetGpuEnabled(
+                HdRetainedTypedSampledDataSource<bool>::New(_gpuEnabled))
+            .SetDrivers(
+                HdRetainedContainerDataSource::New(
+                    HdRendererCreateArgsSchemaTokens->hgi,
+                    HdRetainedTypedSampledDataSource<Hgi*>::New(_hgi.get())))
+            .Build());
 
     const TfToken resolvedId =
         id.IsEmpty()
@@ -1651,6 +1657,7 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
 
         if (!_CreateSceneIndicesAndRenderer(
                 plugin,
+                rendererCreateArgs,
                 sceneIndexInputArgs,
                 hasRendererPluginSceneIndexInputArgs)) {
             return false;
@@ -1683,6 +1690,7 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
 bool
 UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(
     HdRendererPluginHandle const &plugin,
+    const HdRendererCreateArgsSchema &rendererCreateArgs,
     HdContainerDataSourceHandle const &sceneIndexInputArgs,
     const bool hasRendererPluginSceneIndexInputArgs)
 {
@@ -1735,17 +1743,7 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(
 
     _renderer =
         plugin->CreateRenderer(
-            _terminalSceneIndex,
-            HdRendererCreateArgsSchema::Builder()
-                .SetGpuEnabled(
-                    HdRetainedTypedSampledDataSource<bool>::New(
-                        _gpuEnabled))
-                .SetDrivers(
-                    HdRetainedContainerDataSource::New(
-                        HdRendererCreateArgsSchemaTokens->hgi,
-                        HdRetainedTypedSampledDataSource<Hgi*>::New(
-                            _hgiDriver.driver.GetWithDefault<Hgi*>(nullptr))))
-                .Build());
+            _terminalSceneIndex, rendererCreateArgs);
 
     if (!_renderer) {
         return false;

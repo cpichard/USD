@@ -56,6 +56,7 @@ class UsdPrim;
 class HdRenderIndex;
 class HdxTaskController;
 class UsdImagingDelegate;
+class HdRendererCreateArgsSchema;
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GlfSimpleLightingContext);
 TF_DECLARE_REF_PTRS(HdNoticeBatchingSceneIndex);
@@ -845,6 +846,7 @@ private:
 
     bool _CreateSceneIndicesAndRenderer(
         HdRendererPluginHandle const &plugin,
+        const HdRendererCreateArgsSchema &rendererCreateArgs,
         HdContainerDataSourceHandle const &sceneIndexInputArgs,
         bool hasRendererPluginSceneIndexInputArgs);
 

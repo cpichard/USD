@@ -5,6 +5,8 @@
 // https://openusd.org/license.
 //
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
+
+#include "pxr/imaging/hd/rendererCreateArgsSchema.h"
 #include "pxr/imaging/hd/rendererPlugin.h"
 #include "pxr/imaging/hd/rendererPluginHandle.h"
 #include "pxr/imaging/hd/pluginRenderDelegateUniqueHandle.h"
@@ -73,6 +75,13 @@ HdRendererPluginRegistry::GetDefaultPluginId(
     TF_DEBUG(HD_RENDERER_PLUGIN).Msg(
         "Default renderer plugin: none\n");
     return TfToken();
+}
+
+TfToken
+HdRendererPluginRegistry::GetDefaultPluginId(
+    const HdRendererCreateArgsSchema &rendererCreateArgs)
+{
+    return GetDefaultPluginId(HdRendererCreateArgs(rendererCreateArgs));
 }
 
 HdRendererPlugin *
