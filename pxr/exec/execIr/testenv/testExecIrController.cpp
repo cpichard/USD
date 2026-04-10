@@ -502,6 +502,9 @@ Test_ConflictingGoals()
         // We expect exactly one error, due to the presence of conflicting
         // inversion goals.
         ASSERT_EQ(std::distance(mark.begin(), mark.end()), 1);
+
+        // The computed result is an empty value.
+        TF_AXIOM(cache.Get(0).IsEmpty());
     }
 
     // Attempt to invert again, this time specifying desired values for C1's
@@ -541,6 +544,9 @@ Test_ConflictingGoals()
         // We expect exactly one error, due to the presence of conflicting
         // inversion goals.
         ASSERT_EQ(std::distance(mark.begin(), mark.end()), 1);
+
+        // The computed result is an empty value.
+        TF_AXIOM(cache.Get(0).IsEmpty());
     }
 }
 
