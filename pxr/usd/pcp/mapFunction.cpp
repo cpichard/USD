@@ -17,16 +17,20 @@
 #include "pxr/base/tf/ostreamMethods.h"
 
 #include <limits>
+#include <utility>
+#include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace {
 
+using _PathPair = std::pair<SdfPath, SdfPath>;
+using _PathPairVector = std::vector<_PathPair>;
+
 // Order PathPairs using element count and FastLessThan.
 struct _PathPairOrder
 {
-    bool operator()(const PcpMapFunction::PathPair &lhs,
-                    const PcpMapFunction::PathPair &rhs) {
+    bool operator()(const _PathPair &lhs, const _PathPair &rhs) {
         // First order paths by element count which allows to us to be 
         // more efficient in finding the best path match in the source to
         // target direction. This also makes sure that "root identity" 
@@ -48,13 +52,11 @@ struct _PathPairOrder
 // container.
 struct _PathPairOrderSourceLowerBound
 {   
-    bool operator()(const PcpMapFunction::PathPair &lhs,
-                    const SdfPath &rhs) {
+    bool operator()(const _PathPair &lhs, const SdfPath &rhs) {
         return _PathLessThan(lhs.first, rhs);
     }
 
-    bool operator()(const SdfPath &lhs,
-                    const PcpMapFunction::PathPair &rhs) {
+    bool operator()(const SdfPath &lhs, const _PathPair &rhs) {
         return _PathLessThan(lhs, rhs.first);
     }
 private:
@@ -71,11 +73,132 @@ private:
 
 };
 
-PcpMapFunction::PcpMapFunction(PathPair const *begin,
-                               PathPair const *end,
-                               SdfLayerOffset offset,
-                               bool hasRootIdentity)
-    : _data(begin, end, hasRootIdentity)
+struct PcpMapFunction::_SourceAndTargetPathPairs final
+{
+    static const int _MaxLocalPairs = 2;
+
+    _SourceAndTargetPathPairs() {};
+
+    _SourceAndTargetPathPairs(
+        _PathPair const *begin, _PathPair const *end, bool hasRootIdentity)
+        : numPairs(end-begin)
+        , hasRootIdentity(hasRootIdentity) {
+        if (numPairs == 0)
+            return;
+        if (numPairs <= _MaxLocalPairs) {
+            std::uninitialized_copy(begin, end, localPairs);
+        }
+        else {
+            new (&remotePairs) std::shared_ptr<_PathPair>(
+                new _PathPair[numPairs], std::default_delete<_PathPair[]>());
+            std::copy(begin, end, remotePairs.get());
+        }
+    }
+        
+    _SourceAndTargetPathPairs(_SourceAndTargetPathPairs const &other)
+        : numPairs(other.numPairs)
+        , hasRootIdentity(other.hasRootIdentity) {
+        if (numPairs <= _MaxLocalPairs) {
+            std::uninitialized_copy(
+                other.localPairs,
+                other.localPairs + other.numPairs, localPairs);
+        }
+        else {
+            new (&remotePairs) std::shared_ptr<_PathPair>(other.remotePairs);
+        }
+    }
+    _SourceAndTargetPathPairs(_SourceAndTargetPathPairs &&other)
+        : numPairs(other.numPairs)
+        , hasRootIdentity(other.hasRootIdentity) {
+        if (numPairs <= _MaxLocalPairs) {
+            _PathPair *dst = localPairs;
+            _PathPair *src = other.localPairs;
+            _PathPair *srcEnd = other.localPairs + other.numPairs;
+            for (; src != srcEnd; ++src, ++dst) {
+                ::new (static_cast<void*>(std::addressof(*dst)))
+                    _PathPair(std::move(*src));
+            }
+        }
+        else {
+            new (&remotePairs)
+                std::shared_ptr<_PathPair>(std::move(other.remotePairs));
+        }
+    }
+    _SourceAndTargetPathPairs &
+    operator=(_SourceAndTargetPathPairs const &other) {
+        if (this != &other) {
+            this->~_SourceAndTargetPathPairs();
+            new (this) _SourceAndTargetPathPairs(other);
+        }
+        return *this;
+    }
+    _SourceAndTargetPathPairs &
+    operator=(_SourceAndTargetPathPairs &&other) {
+        if (this != &other) {
+            this->~_SourceAndTargetPathPairs();
+            new (this) _SourceAndTargetPathPairs(std::move(other));
+        }
+        return *this;
+    }
+    ~_SourceAndTargetPathPairs() {
+        if (numPairs <= _MaxLocalPairs) {
+            for (_PathPair *p = localPairs; numPairs--; ++p) {
+                p->~_PathPair();
+            }
+        }
+        else {
+            remotePairs.~shared_ptr<_PathPair>();
+        }
+    }
+
+    bool IsNull() const {
+        return numPairs == 0 && !hasRootIdentity;
+    }
+
+    _PathPair const *begin() const {
+        return numPairs <= _MaxLocalPairs ? localPairs : remotePairs.get();
+    }
+
+    _PathPair const *end() const {
+        return begin() + numPairs;
+    }
+
+    bool operator==(_SourceAndTargetPathPairs const &other) const {
+        return numPairs == other.numPairs &&
+            hasRootIdentity == other.hasRootIdentity &&
+            std::equal(begin(), end(), other.begin());
+    }
+
+    bool operator!=(_SourceAndTargetPathPairs const &other) const {
+        return !(*this == other);
+    }
+
+    template <class HashState>
+    friend void TfHashAppend(
+        HashState &h, _SourceAndTargetPathPairs const &data) {
+        h.Append(data.hasRootIdentity);
+        h.Append(data.numPairs);
+        h.AppendRange(std::begin(data), std::end(data));
+    }
+
+    union {
+        _PathPair localPairs[_MaxLocalPairs > 0 ? _MaxLocalPairs : 1];
+        std::shared_ptr<_PathPair> remotePairs;
+    };
+    typedef int PairCount;
+    PairCount numPairs = 0;
+    bool hasRootIdentity = false;
+};
+
+PcpMapFunction::PcpMapFunction()
+    : _mappings(new _SourceAndTargetPathPairs)
+{
+}
+
+PcpMapFunction::PcpMapFunction(
+    std::shared_ptr<_SourceAndTargetPathPairs>&& data,
+    SdfLayerOffset offset)
+    : _mappings(std::move(data))
     , _offset(offset)
 {
 }
@@ -339,8 +462,8 @@ PcpMapFunction::Create(const PathMap &sourceToTarget,
     // Validate the arguments.
     {
         // Make sure we don't exhaust the representable range.
-        const _Data::PairCount maxPairCount =
-            std::numeric_limits<_Data::PairCount>::max();
+        const _SourceAndTargetPathPairs::PairCount maxPairCount =
+            std::numeric_limits<_SourceAndTargetPathPairs::PairCount>::max();
         if (sourceToTarget.size() > maxPairCount) {
             TF_RUNTIME_ERROR("Cannot construct a PcpMapFunction with %zu "
                              "entries; limit is %zu",
@@ -373,13 +496,15 @@ PcpMapFunction::Create(const PathMap &sourceToTarget,
         }
     }
 
-    PathPairVector vec(sourceToTarget.begin(), sourceToTarget.end());
-    PathPair *begin = vec.data(), *end = vec.data() + vec.size();
+    _PathPairVector vec(sourceToTarget.begin(), sourceToTarget.end());
+    _PathPair *begin = vec.data(), *end = vec.data() + vec.size();
     // XXX: This would be unnecessary if we used _PathPairOrder as the 
     // comparator input PathMap.
     std::sort(begin, end, _PathPairOrder());
     bool hasRootIdentity = _Canonicalize(begin, end);
-    return PcpMapFunction(begin, end, offset, hasRootIdentity);
+    return PcpMapFunction(
+        std::make_shared<_SourceAndTargetPathPairs>(
+            begin, end, hasRootIdentity), offset);
 }
 
 PcpMapFunction
@@ -395,20 +520,20 @@ PcpMapFunction::ImpliedClass(const PcpMapFunction& transferFunc,
 
     PcpMapFunction f = transferFunc.Compose(
         classArc.Compose(transferFunc.GetInverse()));
-    f._data.hasRootIdentity = true;
+    f._mappings->hasRootIdentity = true;
     return f;
 }
 
 bool
 PcpMapFunction::IsNull() const
 {
-    return _data.IsNull();
+    return _mappings->IsNull();
 }
 
 PcpMapFunction *Pcp_MakeIdentity()
 {
     PcpMapFunction *ret = new PcpMapFunction;
-    ret->_data.hasRootIdentity = true;
+    ret->_mappings->hasRootIdentity = true;
     return ret;
 }
 
@@ -441,21 +566,27 @@ PcpMapFunction::IsIdentity() const
 bool
 PcpMapFunction::IsIdentityPathMapping() const
 {
-    return _data.numPairs == 0 && _data.hasRootIdentity;
+    return _mappings->numPairs == 0 && _mappings->hasRootIdentity;
+}
+
+bool
+PcpMapFunction::HasRootIdentity() const
+{
+    return _mappings->hasRootIdentity;
 }
 
 void
 PcpMapFunction::Swap(PcpMapFunction& map)
 {
     using std::swap;
-    swap(_data, map._data);
+    swap(_mappings, map._mappings);
     swap(_offset, map._offset);
 }
 
 bool
 PcpMapFunction::operator==(const PcpMapFunction &map) const
 {
-    return _data == map._data && _offset == map._offset;
+    return *_mappings == *map._mappings && _offset == map._offset;
 }
 
 bool
@@ -466,7 +597,7 @@ PcpMapFunction::operator!=(const PcpMapFunction &map) const
 
 static SdfPath
 _Map(const SdfPath& path,
-     const PcpMapFunction::PathPair *pairs,
+     const _PathPair *pairs,
      const int numPairs,
      bool hasRootIdentity,
      bool invert)
@@ -481,12 +612,12 @@ _Map(const SdfPath& path,
     //      of doing that, but some path translation issues make that
     //      infeasible for now.
 
-    const PcpMapFunction::PathPair *begin = pairs;
-    const PcpMapFunction::PathPair *end = begin + numPairs;
+    const _PathPair *begin = pairs;
+    const _PathPair *end = begin + numPairs;
  
     // Find longest prefix that has a mapping;
     // this represents the most-specific mapping to apply.
-    const PcpMapFunction::PathPair *bestMatch = invert ?
+    const _PathPair *bestMatch = invert ?
         _GetBestTargetMatch(path, begin, end) :
         _GetBestSourceMatch(path, begin, end);
 
@@ -557,15 +688,19 @@ _Map(const SdfPath& path,
 SdfPath
 PcpMapFunction::MapSourceToTarget(const SdfPath & path) const
 {
-    return _Map(path, _data.begin(), _data.numPairs, _data.hasRootIdentity,
-                /* invert */ false);
+    return _Map(
+        path, _mappings->begin(), _mappings->numPairs,
+        _mappings->hasRootIdentity,
+        /* invert */ false);
 }
 
 SdfPath
 PcpMapFunction::MapTargetToSource(const SdfPath & path) const
 {
-    return _Map(path, _data.begin(), _data.numPairs, _data.hasRootIdentity,
-                /* invert */ true);
+    return _Map(
+        path, _mappings->begin(), _mappings->numPairs,
+        _mappings->hasRootIdentity,
+        /* invert */ true);
 }
 
 SdfPathExpression
@@ -605,8 +740,8 @@ PcpMapFunction::_MapPathExpressionImpl(
     std::vector<SdfPathExpression> stack;
 
     auto map = [&](SdfPath const &path) {
-        return _Map(path, _data.begin(), _data.numPairs,
-                    _data.hasRootIdentity, invert);
+        return _Map(path, _mappings->begin(), _mappings->numPairs,
+                    _mappings->hasRootIdentity, invert);
     };
 
     auto logic = [&stack](Op op, int argIndex) {
@@ -702,17 +837,17 @@ PcpMapFunction::Compose(const PcpMapFunction &inner) const
     // typically a root identity + other path pair.
     constexpr int NumLocalPairs = 4;
 
-    PathPair localSpace[NumLocalPairs];
-    std::vector<PathPair> remoteSpace;
-    PathPair *scratchBegin = localSpace;
+    _PathPair localSpace[NumLocalPairs];
+    std::vector<_PathPair> remoteSpace;
+    _PathPair *scratchBegin = localSpace;
     int maxRequiredPairs =
-        inner._data.numPairs + int(inner._data.hasRootIdentity) +
-        _data.numPairs + int(_data.hasRootIdentity);
+        inner._mappings->numPairs + int(inner._mappings->hasRootIdentity) +
+        _mappings->numPairs + int(_mappings->hasRootIdentity);
     if (maxRequiredPairs > NumLocalPairs) {
         remoteSpace.resize(maxRequiredPairs);
         scratchBegin = remoteSpace.data();
     }
-    PathPair *scratch = scratchBegin;
+    _PathPair *scratch = scratchBegin;
 
     // The composition of this function over inner is the result
     // of first applying inner, then this function.  Build a list
@@ -722,15 +857,15 @@ PcpMapFunction::Compose(const PcpMapFunction &inner) const
     // the inner and outer functions have the root identity. Add this first 
     // because it'll be first in the sort order.
     if (HasRootIdentity() && inner.HasRootIdentity()) {
-        PathPair &scratchPair = *scratch++;
+        _PathPair &scratchPair = *scratch++;
         scratchPair.first = SdfPath::AbsoluteRootPath();
         scratchPair.second = SdfPath::AbsoluteRootPath();
     }
 
     // Then apply outer function to the output range of inner. 
-    const _Data& data_inner = inner._data;
-    for (const PathPair &pair: data_inner) {
-        PathPair &scratchPair = *scratch++;
+    const _SourceAndTargetPathPairs& data_inner = *inner._mappings;
+    for (const _PathPair &pair: data_inner) {
+        _PathPair &scratchPair = *scratch++;
         scratchPair.first = pair.first;
         scratchPair.second = MapSourceToTarget(pair.second);
     }
@@ -739,11 +874,11 @@ PcpMapFunction::Compose(const PcpMapFunction &inner) const
     // as the inner function's source paths were already unique in the correct
     // order. The entries we add after this will not be sorted so we need to
     // keep track of the sorted range.
-    PathPair *scratchSortedEnd = scratch;
+    _PathPair *scratchSortedEnd = scratch;
 
     // Then apply the inverse of inner to the domain of this function.
-    const _Data& data_outer = _data;
-    for (const PathPair &pair: data_outer) {
+    const _SourceAndTargetPathPairs& data_outer = *_mappings;
+    for (const _PathPair &pair: data_outer) {
         SdfPath source = inner.MapTargetToSource(pair.first);
         if (source.IsEmpty()) {
             continue;
@@ -759,7 +894,7 @@ PcpMapFunction::Compose(const PcpMapFunction &inner) const
             continue;
         }
         
-        PathPair &scratchPair = *scratch++;
+        _PathPair &scratchPair = *scratch++;
         scratchPair.first = std::move(source);
         scratchPair.second = pair.second;
     }
@@ -774,8 +909,10 @@ PcpMapFunction::Compose(const PcpMapFunction &inner) const
     }
 
     bool hasRootIdentity = _Canonicalize(scratchBegin, scratch);
-    return PcpMapFunction(scratchBegin, scratch,
-                          _offset * inner._offset, hasRootIdentity);
+    return PcpMapFunction(
+        std::make_shared<_SourceAndTargetPathPairs>(
+            scratchBegin, scratch, hasRootIdentity),
+        _offset * inner._offset);
 }
 
 PcpMapFunction
@@ -792,25 +929,27 @@ PcpMapFunction::GetInverse() const
     TfAutoMallocTag tag("Pcp", "PcpMapFunction::GetInverse");
     TRACE_FUNCTION();
 
-    PathPairVector targetToSource;
-    targetToSource.reserve(_data.numPairs);
-    for (PathPair const &pair: _data) {
+    _PathPairVector targetToSource;
+    targetToSource.reserve(_mappings->numPairs);
+    for (_PathPair const &pair: *_mappings) {
         targetToSource.emplace_back(pair.second, pair.first);
     }
-    PathPair const
+    _PathPair const
         *begin = targetToSource.data(),
         *end = targetToSource.data() + targetToSource.size();
     // Sort the entries to match the source path ordering requirement.
     std::sort(targetToSource.begin(), targetToSource.end(), _PathPairOrder());
     return PcpMapFunction(
-        begin, end, _offset.GetInverse(), _data.hasRootIdentity);
+        std::make_shared<_SourceAndTargetPathPairs>(
+            begin, end, _mappings->hasRootIdentity),
+        _offset.GetInverse());
 }
 
 PcpMapFunction::PathMap
 PcpMapFunction::GetSourceToTargetMap() const
 {
-    PathMap ret(_data.begin(), _data.end());
-    if (_data.hasRootIdentity) {
+    PathMap ret(_mappings->begin(), _mappings->end());
+    if (_mappings->hasRootIdentity) {
         ret[SdfPath::AbsoluteRootPath()] = SdfPath::AbsoluteRootPath();
     }
     return ret;
@@ -840,7 +979,7 @@ PcpMapFunction::GetString() const
 size_t
 PcpMapFunction::Hash() const
 {
-    return TfHash{}(*this);
+    return TfHash::Combine(*_mappings, _offset);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE
