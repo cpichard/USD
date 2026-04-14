@@ -116,11 +116,6 @@ _AddOne_InverseCompute(const VdfContext &ctx)
     // Create a map to store the results
     ExecIrResult result;
 
-    // TODO: The controller code should do the check for missing invertible
-    // output values so that the client code doesn't need to.
-    if (!ctx.HasInputValue(_tokens->output)) {
-        return result;
-    }
     const double output = ctx.GetInputValue<double>(_tokens->output);
 
     // Compute and store the input value
@@ -278,12 +273,6 @@ _Add_InverseCompute(const VdfContext &ctx)
 {
     // Create a map to store the results
     ExecIrResult result;
-
-    // TODO: The controller code should do the check for missing invertible
-    // output values so that the client code doesn't need to.
-    if (!ctx.HasInputValue(_tokens->output)) {
-        return result;
-    }
 
     const double output =
         ctx.GetInputValue<double>(_tokens->output);
@@ -700,12 +689,6 @@ _AddWithClamp_InverseCompute(const VdfContext &ctx)
 {
     // Create a map to store the results
     ExecIrResult result;
-
-    // TODO: The controller code should do the check for missing invertible
-    // output values so that the client code doesn't need to.
-    if (!ctx.HasInputValue(_tokens->output)) {
-        return result;
-    }
 
     const double output =
         ctx.GetInputValue<double>(_tokens->output);

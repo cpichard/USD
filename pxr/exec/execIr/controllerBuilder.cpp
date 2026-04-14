@@ -8,6 +8,9 @@
 
 #include "pxr/exec/execIr/controllerBuilder.h"
 
+
+#include <iostream>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 ExecIrControllerBuilder::ExecIrControllerBuilder(
@@ -19,26 +22,31 @@ ExecIrControllerBuilder::ExecIrControllerBuilder(
         self.PrimComputation(ExecIrComputationTokens->forwardCompute))
     , _inverseComputeReg(
         self.PrimComputation(ExecIrComputationTokens->inverseCompute))
+    , _inverseCallback(inverseCallback)
 {
     _forwardComputeReg.Callback<ExecIrResult>(forwardCallback);
-
-    // TODO:
-    // Wrap the inverse callback in a function that checks if we have input
-    // values for all invertible output attributes and returns an empty
-    // ExecIrResult if any are missing, so that the client code doesn't have to
-    // do so.
-    //
-    // To do that, we'd need to allow for general functors as callbacks, and
-    // we'd also need some way to check for a non-empty input value without
-    // knowing the value type.
-    _inverseComputeReg.Callback(inverseCallback);
 }
 
-const TfToken &
-ExecIrControllerBuilder::_GetConstantInputName()
+ExecIrControllerBuilder::~ExecIrControllerBuilder()
 {
-    static TfToken inputNameToken("execIrControllerBuilder_inputName");
-    return inputNameToken;
+    // Wrap the inverse callback in a lambda that checks if we have input values
+    // for all invertible output attributes and returns an empty ExecIrResult if
+    // any are missing.
+    _inverseComputeReg.Callback<ExecIrResult>(
+        [inverseCallback = _inverseCallback,
+         invertibleOutputAttributeNames =
+             std::move(_invertibleOutputAttributeNames)]
+        (const VdfContext &ctx) -> void {
+            for (const TfToken &name : invertibleOutputAttributeNames) {
+                if (!ctx.HasInputValue(name)) {
+                    ctx.SetOutput(ExecIrResult{});
+                    std::cout << "\nSKIP: No input for '" << name << "'\n";
+                    return;
+                }
+            }
+
+            ctx.SetOutput(inverseCallback(ctx));
+        });
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

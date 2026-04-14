@@ -24,6 +24,7 @@
 #include "pxr/exec/execIr/tokens.h"
 #include "pxr/exec/execIr/types.h"
 
+#include "pxr/base/tf/token.h"
 #include "pxr/exec/exec/builtinComputations.h"
 #include "pxr/exec/exec/computationBuilders.h"
 #include "pxr/exec/vdf/executionTypeRegistry.h"
@@ -130,6 +131,9 @@ public:
         Callback forwardCallback,
         Callback inverseCallback);
 
+    EXECIR_API
+    ~ExecIrControllerBuilder();
+
     /// Registers an invertible input attribute.
     ///
     /// - Invertible input attributes provide input to the forward computation.
@@ -188,10 +192,6 @@ public:
         const TfToken &attributeName);
 
 private:
-    // Returns a private token used to name constant inputs.
-    EXECIR_API
-    static const TfToken &_GetConstantInputName();
-
     // Returns a pointer to the desired value provided by the
     // 'explicitDesiredValue' and 'computedDesiredValue' inputs; otherwise,
     // returns null.
@@ -207,6 +207,8 @@ private:
     ExecComputationBuilder &_self;
     ExecPrimComputationBuilder _forwardComputeReg;
     ExecPrimComputationBuilder _inverseComputeReg;
+    TfTokenVector _invertibleOutputAttributeNames;
+    Callback _inverseCallback;
 };
 
 template <typename ValueType>
@@ -224,9 +226,7 @@ ExecIrControllerBuilder::InvertibleInputAttribute(
     // provide, as a plugin point for plugins that provide inversion behavior.
     _self.AttributeComputation(
         attributeName, ExecIrComputationTokens->computeDesiredValue)
-        .Callback<ValueType>(+[](const VdfContext &ctx) {
-            const TfToken &attributeName =
-                ctx.GetInputValue<TfToken>(_GetConstantInputName());
+        .Callback<ValueType>([attributeName](const VdfContext &ctx) {
             const ExecIrResult &resultMap = ctx.GetInputValue<ExecIrResult>(
                     ExecIrComputationTokens->inverseCompute);
 
@@ -242,8 +242,7 @@ ExecIrControllerBuilder::InvertibleInputAttribute(
         })
         .Inputs(
             Prim().Computation<ExecIrResult>(
-                ExecIrComputationTokens->inverseCompute),
-            Constant(attributeName).InputName(_GetConstantInputName()));
+                ExecIrComputationTokens->inverseCompute));
 
     // Invertible input attributes define 'computeInvertedForwardValue'
     // computations that get their values from the inverse computation, but only
@@ -354,6 +353,8 @@ ExecIrControllerBuilder::InvertibleOutputAttribute(
 {
     using namespace exec_registration;
 
+    _invertibleOutputAttributeNames.push_back(attributeName);
+
     // The 'explicitDesiredValue' computation only exists to provide an output
     // where desired values can be specified as overrides passed to
     // ComputeWithOverrides.
@@ -402,29 +403,29 @@ ExecIrControllerBuilder::InvertibleOutputAttribute(
     // Register an expression on the invertible output that pulls its value
     // from the forward computation result map.
     _self.AttributeExpression(attributeName)
-        .Callback(+[](const VdfContext &ctx) -> ValueType {
-            const TfToken &attributeName =
-                ctx.GetInputValue<TfToken>(_GetConstantInputName());
+        .Callback<ValueType>([attributeName](const VdfContext &ctx) {
             const ExecIrResult &resultMap =
                 ctx.GetInputValue<ExecIrResult>(
                     ExecIrComputationTokens->forwardCompute);
             const auto it = resultMap.find(attributeName);
             if (it != resultMap.end()) {
-                return it->second.Get<ValueType>();
+                ctx.SetOutput(it->second.Get<ValueType>());
             }
+            else {
+                TF_CODING_ERROR(
+                    "Failed to find a result value for output attribute '%s' "
+                    "when computing %s",
+                    attributeName.GetText(),
+                    ctx.GetNodeDebugName().c_str());
 
-            TF_CODING_ERROR(
-                "Failed to find a result value for output attribute '%s' "
-                "when computing %s",
-                attributeName.GetText(),
-                ctx.GetNodeDebugName().c_str());
-            return VdfExecutionTypeRegistry::GetInstance()
-                .GetFallback<ValueType>();
+                ctx.SetOutput(
+                    VdfExecutionTypeRegistry::GetInstance()
+                        .GetFallback<ValueType>());
+            }
         })
         .Inputs(
             Prim().Computation<ExecIrResult>(
-                ExecIrComputationTokens->forwardCompute),
-            Constant(attributeName).InputName(_GetConstantInputName()));
+                ExecIrComputationTokens->forwardCompute));
 }
 
 template <typename ValueType>

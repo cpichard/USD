@@ -76,18 +76,11 @@ _Compute(const VdfContext &ctx)
 static ExecIrResult
 _Invert(const VdfContext &ctx)
 {
-    ExecIrResult resultMap;
-
-    // TODO: The controller code should do the check for missing invertible
-    // output values so that the client code doesn't need to.
-    const GfMatrix4d *const posedSpace =
-        ctx.GetInputValuePtr<GfMatrix4d>(ExecIrTokens->outSpaceToken);
-    if (!posedSpace) {
-        return resultMap;
-    }
-
     const GfMatrix4d startingSpace =
         ExecIr_UtilsComputeStandardStartingSpace(ctx);
+
+    const GfMatrix4d posedSpace =
+        ctx.GetInputValue<GfMatrix4d>(ExecIrTokens->outSpaceToken);
 
     const ExecIr_UtilsParams params = {
         startingSpace,
@@ -95,6 +88,7 @@ _Invert(const VdfContext &ctx)
         ExecIr_UtilsComputeStandardRotationOrientation(ctx, startingSpace)
     };
 
-    ExecIr_UtilsInvert(ctx, *posedSpace, params, &resultMap);
+    ExecIrResult resultMap;
+    ExecIr_UtilsInvert(ctx, posedSpace, params, &resultMap);
     return resultMap;
 }
