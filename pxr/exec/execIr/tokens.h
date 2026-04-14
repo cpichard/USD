@@ -46,6 +46,48 @@ TF_DECLARE_PUBLIC_TOKENS(
 
 TF_DECLARE_PUBLIC_TOKENS(ExecIrTokens, EXECIR_API, EXEC_IR_TOKENS);
 
+#define EXEC_IR_TRANSFORMABLE_TOKENS                                            \
+    ((avarsTx, "avars:tx"))                                                     \
+    ((avarsTy, "avars:ty"))                                                     \
+    ((avarsTz, "avars:tz"))                                                     \
+    ((avarsRx, "avars:rx"))                                                     \
+    ((avarsRy, "avars:ry"))                                                     \
+    ((avarsRz, "avars:rz"))                                                     \
+    ((avarsRspin, "avars:rspin"))                                               \
+    ((avarsTotalSize, "avars:totalSize"))                                       \
+    ((avarsRotationOrder, "avars:rotationOrder"))                               \
+    ((avarsDefaultTotalSize, "avars:defaultTotalSize"))                         \
+    ((avarsDefaultSpace, "avars:defaultSpace"))                                 \
+    ((avarsUnitScaleFactor, "avars:unitScaleFactor"))                           \
+                                                                                \
+    ((restTx, "rest:tx"))                                                       \
+    ((restTy, "rest:ty"))                                                       \
+    ((restTz, "rest:tz"))                                                       \
+    ((restRx, "rest:rx"))                                                       \
+    ((restRy, "rest:ry"))                                                       \
+    ((restRz, "rest:rz"))                                                       \
+    ((restSpace, "rest:space"))                                                 \
+                                                                                \
+    ((defaultTx, "default:tx"))                                                 \
+    ((defaultTy, "default:ty"))                                                 \
+    ((defaultTz, "default:tz"))                                                 \
+    ((defaultRx, "default:rx"))                                                 \
+    ((defaultRy, "default:ry"))                                                 \
+    ((defaultRz, "default:rz"))                                                 \
+    ((defaultTotalSize, "default:totalSize"))                                   \
+    ((defaultSpace, "default:space"))                                           \
+                                                                                \
+    ((posedSpace, "posed:space"))                                               \
+    ((posedDefaultSpace, "posed:defaultSpace"))                                 \
+                                                                                \
+    ((parentSpace, "parent:Space"))                                             \
+    ((parentDefaultTotalSize, "parent:defaultTotalSize"))                       \
+    ((parentDefaultSpace, "parent:defaultSpace"))                               \
+    ((parentTotalSize, "parent:totalSize"))
+
+TF_DECLARE_PUBLIC_TOKENS(
+    ExecIrTransformableTokens, EXECIR_API, EXEC_IR_TRANSFORMABLE_TOKENS);
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif
