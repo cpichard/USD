@@ -148,7 +148,7 @@ HdRenderIndexAdapterSceneIndex::HdRenderIndexAdapterSceneIndex(
 HdRenderIndexAdapterSceneIndex::HdRenderIndexAdapterSceneIndex(
     const HdRenderDelegateInfo &info)
  : _renderDelegate(std::make_unique<_NullRenderDelegateForAdapter>(info))
- , _renderIndex(HdRenderIndex::New(_renderDelegate.get()))
+ , _renderIndex(HdRenderIndex::NewForFrontendEmulation(_renderDelegate.get()))
  , _observer(this)
 {
     _renderIndex->GetEmulationSceneIndex()->AddObserver(

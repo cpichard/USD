@@ -137,7 +137,7 @@ HdRenderIndex::HdRenderIndex(
     const std::string &instanceName,
     const std::string &appName,
     HdSceneIndexBaseRefPtr const &terminalSceneIndex,
-    const bool createFrontEndEmulationOnly)
+    const bool createFrontendEmulationOnly)
     : _emulationBatchingCtx(std::make_unique<_NoticeBatchingContext>(
         _noticeBatchingTokens->postEmulation))
     , _mergingBatchingCtx(std::make_unique<_NoticeBatchingContext>(
@@ -187,7 +187,7 @@ HdRenderIndex::HdRenderIndex(
             HdLegacyGeomSubsetSceneIndex::New(
                 _emulationBatchingCtx->Append(_emulationSceneIndex));
 
-        if (createFrontEndEmulationOnly) {
+        if (createFrontendEmulationOnly) {
             return;
         }
 
@@ -266,7 +266,7 @@ HdRenderIndex::New(
 }
 
 HdRenderIndex*
-HdRenderIndex::New(
+HdRenderIndex::NewForBackendEmulation(
     HdRenderDelegate *renderDelegate,
     HdDriverVector const& drivers,
     HdSceneIndexBaseRefPtr const &terminalSceneIndex)
@@ -289,12 +289,12 @@ HdRenderIndex::New(
 }
 
 HdRenderIndex*
-HdRenderIndex::New(
-    HdRenderDelegate *renderDelegate)
+HdRenderIndex::NewForFrontendEmulation(
+    HdRenderDelegate *nullRenderDelegate)
 {
-    if (renderDelegate == nullptr) {
+    if (nullRenderDelegate == nullptr) {
         TF_CODING_ERROR(
-            "Null Render Delegate provided to create render index");
+            "No Null Render Delegate provided to create render index");
         return nullptr;
     }
 
@@ -302,12 +302,12 @@ HdRenderIndex::New(
     // the merging scene index and all the filtering scene indices following
     // the merging scene index.
     return new HdRenderIndex(
-        renderDelegate,
+        nullRenderDelegate,
         /* drivers = */ {},
         /* instanceName = */ TfToken(),
         /* appName = */ TfToken(),
         /* terminalSceneIndex = */ nullptr,
-        /* createFrontEndEmulationSceneIndex = */ true);
+        /* createFrontendEmulationSceneIndex = */ true);
 }
 
 void

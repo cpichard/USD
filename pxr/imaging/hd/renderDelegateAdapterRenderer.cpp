@@ -201,7 +201,7 @@ HdRenderDelegateAdapterRenderer::HdRenderDelegateAdapterRenderer(
  : _drivers(_ComputeDrivers(rendererCreateArgs))
  , _renderDelegate(std::move(renderDelegate))
  , _renderIndex(
-     HdRenderIndex::New(
+     HdRenderIndex::NewForBackendEmulation(
          _renderDelegate.Get(),
          _ToPointers(_drivers),
          terminalSceneIndex))

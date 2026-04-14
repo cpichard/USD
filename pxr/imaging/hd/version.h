@@ -149,8 +149,10 @@
 // 98 -> 99: Removing HdRenderIndex::IsSceneIndexEmulationEnabled() and
 //           UsdImagingGLEngine::_GetTaskController().
 //           Emulation is now always enabled.
+// 99 -> 100: HdRenderIndex::New renamed to
+//            HdRenderIndexNewForBack/FrontendEmulation.
 
-#define HD_API_VERSION 99
+#define HD_API_VERSION 100
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 // 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.
