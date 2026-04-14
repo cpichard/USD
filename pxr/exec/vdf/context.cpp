@@ -26,6 +26,12 @@ VdfContext::SetEmptyOutput() const
         return;
     }
 
+    if (!TF_VERIFY(!output->GetAssociatedInput(),
+                   "Attempt to set an empty value on associated output '%s'",
+                   output->GetDebugName().c_str())) {
+        return;
+    }
+
     VdfVector *const vector = _GetExecutor()._GetOutputValueForWriting(*output);
     if (!vector) {
         VDF_FATAL_ERROR(_GetNode(), "Couldn't get output vector.");
@@ -40,6 +46,12 @@ VdfContext::SetEmptyOutput(const TfToken &outputName) const
     // GetOutput emits an error if it returns null.
     const VdfOutput *const output = _node.GetOutput(outputName);
     if (!(output && _IsRequiredOutput(*output))) {
+        return;
+    }
+
+    if (!TF_VERIFY(!output->GetAssociatedInput(),
+                   "Attempt to set an empty value on associated output '%s'",
+                   output->GetDebugName().c_str())) {
         return;
     }
 
