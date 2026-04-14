@@ -52,6 +52,11 @@ TF_DEFINE_ENV_SETTING(
     "non-USD caches/layer stacks; the legacy behavior cannot be enabled in USD "
     "mode");
 
+TF_DEFINE_ENV_SETTING(PCP_ENABLE_SESSION_OWNER_SUBLAYER_REORDERING, true,
+    "When enabled, sublayer reordering is based on the session owner. "                     
+    "When disabled, sublayer order always follows declaration order; session owner "
+    "metadata is ignored.");
+
 struct Pcp_SublayerInfo {
     Pcp_SublayerInfo() = default;
     Pcp_SublayerInfo(const SdfLayerRefPtr& layer_, const SdfLayerOffset& offset_,
@@ -1061,6 +1066,11 @@ Pcp_NeedToRecomputeLayerStackTimeCodesPerSecond(
     return newLayerStackTcps != layerStack->GetTimeCodesPerSecond();
 }
 
+bool PcpIsSessionOwnerSublayerReorderingEnabled()
+{
+    return TfGetEnvSetting(PCP_ENABLE_SESSION_OWNER_SUBLAYER_REORDERING);
+}
+
 ////////////////////////////////////////////////////////////////////////
 // PcpLayerStack
 
@@ -1539,6 +1549,10 @@ PcpLayerStack::_Compute(const std::string &fileFormatTarget,
 
     // The session owner.  This will be empty if there is no session owner
     // in the session layer.
+    //
+    // This will also be empty if sublayer reordering is disabled. In this case, 
+    // we want to skip any reordering based on the session owner, so we don't 
+    // bother computing the session owner at all.
     std::string sessionOwner;
 
     PcpErrorVector errors;
@@ -1596,26 +1610,29 @@ PcpLayerStack::_Compute(const std::string &fileFormatTarget,
                                  std::string(), mutedLayers, &seenLayers, 
                                  &errors);
 
-            // Get the session owner.
-            struct _Helper {
-                static bool FindSessionOwner(const SdfLayerTreeHandle& tree,
-                                             std::string* sessionOwner)
-                {
-                    if (tree->GetLayer()->HasField(SdfPath::AbsoluteRootPath(), 
-                                                   SdfFieldKeys->SessionOwner,
-                                                   sessionOwner)) {
-                        return true;
-                    }
-                    TF_FOR_ALL(subtree, tree->GetChildTrees()) {
-                        if (FindSessionOwner(*subtree, sessionOwner)) {
+            // Get the session owner if we want to reorder sublayers based on 
+            // the session owner.
+            if (PcpIsSessionOwnerSublayerReorderingEnabled()) {
+                struct _Helper {
+                    static bool FindSessionOwner(const SdfLayerTreeHandle& tree,
+                                                std::string* sessionOwner)
+                    {
+                        if (tree->GetLayer()->HasField(SdfPath::AbsoluteRootPath(), 
+                                                    SdfFieldKeys->SessionOwner,
+                                                    sessionOwner)) {
                             return true;
                         }
+                        TF_FOR_ALL(subtree, tree->GetChildTrees()) {
+                            if (FindSessionOwner(*subtree, sessionOwner)) {
+                                return true;
+                            }
+                        }
+                        return false;
                     }
-                    return false;
-                }
-            };
+                };
 
-            _Helper::FindSessionOwner(_sessionLayerTree, &sessionOwner);
+                _Helper::FindSessionOwner(_sessionLayerTree, &sessionOwner);
+            }
         }
     }
 
@@ -1832,9 +1849,11 @@ PcpLayerStack::_BuildLayerStack(
     }
     localSourceInfo.clear();
 
-    // Reorder sublayers according to sessionOwner.
-    _ApplyOwnedSublayerOrder(_identifier, layer, sessionOwner, &sublayerInfo,
-                             errors);
+    // Reorder sublayers according to sessionOwner if needed.
+    if (PcpIsSessionOwnerSublayerReorderingEnabled()) {
+        _ApplyOwnedSublayerOrder(_identifier, layer, sessionOwner, &sublayerInfo,
+                                errors);
+    }
 
     // Recurse over sublayers to build subtrees.  We must do this after
     // applying the sublayer order, otherwise _layers and
