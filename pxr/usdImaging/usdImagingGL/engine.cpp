@@ -1549,6 +1549,14 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
     HdRendererPluginRegistry &registry =
         HdRendererPluginRegistry::GetInstance();
 
+    Hgi * hgi = nullptr;
+    if (_hgiDriver.name == HgiTokens->renderDriver) {
+        hgi = _hgiDriver.driver.GetWithDefault<Hgi*>(nullptr);
+    }
+    if (!hgi) {
+        hgi = _hgi.get();
+    }
+
     const HdRendererCreateArgsSchema rendererCreateArgs(
         HdRendererCreateArgsSchema::Builder()
             .SetGpuEnabled(
@@ -1556,7 +1564,7 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
             .SetDrivers(
                 HdRetainedContainerDataSource::New(
                     HdRendererCreateArgsSchemaTokens->hgi,
-                    HdRetainedTypedSampledDataSource<Hgi*>::New(_hgi.get())))
+                    HdRetainedTypedSampledDataSource<Hgi*>::New(hgi)))
             .Build());
 
     const TfToken resolvedId =
