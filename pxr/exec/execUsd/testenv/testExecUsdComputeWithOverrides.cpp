@@ -46,9 +46,11 @@ PXR_NAMESPACE_USING_DIRECTIVE;
 TF_DEFINE_PRIVATE_TOKENS(
     _tokens,
 
-    (computeTestValue)
-    (unknownComputation)
     (attr)
+    (computeViaRelationship)
+    (computeTestValue)
+    (relationship)
+    (unknownComputation)
 );
 
 EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
@@ -68,6 +70,22 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
             const std::string *const attrValue =
                 ctx.GetInputValuePtr<std::string>(_tokens->attr, &emptyString);
             return *parentValue + *attrValue;
+        });
+
+    // This computation requests itself on a single target of the 'relationship'
+    // relationship, then appends the owning prim's name, separated by a space.
+    self.PrimComputation(_tokens->computeViaRelationship)
+        .Inputs(
+            Relationship(_tokens->relationship)
+            .TargetedObjects<std::string>(_tokens->computeViaRelationship),
+            Computation<SdfPath>(ExecBuiltinComputations->computePath))
+        .Callback(+[](const VdfContext &ctx) -> std::string {
+            const std::string name = ctx.GetInputValue<SdfPath>(
+                ExecBuiltinComputations->computePath).GetName();
+            const std::string *const valuePtr =
+                ctx.GetInputValuePtr<std::string>(
+                    _tokens->computeViaRelationship);
+            return valuePtr ? *valuePtr + ' ' + name : name;
         });
 }
 
@@ -267,6 +285,97 @@ TestComputeWithOverrides()
     }
 }
 
+// Test ComputeWithOverrides when uncompilation makes topological changes to the
+// network that causes structural invalidation caches to become stale.
+//
+// This provides coverage for a bug that caused ComputeWithOverrides to produce
+// incorrect results in this situation.
+//
+static void
+TestTopologicalUpdate()
+{
+    const SdfLayerRefPtr layer = SdfLayer::CreateAnonymous(".usda");
+    layer->ImportFromString(R"usd(#usda 1.0
+        def Scope "Root" {
+            def CustomSchema "Child1" {
+                custom rel relationship = </Root/Child2>
+            }
+
+            def CustomSchema "Child2" {
+                custom rel relationship = </Root/Child3>
+            }
+
+            def CustomSchema "Child3" {
+            }
+        }
+    )usd");
+    const UsdStageConstRefPtr usdStage = UsdStage::Open(layer);
+    TF_AXIOM(usdStage);
+
+    ExecUsdSystem execSystem(usdStage);
+
+    const UsdPrim child1 = usdStage->GetPrimAtPath(SdfPath("/Root/Child1"));
+    const UsdPrim child2 = usdStage->GetPrimAtPath(SdfPath("/Root/Child2"));
+    const UsdPrim child3 = usdStage->GetPrimAtPath(SdfPath("/Root/Child3"));
+    TF_AXIOM(child1 && child2 && child3);
+
+    ExecUsdRequest request = execSystem.BuildRequest({
+        {child1, _tokens->computeViaRelationship},
+    });
+    TF_AXIOM(request.IsValid());
+
+    execSystem.PrepareRequest(request);
+    TF_AXIOM(request.IsValid());
+
+    // Do an initial ComputeWithOverrides.
+    // 
+    // The executor used to do the evaluation will cache data that is used to
+    // accelerate subsequent invalidation traversals.
+    {
+        ExecUsdValueOverrideVector overrides {
+            {{child3, _tokens->computeViaRelationship},
+             VtValue("Child3Override")}
+        };
+
+        const ExecUsdCacheView view =
+            execSystem.ComputeWithOverrides(request, std::move(overrides));
+        ASSERT_EQ(view.Get(0).Get<std::string>(),
+                  "Child3Override Child2 Child1");
+    }
+
+    // Toggle 'active' on Child2 so we uncompile nodes that are visited in the
+    // invalidation traversal done as part of the call to ComputeWithOverrides
+    // above.
+    child2.SetActive(false);
+    child2.SetActive(true);
+
+    // Do a Compute, causing the network to be recompiled, and populating output
+    // caches with new computed values.
+    {
+        const ExecUsdCacheView view = execSystem.Compute(request);
+        ASSERT_EQ(view.Get(0).Get<std::string>(),
+                  "Child3 Child2 Child1");
+    }
+
+    // Call ComputeWithOverrides again.
+    //
+    // In order to produce the correct result, this must invalidate all outputs
+    // that depend on the overridden output. If the invalidation caches used to
+    // perform that invalidation traversal are stale, we can fail to visit all
+    // outputs, returning results from the Compute call above.
+    {
+        ExecUsdValueOverrideVector overrides {
+            {{child3, _tokens->computeViaRelationship},
+             VtValue("Child3Override")}
+        };
+
+        const ExecUsdCacheView view =
+            execSystem.ComputeWithOverrides(request, std::move(overrides));
+        ASSERT_EQ(view.Get(0).Get<std::string>(),
+                  "Child3Override Child2 Child1");
+    }
+}
+
 int main()
 {
     // Load test custom schemas.
@@ -276,6 +385,7 @@ int main()
     ASSERT_EQ(testPlugins[0]->GetName(), "testExecUsdComputeWithOverrides");
 
     TestComputeWithOverrides();
+    TestTopologicalUpdate();
 
     return 0;
 }
