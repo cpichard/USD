@@ -8,9 +8,6 @@
 
 #include "pxr/exec/execIr/controllerBuilder.h"
 
-
-#include <iostream>
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 ExecIrControllerBuilder::ExecIrControllerBuilder(
@@ -40,7 +37,6 @@ ExecIrControllerBuilder::~ExecIrControllerBuilder()
             for (const TfToken &name : invertibleOutputAttributeNames) {
                 if (!ctx.HasInputValue(name)) {
                     ctx.SetOutput(ExecIrResult{});
-                    std::cout << "\nSKIP: No input for '" << name << "'\n";
                     return;
                 }
             }
