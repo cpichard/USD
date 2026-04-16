@@ -697,6 +697,8 @@ protected:
     /// Open some protected methods for whitebox testing.
     friend class UsdImagingGL_UnitTestGLDrawing;
 
+    /// \deprecated There is no render index in the Hydra 2.0 API.
+    ///
     /// Returns the render index of the engine, if any.  This is only used for
     /// whitebox testing.
     USDIMAGINGGL_API
@@ -776,9 +778,11 @@ protected:
     USDIMAGINGGL_API
     UsdImagingDelegate *_GetSceneDelegate() const;
 
+    /// \deprecated Hydra 1.0
     USDIMAGINGGL_API
     HdEngine *_GetHdEngine();
 
+    /// \deprecated Hydra 1.0
     USDIMAGINGGL_API
     HdSelectionSharedPtr _GetSelection() const;
 
@@ -802,18 +806,15 @@ protected:
     bool _displayUnloadedPrimsWithBounds;
     bool _gpuEnabled;
 
-    /* Hydra 2.0 */
+    HdPluginRendererUniqueHandle _renderer; // Hydra 2.0
+    HdxTaskControllerSceneIndexRefPtr _taskControllerSceneIndex; // Hydra 2.0
 
-    HdPluginRendererUniqueHandle _renderer;
-    HdxTaskControllerSceneIndexRefPtr _taskControllerSceneIndex;
-
-    /* Hydra 1.0 */
-    HdPluginRenderDelegateUniqueHandle _renderDelegate;
-    std::unique_ptr<HdRenderIndex> _renderIndex;
+    HdPluginRenderDelegateUniqueHandle _renderDelegate; // \deprecated Hydra 1.0
+    std::unique_ptr<HdRenderIndex> _renderIndex; // \deprecated Hydra 1.0
 
     SdfPath const _sceneDelegateId;
 
-    HdxSelectionTrackerSharedPtr _selTracker;
+    HdxSelectionTrackerSharedPtr _selTracker; // Hydra 1.0
     HdRprimCollection _renderCollection;
     HdRprimCollection _intersectCollection;
 
@@ -869,6 +870,8 @@ private:
 
     /* Hydra 1.0 */
     std::unique_ptr<UsdImagingDelegate> _sceneDelegate;
+
+    // \deprecated
     std::unique_ptr<HdEngine> _engine;
 
     bool _allowAsynchronousSceneProcessing = false;
