@@ -12,6 +12,7 @@
 #include "pxr/pxr.h"
 #include "pxr/base/tf/callContext.h"
 #include "pxr/base/tf/debug.h"
+#include "pxr/base/tf/diagnosticContainer.h"
 #include "pxr/base/tf/diagnosticLite.h"
 #include "pxr/base/tf/error.h"
 #include "pxr/base/tf/singleton.h"
@@ -34,6 +35,7 @@
 #include <atomic>
 #include <cstdarg>
 #include <list>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -417,13 +419,58 @@ private:
     // Helper to append pending error messages to the crash log.
     void _AppendPendingErrorsLogText(ErrorIterator i);
 
-    // Helper to fully rebuild the crash log error text when errors are erased
-    // from the middle.
-    void _RebuildPendingErrorLogText();
+    // Rebuild the pending-errors crash log from startSerial onward.
+    // startSerial = 0 performs a full rebuild.  The backward scan to locate the
+    // dirty boundary is O(tail), not O(total).
+    void _RebuildPendingErrorLogText(size_t startSerial = 0);
 
     // Similar log text for trapped diagnostics.
     void _AppendTrappedDiagnosticsLogText(TfDiagnosticBase const &d);
-    void _RebuildTrappedDiagnosticsLogText();
+
+    // Rebuild the trapped-diagnostics crash log from validLogEnd onward.
+    // validLogEnd = 0 performs a full rebuild.  Only entries at index >=
+    // validLogEnd are re-scanned; the clean prefix is kept in place.
+    void _RebuildTrappedDiagnosticsLogText(size_t validLogEnd = 0);
+
+    // A pin held by each in-flight TfErrorTransport / TfDiagnosticTransport.
+    // Prevents lazy cleanup of stale log text entries while diagnostics are
+    // in transit.  handle is a shared lifetime marker -- the corresponding
+    // weak_ptr in _LogTextBuffer expires when all pins are released, signalling
+    // that stale entries can be cleaned up.
+    struct _LogTextPin {
+        std::shared_ptr<const void> handle;
+    };
+
+    // Called by TfErrorMark::Transport() to pin the pending-errors log text and
+    // record the dirty boundary for a future partial rebuild.  dirtySerial is
+    // the mark's _mark value (serial number threshold).
+    _LogTextPin _PlaceErrorLogTextPin(size_t dirtySerial) {
+        auto &logText = _pendingErrorsLogText.local();
+        logText.MarkDirtyFrom(dirtySerial);
+        return logText.PlacePin();
+    }
+
+    // Called by TfDiagnosticTrap::Transport() to pin the trapped-diagnostics
+    // log text and record the dirty boundary for a future partial rebuild.
+    // logStart is the trap's _logStart value (log text index).
+    _LogTextPin _PlaceDiagnosticLogTextPin(size_t logStart) {
+        auto &logText = _trappedDiagnosticsLogText.local();
+        logText.MarkDirtyFrom(logStart);
+        return logText.PlacePin();
+    }
+
+    // Called by TfDiagnosticTrap::_OnContentsChanged() when the trap's
+    // container is mutated directly (e.g. EraseMatching, Clear*).  If the log
+    // is pinned, only records the dirty boundary so the rebuild happens lazily
+    // on pin expiry; otherwise rebuilds immediately from logStart onward.
+    void _OnTrapContentsChanged(size_t logStart) {
+        auto &logText = _trappedDiagnosticsLogText.local();
+        if (logText.IsPinned()) {
+            logText.MarkDirtyFrom(logStart);
+        } else {
+            _RebuildTrappedDiagnosticsLogText(logStart);
+        }
+    }
 
     // Helper to apply a function to all the delegates.  Return true if `fn` was
     // invoked (i.e. there were delegates to call).
@@ -449,15 +496,71 @@ private:
     // ArchSetExtraLogInfoForErrors under a fixed label.  Update calls
     // fn(active-text) *twice* in order to update the text in both buffers, and
     // it must produce the same results on each call.
+    //
+    // Also owns the pin state for in-flight transports: a weak_ptr that expires
+    // when all outstanding pins are released, plus a flag recording whether a
+    // pin has ever been placed.
     struct _LogTextBuffer {
         _LogTextBuffer() = default;
         explicit _LogTextBuffer(std::string &&label);
         template <class Fn> void Update(Fn &&fn);
+
+        // Place a pin on this log text buffer.  Multiple transports from the
+        // same source thread share a single handle; the pin expires when all
+        // have been posted or dropped.
+        TF_API _LogTextPin PlacePin();
+
+        // Returns true if a pin is currently active (transports in flight).
+        // Use this to skip an eager rebuild that would evict in-flight entries.
+        bool IsPinned() const {
+            return _pinIssued && !_pinHandle.expired();
+        }
+
+        // Returns true if a pin was previously placed and has since expired
+        // (all transports resolved), and clears the pin state.  *indicator is
+        // set to the dirty-from value recorded via MarkDirtyFrom() -- the
+        // caller should do a partial rebuild from that boundary.
+        bool WasUnpinned(size_t *indicator) {
+            if (_pinIssued && _pinHandle.expired()) {
+                *indicator = _validLogEndIndicator;
+                _validLogEndIndicator = _LogEndMax;
+                _pinIssued = false;
+                _pinHandle.reset();
+                return true;
+            }
+            return false;
+        }
+
+        // Record a dirty boundary: the log is known clean only below
+        // min(current _validLogEndIndicator, indicator).  Interpretation of
+        // indicator is caller-specific:
+        //   - _trappedDiagnosticsLogText: a log text index (trap->_logStart)
+        //   - _pendingErrorsLogText: a serial number threshold (mark._mark)
+        // _LogEndMax in both cases means "no dirty boundary recorded".
+        void MarkDirtyFrom(size_t indicator) {
+            _validLogEndIndicator = std::min(_validLogEndIndicator, indicator);
+        }
+
+        // Return a reference to the current log text.
+        const std::vector<std::string> &Get() const {
+            // Both buffers always contain the same content, so just return the
+            // first by convention.
+            return _texts.first;
+        }
+
     private:
-        std::string _label;
-        std::pair<std::vector<std::string>,
-                  std::vector<std::string>> _texts;
-        bool _parity = false;
+        static constexpr size_t _LogEndMax = size_t(-1);
+        
+        std::string                   _label;
+        std::pair<
+            std::vector<std::string>,
+            std::vector<std::string>> _texts;
+        // Dirty-from indicator set by MarkDirtyFrom() at mutation time.
+        // See MarkDirtyFrom() comment for per-buffer semantics.
+        size_t                        _validLogEndIndicator = _LogEndMax;
+        std::weak_ptr<const void>     _pinHandle;
+        bool                          _pinIssued            = false;
+        bool                          _parity               = false;
     };
 
     // Thread-specific diagnostic log text for pending errors.
@@ -491,6 +594,7 @@ private:
     bool _quiet;
 
     friend class Tf_DiagnosticContainer;
+    friend class Tf_DiagnosticMgrTestAccess;
     friend class TfDiagnosticTransport;
     friend class TfDiagnosticTrap;
     friend class TfError;

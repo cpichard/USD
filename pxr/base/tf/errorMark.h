@@ -109,7 +109,8 @@ class TfErrorMark
     inline TfErrorTransport Transport() const {
         TfDiagnosticMgr &mgr = TfDiagnosticMgr::GetInstance();
         return TfErrorTransport(mgr._errorList.local(),
-                                GetBegin(), mgr.GetErrorEnd());
+                                GetBegin(), mgr.GetErrorEnd(),
+                                mgr._PlaceErrorLogTextPin(_mark));
     }
 
     /// Remove all errors in this mark fom the error system and return them in

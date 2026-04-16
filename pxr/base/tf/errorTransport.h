@@ -39,6 +39,7 @@ public:
     void Post() {
         if (ARCH_UNLIKELY(!IsEmpty()))
             _PostImpl();
+        _pin = {};
     }
 
     /// Return true if this TfErrorTransport contains no errors, false
@@ -50,6 +51,7 @@ public:
     /// another.
     void swap(TfErrorTransport &other) {
         _errorList.swap(other._errorList);
+        std::swap(_pin, other._pin);
     }
 
 private:
@@ -57,14 +59,18 @@ private:
 
     TfErrorTransport(ErrorList &src,
                      ErrorList::iterator first,
-                     ErrorList::iterator last) {
+                     ErrorList::iterator last,
+                     TfDiagnosticMgr::_LogTextPin &&pin)
+        : _pin(std::move(pin))
+    {
         _errorList.splice(_errorList.begin(), src, first, last);
     }
 
     TF_API
     void _PostImpl();
-    
+
     ErrorList _errorList;
+    TfDiagnosticMgr::_LogTextPin _pin;
 };
 
 inline void

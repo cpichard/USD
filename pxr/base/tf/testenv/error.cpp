@@ -771,3 +771,265 @@ Test_TfDiagnosticTransport()
 
 TF_ADD_REGTEST(TfDiagnosticTransport);
 
+// Test hooks -- defined in diagnosticMgr.cpp, not in any public header.
+PXR_NAMESPACE_OPEN_SCOPE
+
+TF_API std::vector<std::string> Tf_GetPendingErrorsLogTextForTesting();
+TF_API std::vector<std::string> Tf_GetTrappedDiagnosticsLogTextForTesting();
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+static bool
+Test_TfErrorAndDiagnosticTransportLogText()
+{
+    // All cases run on a dedicated thread to avoid interference from the test
+    // framework's top-level TfErrorMark and to get a clean thread-local state.
+    bool result = false;
+    std::thread t([&result]() {
+
+        // Helper: return true if any entry in 'log' contains 'substr'.
+        auto logContains = [](const std::vector<std::string> &log,
+                              const std::string &substr) {
+            for (const auto &entry : log) {
+                if (TfStringContains(entry, substr)) {
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        // Helpers for each log text.
+        auto hasErrLog = [&logContains](std::string const &substr) {
+            return logContains(
+                Tf_GetPendingErrorsLogTextForTesting(), substr);
+        };
+
+        auto hasTrapLog = [&logContains](std::string const &substr) {
+            return logContains(
+                Tf_GetTrappedDiagnosticsLogTextForTesting(), substr);
+        };
+
+        ////////////////////////////////////////////////////////////////
+        // TfErrorMark::Transport()
+
+        // While a transport is in flight, stale entries remain in the log.
+        // After posting (which re-posts the errors) and clearing them, the lazy
+        // rebuild evicts the stale pre-transport log entry.
+        {
+            TfErrorMark m;
+            TF_RUNTIME_ERROR("flight error");
+            TF_AXIOM(hasErrLog("flight error"));
+
+            TfErrorTransport transport = m.Transport();
+            TF_AXIOM(m.IsClean());
+
+            // Pin still live: log still contains the transported entry.
+            TF_AXIOM(hasErrLog("flight error"));
+
+            // Post re-adds "flight error" to the list; clear it so the next
+            // append can show eviction.  Post() releases the pin, so
+            // WasUnpinned() fires on the next _AppendPendingErrorsLogText.
+            transport.Post();
+            m.Clear();
+            TF_RUNTIME_ERROR("new error");
+            TF_AXIOM(hasErrLog("new error"));
+            // "flight error" was cleared; the rebuild only covers currently-
+            // pending errors.
+            TF_AXIOM(!hasErrLog("flight error"));
+            m.Clear();
+        }
+
+        // Dropping a transport (without Post()) also releases the pin and
+        // triggers cleanup on the next append.
+        {
+            TfErrorMark m;
+            TF_RUNTIME_ERROR("dropped error");
+            TF_AXIOM(hasErrLog("dropped error"));
+            {
+                TfErrorTransport transport = m.Transport();
+                TF_AXIOM(m.IsClean());
+                // transport destroyed here -- pin refcount drops to zero
+            }
+            TF_RUNTIME_ERROR("after drop");
+            TF_AXIOM(hasErrLog("after drop"));
+            TF_AXIOM(!hasErrLog("dropped error"));
+            m.Clear();
+        }
+
+        // Multiple concurrent transports share the same pin: log is not cleaned
+        // up until all are dropped.
+        {
+            TfErrorMark m;
+            TF_RUNTIME_ERROR("multi error");
+
+            TfErrorTransport t1 = m.Transport();
+            TF_RUNTIME_ERROR("second error");
+            TfErrorTransport t2 = m.Transport();
+            TF_AXIOM(m.IsClean());
+
+            // Drop the first -- pin still live because t2 holds it.
+            t1 = TfErrorTransport{};
+            TF_RUNTIME_ERROR("trigger1");
+            TF_AXIOM(hasErrLog("multi error"));
+
+            // Drop the second -- pin now expired; next append rebuilds.
+            t2 = TfErrorTransport{};
+            TF_RUNTIME_ERROR("trigger2");
+            // "multi error" and "second error" were transported and dropped, so
+            // the rebuild finds only the errors still in the list.
+            TF_AXIOM(!hasErrLog("multi error"));
+            TF_AXIOM(!hasErrLog("second error"));
+            m.Clear();
+        }
+
+        // Stale entries on a quiescent thread persist until the next error
+        // triggers lazy cleanup.  ~TfErrorMark does not check for expired pins
+        // (too expensive on the hot dtor path); only
+        // _AppendPendingErrorsLogText does.
+        {
+            TfErrorTransport transport;
+            {
+                TfErrorMark m;
+                TF_RUNTIME_ERROR("quiescent error");
+                transport = m.Transport();
+            }
+            // m destroyed, transport still in flight -- no cleanup yet.
+            transport = TfErrorTransport{};
+
+            // Pin has expired but no new error has been posted: stale entry
+            // remains in the log on this quiescent thread.
+            TF_AXIOM(hasErrLog("quiescent error"));
+
+            // Posting a new error triggers the lazy rebuild via
+            // _AppendPendingErrorsLogText, evicting the stale entry.
+            {
+                TfErrorMark m;
+                TF_RUNTIME_ERROR("trigger error");
+                TF_AXIOM(!hasErrLog("quiescent error"));
+                TF_AXIOM(hasErrLog("trigger error"));
+                m.Clear();
+            }
+        }
+
+        ////////////////////////////////////////////////////////////////
+        // TfDiagnosticTrap::Transport()
+
+        // Transport() must NOT eagerly clear the log (loss-window fix): the
+        // transported diagnostics must remain in the log while in flight.
+        {
+            TfDiagnosticTrap trap;
+            TF_WARN("trap flight warning");
+            TF_AXIOM(hasTrapLog("trap flight warning"));
+
+            TfDiagnosticTransport transport = trap.Transport();
+            TF_AXIOM(trap.IsClean());
+
+            // Pin still live: log must still contain the transported entry.
+            TF_AXIOM(hasTrapLog("trap flight warning"));
+
+            // Drop the transport to release the pin, then issue a new
+            // diagnostic to trigger lazy cleanup.  (Posting would re-capture
+            // the warning back into 'trap', making the "not contains" check
+            // ambiguous.)
+            transport = TfDiagnosticTransport{};
+            TF_WARN("trap new warning");
+            TF_AXIOM(hasTrapLog("trap new warning"));
+            // Stale entry from the dropped transport has been evicted.
+            TF_AXIOM(!hasTrapLog("trap flight warning"));
+            trap.Clear();
+        }
+
+        // _PopTrap respects active pins: when a prior Transport() is in flight,
+        // the eager rebuild that would normally fire when a non-clean trap is
+        // the last on the stack is suppressed, so in-flight diagnostics remain
+        // in the crash log until the pin is released.  (No outer trap --
+        // stack.empty() must be true after the pop for the rebuild condition to
+        // be reached.)
+        {
+            TfDiagnosticTransport transport;
+            {
+                TfDiagnosticTrap trap;
+                TF_WARN("d1");
+                TF_AXIOM(hasTrapLog("d1"));
+
+                // Transport d1 -- log is pinned.
+                transport = trap.Transport();
+                TF_AXIOM(trap.IsClean());
+
+                // New diagnostic while pin is active.
+                TF_WARN("d2");
+
+                // trap destructs: _PopTrap sees wasClean=false (d2 present) and
+                // stack.empty()=true after the pop.  Without the pin check it
+                // would eagerly rebuild to empty, evicting d1 while the
+                // transport is still in flight.  d2 is dispatched to delegates
+                // (no enclosing trap).
+            }
+            // d1 must still be in the log -- the eager rebuild was suppressed.
+            TF_AXIOM(hasTrapLog("d1"));
+
+            // Drop the transport -- pin released.  Open a fresh trap and issue
+            // a diagnostic to trigger lazy cleanup via
+            // _AppendTrappedDiagnosticsLogText.
+            transport = TfDiagnosticTransport{};
+            {
+                TfDiagnosticTrap trap2;
+                TF_WARN("d3");
+                TF_AXIOM(hasTrapLog("d3"));
+                // d1 was transported and dropped; the lazy rebuild evicts it.
+                TF_AXIOM(!hasTrapLog("d1"));
+                trap2.Clear();
+            }
+        }
+
+        // _OnContentsChanged respects active pins: clearing the trap while a
+        // prior Transport() is in flight must not evict in-flight log entries.
+        // Without the IsPinned() guard in _OnTrapContentsChanged, trap.Clear()
+        // would rebuild from _logStart, losing ct1 while it is still in-flight.
+        {
+            TfDiagnosticTransport transport;
+            {
+                TfDiagnosticTrap trap;
+                TF_WARN("ct1");
+                TF_AXIOM(hasTrapLog("ct1"));
+
+                // Transport ct1 -- log is pinned.
+                transport = trap.Transport();
+                TF_AXIOM(trap.IsClean());
+
+                // Issue a second warning, then clear it while the pin is still
+                // active.  The pin guard must prevent the rebuild that would
+                // otherwise truncate the log at _logStart and evict ct1.
+                TF_WARN("ct2");
+                trap.Clear();
+                TF_AXIOM(trap.IsClean());
+                TF_AXIOM(hasTrapLog("ct1"));
+
+                // trap destructs cleanly (container empty, nothing to re-post).
+            }
+            // ct1 still in the log -- transport is still in flight.
+            TF_AXIOM(hasTrapLog("ct1"));
+
+            // Drop the transport -- pin released.  Open a fresh trap and issue
+            // a diagnostic to trigger the lazy rebuild.
+            transport = TfDiagnosticTransport{};
+            {
+                TfDiagnosticTrap trap2;
+                TF_WARN("ct3");
+                TF_AXIOM(hasTrapLog("ct3"));
+                // ct1 was dropped (not re-posted); the rebuild evicts it.
+                TF_AXIOM(!hasTrapLog("ct1"));
+                // ct2 was cleared and never re-posted.
+                TF_AXIOM(!hasTrapLog("ct2"));
+                trap2.Clear();
+            }
+        }
+
+        result = true;
+    });
+    t.join();
+    return result;
+}
+
+TF_ADD_REGTEST(TfErrorAndDiagnosticTransportLogText);
+
