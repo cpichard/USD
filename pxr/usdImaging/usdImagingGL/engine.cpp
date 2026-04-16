@@ -7,6 +7,7 @@
 
 #include "pxr/usdImaging/usdImagingGL/engine.h"
 
+#include "pxr/usd/sdf/path.h"
 #include "pxr/usdImaging/usdImaging/delegate.h"
 #include "pxr/usdImaging/usdImaging/legacyRenderSettingsSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/selectionSceneIndex.h"
@@ -14,6 +15,9 @@
 #include "pxr/usdImaging/usdImaging/rootOverridesSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/sceneIndices.h"
 #include "pxr/usdImaging/usdImaging/usdSceneIndexInputArgsSchema.h"
+
+#include "pxr/usdImaging/usdExecImaging/stageSceneIndexFactory.h"
+#include "pxr/usdImaging/usdExecImaging/stageSceneIndexInterface.h"
 
 #include "pxr/usd/usdGeom/tokens.h"
 #include "pxr/usd/usdGeom/camera.h"
@@ -53,6 +57,7 @@
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
+#include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/staticData.h"
@@ -86,6 +91,14 @@ TF_DEFINE_ENV_SETTING(
     USDIMAGINGGL_ENGINE_ENABLE_CACHING_SCENE_INDEX, false,
     "Use caching scene index (also requires "
     "USDIMAGINGGL_ENGINE_ENABLE_SCENE_INDEX_OBSERVER_RENDERER)");
+
+TF_DEFINE_ENV_SETTING(
+    USDIMAGINGGL_ENGINE_ENABLE_EXEC_SCENE_INDEX, false,
+    "Inserts an initial scene index which provides values computed by exec. "
+    "The exec scene index is added by a merging scene index in the overrides "
+    "scene index callback. Values provided by the exec scene index override "
+    "values in the input scene. To use this feature, usdImaging must be "
+    "built with PXR_BUILD_EXEC=ON.");
 
 namespace UsdImagingGLEngine_Impl
 {
@@ -461,6 +474,8 @@ UsdImagingGLEngine::_DestroyHydraObjects()
         _legacyRenderSettingsSceneIndex = nullptr;
         _rootOverridesSceneIndex = nullptr;
         _lightPruningSceneIndex = nullptr;
+        _mergingStageSceneIndex = nullptr;
+        _execStageSceneIndex = nullptr;
         _stageSceneIndex = nullptr;
     }
 
@@ -507,6 +522,9 @@ UsdImagingGLEngine::PrepareBatch(
         // SetTime will only react if time actually changes.
         if (UseUsdImagingSceneIndex()) {
             _stageSceneIndex->SetTime(params.frame);
+            if (_execStageSceneIndex) {
+                _execStageSceneIndex->SetTime(params.frame);
+            }
         } else {
             _sceneDelegate->SetTime(params.frame);
         }
@@ -567,6 +585,9 @@ UsdImagingGLEngine::PrepareBatch(
 
             TF_VERIFY(_stageSceneIndex);
             _stageSceneIndex->SetStage(stage);
+            if (_execStageSceneIndex) {
+                _execStageSceneIndex->SetStage(stage);
+            }
 
         } else {
             TF_VERIFY(_sceneDelegate);
@@ -1842,6 +1863,24 @@ UsdImagingGLEngine::_AppendOverridesSceneIndices(
 {
     HdSceneIndexBaseRefPtr sceneIndex = inputScene;
 
+    if (TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_EXEC_SCENE_INDEX)) {
+        _execStageSceneIndex = UsdExecImagingCreateStageSceneIndex();
+        if (TF_VERIFY(_execStageSceneIndex)) {
+            // Insert a merging scene index that merges the input scene with the
+            // _execStageSceneIndex. The _execStageSceneIndex is added first so
+            // that its data sources overshadow the corresponding data sources
+            // from the input scene.
+            _mergingStageSceneIndex = HdMergingSceneIndex::New();
+            _mergingStageSceneIndex->AddInputScene(
+                _execStageSceneIndex,
+                SdfPath::AbsoluteRootPath());
+            _mergingStageSceneIndex->AddInputScene(
+                inputScene,
+                SdfPath::AbsoluteRootPath());
+            sceneIndex = _mergingStageSceneIndex;
+        }
+    }
+
     const HdContainerDataSourceHandle prefixPathPruningInputArgs =
         HdRetainedContainerDataSource::New(
             HdsiPrefixPathPruningSceneIndexTokens->excludePathPrefixes,
@@ -2647,6 +2686,9 @@ UsdImagingGLEngine::_PreSetTime(const UsdImagingGLRenderParams& params)
                 _postInstancingNoticeBatchingSceneIndex);
 
         _stageSceneIndex->ApplyPendingUpdates();
+        if (_execStageSceneIndex) {
+            _execStageSceneIndex->ApplyPendingUpdates();
+        }
     } else {
         // Set the fallback refine level; if this changes from the
         // existing value, all prim refine levels will be dirtied.

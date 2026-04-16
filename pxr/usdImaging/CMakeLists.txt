@@ -1,5 +1,6 @@
 set(DIRS
     usdImaging
+    usdExecImaging
     usdImagingGL
     usdProcImaging
     usdSkelImaging
