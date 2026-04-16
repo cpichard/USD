@@ -99,6 +99,7 @@ pxr_plugin(${PXR_PACKAGE}
         dependencySceneIndexPlugin
         dependencyForwardingSceneIndexPlugin
         displayFilter
+        displayColorSpaceSceneIndexPlugin
         gprim
         gprimbase
         instancer
@@ -139,6 +140,7 @@ pxr_plugin(${PXR_PACKAGE}
         rileyRenderViewSchema
         rileySampleFilterSchema
         rileyShadingNodeSchema
+        renderingColorSpaceSceneIndexPlugin
         rixStrings
         sampleFilter
         sphere
