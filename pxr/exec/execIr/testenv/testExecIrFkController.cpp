@@ -122,6 +122,77 @@ Test_IrForwardCompute()
     }
 }
 
+// Tests inverse and forward computation by:
+// - Solving for input avar values with the given desired values as goals for
+//   the output spaces and confirming we get the expected input values.
+// - Authoring the resulting input values onto the input avars and computing
+//   the output spaces and confirming that we get the desired values that were
+//   used for the initial inversion.
+static
+void _VerifyInverseAndForwardResults(
+    const std::vector<UsdAttribute> &inputAvars,
+    const std::vector<double> &expectedInputValues,
+    const std::vector<UsdAttribute> &outputSpaces,
+    const std::vector<GfMatrix4d> &desiredValues,
+    ExecUsdSystem *execSystem)
+{
+    TF_AXIOM(inputAvars.size() == expectedInputValues.size());
+    TF_AXIOM(outputSpaces.size() == desiredValues.size());
+
+    // Invert, specifying the desired values as goals, and confirm we get the
+    // expected input values.
+    {
+        std::vector<ExecUsdValueKey> valueKeys;
+        for (const UsdAttribute &attr : inputAvars) {
+            valueKeys.emplace_back(
+                attr, ExecIrComputationTokens->computeDesiredValue);
+        }
+        const ExecUsdRequest request =
+            execSystem->BuildRequest(std::move(valueKeys));
+        TF_AXIOM(request.IsValid());
+
+        ExecUsdValueOverrideVector overrides;
+        for (size_t i=0; i<desiredValues.size(); ++i) {
+            overrides.push_back(
+                {{outputSpaces[i],
+                  ExecIrComputationTokens->explicitDesiredValue},
+                 VtValue(desiredValues[i])});
+        };
+        ExecUsdCacheView cache =
+            execSystem->ComputeWithOverrides(request, std::move(overrides));
+
+        for (unsigned int i=0; i<expectedInputValues.size(); ++i) {
+            const VtValue value = cache.Get(i);
+            TF_AXIOM(value.IsHolding<double>());
+            ASSERT_CLOSE(value.Get<double>(), expectedInputValues[i]);
+        }
+    }
+
+    // Author the expected input values and do a forward compute to confirm we
+    // get the desired output values.
+    {
+        for (unsigned int i=0; i<expectedInputValues.size(); ++i) {
+            inputAvars[i].Set(expectedInputValues[i]);
+        }
+
+        std::vector<ExecUsdValueKey> valueKeys;
+        for (const UsdAttribute &attr : outputSpaces) {
+            valueKeys.emplace_back(attr, ExecBuiltinComputations->computeValue);
+        }
+        const ExecUsdRequest request =
+            execSystem->BuildRequest(std::move(valueKeys));
+        TF_AXIOM(request.IsValid());
+
+        ExecUsdCacheView cache = execSystem->Compute(request);
+
+        for (size_t i=0; i<desiredValues.size(); ++i) {
+            const VtValue value = cache.Get(i);
+            TF_AXIOM(value.IsHolding<GfMatrix4d>());
+            ASSERT_CLOSE(value.Get<GfMatrix4d>(), desiredValues[i]);
+        }
+    }
+}
+
 static void
 Test_IrInverseCompute()
 {
@@ -178,48 +249,36 @@ Test_IrInverseCompute()
                                               0, -1, 0, 0,
                                               1,  0, 0, 0,
                                               1,  2, 3, 1);
-        ExecUsdValueOverrideVector overrides {
-            {{outSpace, ExecIrComputationTokens->explicitDesiredValue},
-             VtValue(desiredOutSpaceValue)}
-        };
-        ExecUsdCacheView cache =
-            execSystem.ComputeWithOverrides(request, std::move(overrides));
 
         // Expected input values in the same order as the value keys in the
         // request.
         const std::vector<double> expectedInputValues{
             90.0, -90.0, 90.0, 0.0,    1.0, 2.0, 3.0,
         };
-        for (unsigned int index=0; index<expectedInputValues.size(); ++index) {
-            ASSERT_CLOSE(
-                cache.Get(index).Get<double>(),
-                expectedInputValues[index]);
-        }
+
+        _VerifyInverseAndForwardResults(
+            inputAttributes, expectedInputValues,
+            {outSpace}, {desiredOutSpaceValue},
+            &execSystem);
     }
 
-    // Compute with a different desired value.
+    // Invert with a different desired value.
     {
         const GfMatrix4d desiredOutSpaceValue( 0,  0, -1, 0,
                                                0,  1,  0, 0,
                                                1,  0,  0, 0,
                                               10, 20, 30, 1);
-        ExecUsdValueOverrideVector overrides {
-            {{outSpace, ExecIrComputationTokens->explicitDesiredValue},
-             VtValue(desiredOutSpaceValue)}
-        };
-        ExecUsdCacheView cache =
-            execSystem.ComputeWithOverrides(request, std::move(overrides));
 
         // Expected input values in the same order as the value keys in the
         // request.
         const std::vector<double> expectedInputValues{
             0.0, 90.0, 0.0, 0.0,    10.0, 20.0, 30.0,
         };
-        for (unsigned int index=0; index<expectedInputValues.size(); ++index) {
-            ASSERT_CLOSE(
-                cache.Get(index).Get<double>(),
-                expectedInputValues[index]);
-        }
+
+        _VerifyInverseAndForwardResults(
+            inputAttributes, expectedInputValues,
+            {outSpace}, {desiredOutSpaceValue},
+            &execSystem);
     }
 
     // Now set the parent space and compute the inverse again.
@@ -236,23 +295,17 @@ Test_IrInverseCompute()
                                                0,  1,  0, 0,
                                                1,  0,  0, 0,
                                               10, 20, 30, 1);
-        ExecUsdValueOverrideVector overrides {
-            {{outSpace, ExecIrComputationTokens->explicitDesiredValue},
-             VtValue(desiredOutSpaceValue)}
-        };
-        ExecUsdCacheView cache =
-            execSystem.ComputeWithOverrides(request, std::move(overrides));
 
         // Expected input values in the same order as the value keys in the
         // request.
         const std::vector<double> expectedInputValues{
             0.0, 90.0, 0.0, 0.0,    9.0, 19.0, 29.0,
         };
-        for (unsigned int index=0; index<expectedInputValues.size(); ++index) {
-            ASSERT_CLOSE(
-                cache.Get(index).Get<double>(),
-                expectedInputValues[index]);
-        }
+
+        _VerifyInverseAndForwardResults(
+            inputAttributes, expectedInputValues,
+            {outSpace}, {desiredOutSpaceValue},
+            &execSystem);
     }
 }
 
@@ -316,23 +369,6 @@ Test_DependentFkControllers()
 
     ExecUsdSystem execSystem(usdStage);
 
-    const ExecUsdRequest outputRequest = execSystem.BuildRequest({
-            ExecUsdValueKey{
-                parentOutSpace, ExecBuiltinComputations->computeValue},
-            ExecUsdValueKey{
-                childOutSpace, ExecBuiltinComputations->computeValue},
-        });
-    TF_AXIOM(outputRequest.IsValid());
-
-    std::vector<ExecUsdValueKey> valueKeys;
-    for (const UsdAttribute &attr : inputAttributes) {
-        valueKeys.emplace_back(
-            attr, ExecIrComputationTokens->computeDesiredValue);
-    }
-    const ExecUsdRequest inputRequest =
-        execSystem.BuildRequest(std::move(valueKeys));
-    TF_AXIOM(inputRequest.IsValid());
-
     const GfMatrix4d desiredParentOutSpaceValue(0,  0, 1, 0,
                                                 0, -1, 0, 0,
                                                 1,  0, 0, 0,
@@ -346,36 +382,11 @@ Test_DependentFkControllers()
         0.0,   0.0,   0.0, 0.0,    3.0, -2.0, 1.0,
     };
 
-    {
-        ExecUsdValueOverrideVector overrides {
-            {{parentOutSpace, ExecIrComputationTokens->explicitDesiredValue},
-             VtValue(desiredParentOutSpaceValue)},
-            {{childOutSpace, ExecIrComputationTokens->explicitDesiredValue},
-             VtValue(desiredChildOutSpaceValue)},
-        };
-        ExecUsdCacheView cache =
-            execSystem.ComputeWithOverrides(inputRequest, std::move(overrides));
-
-        for (unsigned int index=0; index<expectedInputValues.size(); ++index) {
-            ASSERT_CLOSE(
-                cache.Get(index).Get<double>(),
-                expectedInputValues[index]);
-        }
-    }
-
-    // Author the expected input values and confirm we get the desired output
-    // values.
-    {
-        int index = 0;
-        for (const UsdAttribute &attr : inputAttributes) {
-            attr.Set(expectedInputValues[index++]);
-        }
-
-        ExecUsdCacheView cache = execSystem.Compute(outputRequest);
-
-        ASSERT_CLOSE(cache.Get(0).Get<GfMatrix4d>(), desiredParentOutSpaceValue);
-        ASSERT_CLOSE(cache.Get(1).Get<GfMatrix4d>(), desiredChildOutSpaceValue);
-    }
+    _VerifyInverseAndForwardResults(
+        inputAttributes, expectedInputValues,
+        {parentOutSpace, childOutSpace},
+        {desiredParentOutSpaceValue, desiredChildOutSpaceValue},
+        &execSystem);
 }
 
 int main(int argc, char **argv)
