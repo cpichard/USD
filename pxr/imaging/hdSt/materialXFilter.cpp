@@ -171,6 +171,8 @@ R"(
 <materialx version="1.38">
   <point_light name="pt_light" type="lightshader">
   </point_light>
+  <spot_light name="spot_light" type="lightshader">
+  </spot_light>
   <directional_light name="dir_light" type="lightshader">
   </directional_light>
 </materialx>

@@ -63,11 +63,39 @@ R"(#if NUM_LIGHTS > 0
             // Distant lights have Hydra attenuation = vec3(0.0, 0.0, 0.0)
             if (light.attenuation.x == 0.0 && light.attenuation.y == 0.0 && 
                 light.attenuation.z == 0.0) {
-                $lightData[u_numActiveLightSources].type = 2; // directional
+                $lightData[u_numActiveLightSources].type = 3; // directional
 
                 // Direction (Hydra position in ViewSpace)
                 $lightData[u_numActiveLightSources].direction = 
                     (HdGet_worldToViewInverseMatrix() * -light.position).xyz;
+            }
+            // Spot lights should have an authored spot cutoff < 180 
+            else if (light.spotCutoffAndFalloff.x < 180.0) {
+                $lightData[u_numActiveLightSources].type = 2; // spot
+
+                // Position (Hydra position in ViewSpace)
+                $lightData[u_numActiveLightSources].position = 
+                    (HdGet_worldToViewInverseMatrix() * light.position).xyz;
+
+                // Direction (Hydra spotDirection in ViewSpace)
+                $lightData[u_numActiveLightSources].direction = 
+                    (HdGet_worldToViewInverseMatrix() * light.spotDirection).xyz;
+
+                // Inner and Outer angles (Hydra cutoff and fallof angles) Note 
+                // that these angles are in degrees in Hydra and MaterialX
+                // expects them in radians.
+                const float cutoffD = light.spotCutoffAndFalloff.x;
+                const float falloffD = light.spotCutoffAndFalloff.y;
+                float outerD, innerD;
+                if (cutoffD < 90.0) {
+                    outerD = max(cutoffD, falloffD);
+                    innerD = 90 - falloffD;
+                } else {
+                    outerD = cutoffD;
+                    innerD = falloffD;
+                }
+                $lightData[u_numActiveLightSources].outer_angle = radians(outerD);
+                $lightData[u_numActiveLightSources].inner_angle = radians(innerD);
             }
             // Treat all other lights as Point lights
             else {
