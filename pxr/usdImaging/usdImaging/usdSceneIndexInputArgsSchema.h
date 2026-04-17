@@ -76,15 +76,24 @@ public:
     /// \name Member accessor
     /// @{
 
+    /// The USD stage used to populate the usd imaging scene indices. Note
+    /// that a client of usd imaging can specify the stage either in this
+    /// schema or later by calling UsdStageSceneIndex::SetStage, for example
+    /// after all scene indices and the renderer have been created. The
+    /// results of either are equivalent but there might differences in the
+    /// performance.
     USDIMAGING_API
     UsdStageRefPtrDataSourceHandle GetStage() const;
 
     USDIMAGING_API
     HdBoolDataSourceHandle GetIncludeUnloadedPrims() const;
 
+    /// If true, switch the draw mode for unloaded prims to bounds.
     USDIMAGING_API
     HdBoolDataSourceHandle GetDisplayUnloadedPrimsWithBounds() const;
 
+    /// If true, add scene index resolving usd draw mode (from GeomModelAPI,
+    /// e.g., "cards").
     USDIMAGING_API
     HdBoolDataSourceHandle GetAddDrawModeSceneIndex() const; 
 
