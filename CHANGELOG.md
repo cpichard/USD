@@ -10,6 +10,8 @@
     (PR: [#3707](https://github.com/PixarAnimationStudios/OpenUSD/pull/3707))
   - Fixed a bug where OpenImageIO would not use the OpenColorIO library built by
     build_usd.py if both were enabled.
+  - Updated OCIO version to 2.4.2 for macOS builds, to avoid build issues with 
+    latest versions of Xcode (26).
 
 - Removed support for Python 3.8 and added support for Python 3.14 for the 
   usd-core PyPI package.
