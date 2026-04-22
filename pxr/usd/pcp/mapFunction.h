@@ -225,13 +225,17 @@ public:
     size_t Hash() const;
 
 private:
-    struct _SourceAndTargetPathPairs;
+    struct _Mappings;
 
     PcpMapFunction(
-        std::shared_ptr<_SourceAndTargetPathPairs>&& mappings,
+        std::shared_ptr<_Mappings>&& mappings,
         SdfLayerOffset offset);
 
-    PCP_API
+    SdfPath
+    _MapPathImpl(
+        bool invert,
+        const SdfPath& path) const;
+
     SdfPathExpression
     _MapPathExpressionImpl(
         bool invert,
@@ -250,7 +254,7 @@ private:
         h.Append(x.Hash());
     }
 
-    std::shared_ptr<_SourceAndTargetPathPairs> _mappings;
+    std::shared_ptr<_Mappings> _mappings;
     SdfLayerOffset _offset;
 };
 

@@ -13,11 +13,13 @@
 #include "pxr/base/tf/hash.h"
 #include "pxr/base/tf/mallocTag.h"
 #include "pxr/base/tf/staticData.h"
+#include "pxr/base/tf/stl.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/ostreamMethods.h"
 
 #include <limits>
 #include <utility>
+#include <variant>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -71,9 +73,7 @@ private:
     }
 };
 
-};
-
-struct PcpMapFunction::_SourceAndTargetPathPairs final
+struct _SourceAndTargetPathPairs final
 {
     static const int _MaxLocalPairs = 2;
 
@@ -190,15 +190,69 @@ struct PcpMapFunction::_SourceAndTargetPathPairs final
     bool hasRootIdentity = false;
 };
 
+} // end anonymous namespace
+
+struct PcpMapFunction::_Mappings final
+{
+    _Mappings() = default;
+    _Mappings(_PathPair const *begin, _PathPair const *end, bool hasRootIdentity)
+        : data(std::in_place_type<_SourceAndTargetPathPairs>, 
+            begin, end, hasRootIdentity)
+    { }
+    _Mappings(_SourceAndTargetPathPairs&& pathPairs)
+        : data(std::in_place_type<_SourceAndTargetPathPairs>,
+            std::move(pathPairs))
+    { }
+
+    bool operator==(const _Mappings& m) const
+    {
+        return data == m.data;
+    }
+
+    bool operator!=(const _Mappings& m) const
+    {
+        return !(*this == m);
+    }
+
+    bool IsPathPairs() const
+    {
+        return std::holds_alternative<_SourceAndTargetPathPairs>(data);
+    }
+
+    const _SourceAndTargetPathPairs& GetPathPairs() const
+    {
+        return std::get<_SourceAndTargetPathPairs>(data);
+    }
+
+    _SourceAndTargetPathPairs& GetPathPairs()
+    {
+        return std::get<_SourceAndTargetPathPairs>(data);
+    }
+
+    template <class HashState>
+    friend void TfHashAppend(HashState &h, _Mappings const& m){
+        std::visit(TfOverloads{
+            [&](const _SourceAndTargetPathPairs& pairs) {
+                h.Append(pairs);
+            }
+        }, m.data);
+    }
+
+    std::variant<
+        // Flat list of (source path, target path) pairs.
+        _SourceAndTargetPathPairs
+    > data;
+};
+
 PcpMapFunction::PcpMapFunction()
-    : _mappings(new _SourceAndTargetPathPairs)
+    : _mappings(new _Mappings)
 {
 }
 
 PcpMapFunction::PcpMapFunction(
-    std::shared_ptr<_SourceAndTargetPathPairs>&& data,
+    std::shared_ptr<_Mappings>&& mappings,
     SdfLayerOffset offset)
-    : _mappings(std::move(data))
+    : _mappings(std::move(mappings))
     , _offset(offset)
 {
 }
@@ -503,7 +557,7 @@ PcpMapFunction::Create(const PathMap &sourceToTarget,
     std::sort(begin, end, _PathPairOrder());
     bool hasRootIdentity = _Canonicalize(begin, end);
     return PcpMapFunction(
-        std::make_shared<_SourceAndTargetPathPairs>(
+        std::make_shared<_Mappings>(
             begin, end, hasRootIdentity), offset);
 }
 
@@ -520,20 +574,27 @@ PcpMapFunction::ImpliedClass(const PcpMapFunction& transferFunc,
 
     PcpMapFunction f = transferFunc.Compose(
         classArc.Compose(transferFunc.GetInverse()));
-    f._mappings->hasRootIdentity = true;
+
+    if (!f.HasRootIdentity()) {
+        f._mappings->GetPathPairs().hasRootIdentity = true;
+    }
     return f;
 }
 
 bool
 PcpMapFunction::IsNull() const
 {
-    return _mappings->IsNull();
+    return std::visit(TfOverloads{
+        [](const _SourceAndTargetPathPairs& pathPairs) {
+            return pathPairs.IsNull();
+        }
+    }, _mappings->data);
 }
 
 PcpMapFunction *Pcp_MakeIdentity()
 {
     PcpMapFunction *ret = new PcpMapFunction;
-    ret->_mappings->hasRootIdentity = true;
+    ret->_mappings->GetPathPairs().hasRootIdentity = true;
     return ret;
 }
 
@@ -566,13 +627,21 @@ PcpMapFunction::IsIdentity() const
 bool
 PcpMapFunction::IsIdentityPathMapping() const
 {
-    return _mappings->numPairs == 0 && _mappings->hasRootIdentity;
+    return std::visit(TfOverloads{
+        [](const _SourceAndTargetPathPairs& pathPairs) { 
+            return pathPairs.numPairs == 0 && pathPairs.hasRootIdentity;
+        }
+    }, _mappings->data);
 }
 
 bool
 PcpMapFunction::HasRootIdentity() const
 {
-    return _mappings->hasRootIdentity;
+    return std::visit(TfOverloads{
+        [](const _SourceAndTargetPathPairs& pathPairs) {
+            return pathPairs.hasRootIdentity;
+        }
+    }, _mappings->data);
 }
 
 void
@@ -597,9 +666,7 @@ PcpMapFunction::operator!=(const PcpMapFunction &map) const
 
 static SdfPath
 _Map(const SdfPath& path,
-     const _PathPair *pairs,
-     const int numPairs,
-     bool hasRootIdentity,
+     const _SourceAndTargetPathPairs& pairs,
      bool invert)
 {
     // Note that we explicitly do not fix target paths here. This
@@ -612,8 +679,8 @@ _Map(const SdfPath& path,
     //      of doing that, but some path translation issues make that
     //      infeasible for now.
 
-    const _PathPair *begin = pairs;
-    const _PathPair *end = begin + numPairs;
+    const _PathPair *begin = pairs.begin();
+    const _PathPair *end = pairs.end();
  
     // Find longest prefix that has a mapping;
     // this represents the most-specific mapping to apply.
@@ -624,7 +691,7 @@ _Map(const SdfPath& path,
     SdfPath result;
     // size_t minTargetElementCount = 0;
     if (bestMatch == end) {
-        if (hasRootIdentity) {
+        if (pairs.hasRootIdentity) {
             // Use the root identity.
             result = path;
         }
@@ -686,21 +753,25 @@ _Map(const SdfPath& path,
 }
 
 SdfPath
+PcpMapFunction::_MapPathImpl(bool invert, const SdfPath &path) const
+{
+    return std::visit(TfOverloads{
+        [&](const _SourceAndTargetPathPairs& pathPairs) {
+            return _Map(path, pathPairs, invert);
+        }
+    }, _mappings->data);
+}
+
+SdfPath
 PcpMapFunction::MapSourceToTarget(const SdfPath & path) const
 {
-    return _Map(
-        path, _mappings->begin(), _mappings->numPairs,
-        _mappings->hasRootIdentity,
-        /* invert */ false);
+    return _MapPathImpl(/* invert */ false, path);
 }
 
 SdfPath
 PcpMapFunction::MapTargetToSource(const SdfPath & path) const
 {
-    return _Map(
-        path, _mappings->begin(), _mappings->numPairs,
-        _mappings->hasRootIdentity,
-        /* invert */ true);
+    return _MapPathImpl(/* invert */ true, path);
 }
 
 SdfPathExpression
@@ -740,8 +811,7 @@ PcpMapFunction::_MapPathExpressionImpl(
     std::vector<SdfPathExpression> stack;
 
     auto map = [&](SdfPath const &path) {
-        return _Map(path, _mappings->begin(), _mappings->numPairs,
-                    _mappings->hasRootIdentity, invert);
+        return _MapPathImpl(invert, path);
     };
 
     auto logic = [&stack](Op op, int argIndex) {
@@ -819,19 +889,11 @@ PcpMapFunction::_MapPathExpressionImpl(
     return stack.empty() ? SdfPathExpression {} : stack.back();
 }
 
-PcpMapFunction
-PcpMapFunction::Compose(const PcpMapFunction &inner) const
+static _SourceAndTargetPathPairs
+_ComposePathPairs(
+    const _SourceAndTargetPathPairs& outerPairs,
+    const _SourceAndTargetPathPairs& innerPairs)
 {
-    TfAutoMallocTag tag("Pcp", "PcpMapFunction::Compose");
-    TRACE_FUNCTION();
-
-    // Fast path identities.  These do occur in practice and are
-    // worth special-casing since it lets us avoid heap allocation.
-    if (IsIdentity())
-        return inner;
-    if (inner.IsIdentity())
-        return *this;
-
     // A 100k random test subset from a production
     // shot show a mean result size of 1.906050;
     // typically a root identity + other path pair.
@@ -841,8 +903,8 @@ PcpMapFunction::Compose(const PcpMapFunction &inner) const
     std::vector<_PathPair> remoteSpace;
     _PathPair *scratchBegin = localSpace;
     int maxRequiredPairs =
-        inner._mappings->numPairs + int(inner._mappings->hasRootIdentity) +
-        _mappings->numPairs + int(_mappings->hasRootIdentity);
+        innerPairs.numPairs + int(innerPairs.hasRootIdentity) +
+        outerPairs.numPairs + int(outerPairs.hasRootIdentity);
     if (maxRequiredPairs > NumLocalPairs) {
         remoteSpace.resize(maxRequiredPairs);
         scratchBegin = remoteSpace.data();
@@ -856,18 +918,17 @@ PcpMapFunction::Compose(const PcpMapFunction &inner) const
     // The composed result will have the root identity if and only if both
     // the inner and outer functions have the root identity. Add this first 
     // because it'll be first in the sort order.
-    if (HasRootIdentity() && inner.HasRootIdentity()) {
+    if (outerPairs.hasRootIdentity && innerPairs.hasRootIdentity) {
         _PathPair &scratchPair = *scratch++;
         scratchPair.first = SdfPath::AbsoluteRootPath();
         scratchPair.second = SdfPath::AbsoluteRootPath();
     }
 
     // Then apply outer function to the output range of inner. 
-    const _SourceAndTargetPathPairs& data_inner = *inner._mappings;
-    for (const _PathPair &pair: data_inner) {
+    for (const _PathPair &pair: innerPairs) {
         _PathPair &scratchPair = *scratch++;
         scratchPair.first = pair.first;
-        scratchPair.second = MapSourceToTarget(pair.second);
+        scratchPair.second = _Map(pair.second, outerPairs, /* invert */ false);
     }
 
     // This contents of scratch, as of now, will have been automatically sorted
@@ -877,9 +938,8 @@ PcpMapFunction::Compose(const PcpMapFunction &inner) const
     _PathPair *scratchSortedEnd = scratch;
 
     // Then apply the inverse of inner to the domain of this function.
-    const _SourceAndTargetPathPairs& data_outer = *_mappings;
-    for (const _PathPair &pair: data_outer) {
-        SdfPath source = inner.MapTargetToSource(pair.first);
+    for (const _PathPair &pair: outerPairs) {
+        SdfPath source = _Map(pair.first, innerPairs, /* invert */ true);
         if (source.IsEmpty()) {
             continue;
         }
@@ -909,9 +969,26 @@ PcpMapFunction::Compose(const PcpMapFunction &inner) const
     }
 
     bool hasRootIdentity = _Canonicalize(scratchBegin, scratch);
+    return _SourceAndTargetPathPairs(scratchBegin, scratch, hasRootIdentity);
+}
+
+PcpMapFunction
+PcpMapFunction::Compose(const PcpMapFunction &inner) const
+{
+    TfAutoMallocTag tag("Pcp", "PcpMapFunction::Compose");
+    TRACE_FUNCTION();
+
+    // Fast path identities.  These do occur in practice and are
+    // worth special-casing since it lets us avoid heap allocation.
+    if (IsIdentity())
+        return inner;
+    if (inner.IsIdentity())
+        return *this;
+
     return PcpMapFunction(
-        std::make_shared<_SourceAndTargetPathPairs>(
-            scratchBegin, scratch, hasRootIdentity),
+        std::make_shared<_Mappings>(
+            _ComposePathPairs(
+                _mappings->GetPathPairs(), inner._mappings->GetPathPairs())),
         _offset * inner._offset);
 }
 
@@ -923,15 +1000,12 @@ PcpMapFunction::ComposeOffset(const SdfLayerOffset &offset) const
     return composed;
 }
 
-PcpMapFunction
-PcpMapFunction::GetInverse() const
+static _SourceAndTargetPathPairs
+_InvertPathPairs(const _SourceAndTargetPathPairs& pathPairs)
 {
-    TfAutoMallocTag tag("Pcp", "PcpMapFunction::GetInverse");
-    TRACE_FUNCTION();
-
     _PathPairVector targetToSource;
-    targetToSource.reserve(_mappings->numPairs);
-    for (_PathPair const &pair: *_mappings) {
+    targetToSource.reserve(pathPairs.numPairs);
+    for (_PathPair const &pair: pathPairs) {
         targetToSource.emplace_back(pair.second, pair.first);
     }
     _PathPair const
@@ -939,17 +1013,31 @@ PcpMapFunction::GetInverse() const
         *end = targetToSource.data() + targetToSource.size();
     // Sort the entries to match the source path ordering requirement.
     std::sort(targetToSource.begin(), targetToSource.end(), _PathPairOrder());
-    return PcpMapFunction(
-        std::make_shared<_SourceAndTargetPathPairs>(
-            begin, end, _mappings->hasRootIdentity),
-        _offset.GetInverse());
+    return _SourceAndTargetPathPairs(begin, end, pathPairs.hasRootIdentity);
+}
+
+PcpMapFunction
+PcpMapFunction::GetInverse() const
+{
+    TfAutoMallocTag tag("Pcp", "PcpMapFunction::GetInverse");
+    TRACE_FUNCTION();
+
+    std::shared_ptr<_Mappings> invMappings = std::visit(TfOverloads{
+        [&](const _SourceAndTargetPathPairs& pathPairs) {
+            return std::make_shared<_Mappings>(_InvertPathPairs(pathPairs));
+        },
+    }, _mappings->data);
+
+    return PcpMapFunction(std::move(invMappings), _offset.GetInverse());
 }
 
 PcpMapFunction::PathMap
 PcpMapFunction::GetSourceToTargetMap() const
 {
-    PathMap ret(_mappings->begin(), _mappings->end());
-    if (_mappings->hasRootIdentity) {
+    const _SourceAndTargetPathPairs& mappings = _mappings->GetPathPairs();
+
+    PathMap ret(mappings.begin(), mappings.end());
+    if (mappings.hasRootIdentity) {
         ret[SdfPath::AbsoluteRootPath()] = SdfPath::AbsoluteRootPath();
     }
     return ret;
