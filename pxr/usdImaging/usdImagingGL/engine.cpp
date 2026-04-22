@@ -13,6 +13,7 @@
 #include "pxr/usdImaging/usdImaging/selectionSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/stageSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/rootOverridesSceneIndex.h"
+#include "pxr/usdImaging/usdImaging/sceneIndex.h"
 #include "pxr/usdImaging/usdImaging/sceneIndices.h"
 #include "pxr/usdImaging/usdImaging/usdSceneIndexInputArgsSchema.h"
 
@@ -468,15 +469,13 @@ UsdImagingGLEngine::_DestroyHydraObjects()
         TRACE_SCOPE("Destroy UsdImaging scene indices");
 
         _usdImagingFinalSceneIndex = nullptr;
+        _usdImagingSceneIndex = nullptr;
         _displayStyleSceneIndex = nullptr;
-        _selectionSceneIndex = nullptr;
-        _postInstancingNoticeBatchingSceneIndex = nullptr;
         _legacyRenderSettingsSceneIndex = nullptr;
         _rootOverridesSceneIndex = nullptr;
         _lightPruningSceneIndex = nullptr;
         _mergingStageSceneIndex = nullptr;
         _execStageSceneIndex = nullptr;
-        _stageSceneIndex = nullptr;
     }
 
     {
@@ -521,7 +520,7 @@ UsdImagingGLEngine::PrepareBatch(
         _PreSetTime(params);
         // SetTime will only react if time actually changes.
         if (UseUsdImagingSceneIndex()) {
-            _stageSceneIndex->SetTime(params.frame);
+            _usdImagingSceneIndex->SetTime(params.frame);
             if (_execStageSceneIndex) {
                 _execStageSceneIndex->SetTime(params.frame);
             }
@@ -570,7 +569,8 @@ UsdImagingGLEngine::PrepareBatch(
         auto stage = root.GetStage();
         if (UseUsdImagingSceneIndex()) {
             _ScopedHydraNoticeBatch noticeBatch(
-                _postInstancingNoticeBatchingSceneIndex);
+                _usdImagingSceneIndex->
+                    GetPostInstancingNoticeBatchingSceneIndex());
 
             // Set timeCodesPerSecond in HdsiSceneGlobalsSceneIndex.
             if (_appSceneIndices) {
@@ -583,8 +583,7 @@ UsdImagingGLEngine::PrepareBatch(
 
             // XXX(USD-7115): Add invis overrides from _invisedPrimPaths.
 
-            TF_VERIFY(_stageSceneIndex);
-            _stageSceneIndex->SetStage(stage);
+            _usdImagingSceneIndex->SetStage(stage);
             if (_execStageSceneIndex) {
                 _execStageSceneIndex->SetStage(stage);
             }
@@ -1119,10 +1118,10 @@ UsdImagingGLEngine::SetSelected(SdfPathVector const& paths)
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     if (UseUsdImagingSceneIndex()) {
-        _selectionSceneIndex->ClearSelection();
+        _usdImagingSceneIndex->ClearSelection();
 
         for (const SdfPath &path : paths) {
-            _selectionSceneIndex->AddSelection(path);
+            _usdImagingSceneIndex->AddSelection(path);
         }
         return;
     }
@@ -1156,7 +1155,7 @@ UsdImagingGLEngine::ClearSelected()
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     if (UseUsdImagingSceneIndex()) {
-        _selectionSceneIndex->ClearSelection();
+        _usdImagingSceneIndex->ClearSelection();
         return;
     }
 
@@ -1185,7 +1184,7 @@ UsdImagingGLEngine::AddSelected(SdfPath const &path, int instanceIndex)
     TF_PY_ALLOW_THREADS_IN_SCOPE();
 
     if (UseUsdImagingSceneIndex()) {
-        _selectionSceneIndex->AddSelection(path);
+        _usdImagingSceneIndex->AddSelection(path);
         return;
     }
 
@@ -1916,22 +1915,14 @@ void
 UsdImagingGLEngine::_CreateUsdImagingSceneIndices(
     HdContainerDataSourceHandle const &sceneIndexInputArgs)
 {
-    const UsdImagingSceneIndices sceneIndices =
-        UsdImagingCreateSceneIndices(
+    _usdImagingSceneIndex =
+        UsdImagingSceneIndex::New(
             sceneIndexInputArgs,
             std::bind(
                 &UsdImagingGLEngine::_AppendOverridesSceneIndices,
                 this, std::placeholders::_1));
 
-    _stageSceneIndex =
-        sceneIndices.stageSceneIndex;
-    _postInstancingNoticeBatchingSceneIndex =
-        sceneIndices.postInstancingNoticeBatchingSceneIndex;
-    _selectionSceneIndex =
-        sceneIndices.selectionSceneIndex;
-
-    HdSceneIndexBaseRefPtr sceneIndex =
-        sceneIndices.finalSceneIndex;
+    HdSceneIndexBaseRefPtr sceneIndex = _usdImagingSceneIndex;
     sceneIndex = _displayStyleSceneIndex =
         HdsiLegacyDisplayStyleOverrideSceneIndex::New(sceneIndex);
 
@@ -2683,9 +2674,10 @@ UsdImagingGLEngine::_PreSetTime(const UsdImagingGLRenderParams& params)
         _displayStyleSceneIndex->SetRefineLevelFallback(refineLevel);
 
         _ScopedHydraNoticeBatch noticeBatch(
-                _postInstancingNoticeBatchingSceneIndex);
+            _usdImagingSceneIndex->
+                GetPostInstancingNoticeBatchingSceneIndex());
 
-        _stageSceneIndex->ApplyPendingUpdates();
+        _usdImagingSceneIndex->ApplyPendingUpdates();
         if (_execStageSceneIndex) {
             _execStageSceneIndex->ApplyPendingUpdates();
         }

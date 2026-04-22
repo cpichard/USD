@@ -58,10 +58,8 @@ class UsdImagingDelegate;
 class HdRendererCreateArgsSchema;
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GlfSimpleLightingContext);
-TF_DECLARE_REF_PTRS(HdNoticeBatchingSceneIndex);
-TF_DECLARE_REF_PTRS(UsdImagingStageSceneIndex);
+TF_DECLARE_REF_PTRS(UsdImagingSceneIndex);
 TF_DECLARE_REF_PTRS(UsdImagingRootOverridesSceneIndex);
-TF_DECLARE_REF_PTRS(UsdImagingSelectionSceneIndex);
 TF_DECLARE_REF_PTRS(HdCachingSceneIndex);
 TF_DECLARE_REF_PTRS(HdsiLegacyDisplayStyleOverrideSceneIndex);
 TF_DECLARE_REF_PTRS(HdsiPrimTypeAndPathPruningSceneIndex);
@@ -851,17 +849,16 @@ private:
 
     // Note that we'll only ever use one of _sceneIndex/_sceneDelegate
     // at a time.
-    UsdImagingStageSceneIndexRefPtr _stageSceneIndex;
     UsdExecImagingStageSceneIndexInterfaceRefPtr _execStageSceneIndex;
     HdMergingSceneIndexRefPtr _mergingStageSceneIndex;
-    HdNoticeBatchingSceneIndexRefPtr _postInstancingNoticeBatchingSceneIndex;
-    UsdImagingSelectionSceneIndexRefPtr _selectionSceneIndex;
     UsdImagingRootOverridesSceneIndexRefPtr _rootOverridesSceneIndex;
     UsdImagingLegacyRenderSettingsSceneIndexRefPtr _legacyRenderSettingsSceneIndex;
     HdsiLegacyDisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
     HdsiPrimTypeAndPathPruningSceneIndexRefPtr _lightPruningSceneIndex;
     // State of the _lightPruningSceneIndex.
     bool _lightPruningSceneIndexEnableSceneLights;
+
+    UsdImagingSceneIndexRefPtr _usdImagingSceneIndex;
     HdSceneIndexBaseRefPtr _usdImagingFinalSceneIndex;
 
     HdMergingSceneIndexRefPtr _mergingSceneIndex;

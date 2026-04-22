@@ -136,6 +136,7 @@ pxr_library(usdImaging
         representedByAncestorPrimAdapter
         rerootingContainerDataSource
         rerootingSceneIndex
+        sceneIndex
         sceneIndexPlugin
         sceneIndexPrimAdapter
         sceneIndices

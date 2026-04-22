@@ -13,6 +13,7 @@
 #include "pxr/usdImaging/usdImaging/dataSourceStage.h"
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
+#include "pxr/usdImaging/usdImaging/usdSceneIndexInputArgsSchema.h"
 
 #include "pxr/imaging/hd/dataSourceTypeDefs.h"
 #include "pxr/imaging/hd/overlayContainerDataSource.h"
@@ -21,9 +22,6 @@
 #include "pxr/base/tf/denseHashSet.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
-
-TF_DEFINE_PUBLIC_TOKENS(UsdImagingStageSceneIndexTokens,
-                        USDIMAGING_STAGE_SCENE_INDEX_TOKENS);
 
 namespace
 {
@@ -190,13 +188,9 @@ _InvalidateImagingSubprim(
 bool
 _GetIncludeUnloadedPrims(HdContainerDataSourceHandle const &inputArgs)
 {
-    if (!inputArgs) {
-        return false;
-    }
-    HdBoolDataSourceHandle const ds =
-        HdBoolDataSource::Cast(
-            inputArgs->Get(
-                UsdImagingStageSceneIndexTokens->includeUnloadedPrims));
+    const UsdImagingUsdSceneIndexInputArgsSchema schema =
+        UsdImagingUsdSceneIndexInputArgsSchema::GetFromParent(inputArgs);
+    HdBoolDataSourceHandle const ds = schema.GetIncludeUnloadedPrims();
     if (!ds) {
         return false;
     }

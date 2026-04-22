@@ -23,12 +23,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-#define USDIMAGING_STAGE_SCENE_INDEX_TOKENS \
-    (includeUnloadedPrims)                  \
-
-TF_DECLARE_PUBLIC_TOKENS(UsdImagingStageSceneIndexTokens, USDIMAGING_API,
-                         USDIMAGING_STAGE_SCENE_INDEX_TOKENS);
-
 using UsdImagingPrimAdapterSharedPtr =
     std::shared_ptr<class UsdImagingPrimAdapter>;
 class UsdImaging_AdapterManager;
@@ -39,8 +33,8 @@ TF_DECLARE_REF_PTRS(UsdImagingStageSceneIndex);
 /// A scene index consuming a UsdStage.
 ///
 /// This scene index does not perform any transformations such as
-/// flattening visibility or transforms or aggregate native
-/// instances. Use UsdImagingCreateSceneIndices to get a chain
+/// flattening visibility or transforms or aggregating native
+/// instances. Use UsdImagingSceneIndex to get a chain
 /// of scene indices to resolve those.
 ///
 class UsdImagingStageSceneIndex : public HdSceneIndexBase

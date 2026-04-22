@@ -86,8 +86,11 @@ _AdditionalStageSceneIndexInputArgs(
     }
     static HdContainerDataSourceHandle const ds =
         HdRetainedContainerDataSource::New(
-            UsdImagingStageSceneIndexTokens->includeUnloadedPrims,
-            HdRetainedTypedSampledDataSource<bool>::New(true));
+            UsdImagingUsdSceneIndexInputArgsSchema::GetSchemaToken(),
+            UsdImagingUsdSceneIndexInputArgsSchema::Builder()
+                .SetIncludeUnloadedPrims(
+                    HdRetainedTypedSampledDataSource<bool>::New(true))
+                .Build());
     return ds;
 }
 
