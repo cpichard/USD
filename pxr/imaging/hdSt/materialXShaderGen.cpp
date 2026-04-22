@@ -49,6 +49,7 @@ static const std::string MxHdLightString =
 R"(#if NUM_LIGHTS > 0
     for (int i = 0; i < GetLightCount(); ++i) {
         LightSource light = GetLightSource(i);
+        float intensityAdj = 1.0;
 
         // Save the indirect light transformation
         if (light.isIndirectLight) {
@@ -63,7 +64,7 @@ R"(#if NUM_LIGHTS > 0
             // Distant lights have Hydra attenuation = vec3(0.0, 0.0, 0.0)
             if (light.attenuation.x == 0.0 && light.attenuation.y == 0.0 && 
                 light.attenuation.z == 0.0) {
-                $lightData[u_numActiveLightSources].type = 3; // directional
+                $lightData[u_numActiveLightSources].type = 2; // directional
 
                 // Direction (Hydra position in ViewSpace)
                 $lightData[u_numActiveLightSources].direction = 
@@ -71,31 +72,23 @@ R"(#if NUM_LIGHTS > 0
             }
             // Spot lights should have an authored spot cutoff < 180 
             else if (light.spotCutoffAndFalloff.x < 180.0) {
-                $lightData[u_numActiveLightSources].type = 2; // spot
+                // We pre-apply the spot light attenuation and treat this as 
+                // a point light.
+                $lightData[u_numActiveLightSources].type = 1; // point
 
                 // Position (Hydra position in ViewSpace)
                 $lightData[u_numActiveLightSources].position = 
                     (HdGet_worldToViewInverseMatrix() * light.position).xyz;
 
-                // Direction (Hydra spotDirection in ViewSpace)
-                $lightData[u_numActiveLightSources].direction = 
-                    (HdGet_worldToViewInverseMatrix() * light.spotDirection).xyz;
-
-                // Inner and Outer angles (Hydra cutoff and fallof angles) Note 
-                // that these angles are in degrees in Hydra and MaterialX
-                // expects them in radians.
-                const float cutoffD = light.spotCutoffAndFalloff.x;
-                const float falloffD = light.spotCutoffAndFalloff.y;
-                float outerD, innerD;
-                if (cutoffD < 90.0) {
-                    outerD = max(cutoffD, falloffD);
-                    innerD = 90 - falloffD;
-                } else {
-                    outerD = cutoffD;
-                    innerD = falloffD;
-                }
-                $lightData[u_numActiveLightSources].outer_angle = radians(outerD);
-                $lightData[u_numActiveLightSources].inner_angle = radians(innerD);
+                // The only difference between spot and point lights is the 
+                // attenuation calculation. They differ a lot between 
+                // MaterialX and USD. This is the USD calculation that we 
+                // pre-apply to the intensity instead of using MaterialX's 
+                // spot light calculation. 
+                vec3 l = (light.position.w == 0.0)
+                            ? normalize(light.position.xyz)
+                            : normalize(light.position - Peye).xyz;
+                intensityAdj = lightSpotAttenuation(l, i);
             }
             // Treat all other lights as Point lights
             else {
@@ -113,7 +106,7 @@ R"(#if NUM_LIGHTS > 0
             vec3 lightColor = (intensity == 0.0) 
                 ? light.diffuse.rgb : light.diffuse.rgb/intensity;
             $lightData[u_numActiveLightSources].color = lightColor;
-            $lightData[u_numActiveLightSources].intensity = intensity;
+            $lightData[u_numActiveLightSources].intensity = intensity * intensityAdj;
             
             // Attenuation 
             // Hydra: vec3(const, linear, quadratic)
