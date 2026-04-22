@@ -28,6 +28,7 @@ public:
     {
         // Single-segment ordinary curves.
         TwoKnotBezier,
+        TwoKnotBezierAutoEase,
         TwoKnotHermite,
         TwoKnotLinear,
 
@@ -41,7 +42,9 @@ public:
         InnerLoopPre,
         InnerLoopPost,
         ExtrapLoopRepeat,
+        ExtrapLoopRepeatDualValued,
         ExtrapLoopReset,
+        ExtrapLoopResetDualValued,
         ExtrapLoopOscillate,
         InnerAndExtrapLoops,
 

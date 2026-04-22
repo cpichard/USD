@@ -20,6 +20,7 @@ using SData = TsTest_SplineData;
 TF_REGISTRY_FUNCTION(TfEnum)
 {
     TF_ADD_ENUM_NAME(TsTest_Museum::TwoKnotBezier);
+    TF_ADD_ENUM_NAME(TsTest_Museum::TwoKnotBezierAutoEase);
     TF_ADD_ENUM_NAME(TsTest_Museum::TwoKnotHermite);
     TF_ADD_ENUM_NAME(TsTest_Museum::TwoKnotLinear);
     TF_ADD_ENUM_NAME(TsTest_Museum::FourKnotBezier);
@@ -29,7 +30,9 @@ TF_REGISTRY_FUNCTION(TfEnum)
     TF_ADD_ENUM_NAME(TsTest_Museum::InnerLoopPre);
     TF_ADD_ENUM_NAME(TsTest_Museum::InnerLoopPost);
     TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopRepeat);
+    TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopRepeatDualValued);
     TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopReset);
+    TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopResetDualValued);
     TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopOscillate);
     TF_ADD_ENUM_NAME(TsTest_Museum::InnerAndExtrapLoops);
     TF_ADD_ENUM_NAME(TsTest_Museum::RegressiveLoop);
@@ -80,6 +83,29 @@ static TsTest_SplineData _TwoKnotBezier()
 
     SData data;
     data.SetKnots({knot1, knot2});
+    return data;
+}
+
+static TsTest_SplineData _TwoKnotBezierAutoEase()
+{
+    SData::Knot knot1;
+    knot1.time = 1.0;
+    knot1.nextSegInterpMethod = SData::InterpCurve;
+    knot1.value = 1.0;
+    knot1.postAuto = true;
+
+    SData::Knot knot2;
+    knot2.time = 5.0;
+    knot2.nextSegInterpMethod = SData::InterpCurve;
+    knot2.value = 2.0;
+    knot2.preAuto = true;
+
+    SData data;
+    data.SetKnots({knot1, knot2});
+    SData::Extrapolation extrap(SData::ExtrapLoop);
+    extrap.loopMode = SData::LoopRepeat;
+    data.SetPreExtrapolation(extrap);
+    data.SetPostExtrapolation(extrap);
     return data;
 }
 
@@ -450,6 +476,38 @@ static TsTest_SplineData _ExtrapLoopRepeat()
     return data;
 }
 
+static TsTest_SplineData _ExtrapLoopRepeatDualValued()
+{
+    SData::Knot knot1;
+    knot1.time = 100.0;
+    knot1.nextSegInterpMethod = SData::InterpCurve;
+    knot1.value = 10.0;
+    knot1.preValue = -10.0;
+    knot1.isDualValued = true;
+    knot1.postSlope = 0.0;
+    knot1.postLen = 3.0;
+
+    SData::Knot knot2;
+    knot2.time = 105.0;
+    knot2.nextSegInterpMethod = SData::InterpLinear;
+    knot2.value = 20.0;
+    knot2.preSlope = 0.0;
+    knot2.preLen = 3.0;
+
+    SData::Knot knot3;
+    knot3.time = 110.0;
+    knot3.nextSegInterpMethod = SData::InterpHeld;
+    knot3.value = 15.0;
+
+    SData data;
+    data.SetKnots({knot1, knot2, knot3});
+    SData::Extrapolation extrap(SData::ExtrapLoop);
+    extrap.loopMode = SData::LoopRepeat;
+    data.SetPreExtrapolation(extrap);
+    data.SetPostExtrapolation(extrap);
+    return data;
+}
+
 static TsTest_SplineData _ExtrapLoopReset()
 {
     SData::Knot knot1;
@@ -470,6 +528,38 @@ static TsTest_SplineData _ExtrapLoopReset()
     knot3.time = 110.0;
     knot3.nextSegInterpMethod = SData::InterpHeld;
     knot3.value = 15.0;
+
+    SData data;
+    data.SetKnots({knot1, knot2, knot3});
+    SData::Extrapolation extrap(SData::ExtrapLoop);
+    extrap.loopMode = SData::LoopReset;
+    data.SetPreExtrapolation(extrap);
+    data.SetPostExtrapolation(extrap);
+    return data;
+}
+
+static TsTest_SplineData _ExtrapLoopResetDualValued()
+{
+    SData::Knot knot1;
+    knot1.time = 100.0;
+    knot1.nextSegInterpMethod = SData::InterpCurve;
+    knot1.value = 10.0;
+    knot1.postSlope = 0.0;
+    knot1.postLen = 3.0;
+
+    SData::Knot knot2;
+    knot2.time = 105.0;
+    knot2.nextSegInterpMethod = SData::InterpLinear;
+    knot2.value = 20.0;
+    knot2.preSlope = 0.0;
+    knot2.preLen = 3.0;
+
+    SData::Knot knot3;
+    knot3.time = 110.0;
+    knot3.nextSegInterpMethod = SData::InterpHeld;
+    knot3.value = 20.0;
+    knot3.isDualValued = true;
+    knot3.preValue = 15.0;
 
     SData data;
     data.SetKnots({knot1, knot2, knot3});
@@ -1152,6 +1242,7 @@ TsTest_Museum::GetData(const DataId id)
     switch (id)
     {
         case TwoKnotBezier: return _TwoKnotBezier();
+        case TwoKnotBezierAutoEase: return _TwoKnotBezierAutoEase();
         case TwoKnotHermite: return _TwoKnotHermite();
         case TwoKnotLinear: return _TwoKnotLinear();
         case FourKnotBezier: return _FourKnotBezier();
@@ -1161,7 +1252,9 @@ TsTest_Museum::GetData(const DataId id)
         case InnerLoopPre: return _InnerLoopPre();
         case InnerLoopPost: return _InnerLoopPost();
         case ExtrapLoopRepeat: return _ExtrapLoopRepeat();
+        case ExtrapLoopRepeatDualValued: return _ExtrapLoopRepeatDualValued();
         case ExtrapLoopReset: return _ExtrapLoopReset();
+        case ExtrapLoopResetDualValued: return _ExtrapLoopResetDualValued();
         case ExtrapLoopOscillate: return _ExtrapLoopOscillate();
         case InnerAndExtrapLoops: return _InnerAndExtrapLoops();
         case RegressiveLoop: return _RegressiveLoop();

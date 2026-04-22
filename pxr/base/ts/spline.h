@@ -263,6 +263,8 @@ public:
     /// knots. Attempts to bake an infinite number of knots will emit a coding
     /// error and return an empty \c TsKnotMap.
     ///
+    /// Empty \p interval causes this function to return an empty \c TsKnotMap.
+    ///
     /// \note Knots baked from extrapolation loops may include knots that are
     /// generated from multiple input knots. Knots at loop boundaries get their
     /// "pre" values from the end of the loop and their "post" values from the
