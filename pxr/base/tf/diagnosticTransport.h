@@ -83,6 +83,7 @@ public:
     }
 
 private:
+    friend class Tf_DiagnosticMgrTestAccess;
     friend class TfDiagnosticTrap;
 
     // TfDiagnosticTrap calls this to implement Transport().

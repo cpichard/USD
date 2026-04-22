@@ -103,25 +103,25 @@ TfDiagnosticTrap::GetStatuses() const
 TfDiagnosticTransport
 TfDiagnosticTrap::Transport()
 {
+    TfDiagnosticTransport transport;
     if (IsClean()) {
-        return {};
+        return transport;
     }
-
-    TfDiagnosticMgr &mgr = TfDiagnosticMgr::GetInstance();
-    TfDiagnosticTransport transport {
+    TfDiagnosticMgr::_LogTextPin pin =
+        TfDiagnosticMgr::GetInstance()._PinDiagnosticsLogText(_container);
+    transport = TfDiagnosticTransport {
         std::move(_container),
-        mgr._PlaceDiagnosticLogTextPin(_logStart)
+        std::move(pin)
     };
     _container.Clear();
-    // No need to call _OnContentsChanged() -- _PlaceDiagnosticLogTextPin()
-    // already marked the log text dirty from _logStart.
+    _OnContentsChanged();
     return transport;
 }
 
 void
 TfDiagnosticTrap::_OnContentsChanged() const
 {
-    TfDiagnosticMgr::GetInstance()._OnTrapContentsChanged(_logStart);
+    TfDiagnosticMgr::GetInstance()._RebuildTrappedDiagnosticsLogText(_logStart);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

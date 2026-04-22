@@ -55,6 +55,7 @@ public:
     }
 
 private:
+    friend class Tf_DiagnosticMgrTestAccess;
     friend class TfErrorMark;
 
     TfErrorTransport(ErrorList &src,

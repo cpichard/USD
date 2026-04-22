@@ -83,6 +83,23 @@ TfErrorMark::~TfErrorMark()
         _ReportErrors(mgr);
 }
 
+TfErrorTransport
+TfErrorMark::Transport() const
+{
+    TfErrorTransport transport;
+    Iterator begin = GetBegin(), end = GetEnd();
+    if (begin == end) {
+        return transport;
+    }
+    TfDiagnosticMgr &mgr = TfDiagnosticMgr::GetInstance();
+    auto &ts = mgr._threadState.local();
+    transport = TfErrorTransport {
+        ts._errorList, begin, end, mgr._PinErrorLogText(begin, end)
+    };
+    mgr._RebuildPendingErrorLogText(_mark);
+    return transport;
+}
+
 void
 TfReportActiveErrorMarks()
 {
