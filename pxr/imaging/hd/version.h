@@ -151,8 +151,11 @@
 //           Emulation is now always enabled.
 // 99 -> 100: HdRenderIndex::New renamed to
 //            HdRenderIndexNewForBack/FrontendEmulation.
+// 100 -> 101: HdRendererPlugin::GetSceneIndexInputArgs renamed to
+//             GetSceneIndexCreateArgs. HdSceneIndexInputArgsSchema renamed
+//             to HdSceneIndexCreateArgsSchema accordingly.
 
-#define HD_API_VERSION 100
+#define HD_API_VERSION 101
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 // 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.

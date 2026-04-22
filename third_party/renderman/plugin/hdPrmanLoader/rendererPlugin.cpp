@@ -19,7 +19,11 @@
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
 #if HD_API_VERSION >= 90
 #include "pxr/imaging/hd/retainedDataSource.h"
+#if HD_API_VERSION >= 101
+#include "pxr/imaging/hd/sceneIndexCreateArgsSchema.h"
+#else
 #include "pxr/imaging/hd/sceneIndexInputArgsSchema.h"
+#endif
 #endif
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -241,10 +245,18 @@ _GetRenderDelegateInfo()
 }
 
 HdContainerDataSourceHandle
+#if HD_API_VERSION >= 101
+HdPrmanLoaderRendererPlugin::GetSceneIndexCreateArgs() const
+#else
 HdPrmanLoaderRendererPlugin::GetSceneIndexInputArgs() const
+#endif
 {
     static HdContainerDataSourceHandle const result =
+#if HD_API_VERSION >= 101
+        HdSceneIndexCreateArgsSchema::Builder()
+#else
         HdSceneIndexInputArgsSchema::Builder()
+#endif
             .SetMotionBlurSupport(
                 HdRetainedTypedSampledDataSource<bool>::New(true))
             .SetCameraMotionBlurSupport(
@@ -257,7 +269,7 @@ HdPrmanLoaderRendererPlugin::GetSceneIndexInputArgs() const
     return result;
 }
 
-#endif
+#endif // HD_API_VERSION >= 90
 
 int HdPrmanLoaderRendererPlugin::_GetCpuConfig(
     HdRenderSettingsMap const& settingsMap)

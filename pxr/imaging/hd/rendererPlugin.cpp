@@ -168,7 +168,7 @@ HdRendererPlugin::IsSupported(
 }
 
 HdContainerDataSourceHandle
-HdRendererPlugin::GetSceneIndexInputArgs() const
+HdRendererPlugin::GetSceneIndexCreateArgs() const
 {
     return {};
 }

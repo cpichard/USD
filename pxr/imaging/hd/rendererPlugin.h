@@ -57,11 +57,11 @@ public:
         std::string *reasonWhyNot = nullptr) const;
 
     ///
-    /// Arguments that an application should pass as input arguments to
+    /// Arguments that an application should pass as create arguments to
     /// scene indices so that they can be configured for the needs of the
     /// renderer.
     ///
-    /// Follows the HdSceneIndexInputArgsSchema but can have data sources
+    /// Follows the HdSceneIndexCreateArgsSchema but can have data sources
     /// at additional data sources.
     ///
     /// Example: Some scene indices are computing samples for motion blur
@@ -76,7 +76,7 @@ public:
     ///
     HD_API
     virtual
-    HdContainerDataSourceHandle GetSceneIndexInputArgs() const;
+    HdContainerDataSourceHandle GetSceneIndexCreateArgs() const;
 
     ///
     /// Create renderer through the plugin and wrap it in a handle that

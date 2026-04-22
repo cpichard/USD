@@ -11,7 +11,7 @@
 #include "pxr/imaging/hd/renderDelegateInfo.h"
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
-#include "pxr/imaging/hd/sceneIndexInputArgsSchema.h"
+#include "pxr/imaging/hd/sceneIndexCreateArgsSchema.h"
 
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -61,10 +61,10 @@ HdStormRendererPlugin::IsSupported(
 }
 
 HdContainerDataSourceHandle
-HdStormRendererPlugin::GetSceneIndexInputArgs() const
+HdStormRendererPlugin::GetSceneIndexCreateArgs() const
 {
     static HdContainerDataSourceHandle const result =
-        HdSceneIndexInputArgsSchema::Builder()
+        HdSceneIndexCreateArgsSchema::Builder()
             .SetMotionBlurSupport(
                 HdRetainedTypedSampledDataSource<bool>::New(false))
             .SetCameraMotionBlurSupport(

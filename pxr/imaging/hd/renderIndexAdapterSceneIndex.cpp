@@ -10,7 +10,7 @@
 #include "pxr/imaging/hd/renderDelegate.h"
 #include "pxr/imaging/hd/renderDelegateInfo.h"
 #include "pxr/imaging/hd/renderIndex.h"
-#include "pxr/imaging/hd/sceneIndexInputArgsSchema.h"
+#include "pxr/imaging/hd/sceneIndexCreateArgsSchema.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -128,7 +128,7 @@ HdRenderDelegateInfo
 _GetRenderDelegateInfo(
     HdContainerDataSourceHandle const &inputArgs)
 {
-    const HdSceneIndexInputArgsSchema schema(inputArgs);
+    const HdSceneIndexCreateArgsSchema schema(inputArgs);
     if (HdRenderDelegateInfoDataSourceHandle const ds =
             schema.GetLegacyRenderDelegateInfo()) {
         return ds->GetTypedValue(0.0f);

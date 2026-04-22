@@ -181,7 +181,7 @@ pxr_library(hd
         sceneGlobalsSchema
         sceneIndex
         sceneIndexAdapterSceneDelegate
-        sceneIndexInputArgsSchema
+        sceneIndexCreateArgsSchema
         sceneIndexObserver
         sceneIndexPlugin
         sceneIndexPluginRegistry

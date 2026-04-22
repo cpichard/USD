@@ -75,7 +75,7 @@ UsdImagingCreateSceneIndices(
 /// New API that gets us closer to the direction that all scene indices are
 /// created with inputArgs which come by overlaying the container data
 /// sources from the application and from
-/// HdRendererPlugin::GetSceneIndexInputArgs().
+/// HdRendererPlugin::GetSceneIndexCreateArgs().
 ///
 /// We have not moved UsdImagingSceneIndexAppendCallback into inputArgs because
 /// a std::function is not a value type (no operator==) and, thus, cannot be

@@ -9,7 +9,7 @@
 #include "pxr/imaging/hd/renderDelegateInfo.h"
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
-#include "pxr/imaging/hd/sceneIndexInputArgsSchema.h"
+#include "pxr/imaging/hd/sceneIndexCreateArgsSchema.h"
 
 #include "pxr/imaging/plugin/hdEmbree/renderDelegate.h"
 
@@ -38,10 +38,10 @@ _RenderDelegateInfo()
 }
 
 HdContainerDataSourceHandle
-HdEmbreeRendererPlugin::GetSceneIndexInputArgs() const
+HdEmbreeRendererPlugin::GetSceneIndexCreateArgs() const
 {
     static HdContainerDataSourceHandle const result =
-        HdSceneIndexInputArgsSchema::Builder()
+        HdSceneIndexCreateArgsSchema::Builder()
             .SetMotionBlurSupport(
                 HdRetainedTypedSampledDataSource<bool>::New(false))
             .SetCameraMotionBlurSupport(
