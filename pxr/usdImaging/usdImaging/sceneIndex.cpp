@@ -9,16 +9,16 @@
 #include "pxr/usdImaging/usdImaging/selectionSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/sceneIndices.h"
 #include "pxr/usdImaging/usdImaging/stageSceneIndex.h"
-#include "pxr/usdImaging/usdImaging/usdSceneIndexInputArgsSchema.h"
+#include "pxr/usdImaging/usdImaging/sceneIndexCreateArgsSchema.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 UsdImagingSceneIndex::UsdImagingSceneIndex(
-    HdContainerDataSourceHandle const &inputArgs,
+    HdContainerDataSourceHandle const &createArgs,
     const UsdImagingSceneIndexAppendCallback &overridesSceneIndexCallback)
  : UsdImagingSceneIndex(
      UsdImagingCreateSceneIndices(
-         inputArgs,
+         createArgs,
          overridesSceneIndexCallback))
 {
 }

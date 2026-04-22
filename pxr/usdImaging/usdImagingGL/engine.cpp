@@ -15,7 +15,7 @@
 #include "pxr/usdImaging/usdImaging/rootOverridesSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/sceneIndex.h"
 #include "pxr/usdImaging/usdImaging/sceneIndices.h"
-#include "pxr/usdImaging/usdImaging/usdSceneIndexInputArgsSchema.h"
+#include "pxr/usdImaging/usdImaging/sceneIndexCreateArgsSchema.h"
 
 #include "pxr/usdImaging/usdExecImaging/stageSceneIndexFactory.h"
 #include "pxr/usdImaging/usdExecImaging/stageSceneIndexInterface.h"
@@ -1613,8 +1613,8 @@ UsdImagingGLEngine::SetRendererPlugin(TfToken const &id)
         HdOverlayContainerDataSource::OverlayedContainerDataSources(
             rendererPluginSceneIndexCreateArgs,
             HdRetainedContainerDataSource::New(
-                UsdImagingUsdSceneIndexInputArgsSchema::GetSchemaToken(),
-                UsdImagingUsdSceneIndexInputArgsSchema::Builder()
+                UsdImagingSceneIndexCreateArgsSchema::GetSchemaToken(),
+                UsdImagingSceneIndexCreateArgsSchema::Builder()
                     .SetAddDrawModeSceneIndex(
                         HdRetainedTypedSampledDataSource<bool>::New(
                             _enableUsdDrawModes))

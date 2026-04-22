@@ -126,7 +126,6 @@ pxr_library(usdImaging
         usdRenderProductSchema
         usdRenderSettingsSchema
         usdRenderVarSchema
-        usdSceneIndexInputArgsSchema
         rectLightAdapter
         renderPassAdapter
         renderProductAdapter
@@ -137,6 +136,7 @@ pxr_library(usdImaging
         rerootingContainerDataSource
         rerootingSceneIndex
         sceneIndex
+        sceneIndexCreateArgsSchema
         sceneIndexPlugin
         sceneIndexPrimAdapter
         sceneIndices

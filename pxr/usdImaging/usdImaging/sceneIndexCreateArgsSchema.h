@@ -15,8 +15,8 @@
 /* **                                                                      ** */
 /* ************************************************************************** */
 
-#ifndef PXR_USD_IMAGING_USD_IMAGING_USD_SCENE_INDEX_INPUT_ARGS_SCHEMA_H
-#define PXR_USD_IMAGING_USD_IMAGING_USD_SCENE_INDEX_INPUT_ARGS_SCHEMA_H
+#ifndef PXR_USD_IMAGING_USD_IMAGING_SCENE_INDEX_CREATE_ARGS_SCHEMA_H
+#define PXR_USD_IMAGING_USD_IMAGING_SCENE_INDEX_CREATE_ARGS_SCHEMA_H
 
 /// \file
 
@@ -35,37 +35,37 @@ using UsdStageRefPtrDataSource = HdTypedSampledDataSource<UsdStageRefPtr>;
 using UsdStageRefPtrDataSourceHandle = UsdStageRefPtrDataSource::Handle;
 // --(END CUSTOM CODE: Declares)--
 
-#define USD_IMAGING_USD_SCENE_INDEX_INPUT_ARGS_SCHEMA_TOKENS \
-    (usdSceneIndex) \
+#define USD_IMAGING_SCENE_INDEX_CREATE_ARGS_SCHEMA_TOKENS \
+    (usdImagingSceneIndexCreateArgs) \
     (stage) \
     (includeUnloadedPrims) \
     (displayUnloadedPrimsWithBounds) \
     (addDrawModeSceneIndex) \
 
-TF_DECLARE_PUBLIC_TOKENS(UsdImagingUsdSceneIndexInputArgsSchemaTokens, USDIMAGING_API,
-    USD_IMAGING_USD_SCENE_INDEX_INPUT_ARGS_SCHEMA_TOKENS);
+TF_DECLARE_PUBLIC_TOKENS(UsdImagingSceneIndexCreateArgsSchemaTokens, USDIMAGING_API,
+    USD_IMAGING_SCENE_INDEX_CREATE_ARGS_SCHEMA_TOKENS);
 
 //-----------------------------------------------------------------------------
 
 
-/// \class UsdImagingUsdSceneIndexInputArgsSchema
+/// \class UsdImagingSceneIndexCreateArgsSchema
 ///
-class UsdImagingUsdSceneIndexInputArgsSchema : public HdSchema
+class UsdImagingSceneIndexCreateArgsSchema : public HdSchema
 {
 public:
     /// \name Schema retrieval
     /// @{
 
-    UsdImagingUsdSceneIndexInputArgsSchema(HdContainerDataSourceHandle container)
+    UsdImagingSceneIndexCreateArgsSchema(HdContainerDataSourceHandle container)
       : HdSchema(container) {}
 
     /// Retrieves a container data source with the schema's default name token
-    /// "usdSceneIndex" from the parent container and constructs a
-    /// UsdImagingUsdSceneIndexInputArgsSchema instance.
+    /// "usdImagingSceneIndexCreateArgs" from the parent container and constructs a
+    /// UsdImagingSceneIndexCreateArgsSchema instance.
     /// Because the requested container data source may not exist, the result
     /// should be checked with IsDefined() or a bool comparison before use.
     USDIMAGING_API
-    static UsdImagingUsdSceneIndexInputArgsSchema GetFromParent(
+    static UsdImagingSceneIndexCreateArgsSchema GetFromParent(
         const HdContainerDataSourceHandle &fromParentContainer);
 
     /// @}
@@ -133,7 +133,7 @@ public:
         const HdBoolDataSourceHandle &addDrawModeSceneIndex
     );
 
-    /// \class UsdImagingUsdSceneIndexInputArgsSchema::Builder
+    /// \class UsdImagingSceneIndexCreateArgsSchema::Builder
     /// 
     /// Utility class for setting sparse sets of child data source fields to be
     /// filled as arguments into BuildRetained. Because all setter methods

@@ -13,7 +13,7 @@
 #include "pxr/usdImaging/usdImaging/dataSourceStage.h"
 #include "pxr/usdImaging/usdImaging/primAdapter.h"
 #include "pxr/usdImaging/usdImaging/tokens.h"
-#include "pxr/usdImaging/usdImaging/usdSceneIndexInputArgsSchema.h"
+#include "pxr/usdImaging/usdImaging/sceneIndexCreateArgsSchema.h"
 
 #include "pxr/imaging/hd/dataSourceTypeDefs.h"
 #include "pxr/imaging/hd/overlayContainerDataSource.h"
@@ -186,10 +186,10 @@ _InvalidateImagingSubprim(
 }
 
 bool
-_GetIncludeUnloadedPrims(HdContainerDataSourceHandle const &inputArgs)
+_GetIncludeUnloadedPrims(HdContainerDataSourceHandle const &createArgs)
 {
-    const UsdImagingUsdSceneIndexInputArgsSchema schema =
-        UsdImagingUsdSceneIndexInputArgsSchema::GetFromParent(inputArgs);
+    const UsdImagingSceneIndexCreateArgsSchema schema =
+        UsdImagingSceneIndexCreateArgsSchema::GetFromParent(createArgs);
     HdBoolDataSourceHandle const ds = schema.GetIncludeUnloadedPrims();
     if (!ds) {
         return false;
@@ -202,8 +202,8 @@ _GetIncludeUnloadedPrims(HdContainerDataSourceHandle const &inputArgs)
 // ---------------------------------------------------------------------------
 
 UsdImagingStageSceneIndex::UsdImagingStageSceneIndex(
-        HdContainerDataSourceHandle const &inputArgs)
-  : _includeUnloadedPrims(_GetIncludeUnloadedPrims(inputArgs))
+        HdContainerDataSourceHandle const &createArgs)
+  : _includeUnloadedPrims(_GetIncludeUnloadedPrims(createArgs))
   , _adapterManager(std::make_unique<UsdImaging_AdapterManager>())
 {
 }

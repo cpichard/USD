@@ -49,8 +49,10 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Version 24 - Adding UsdImagingSceneIndex. Making UsdImagingStageSceneIndex's
 //              inputArgs conform to UsdImagingUsdSceneIndexInputArgsSchema and
 //              dropping UsdImagingStageSceneIndexTokens.
+// Version 25 - Renaming UsdImagingUsdSceneIndexInputArgsSchema to
+//              UsdImagingSceneIndexCreateArgsSchema.
 
-#define USD_IMAGING_API_VERSION 24
+#define USD_IMAGING_API_VERSION 25
 
 
 PXR_NAMESPACE_CLOSE_SCOPE

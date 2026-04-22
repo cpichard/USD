@@ -11,10 +11,10 @@
     ),        
 
     #--------------------------------------------------------------------------
-    # usdImaging/usdSceneIndex
+    # usdImaging/sceneIndexCreateArgs
     dict(
-        SCHEMA_NAME = 'UsdSceneIndexInputArgs',
-        SCHEMA_TOKEN = 'usdSceneIndex',
+        SCHEMA_NAME = 'SceneIndexCreateArgs',
+        SCHEMA_TOKEN = 'usdImagingSceneIndexCreateArgs',
         ADD_DEFAULT_LOCATOR = True,
         MEMBERS = [
             ('stage', 'UsdStageRefPtrDataSource',

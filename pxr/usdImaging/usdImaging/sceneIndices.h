@@ -73,7 +73,7 @@ UsdImagingCreateSceneIndices(
 /// \deprecated Use encapsulating UsdImagingSceneIndex instead
 ///
 /// New API that gets us closer to the direction that all scene indices are
-/// created with inputArgs which come by overlaying the container data
+/// created with createArgs which come by overlaying the container data
 /// sources from the application and from
 /// HdRendererPlugin::GetSceneIndexCreateArgs().
 ///
@@ -85,7 +85,7 @@ UsdImagingCreateSceneIndices(
 USDIMAGING_API
 UsdImagingSceneIndices
 UsdImagingCreateSceneIndices(
-    HdContainerDataSourceHandle const &inputArgs,
+    HdContainerDataSourceHandle const &createArgs,
     const UsdImagingSceneIndexAppendCallback &overridesSceneIndexCallback);
 
 PXR_NAMESPACE_CLOSE_SCOPE
