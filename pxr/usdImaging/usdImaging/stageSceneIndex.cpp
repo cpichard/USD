@@ -304,6 +304,15 @@ UsdImagingStageSceneIndex::GetChildPrimPaths(
         return {};
     }
 
+    // _GetPrimPredicate() is configured to not traverse under instances.
+    // However, when the starting prim path is beneath an instance (i.e. an 
+    // instance proxy prim path), GetFilteredChildren below will traverse its
+    // children (see Usd_CreatePredicateForTraversal).
+    // So, we explictly bail early here.
+    if (prim.IsInstance() || prim.IsInstanceProxy()) {
+        return {};
+    }
+
     SdfPathVector result;
 
     // This function needs to match Populate() in traversal rules.  Namely:
