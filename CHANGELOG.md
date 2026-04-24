@@ -185,7 +185,6 @@
     within a UsdShadeMaterial prims, but not UsdShadeMaterial itself. 
     Additionally no imageable prims are allowed to be children of a 
     UsdShadeMaterial prim.
-  - Updated file extension validator to recognize .mtlx as a valid file extension. 
 
 - Deprecated old API and added new API to support implementation of Sdr's new 
   categorization semantics. Refer to Sdr API docs for more info.
