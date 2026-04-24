@@ -96,6 +96,17 @@ pxr_test_scripts(
     testenv/testUsdUtilsVarSelsSessionLayer.py
 )
 
+pxr_build_test_shared_lib(TestUsdUtilsCustomFilesystemResolver
+    INSTALL_PREFIX UsdUtilsPlugins
+    LIBRARIES
+        ar
+        sdf
+        tf
+
+    CPPFILES
+        testenv/TestUsdUtilsCustomFilesystemResolver_plugin.cpp
+)
+
 pxr_build_test_shared_lib(TestUsdUtilsDependenciesCustomResolver
     INSTALL_PREFIX UsdUtilsPlugins
     LIBRARIES

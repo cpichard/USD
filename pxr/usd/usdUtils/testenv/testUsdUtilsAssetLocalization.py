@@ -16,16 +16,26 @@ def _RemoveExistingDir(dir):
 class TestUsdUtilsAssetLocalization(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        # Register test file format plugin
         # Test plugins are installed relative to this script
         testRoot = os.path.join(
             os.path.dirname(os.path.abspath(__file__)), "UsdUtilsPlugins")
 
         pr = Plug.Registry()
 
+        # Register test file format plugin
         testFileFormatPath = os.path.join(testRoot,
             "lib/TestUsdUtilsLocalizeExternalAssetDependencies*/Resources/")
         pr.RegisterPlugins(testFileFormatPath)
+
+        # Register custom filesystem path resolver
+        testCustomFilesystemResolverPath = os.path.join(
+            testRoot, 'lib/TestUsdUtilsCustomFilesystemResolver*/Resources/')
+        pr.RegisterPlugins(testCustomFilesystemResolverPath)
+
+        # This is used to test custom filesystem paths paths below ('///).  This
+        # particular resolver will defer to the default resolver in all other 
+        # cases.
+        Ar.SetPreferredResolver("CustomFilesystemResolver")
 
     def test_RemappedReferencePathsAppearInLocalizedLayers(self):
         localizationDir = "remapRef_localized"
@@ -186,6 +196,38 @@ class TestUsdUtilsAssetLocalization(unittest.TestCase):
         for expectedAsset in expectedAssets:
             self.assertTrue(os.path.exists(
                 os.path.join(localizationDir, expectedAsset)))
+            
+    def test_CustomFilesystemPathsInUsdz(self):
+        assetPath = "customFilesystem/root.usda"
+        archivePath = "customFilesystem.usdz"
+        context = Ar.GetResolver().CreateDefaultContextForAsset(assetPath)
+
+        with Ar.ResolverContextBinder(context):
+            self.assertTrue(UsdUtils.CreateNewUsdzPackage(
+                assetPath, archivePath))
+
+        zf = Sdf.ZipFile.Open(archivePath)
+        expectedAssets = [
+            "root.usda", 
+            "0/sub.usda",
+        ]
+        self.assertEqual(expectedAssets, zf.GetFileNames())
+
+    def test_CustomFilesystemPathsInInLocalizedPackage(self):
+        assetPath = "customFilesystem/root.usda"
+        localizationDir = "customFilesystem_localized"
+        _RemoveExistingDir(localizationDir)
+
+        self.assertTrue(UsdUtils.LocalizeAsset(assetPath, localizationDir))
+
+        expectedAssets = [
+            "root.usda", 
+            "0/sub.usda"
+        ]
+
+        for expectedAsset in expectedAssets:
+            self.assertTrue(os.path.exists(
+                os.path.join(localizationDir, expectedAsset)), expectedAsset)
 
 if __name__=="__main__":
     unittest.main()
