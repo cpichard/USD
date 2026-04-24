@@ -2438,7 +2438,7 @@ class InstallContext:
             apple_utils.SetTarget(self)
 
             self.macOSCodesign = False
-            if args.macos_codesign:
+            if args.macos_codesign and not self.targetWasm:
                 self.macOSCodesign = (args.macos_codesign_id or 
                                       apple_utils.GetCodeSignID())
             if apple_utils.IsHostArm() and args.ignore_homebrew:
