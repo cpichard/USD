@@ -21,7 +21,7 @@ Our test machines have the following software versions installed.
 | OneTBB        | 2021.9               | 2021.9                       | 2021.9                         |
 | OpenSubdiv    | 3.6.1                | 3.6.1                        | 3.6.1                          |
 | OpenImageIO   | 2.5.16.0             | 2.5.16.0                     | 2.5.16.0                       |
-| OpenColorIO   | 2.2.1                | 2.2.1                        | 2.2.1                          |
+| OpenColorIO   | 2.2.1                | 2.4.2                        | 2.2.1                          |
 | OSL           | 1.13.11              |                              |                                |
 | Ptex          | 2.4.2                | 2.4.2                        | 2.4.2                          |
 | Qt for Python | PySide2 5.15.2.1     | PySide6 6.3.1                | PySide2 5.15.2.1               |
