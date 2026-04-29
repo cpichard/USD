@@ -93,13 +93,6 @@ TsSpline TsTest_TsEvaluator::SplineDataToSpline(
         return TsSpline();
     }
 
-    const SData::Features features = data.GetRequiredFeatures();
-    if (features & SData::FeatureAutoTangents)
-    {
-        TF_CODING_ERROR("Unsupported spline features");
-        return TsSpline(valueType);
-    }
-
     // Don't de-regress.  If the SplineData is regressive, the Spline should be
     // too.
     TsAntiRegressionAuthoringSelector selector(TsAntiRegressionNone);
@@ -195,6 +188,11 @@ TsSpline TsTest_TsEvaluator::SplineDataToSpline(
                 knot.SetNextInterpolation(TsInterpCurve); break;
             default: TF_CODING_ERROR("Unexpected interpolation method");
         }
+
+        knot.SetPreTanAlgorithm(dataKnot.preAuto ? TsTangentAlgorithmAutoEase
+                                                 : TsTangentAlgorithmNone);
+        knot.SetPostTanAlgorithm(dataKnot.postAuto ? TsTangentAlgorithmAutoEase
+                                                   : TsTangentAlgorithmNone);
 
         spline.SetKnot(knot);
     }

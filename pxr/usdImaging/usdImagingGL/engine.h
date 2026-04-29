@@ -54,14 +54,12 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 class UsdPrim;
 class HdRenderIndex;
-class HdxTaskController;
 class UsdImagingDelegate;
+class HdRendererCreateArgsSchema;
 
 TF_DECLARE_WEAK_AND_REF_PTRS(GlfSimpleLightingContext);
-TF_DECLARE_REF_PTRS(HdNoticeBatchingSceneIndex);
-TF_DECLARE_REF_PTRS(UsdImagingStageSceneIndex);
+TF_DECLARE_REF_PTRS(UsdImagingSceneIndex);
 TF_DECLARE_REF_PTRS(UsdImagingRootOverridesSceneIndex);
-TF_DECLARE_REF_PTRS(UsdImagingSelectionSceneIndex);
 TF_DECLARE_REF_PTRS(HdCachingSceneIndex);
 TF_DECLARE_REF_PTRS(HdsiLegacyDisplayStyleOverrideSceneIndex);
 TF_DECLARE_REF_PTRS(HdsiPrimTypeAndPathPruningSceneIndex);
@@ -69,6 +67,7 @@ TF_DECLARE_REF_PTRS(HdsiSceneGlobalsSceneIndex);
 TF_DECLARE_REF_PTRS(HdSceneIndexBase);
 TF_DECLARE_REF_PTRS(HdMergingSceneIndex);
 TF_DECLARE_REF_PTRS(HdxTaskControllerSceneIndex);
+TF_DECLARE_REF_PTRS(UsdExecImagingStageSceneIndexInterface);
 
 using UsdStageWeakPtr = TfWeakPtr<class UsdStage>;
 
@@ -696,6 +695,8 @@ protected:
     /// Open some protected methods for whitebox testing.
     friend class UsdImagingGL_UnitTestGLDrawing;
 
+    /// \deprecated There is no render index in the Hydra 2.0 API.
+    ///
     /// Returns the render index of the engine, if any.  This is only used for
     /// whitebox testing.
     USDIMAGINGGL_API
@@ -775,14 +776,11 @@ protected:
     USDIMAGINGGL_API
     UsdImagingDelegate *_GetSceneDelegate() const;
 
+    /// \deprecated Hydra 1.0
     USDIMAGINGGL_API
     HdEngine *_GetHdEngine();
 
-    /// \deprecated The HdxTaskController is replaced by the
-    ///             HdxTaskControllerSceneIndex.
-    USDIMAGINGGL_API
-    HdxTaskController *_GetTaskController() const;
-
+    /// \deprecated Hydra 1.0
     USDIMAGINGGL_API
     HdSelectionSharedPtr _GetSelection() const;
 
@@ -806,19 +804,15 @@ protected:
     bool _displayUnloadedPrimsWithBounds;
     bool _gpuEnabled;
 
-    /* Hydra 2.0 */
+    HdPluginRendererUniqueHandle _renderer; // Hydra 2.0
+    HdxTaskControllerSceneIndexRefPtr _taskControllerSceneIndex; // Hydra 2.0
 
-    HdPluginRendererUniqueHandle _renderer;
-    HdxTaskControllerSceneIndexRefPtr _taskControllerSceneIndex;
-
-    /* Hydra 1.0 */
-    HdPluginRenderDelegateUniqueHandle _renderDelegate;
-    std::unique_ptr<HdRenderIndex> _renderIndex;
-    std::unique_ptr<HdxTaskController> _taskController;
+    HdPluginRenderDelegateUniqueHandle _renderDelegate; // \deprecated Hydra 1.0
+    std::unique_ptr<HdRenderIndex> _renderIndex; // \deprecated Hydra 1.0
 
     SdfPath const _sceneDelegateId;
 
-    HdxSelectionTrackerSharedPtr _selTracker;
+    HdxSelectionTrackerSharedPtr _selTracker; // Hydra 1.0
     HdRprimCollection _renderCollection;
     HdRprimCollection _intersectCollection;
 
@@ -845,7 +839,9 @@ private:
 
     bool _CreateSceneIndicesAndRenderer(
         HdRendererPluginHandle const &plugin,
-        HdContainerDataSourceHandle const &sceneIndexInputArgs);
+        const HdRendererCreateArgsSchema &rendererCreateArgs,
+        HdContainerDataSourceHandle const &sceneIndexInputArgs,
+        bool hasRendererPluginSceneIndexInputArgs);
 
     void _DestroyHydraObjects();
 
@@ -853,15 +849,16 @@ private:
 
     // Note that we'll only ever use one of _sceneIndex/_sceneDelegate
     // at a time.
-    UsdImagingStageSceneIndexRefPtr _stageSceneIndex;
-    HdNoticeBatchingSceneIndexRefPtr _postInstancingNoticeBatchingSceneIndex;
-    UsdImagingSelectionSceneIndexRefPtr _selectionSceneIndex;
+    UsdExecImagingStageSceneIndexInterfaceRefPtr _execStageSceneIndex;
+    HdMergingSceneIndexRefPtr _mergingStageSceneIndex;
     UsdImagingRootOverridesSceneIndexRefPtr _rootOverridesSceneIndex;
     UsdImagingLegacyRenderSettingsSceneIndexRefPtr _legacyRenderSettingsSceneIndex;
     HdsiLegacyDisplayStyleOverrideSceneIndexRefPtr _displayStyleSceneIndex;
     HdsiPrimTypeAndPathPruningSceneIndexRefPtr _lightPruningSceneIndex;
     // State of the _lightPruningSceneIndex.
     bool _lightPruningSceneIndexEnableSceneLights;
+
+    UsdImagingSceneIndexRefPtr _usdImagingSceneIndex;
     HdSceneIndexBaseRefPtr _usdImagingFinalSceneIndex;
 
     HdMergingSceneIndexRefPtr _mergingSceneIndex;
@@ -870,6 +867,8 @@ private:
 
     /* Hydra 1.0 */
     std::unique_ptr<UsdImagingDelegate> _sceneDelegate;
+
+    // \deprecated
     std::unique_ptr<HdEngine> _engine;
 
     bool _allowAsynchronousSceneProcessing = false;

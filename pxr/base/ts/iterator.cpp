@@ -32,6 +32,35 @@ GfInterval _GetOpenLoopedInterval(const TsLoopParams& lp)
     return result;
 }
 
+bool _SegmentAtEnd(
+    const GfInterval& interval,
+    const Ts_Segment& segment,
+    const bool reversed)
+{
+    if (reversed) {
+        const double t0 = segment.p0[0];
+        // When reversed, don't go back in time if we have the earliest
+        // post-value needed by the interval.
+        if (!interval.Contains(t0) || t0 == interval.GetMin()) {
+            return true;
+        }
+    } else {
+        const double t1 = segment.p1[0];
+        if (!interval.Contains(t1)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool _SegmentOverlapsInterval(
+    const GfInterval& interval,
+    const Ts_Segment& segment)
+{
+    const GfInterval segInterval(segment.p0[0], segment.p1[0], CLOSED, OPEN);
+    return !((segInterval & interval).IsEmpty());
+}
+
 }  // end anonymous namespace
 
 
@@ -66,6 +95,7 @@ Ts_SegmentPrototypeIterator::Ts_SegmentPrototypeIterator(
 
     if (iterInterval.IsEmpty()) {
         _atEnd = true;
+        _interval = iterInterval;
         return;
     }
 
@@ -104,11 +134,6 @@ Ts_SegmentPrototypeIterator::Ts_SegmentPrototypeIterator(
 void
 Ts_SegmentPrototypeIterator::_UpdateSegment()
 {
-    if (_atEnd) {
-        _segment = Ts_Segment();
-        return;
-    }
-
     const auto& times = _data->times;
     const auto& lp = _data->loopParams;
 
@@ -147,41 +172,72 @@ Ts_Segment Ts_SegmentPrototypeIterator::operator *() const
 
 Ts_SegmentPrototypeIterator& Ts_SegmentPrototypeIterator::operator ++()
 {
-    if (_atEnd) {
+    if (_SegmentAtEnd(_interval, _segment, _reversed)) {
+        _atEnd = true;
         return *this;
     }
 
+    StepForward();
+    return *this;
+}
+
+bool
+Ts_SegmentPrototypeIterator::StepForward()
+{
+    // We can't move if we don't have an initialization anchor time.
+    if (_interval.IsEmpty()) {
+        _atEnd = true;
+        return false;
+    }
+
+    // Ensure _timesIt is within range.
     const auto& times = _data->times;
+    if (_timesIt < times.begin() || _timesIt >= times.end()) {
+        _atEnd = true;
+        return false;
+    }
+
+    // We can't step beyond the prototype basis.
     const auto& lp = _data->loopParams;
+    if ((_reversed && *_timesIt <= lp.protoStart) ||
+        (!_reversed && *_timesIt >= lp.protoEnd))
+    {
+        _atEnd = true;
+        return false;
+    }
 
     if (_reversed) {
         // If we cannot decrement the iterator or if it already points outside
-        // the prototype, set _atEnd to true.
-        if (_timesIt == times.begin() ||
-            _timesIt == times.end() ||
-            *_timesIt <= lp.protoStart ||
-            *_timesIt <= _interval.GetMin())
+        // the times region, set _atEnd to true.
+        if (_timesIt == times.begin()) {
+            _atEnd = true;
+            return false;
+        }
+        --_timesIt;
+    } else {
+        if (_timesIt + 1 == times.end() ||
+            *(_timesIt + 1) >= lp.protoEnd)
         {
             _atEnd = true;
+            return false;
         }
-
-        if (!_atEnd) {
-            --_timesIt;
-        }
-    } else {
-        if (!_atEnd) {
-            ++_timesIt;
-            _atEnd = (_timesIt == times.end() ||
-                      *_timesIt >= lp.protoEnd ||
-                      !_interval.Contains(*_timesIt));
-        }
+        ++_timesIt;
     }
 
     _UpdateSegment();
 
-    return *this;
+    _atEnd = !_SegmentOverlapsInterval(_interval, _segment);
+    return true;
 }
 
+bool
+Ts_SegmentPrototypeIterator::StepBackward()
+{
+    _reversed = !_reversed;
+    const bool success = StepForward();
+    _reversed = !_reversed;
+    return success;
+}
 
 ////////////////////////////////////////////////////////////////
 // Ts_SegmentLoopIterator
@@ -216,6 +272,7 @@ Ts_SegmentLoopIterator::Ts_SegmentLoopIterator(
 
     if (iterInterval.IsEmpty()) {
         _atEnd = true;
+        _interval = iterInterval;
         return;
     }
 
@@ -245,18 +302,7 @@ Ts_SegmentLoopIterator::Ts_SegmentLoopIterator(
     }
     _curIteration = std::clamp(_curIteration, _minIteration, _maxIteration);
 
-    // Offset from the time this iterator is being asked for and the time
-    // to pass to the Ts_SegmentPrototypeIterator.
-    double timeDelta = _curIteration * _protoSpan;
-
-    // Calculate the time to use for the protoType iterator;
-    GfInterval protoIterInterval = iterInterval - GfInterval(timeDelta);
-
-    _protoIt = Ts_SegmentPrototypeIterator(_data,
-                                           protoIterInterval,
-                                           _reversed);
-
-    // Update _segment based on _protoIt
+    _UpdatePrototypeIterator();
     _UpdateSegment();
     _atEnd = _protoIt.AtEnd();
 }
@@ -264,26 +310,34 @@ Ts_SegmentLoopIterator::Ts_SegmentLoopIterator(
 void
 Ts_SegmentLoopIterator::_UpdateSegment()
 {
-    if (_atEnd) {
-        _segment = Ts_Segment();
-    } else {
-        _segment = *_protoIt;
-        GfVec2d delta(_curIteration * _protoSpan, _curIteration * _valueOffset);
-        _segment += delta;
-    }
+    _segment = *_protoIt;
+    GfVec2d delta(_curIteration * _protoSpan, _curIteration * _valueOffset);
+    _segment += delta;
 }
 
 void
 Ts_SegmentLoopIterator::_UpdatePrototypeIterator()
 {
-    GfInterval loopedInterval = _GetOpenLoopedInterval(_data->loopParams);
-
-    const GfInterval iterInterval = _interval & loopedInterval;
+    const auto& lp = _data->loopParams;
     const double timeDelta = _curIteration * _protoSpan;
-    const GfInterval protoIterInterval = iterInterval - GfInterval(timeDelta);
+
+    // Use the full proto interval unless the starting _interval boundary
+    // falls within the current iteration.
+    GfInterval protoInterval(lp.protoStart, lp.protoEnd, CLOSED, OPEN);
+    if (_reversed) {
+        const double startTime = _interval.GetMax() - timeDelta;
+        if (protoInterval.Contains(startTime)) {
+            protoInterval.SetMax(startTime, OPEN);
+        }
+    } else {
+        const double startTime = _interval.GetMin() - timeDelta;
+        if (protoInterval.Contains(startTime)) {
+            protoInterval.SetMin(startTime, CLOSED);
+        }
+    }
 
     _protoIt = Ts_SegmentPrototypeIterator(_data,
-                                           protoIterInterval,
+                                           protoInterval,
                                            _reversed);
 }
 
@@ -296,28 +350,65 @@ Ts_SegmentLoopIterator::operator *() const
 Ts_SegmentLoopIterator&
 Ts_SegmentLoopIterator::operator ++()
 {
-    if (_protoIt.AtEnd()) {
+    if (_SegmentAtEnd(_interval, _segment, _reversed)) {
         _atEnd = true;
-    } else {
-        ++_protoIt;
-        if (_protoIt.AtEnd()) {
-            // Hit end of a prototype loop.
-            _curIteration += (_reversed ? -1 : 1);
-
-            _UpdatePrototypeIterator();
-
-            if (_protoIt.AtEnd()) {
-                // We really are at end.
-                _atEnd = true;
-            }
-        }
+        return *this;
     }
 
-    _UpdateSegment();
-
+    StepForward();
     return *this;
 }
 
+bool
+Ts_SegmentLoopIterator::StepForward()
+{
+    // We can't move if we don't have an initialization anchor time.
+    if (_interval.IsEmpty()) {
+        _atEnd = true;
+        return false;
+    }
+
+    // Ensure we're operating within unrolled inner loop region
+    GfInterval loopedInterval = _GetOpenLoopedInterval(_data->loopParams);
+    if (_SegmentAtEnd(loopedInterval, _segment, _reversed)) {
+        _atEnd = true;
+        return false;
+    }
+
+    const bool stepBackward =
+        _steppingBackward ^ _initializedPrototypeItBackward;
+    bool success = stepBackward ? _protoIt.StepBackward()
+                                : _protoIt.StepForward();
+    if (!success) {
+        // Hit end of a prototype loop.
+        _curIteration += (_reversed ? -1 : 1);
+
+        if ((_reversed && _curIteration < _minIteration) ||
+            (!_reversed && _curIteration > _maxIteration))
+        {
+            _atEnd = true;
+            return false;
+        }
+
+        _initializedPrototypeItBackward = _steppingBackward;
+        _UpdatePrototypeIterator();
+    }
+
+    _UpdateSegment();
+    _atEnd = !_SegmentOverlapsInterval(_interval, _segment);
+    return true;
+}
+
+bool
+Ts_SegmentLoopIterator::StepBackward()
+{
+    _reversed = !_reversed;
+    _steppingBackward = true;
+    const bool success = StepForward();
+    _steppingBackward = false;
+    _reversed = !_reversed;
+    return success;
+}
 
 ////////////////////////////////////////////////////////////////
 // Ts_SegmentKnotIterator
@@ -376,17 +467,17 @@ Ts_SegmentKnotIterator::Ts_SegmentKnotIterator(
                 _interval.GetMax() > _loopedInterval.GetMax())
             {
                 // We're iterating (in reverse) after the end of inner looping.
-                _knotSection = PreInnerLooping;
+                _knotSection = PostInnerLooping;
             } else if (_interval.GetMax() > _loopedInterval.GetMin()) {
                 // We're starting iterations in the middle of the inner looped
                 // section.
                 _knotSection = InnerLooping;
             } else if (_interval.GetMax() > times.front()) {
                 // We're starting iterations (in reverse) before the inner looping.
-                _knotSection = PostInnerLooping;
+                _knotSection = PreInnerLooping;
             } else {
                 // We're starting (in reverse) iterations before the start of the knots.
-                _knotSection = PostInnerLooping;
+                _knotSection = PreInnerLooping;
                 _atEnd = true;
                 return;
             }
@@ -450,11 +541,6 @@ Ts_SegmentKnotIterator::Ts_SegmentKnotIterator(
 void
 Ts_SegmentKnotIterator::_UpdateSegment()
 {
-    if (_atEnd) {
-        _segment = Ts_Segment();
-        return;
-    }
-
     // If we're in the inner looping section, just let _loopIt do the work.
     if (_knotSection == InnerLooping) {
         _segment = *_loopIt;
@@ -478,10 +564,8 @@ Ts_SegmentKnotIterator::_UpdateSegment()
     ptrdiff_t nextIndex = prevIndex + 1;
 
     // Check to see if we've run into the back end of _loopedInterval
-    if (_hasInnerLoops &&
-        ((_knotSection == PreInnerLooping && _reversed) ||
-         (_knotSection == PostInnerLooping && !_reversed)) &&
-        (times[prevIndex] <= _loopedInterval.GetMax()))
+    if (_hasInnerLoops && _knotSection == PostInnerLooping &&
+        times[prevIndex] <= _loopedInterval.GetMax())
     {
         prevKnot = _data->GetKnotDataAsDouble(_firstProtoKnotIndex);
         // Note: use numPostLoops + 1 because at the end of the 0th loop we
@@ -493,10 +577,8 @@ Ts_SegmentKnotIterator::_UpdateSegment()
     }
 
     // Check to see if we've run into the front end of _loopedInterval
-    if (_hasInnerLoops &&
-        ((_knotSection == PreInnerLooping && !_reversed) ||
-         (_knotSection == PostInnerLooping && _reversed)) &&
-        (times[nextIndex] >= _loopedInterval.GetMin()))
+    if (_hasInnerLoops && _knotSection == PreInnerLooping &&
+        times[nextIndex] >= _loopedInterval.GetMin())
     {
         nextKnot = _data->GetKnotDataAsDouble(_firstProtoKnotIndex);
         // Note: when at the start of the prototype, we have 0 times the offset
@@ -512,9 +594,9 @@ Ts_SegmentKnotIterator::_UpdateSegment()
     _segment.t0 = _segment.p0 +
                   GfVec2d(prevKnot.postTanWidth,
                           prevKnot.postTanWidth * prevKnot.postTanSlope);
-    _segment.t1 = _segment.p1 -
-                  GfVec2d(nextKnot.preTanWidth,
-                          nextKnot.preTanWidth * nextKnot.preTanSlope);
+    _segment.t1 = _segment.p1 +
+                  GfVec2d(-nextKnot.preTanWidth,
+                          nextKnot.GetPreTanHeight());
     _segment.SetInterp(prevKnot.nextInterp, _data->curveType);
 }
 
@@ -527,85 +609,97 @@ Ts_SegmentKnotIterator::operator *() const
 Ts_SegmentKnotIterator&
 Ts_SegmentKnotIterator::operator ++()
 {
-    if (_atEnd) {
-        // Don't go beyond the end.
+    if (_SegmentAtEnd(_interval, _segment, _reversed)) {
+        _atEnd = true;
         return *this;
     }
 
-    // Save some typing
+    StepForward();
+    return *this;
+}
+
+bool
+Ts_SegmentKnotIterator::StepForward()
+{
+    // We can't move if we don't have an initialization anchor time.
+    if (_interval.IsEmpty()) {
+        _atEnd = true;
+        return false;
+    }
+
     const auto& times = _data->times;
 
     if (_knotSection == InnerLooping) {
-        ++_loopIt;
-        if (_loopIt.AtEnd()) {
-            // We've run off the end of the inner looped section. Have we
-            // also run off the iteration interval? Check _segment which
-            // still has the last iteration in it.
-            if ((_reversed && _segment.p0[0] <= _interval.GetMin()) ||
-                (!_reversed && _segment.p1[0] >= _interval.GetMax()))
-            {
-                _atEnd = true;
-            } else {
-                // Move to PostInnerLooping and set _timesIt correctly. This is
-                // essentially the same algorithm used in the constructor.
-                _knotSection = PostInnerLooping;
+        const bool stepBackward =
+            _steppingBackward ^ _initializedLoopItBackward;
 
-                // XXX: There are slight variations on this if/else block in the
-                // prototype, the knot, and the segment iterators. It might be
-                // nice to unify them one day.
-                if (_reversed) {
-                    // Find the start of the segment we're interested in.
-                    _timesIt = std::lower_bound(times.begin(), times.end(),
-                                                _loopedInterval.GetMin());
-                    if (_timesIt == times.begin()) {
-                        _atEnd = true;
-                    } else {
-                        --_timesIt;
-                    }
-                } else {
-                    _timesIt = std::upper_bound(times.begin(), times.end(),
-                                                _loopedInterval.GetMax());
-                    if (_timesIt == times.end()) {
-                        _atEnd = true;
-                    } else {
-                        --_timesIt;
-                    }
+        const bool success = stepBackward ? _loopIt.StepBackward()
+                                          : _loopIt.StepForward();
+        if (!success) {
+            // _loopIt is exhausted. Move to the next knot section and set
+            // _timesIt correctly. This is essentially the same algorithm
+            // used in the constructor.
+            _knotSection = _reversed ? PreInnerLooping : PostInnerLooping;
+
+            // XXX: There are slight variations on this if/else block in the
+            // prototype, the knot, and the segment iterators. It might be
+            // nice to unify them one day.
+            if (_reversed) {
+                // Find the start of the segment we're interested in.
+                _timesIt = std::lower_bound(times.begin(), times.end(),
+                                            _loopedInterval.GetMin());
+                if (_timesIt == times.begin()) {
+                    _atEnd = true;
+                    return false;
                 }
+                --_timesIt;
+            } else {
+                _timesIt = std::upper_bound(times.begin(), times.end(),
+                                            _loopedInterval.GetMax());
+                if (_timesIt == times.end() ||
+                    _timesIt == times.begin())
+                {
+                    _atEnd = true;
+                    return false;
+                }
+                --_timesIt;
             }
         }
     } else {
         if (_reversed) {
             if (_timesIt == times.begin() ||
-                _timesIt == times.end() ||
-                !_interval.Contains(*_timesIt))
+                _timesIt + 1 >= times.end())
             {
                 _atEnd = true;
+                return false;
             }
-            if (!_atEnd) {
-                --_timesIt;
-                if (_knotSection == PreInnerLooping &&
-                    *_timesIt < _loopedInterval.GetMax())
-                {
-                    // We have just entered the inner looping section.
-                    _knotSection = InnerLooping;
-                    _loopIt = Ts_SegmentLoopIterator(_data,
-                                                     _interval,
-                                                     _reversed);
-                }
+            --_timesIt;
+            if (_knotSection == PostInnerLooping &&
+                *_timesIt < _loopedInterval.GetMax())
+            {
+                // We have just entered the inner looping section.
+                _knotSection = InnerLooping;
+                _initializedLoopItBackward = _steppingBackward;
+                _loopIt = Ts_SegmentLoopIterator(_data,
+                                                 _interval,
+                                                 _reversed);
             }
         } else {
-            if (!_atEnd) {
-                ++_timesIt;
-
-                _atEnd = (_timesIt == times.end() ||
-                          !_interval.Contains(*_timesIt));
+            if (_timesIt == times.end() ||
+                (_knotSection == PostInnerLooping &&
+                 _timesIt + 2 >= times.end()))
+            {
+                _atEnd = true;
+                return false;
             }
-            if (!_atEnd &&
-                _knotSection == PreInnerLooping &&
+            ++_timesIt;
+
+            if (_knotSection == PreInnerLooping &&
                 *_timesIt >= _loopedInterval.GetMin())
             {
                 // We have just entered the inner looping section.
                 _knotSection = InnerLooping;
+                _initializedLoopItBackward = _steppingBackward;
                 _loopIt = Ts_SegmentLoopIterator(_data,
                                                  _interval,
                                                  _reversed);
@@ -614,8 +708,19 @@ Ts_SegmentKnotIterator::operator ++()
     }
 
     _UpdateSegment();
+    _atEnd = !_SegmentOverlapsInterval(_interval, _segment);
+    return true;
+}
 
-    return *this;
+bool
+Ts_SegmentKnotIterator::StepBackward()
+{
+    _reversed = !_reversed;
+    _steppingBackward = true;
+    const bool success = StepForward();
+    _steppingBackward = false;
+    _reversed = !_reversed;
+    return success;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -699,25 +804,27 @@ Ts_SegmentIterator::Ts_SegmentIterator(
         const double knotSpan = _lastKnotTime - _firstKnotTime;
         _minIteration =
             int32_t(std::floor((_interval.GetMin() - _firstKnotTime) / knotSpan));
-        _maxIteration =
-            int32_t(std::floor((_interval.GetMax() - _firstKnotTime) / knotSpan));
 
         // If not pre-extrapolation looping, do not allow negative iterations.
         if (!_preExtrapLooped) {
             _minIteration = std::max(_minIteration, 0);
-            _maxIteration = std::max(_maxIteration, 0);
         }
 
         // If not post-extrapolation looping, do not allow positive iterations.
         if (!_postExtrapLooped) {
             _minIteration = std::min(_minIteration, 0);
-            _maxIteration = std::min(_maxIteration, 0);
         }
     } else {
         _minIteration = _maxIteration = 0;
     }
 
     _curIteration = _minIteration;
+    if (_preExtrapLooped) {
+        _minIteration = std::numeric_limits<int32_t>::min();
+    }
+    if (_postExtrapLooped) {
+        _maxIteration = std::numeric_limits<int32_t>::max();
+    }
 
     if (_interval.GetMin() < _firstKnotTime) {
         _splineRegion = (_preExtrapLooped
@@ -745,46 +852,111 @@ Ts_SegmentIterator::operator *() const
 Ts_SegmentIterator&
 Ts_SegmentIterator::operator ++()
 {
-    if (_atEnd) {
+    if (_SegmentAtEnd(_interval, _segment, /* reversed */ false)) {
+        _atEnd = true;
         return *this;
     }
 
+    StepForward();
+    return *this;
+}
+
+bool
+Ts_SegmentIterator::StepForward()
+{
+    // We can't move if we don't have an initialization anchor time.
+    if (_interval.IsEmpty()) {
+        return false;
+    }
+
+    // If we're advancing out of post-extrapolation, we're done.
     if (_splineRegion == TsSourcePostExtrap) {
-        // We're advancing out of post-extrapolation, we're done.
         _atEnd = true;
+        return false;
+    }
+
+    bool initializedKnotIt = false;
+    if (_splineRegion == TsSourcePreExtrap) {
+        // Advancing out of pre-extrapolation. Assume we're advancing
+        // to knot interpolation until proven otherwise.
+        _splineRegion = TsSourceKnotInterp;
+        _curIteration = 0;
+        _initializedKnotItBackward = false;
+        initializedKnotIt = true;
+        // It's possible that there's only one knot and we're going to
+        // advance straight to post-extrap. Update the iterator here, if it
+        // starts AtEnd() then there are no knot segments.
+        _UpdateKnotIterator();
     } else {
-        if (_splineRegion == TsSourcePreExtrap) {
-            // Advancing out of pre-extrapolation. Assume we're advancing
-            // to knot interpolation until proven otherwise.
-            _splineRegion = TsSourceKnotInterp;
-            _curIteration = 0;
-            // It's possible that there's only one knot and we're going to
-            // advance straight to post-extrap. Update the iterator here, if it
-            // starts AtEnd() then there are no knot segments.
-            _UpdateKnotIterator();
-        } else {
-            ++_knotIt;
-        }
-
-        if (_knotIt.AtEnd()) {
-            // This is the end of a loop. Move to the next iteration if
-            // there is one.
+        const bool success =
+            _initializedKnotItBackward ? _knotIt.StepBackward()
+                                        : _knotIt.StepForward();
+        if (!success) {
+            // We don't need to consult _initializedKnotItBackward
+            // since this is the top-level iterator, and stepping
+            // forward here always means stepping forward in time.
             ++_curIteration;
+            _initializedKnotItBackward = false;
+            initializedKnotIt = true;
             _UpdateKnotIterator();
-        }
-
-        if (_knotIt.AtEnd()) {
-            // Done with iterations, see if we need a postExtrap segment.
-            if (!_postExtrapLooped && _interval.GetMax() > _lastKnotTime) {
-                _splineRegion = TsSourcePostExtrap;
-            } else {
-                _atEnd = true;
-            }
         }
     }
 
+    if ((_curIteration > _maxIteration ||
+        (initializedKnotIt && _knotIt.AtEnd())) && !_postExtrapLooped)
+    {
+        _splineRegion = TsSourcePostExtrap;
+    }
+
     _UpdateSegment();
-    return *this;
+    _atEnd = !_SegmentOverlapsInterval(_interval, _segment);
+    return true;
+}
+
+bool
+Ts_SegmentIterator::StepBackward()
+{
+    // We can't move if we don't have an initialization anchor time.
+    if (_interval.IsEmpty()) {
+        return false;
+    }
+
+    // If we're advancing out of pre-extrapolation, we're done.
+    if (_splineRegion == TsSourcePreExtrap) {
+        _atEnd = true;
+        return false;
+    }
+
+    bool initializedKnotIt = false;
+    if (_splineRegion == TsSourcePostExtrap) {
+        _splineRegion = TsSourceKnotInterp;
+        _curIteration = 0;
+        _initializedKnotItBackward = true;
+        initializedKnotIt = true;
+        _UpdateKnotIterator();
+    } else {
+        const bool success =
+            _initializedKnotItBackward ? _knotIt.StepForward()
+                                        : _knotIt.StepBackward();
+        if (!success) {
+            // Stepping backward here always means stepping backward
+            // in time.
+            --_curIteration;
+            _initializedKnotItBackward = true;
+            initializedKnotIt = true;
+            _UpdateKnotIterator();
+        }
+    }
+
+    if ((_curIteration < _minIteration ||
+        (initializedKnotIt && _knotIt.AtEnd())) && !_preExtrapLooped)
+    {
+        _splineRegion = TsSourcePreExtrap;
+    }
+
+    _UpdateSegment();
+    _atEnd = !_SegmentOverlapsInterval(_interval, _segment);
+    return true;
 }
 
 /// Update the knot iterator appropriately.
@@ -798,7 +970,7 @@ Ts_SegmentIterator::_UpdateKnotIterator()
         return;
     }
 
-    if (_curIteration > _maxIteration) {
+    if (_curIteration > _maxIteration || _curIteration < _minIteration) {
         // Off the end. Reset _knotIt so it will be AtEnd().
         _knotIt = Ts_SegmentKnotIterator();
         return;
@@ -809,30 +981,27 @@ Ts_SegmentIterator::_UpdateKnotIterator()
     const double knotTimeSpan = _lastKnotTime - _firstKnotTime;
     const double timeDelta = _curIteration * knotTimeSpan;
 
-    // Shift the input _interval an appropriate amount for iterating over the
-    // knots themselves. Normally this is shifting by timeDelta, but if we're
-    // oscillating in reverse, we need to flop that knot interval.
-    GfInterval knotIterInterval;
-
     // If we're reversing, we want to shift and flop the interval. Try to do this
     // with a minimal amount of operations to minimize round off error
     // accumulation.
     if (_curIteration < 0) {
         _oscillating = (_data->preExtrapolation.mode == TsExtrapLoopOscillate);
         _valueShift = (_data->preExtrapolation.mode == TsExtrapLoopRepeat
-                       ? _curIteration * (_lastKnotValue - _firstKnotValue)
+                       ? _curIteration * (_lastKnotValue - _firstKnotPreValue)
                        : 0.0);
     } else if (_curIteration > 0) {
         _oscillating = (_data->postExtrapolation.mode == TsExtrapLoopOscillate);
         _valueShift = (_data->postExtrapolation.mode == TsExtrapLoopRepeat
-                       ? _curIteration * (_lastKnotValue - _firstKnotValue)
+                       ? _curIteration * (_lastKnotValue - _firstKnotPreValue)
                        : 0.0);
     } else {
         _oscillating = false;
         _valueShift = 0.0;
     }
-    _reversing = _oscillating && (_curIteration % 2 != 0);
-    if (_reversing) {
+
+    const bool oscillateReversing = _oscillating && (_curIteration % 2 != 0);
+    _reversing = _initializedKnotItBackward ^ oscillateReversing;
+    if (oscillateReversing) {
         // We're reversed, flop things around.
         //
         // The math for the interval is the same as it would be for a simple
@@ -878,44 +1047,55 @@ Ts_SegmentIterator::_UpdateKnotIterator()
         _shift1 = timeDelta + _firstKnotTime;
         _shift2 = _lastKnotTime;
         _valueShift = 0.0;  // Oscillating loops never have a value offset
-        const double t1 = -(_interval.GetMin() - _shift1) + _shift2;
-        const double t0 = -(_interval.GetMax() - _shift1) + _shift2;
-        knotIterInterval = GfInterval(t0, t1, CLOSED, OPEN);
     } else {
         // For the non-reversed case, we can just subtract timeDelta.
         _shift1 = timeDelta;
         _shift2 = 0;
-        knotIterInterval = _interval - GfInterval(_shift1);
+    }
+
+    // We can use the full interval, because "_atEnd" relies on the computed
+    // _segment span, not _knotIt.AtEnd()
+    GfInterval knotIterInterval(_firstKnotTime, _lastKnotTime);
+
+    // Rewrite the "min" side of the interval with the min translated to
+    // the valid basis of the segment knot iterator if the current knot
+    // time span contains _interval.GetMin(). This ensures that the iterator
+    // starts at the expected segment. All other sections use the full knot
+    // interval, and _atEnd is calculated in _UpdateSegment. Note that we
+    // don't need to rewrite the "min" side if the knot iterator is constructed
+    // because of StepBackward().
+    if (_interval.GetMin() >= (timeDelta + _firstKnotTime) &&
+        _interval.GetMin() < (timeDelta + _firstKnotTime + knotTimeSpan) &&
+        !_initializedKnotItBackward)
+    {
+        if (oscillateReversing) {
+            const double t1 = -(_interval.GetMin() - _shift1) + _shift2;
+            knotIterInterval.SetMax(t1, /* closed */ false);
+        } else {
+            knotIterInterval.SetMin(_interval.GetMin() - _shift1);
+        }
     }
 
     _knotIt = Ts_SegmentKnotIterator(_data, knotIterInterval, _reversing);
-    _atEnd = _knotIt.AtEnd();
 }
 
 /// Update the segment after the iterators change.
 void
 Ts_SegmentIterator::_UpdateSegment()
 {
-    if (_atEnd) {
-        _segment = Ts_Segment();
-    } else if (_splineRegion == TsSourcePreExtrap) {
+    if (_splineRegion == TsSourcePreExtrap) {
         _UpdatePreExtrapSegment();
     } else if (_splineRegion == TsSourcePostExtrap) {
         _UpdatePostExtrapSegment();
     } else {
-        if (_knotIt.AtEnd()) {
-            _atEnd = true;
-            _segment = Ts_Segment();
+        _segment = *_knotIt;
+        if (_oscillating && (_curIteration % 2 != 0)) {
+            // Don't bother shifting the value, reversed loops never have a
+            // value offset.
+            _segment = -(_segment - _shift2) + _shift1;
         } else {
-            _segment = *_knotIt;
-            if (_reversing) {
-                // Don't bother shifting the value, reversed loops never have a
-                // value offset.
-                _segment = -(_segment - _shift2) + _shift1;
-            } else {
-                // Shift both time and value.
-                _segment += GfVec2d(_shift1, _valueShift);
-            }
+            // Shift both time and value.
+            _segment += GfVec2d(_shift1, _valueShift);
         }
     }
 }

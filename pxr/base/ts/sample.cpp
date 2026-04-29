@@ -6,6 +6,7 @@
 //
 
 #include "pxr/pxr.h"
+#include "pxr/base/ts/iterator.h"
 #include "pxr/base/ts/sample.h"
 #include "pxr/base/ts/splineData.h"
 #include "pxr/base/ts/regressionPreventer.h"
@@ -26,6 +27,8 @@ using Ts_DoubleKnotData = Ts_TypedKnotData<double>;
 
 namespace
 {
+    constexpr double inf = std::numeric_limits<double>::infinity();
+
     // Each spline can have as many as seven intervals that are populated from
     // different sources, for example, pre-extrapolation loops, inner loops,
     // post-extrapolation, etc.
@@ -130,13 +133,6 @@ namespace
             double timeScale,
             double valueScale,
             double tolerance);
-
-        // Constructor for baking
-        _Sampler(
-            const Ts_SplineData* const data,
-            const GfInterval& timeInterval,
-            const bool includeExtrapLoops,
-            Ts_SplineData* bakedData);
 
         bool Sample(
             Ts_SampleDataInterface* sampledSpline);
@@ -289,27 +285,65 @@ namespace
         std::vector<Ts_DoubleKnotData> _internalKnots;
         std::vector<TsTime> _internalTimes;
     };
-}
 
-// Constructor for baking.
-_Sampler::_Sampler(
-    const Ts_SplineData* const data,
-    const GfInterval& timeInterval,
-    const bool includeExtrapLoops,
-    Ts_SplineData* bakedData)
-    : _data(data)
-    , _timeInterval(timeInterval)
-    , _timeScale(1.0)
-    , _valueScale(1.0)
-    , _tolerance(1.0)
-    , _includeExtrapLoops(includeExtrapLoops)
-    , _bakedData(bakedData)
-{
-    // It should be impossible to fail this check. If we do, we're likely to
-    // crash or produce nonsense.
-    TF_AXIOM(data && bakedData);
+    // Writes the pre values of the given output data.
+    void _SetKnotDataPreValues(
+        const Ts_Segment& segment,
+        Ts_DoubleKnotData& data
+    ) {
+        data.time = segment.p1[0];
 
-    _Init();
+        data.preTanAlgorithm = TsTangentAlgorithmNone;
+        data.preTanWidth = segment.p1[0] - segment.t1[0];
+        data.preTanSlope =
+            data.preTanWidth == 0
+            ? 0
+            : (segment.p1[1] - segment.t1[1]) / data.preTanWidth;
+
+        data.preValue = segment.p1[1];
+    }
+
+    // This function requires that the pre-values on the given knot data have
+    // already been correctly set. If they have not yet been set, this
+    // function will write values with potentially incorrect semantics.
+    void _SetKnotDataValues(
+        const Ts_Segment& segment,
+        Ts_DoubleKnotData& data
+    ) {
+        data.postTanAlgorithm = TsTangentAlgorithmNone;
+        data.postTanWidth = segment.t0[0] - segment.p0[0];
+        data.postTanSlope =
+            data.postTanWidth == 0
+            ? 0
+            : (segment.t0[1] - segment.p0[1]) / data.postTanWidth;
+
+        if (segment.p1[0] != +inf) {
+            data.nextInterp = segment.GetInterpMode();
+        }
+        if (data.nextInterp == TsInterpCurve) {
+            switch (segment.interp)
+            {
+                case Ts_SegmentInterp::Hermite:
+                    data.curveType = TsCurveTypeHermite;
+                    break;
+                case Ts_SegmentInterp::Bezier:
+                    data.curveType = TsCurveTypeBezier;
+                    break;
+                default:
+                    TF_VERIFY(false,
+                              "Unable to set knot data curve type from "
+                              "unknown segment curve type.");
+            }
+        }
+
+        data.value = segment.p0[1];
+        if (data.value == data.preValue) {
+            data.dualValued = false;
+            data.preValue = 0;
+        } else {
+            data.dualValued = true;
+        }
+    }
 }
 
 // Constructor for sampling.
@@ -1364,318 +1398,6 @@ _Sampler::_ConvertUnrolledKnotsForSampling()
     }
 }
 
-// Figure out knot indices outside the [0..n] range of _unrolledKnots and
-// iterate through them to assemble the output knots in bakedData.
-template <typename T>
-void
-_Sampler::_BakeTypedKnots(const Ts_TypedSplineData<T>* typedData,
-                          const GfInterval& interval,
-                          const TsExtrapolation* preExtrapPtr,
-                          const TsExtrapolation* postExtrapPtr,
-                          Ts_TypedSplineData<T>* bakedData)
-{
-    // Iteration counts and loop times. Given a spline whose sequence of knots
-    // span times from t0 to t1, we can map any time t to an iteration and a
-    // time within that iteration. Define tDelta as t1 - t0 and we can define
-    // each iteration as spanning the range from (t0 + k * tDelta) to
-    // (t1 + k * tDelta) where k is the iteration number. When k = 0, this is
-    // just the normal knot span. For pre-extrapolation loops, k < 0 and for
-    // post-extrapolation loops, k > 0.
-    //
-    // Within each loop, loopTime = time - (t0 + k * tDelta), yielding a
-    // looptime value in the range [t0 .. t1].
-    //
-    // This is further complicated because each iteration meets its neighbors at
-    // a knot. That is (t1 * k * tDelta) == (t0 + (k+1) * tDelta). To keep the
-    // shape of the curve fixed, the boundary knots are formed by combining the
-    // two overlapping knots. The left side of the boundary is part of iteration
-    // k and gets its values from the last knot in the spline.  The right side
-    // of the boundary is part of iteration k+1 and gets its values from the
-    // first knot in the spline.
-    
-    // The amount by which time changes every loop.
-    const double timeDelta = _lastTime - _firstTime;
-
-    // Get the number of knots in each loop. This is one less than the number of
-    // knots in the original spline.
-    // 
-    // Consider a spline with 3 knots that we'll label A, B, and C. This spline
-    // has two segments A-B and B-C. When looping we want to repeat these two
-    // segments, as in A-B, B-C, A-B, B-C, etc. Segment B-C must be followed by
-    // A-B. So the knot between the two segments must look like C from the left
-    // and A from the right, call it C|A. So the full looped sequence becomes
-    // C|A-B, B-C|A, C|A-B, B-C|A, etc. So we have a loop size of 2 knots and we
-    // have to construct a hybrid knot C|A that looks like C from the left and A
-    // from the right.
-    const ptrdiff_t loopSize = _unrolledKnots.size() - 1;
-
-    // We need to figure out the iteration for the min time so we can
-    // find the right knot to start with which may update the iteration.
-    ptrdiff_t iteration = ptrdiff_t(
-        std::floor((interval.GetMin() - _firstTime) / timeDelta));
-    
-    const TsExtrapolation* extrap = (iteration <= 0
-                                     ? preExtrapPtr
-                                     : postExtrapPtr);
-
-    if (!extrap || !extrap->IsLooping()) {
-        // We're not looping. Reset iteration
-        iteration = 0;
-    }
-
-    double loopTime = interval.GetMin() - (iteration * timeDelta);
-
-    auto beginIt = std::lower_bound(_unrolledKnots.begin(),
-                                    _unrolledKnots.end(),
-                                    loopTime,
-                                    _UnrolledKnotTimeLess(typedData));
-    
-    // If beginIt is past the end or is between knots, back up to the knot at
-    // the beginning of the segment.
-    if (beginIt == _unrolledKnots.end() ||
-        (beginIt != _unrolledKnots.begin() &&
-         beginIt->GetTime(_data) > loopTime))
-    {
-        --beginIt;
-    }
-
-    // When looping, knotIndex is often outside the range of _unrolledKnots
-    // indices. If _unrolledKnots had 3 knots, their indices would be 0, 1, and
-    // 2. Pre-extrapolation looped knots would have negative indices and
-    // post-extrapolation knots would have indices greater than 2.
-    //
-    // Note, however, that we treat index 0 as if it were a pre-extrapolation
-    // knot and 2 as if it were a post-extrapolation knot if looping being used.
-    // This is because those knots are the beginning or end of loops and need
-    // to be generated by combining the data from 2 knots.
-    ptrdiff_t knotIndex = std::distance(_unrolledKnots.begin(), beginIt)
-                          + iteration * loopSize;
-
-    Ts_TypedKnotData<T> knot;
-    do
-    {
-        // Are we looping, oscillating, or repeating?
-        const bool looping = extrap &&
-                             extrap->IsLooping();
-        const bool oscillating = extrap &&
-                                 (extrap->mode == TsExtrapLoopOscillate);
-        const bool repeating = extrap &&
-                               (extrap->mode == TsExtrapLoopRepeat);
-
-        // Do we go forward in time every other loop, or every loop?
-        const int forwardFrequency = (oscillating ? 2 : 1);
-
-        // The amount by which the value changes every loop. It only changes if
-        // the mode is TsExtrapLoopRepeat. "Reset" and "oscillate" modes have no
-        // value change between iterations.
-        const double valueDelta = (repeating
-                                   ? (_unrolledKnots.back().GetValue(typedData) -
-                                      _unrolledKnots.front().GetValue(typedData))
-                                   : 0.0);
-    
-        iteration = (looping
-                     ? ptrdiff_t(std::floor(knotIndex / double(loopSize)))
-                     : 0);
-
-        ptrdiff_t loopIndex = knotIndex;
-        if (looping) {
-            // knotIndex % loopSize will return negative numbers if knotIndex is
-            // negative, so compute it from the knotIndex and iteration instead
-            // to ensure it is in the range [0..loopSize].
-            loopIndex = knotIndex - iteration * loopSize;
-        }
-
-        const bool reversed = ((iteration % forwardFrequency) != 0);
-
-        if (reversed) {
-            // Handle reverse oscillation. For this iteration we're iterating
-            // from the last knot toward 0.
-            const ptrdiff_t revLoopIndex = loopSize - loopIndex;
-            const _UnrolledKnot& uKnot = _unrolledKnots[revLoopIndex];
-            knot = uKnot.GetKnotData(typedData);
-
-            // Adjust the time
-            knot.time = _firstTime + _lastTime - uKnot.GetTime(typedData)
-                        + timeDelta * iteration;
-
-            // Since we're reversed, we're clearly oscillating and valueDelta
-            // must be 0.0, so don't bother adding it in.
-            knot.value = uKnot.GetValue(typedData);
-
-            // In order to preserve the shape of the spline we have to:
-            //   * swap the value and preValue.
-            //   * swap the preTanWidth and postTanWidth
-            //   * swap the preTanSlope and postTanSlope and negate them
-            //   * handle held interpolation by copying the value from the other
-            //     end of the segment.
-            //   * move the interpolation flag from the other end of the segment
-
-            using std::swap;   // enable ADL for swap
-            if (knot.dualValued) {
-                knot.preValue = uKnot.GetPreValue(typedData);
-                swap(knot.preValue, knot.value);
-            } else {
-                knot.preValue = knot.value;
-            }
-
-            swap(knot.preTanWidth, knot.postTanWidth);
-            swap(knot.preTanSlope, knot.postTanSlope);
-            knot.preTanSlope *= -1;
-            knot.postTanSlope *= -1;
-
-            // Get the knot at the other end of the segment
-            const _UnrolledKnot& otherUKnot = _unrolledKnots[revLoopIndex - 1];
-            const Ts_TypedKnotData<T>& otherKnot =
-                otherUKnot.GetKnotData(typedData);
-
-            if (otherKnot.nextInterp == TsInterpHeld) {
-                // The held interpolation on otherKnot created a discontinuity
-                // at knot. Make it dualValued and copy in the correct value to
-                // preserve the held segment unchanged.
-                knot.dualValued = true;
-                knot.value = otherUKnot.GetValue(typedData);
-            }
-
-            // Make sure the segment interpolates the same way.
-            knot.nextInterp = otherKnot.nextInterp;
-
-            // If this is the first knot in this iteration we need to hybridize
-            // it with the last knot in the previous iteration.
-            if (loopIndex == 0) {
-                // This knot is the point where the oscillation reverses
-                // direction. The spline arrives at the left side of this knot
-                // (in normal time direction) and departs from a copy of pre
-                // side moving reversed in time.
-
-                // There are never discontinuities at the reflection point
-                knot.dualValued = false;
-
-                // The pre-tangent is an inverted version of the post-tangent
-                knot.preTanSlope = -knot.postTanSlope;
-                knot.preTanWidth = knot.postTanWidth;
-
-                // Reset the tangent algorithms since baking out the loops
-                // would change algorithm results
-                knot.preTanAlgorithm = TsTangentAlgorithmNone;
-                knot.postTanAlgorithm = TsTangentAlgorithmNone;
-            }
-        } else {
-            // Not reversed
-            const _UnrolledKnot& uKnot = _unrolledKnots[loopIndex];
-            knot = uKnot.GetKnotData(typedData);
-
-            // Adjust the time
-            knot.time = uKnot.GetTime(typedData) + timeDelta * iteration;
-            knot.value = uKnot.GetValue(typedData) + valueDelta * iteration;
-
-            if (looping && loopIndex == 0) {
-                // Hybridize the knot. This iteration is moving forward in time
-                // which makes dealing with interpolation and dual valued knots
-                // much easier, but the previous iteration may be time reversed.
-
-                if (oscillating) {
-                    // We're oscillating. Hybridize the knot with itself. So it
-                    // is never dual valued and we negate the incoming tangent
-                    // slope.
-                    knot.dualValued = false;
-                    knot.preTanSlope *= -knot.postTanSlope;
-                    knot.preTanWidth = knot.postTanWidth;
-                } else {
-                    // We're looping with repeat or reset. Dual valued knots are
-                    // preserved (from the pre side) and time proceeds into the
-                    // future.
-
-                    // The the knot data for the pre side.
-                    const _UnrolledKnot& preUKnot = _unrolledKnots[loopSize];
-                    const Ts_TypedKnotData<T>& preKnot =
-                        preUKnot.GetKnotData(typedData);
-
-                    knot.preValue = preUKnot.GetPreValue(typedData)
-                                    + valueDelta * (iteration - 1);
-                    knot.dualValued = preKnot.dualValued
-                                      || extrap->mode == TsExtrapLoopReset;
-                                  
-                    knot.preTanWidth = preKnot.preTanWidth;
-                    knot.preTanSlope = preKnot.preTanSlope;
-                }
-
-                knot.preTanAlgorithm = TsTangentAlgorithmNone;
-                knot.postTanAlgorithm = TsTangentAlgorithmNone;
-            }
-        }
-
-        bakedData->PushKnot(&knot, VtDictionary());
-
-        ++knotIndex;
-
-        // Make sure we're pointing at the right extrapolation parameters
-        if (knotIndex >= loopSize) {
-            extrap = postExtrapPtr;
-        } else if (knotIndex <= 0) {
-            extrap = preExtrapPtr;
-        } else {
-            extrap = nullptr;
-        }
-
-        // If we're not looping and we've exhausted the regular knots, stop.
-        if (!looping && knotIndex > loopSize) {
-            break;
-        }
-
-        // Otherwise, continue until we've stored a knot at a time >= the
-        // max time of the interval.
-    } while (knot.time < interval.GetMax());
-}
-
-bool
-_Sampler::Bake(Ts_SplineData* bakedData)
-{
-    // This should have already been handled.
-    if (_unrolledKnots.empty()) {
-        TF_CODING_ERROR("_Sampler::Bake invoked with an empty spline."
-                        " Please report a bug.");
-        return false;
-    }
-
-    // If we're including extrapolation loops, bake the caller provided
-    // time interval. But if we're only baking inner loops, then bake
-    // the whole inner loop time interval.
-    const GfInterval bakeInterval = _includeExtrapLoops
-                                    ? _timeInterval
-                                    : GfInterval(_firstTime, _lastTime);
-
-    const TsExtrapolation* preExtrapPtr =
-        (bakeInterval.GetMin() <= _firstTime
-         ? &_data->preExtrapolation
-         : nullptr);
-    const TsExtrapolation* postExtrapPtr =
-        (bakeInterval.GetMax() >= _lastTime
-         ? &_data->postExtrapolation
-         : nullptr);
-
-#define _MAKE_CLAUSE(unused, tuple)                                     \
-    if (_data->GetValueType() == Ts_GetType<TS_SPLINE_VALUE_CPP_TYPE(tuple)>()) \
-    {                                                                   \
-        using T = TS_SPLINE_VALUE_CPP_TYPE(tuple);                      \
-        const Ts_TypedSplineData<T>* typedData =                        \
-            dynamic_cast<const Ts_TypedSplineData<T>*>(_data);          \
-        Ts_TypedSplineData<T>* typedBakedData =                         \
-            dynamic_cast<Ts_TypedSplineData<T>*>(bakedData);            \
-                                                                        \
-        _BakeTypedKnots(typedData, bakeInterval,                        \
-                        preExtrapPtr, postExtrapPtr,                    \
-                        typedBakedData);                                \
-        return true;                                                    \
-    }
-
-    TF_PP_SEQ_FOR_EACH(_MAKE_CLAUSE, ~, TS_SPLINE_SUPPORTED_VALUE_TYPES);
-
-    TF_CODING_ERROR("Unsupported spline value type in _Sampler::Bake: %s",
-                    _data->GetValueType().GetTypeName().c_str());
-    
-    return false;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // SAMPLE ENTRY POINT
 
@@ -1742,10 +1464,13 @@ Ts_SplineData* Ts_Bake(
         return nullptr;
     }
 
+    if (timeInterval.IsEmpty()) {
+        return nullptr;
+    }
+
     // Populate baked data with an empty spline data of the right type. Copy the
     // looping and other parameters from data.
     bakedData = Ts_SplineData::Create(data->GetValueType(), data);
-
     if (data->times.empty()) {
         // Nothing to bake, just reset the inner loop params. Baked data no
         // longer has inner loops.
@@ -1753,11 +1478,66 @@ Ts_SplineData* Ts_Bake(
         return bakedData;
     }
 
-    // Construct a sampler for baking.
-    _Sampler sampler(data, timeInterval, includeExtrapLoops, bakedData);
+    // Truncate time interval to the knot span if we don't want to iterate
+    // extrap loops.
+    GfInterval inputInterval = timeInterval;
+    if (!includeExtrapLoops) {
+        GfInterval knotSpan = GfInterval(data->times.front(),
+                                         data->times.back());
+        if (data->HasInnerLoops()) {
+            knotSpan |= data->loopParams.GetLoopedInterval();
+        }
+        inputInterval &= knotSpan;
+    }
 
-    // Bake it
-    sampler.Bake(bakedData);
+    // Bake -- create the iterator.
+    Ts_SegmentIterator it(data, inputInterval);
+    TF_VERIFY(!it.AtEnd(), "Ts_SegmentIterator should not be AtEnd() given a "
+                           " valid interval and non-empty spline.");
+
+    // Step the iterator back if possible to get information about the pre-side
+    // of the first knot.
+    Ts_Segment segment = *it;
+    if (segment.p0[0] != -inf) {
+        const bool success = it.StepBackward();
+        TF_VERIFY(success,
+                  "Ts_SegmentIterator should be able to step backward "
+                  "when the current segment's start time is not -inf.");
+        segment = *it;
+    }
+    Ts_TypedKnotData<double> d;
+    _SetKnotDataPreValues(segment, d);
+
+    // Go back to the original start segment of the iterator, or the
+    // second segment if the original segment started at time -inf.
+    if (segment.p1[0] != +inf) {
+        bool success = it.StepForward();
+        TF_VERIFY(success,
+                  "Ts_SegmentIterator should be able to step forward "
+                  "when the current segment's end time is not +inf");
+    }
+
+    while (!it.AtEnd()) {
+        segment = *it;
+        _SetKnotDataValues(segment, d);
+
+        bakedData->SetKnotFromDouble(&d, VtDictionary());
+        d = Ts_TypedKnotData<double>();
+
+        _SetKnotDataPreValues(segment, d);
+        ++it;
+    }
+
+    // Step the iterator forward if possible to get information about the
+    // post-side of the last knot.
+    if (segment.p1[0] != +inf) {
+        bool success = it.StepForward();
+        TF_VERIFY(success,
+                  "Ts_SegmentIterator should be able to step forward "
+                  "when the current segment's end time is not +inf");
+        _SetKnotDataValues(segment, d);
+        bakedData->SetKnotFromDouble(&d, VtDictionary());
+    }
 
     // reset the inner loop params. Baked data no longer has inner loops.
     bakedData->loopParams = TsLoopParams();

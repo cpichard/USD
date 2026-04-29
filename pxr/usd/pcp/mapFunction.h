@@ -66,11 +66,10 @@ class PcpMapFunction
 public:
     /// A mapping from path to path.
     typedef std::map<SdfPath, SdfPath, SdfPath::FastLessThan> PathMap;
-    typedef std::pair<SdfPath, SdfPath> PathPair;
-    typedef std::vector<PathPair> PathPairVector;
 
     /// Construct a null function.
-    PcpMapFunction() = default;
+    PCP_API
+    PcpMapFunction();
 
     /// Constructs a map function with the given arguments.
     /// Returns a null map function on error (see IsNull()).
@@ -132,7 +131,8 @@ public:
 
     /// Return true if the map function maps the absolute root path to the
     /// absolute root path, false otherwise.
-    bool HasRootIdentity() const { return _data.hasRootIdentity; }
+    PCP_API
+    bool HasRootIdentity() const;
 
     /// Map a path in the source namespace to the target.
     /// If the path is not in the domain, returns an empty path.
@@ -225,14 +225,17 @@ public:
     size_t Hash() const;
 
 private:
+    struct _Mappings;
 
-    PCP_API
-    PcpMapFunction(PathPair const *sourceToTargetBegin,
-                   PathPair const *sourceToTargetEnd,
-                   SdfLayerOffset offset,
-                   bool hasRootIdentity);
+    PcpMapFunction(
+        std::shared_ptr<_Mappings>&& mappings,
+        SdfLayerOffset offset);
 
-    PCP_API
+    SdfPath
+    _MapPathImpl(
+        bool invert,
+        const SdfPath& path) const;
+
     SdfPathExpression
     _MapPathExpressionImpl(
         bool invert,
@@ -244,126 +247,14 @@ private:
 private:
     friend PcpMapFunction *Pcp_MakeIdentity();
 
-    static const int _MaxLocalPairs = 2;
-    struct _Data final {
-        _Data() {};
-
-        _Data(PathPair const *begin, PathPair const *end, bool hasRootIdentity)
-            : numPairs(end-begin)
-            , hasRootIdentity(hasRootIdentity) {
-            if (numPairs == 0)
-                return;
-            if (numPairs <= _MaxLocalPairs) {
-                std::uninitialized_copy(begin, end, localPairs);
-            }
-            else {
-                new (&remotePairs) std::shared_ptr<PathPair>(
-                    new PathPair[numPairs], std::default_delete<PathPair[]>());
-                std::copy(begin, end, remotePairs.get());
-            }
-        }
-        
-        _Data(_Data const &other)
-            : numPairs(other.numPairs)
-            , hasRootIdentity(other.hasRootIdentity) {
-            if (numPairs <= _MaxLocalPairs) {
-                std::uninitialized_copy(
-                    other.localPairs,
-                    other.localPairs + other.numPairs, localPairs);
-            }
-            else {
-                new (&remotePairs) std::shared_ptr<PathPair>(other.remotePairs);
-            }
-        }
-        _Data(_Data &&other)
-            : numPairs(other.numPairs)
-            , hasRootIdentity(other.hasRootIdentity) {
-            if (numPairs <= _MaxLocalPairs) {
-                PathPair *dst = localPairs;
-                PathPair *src = other.localPairs;
-                PathPair *srcEnd = other.localPairs + other.numPairs;
-                for (; src != srcEnd; ++src, ++dst) {
-                    ::new (static_cast<void*>(std::addressof(*dst)))
-                        PathPair(std::move(*src));
-                }
-            }
-            else {
-                new (&remotePairs)
-                    std::shared_ptr<PathPair>(std::move(other.remotePairs));
-            }
-        }
-        _Data &operator=(_Data const &other) {
-            if (this != &other) {
-                this->~_Data();
-                new (this) _Data(other);
-            }
-            return *this;
-        }
-        _Data &operator=(_Data &&other) {
-            if (this != &other) {
-                this->~_Data();
-                new (this) _Data(std::move(other));
-            }
-            return *this;
-        }
-        ~_Data() {
-            if (numPairs <= _MaxLocalPairs) {
-                for (PathPair *p = localPairs; numPairs--; ++p) {
-                    p->~PathPair();
-                }
-            }
-            else {
-                remotePairs.~shared_ptr<PathPair>();
-            }
-        }
-
-        bool IsNull() const {
-            return numPairs == 0 && !hasRootIdentity;
-        }
-
-        PathPair const *begin() const {
-            return numPairs <= _MaxLocalPairs ? localPairs : remotePairs.get();
-        }
-
-        PathPair const *end() const {
-            return begin() + numPairs;
-        }
-
-        bool operator==(_Data const &other) const {
-            return numPairs == other.numPairs &&
-                hasRootIdentity == other.hasRootIdentity &&
-                std::equal(begin(), end(), other.begin());
-        }
-
-        bool operator!=(_Data const &other) const {
-            return !(*this == other);
-        }
-
-        template <class HashState>
-        friend void TfHashAppend(HashState &h, _Data const &data){
-            h.Append(data.hasRootIdentity);
-            h.Append(data.numPairs);
-            h.AppendRange(std::begin(data), std::end(data));
-        }
-
-        union {
-            PathPair localPairs[_MaxLocalPairs > 0 ? _MaxLocalPairs : 1];
-            std::shared_ptr<PathPair> remotePairs;
-        };
-        typedef int PairCount;
-        PairCount numPairs = 0;
-        bool hasRootIdentity = false;
-    };
-
     // Specialize TfHashAppend for PcpMapFunction.
     template <typename HashState>
     friend inline
     void TfHashAppend(HashState& h, const PcpMapFunction& x){
-        h.Append(x._data);
-        h.Append(x._offset);
+        h.Append(x.Hash());
     }
 
-    _Data _data;
+    std::shared_ptr<_Mappings> _mappings;
     SdfLayerOffset _offset;
 };
 

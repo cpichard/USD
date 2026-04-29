@@ -43,17 +43,6 @@ categories:
   
   - \c tsTest_TsEvaluator (h, cpp, wrap): backend for the Ts library.
   
-  - \c tsTest_MayapyEvaluator (py): backend for the `mayapy` interpreter.
-    Produces evaluations using Autodesk Maya.  Built optionally, and requires a
-    working installation of Maya.
-    
-    - \c tsTest_MayapyDriver (py): helper for `tsTest_MayapyEvaluator`.  A
-      script that runs inside `mayapy`.
-      
-  - \c tsTest_AnimXEvaluator (h, cpp, wrap): backend for the AnimX library, an
-    open-source Autodesk project that emulates Maya evaluation.  Built
-    optionally, and requires a working installation of AnimX.
-  
 - <b>Single-Backend Tests.</b>  CTest cases that call into one backend to
   validate behavior.
   
@@ -62,8 +51,5 @@ categories:
   
 - <b>Comparison Tests.</b>  CTest cases that call into two backends to compare
   their behavior with identical spline inputs.
-
-  - Tests in \c testenv that start with \c tsTest and include \c Vs.  For
-    example, \c tsTest_MayapyVsAnimX.
 
 */

@@ -8,7 +8,7 @@
 
 from pxr import Ar
 from pxr import Usd
-from pxr import UsdGeom, UsdRender
+from pxr import UsdGeom, UsdRender, UsdHydra
 from pxr import Sdf
 from pxr import UsdUtils, UsdAppUtils
 from pxr import Tf
@@ -349,8 +349,19 @@ def main() -> int:
         # the output image. We just pass it along for cleanliness.
         glWidget = _SetupOpenGLContext(args.imageWidth, args.imageWidth)
 
+    # Determine Hydra renderer plugin to use. 
+    rendererName = ''
+    if args.rendererPlugin:
+        # Renderer plugin was specified on the command-line.
+        rendererName = args.rendererPlugin
+    elif args.rpPrimPath:
+        # Check render pass prim for a renderer plugin name.
+        renderPass = UsdRender.Pass(usdStage.GetPrimAtPath(args.rpPrimPath))
+        hydraAPI = UsdHydra.RenderPassAPI(renderPass)
+        if hydraAPI:
+            rendererName = hydraAPI.GetHydraRendererNameAttr().Get()
     rendererPluginId = UsdAppUtils.rendererArgs.GetPluginIdFromArgument(
-        args.rendererPlugin) or ''
+        rendererName) or ''
 
     # Initialize FrameRecorder 
     frameRecorder = UsdAppUtils.FrameRecorder(

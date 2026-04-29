@@ -30,6 +30,7 @@ pxr_library(usdImagingGL
         usdHydra
         usdShade
         usdImaging
+        usdExecImaging
         ar
 
     PUBLIC_CLASSES

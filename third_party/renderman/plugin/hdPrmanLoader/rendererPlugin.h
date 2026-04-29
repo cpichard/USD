@@ -51,6 +51,16 @@ public:
         std::string * reasonWhyNot = nullptr) const override;
 #endif
 
+#if HD_API_VERSION >= 90
+#if HD_API_VERSION >= 101
+    HDPRMANLOADER_API
+    HdContainerDataSourceHandle GetSceneIndexCreateArgs() const override;
+#else
+    HDPRMANLOADER_API
+    HdContainerDataSourceHandle GetSceneIndexInputArgs() const override;
+#endif
+#endif
+
 protected:
 
     HDPRMANLOADER_API

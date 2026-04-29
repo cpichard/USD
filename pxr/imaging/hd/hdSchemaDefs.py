@@ -1574,13 +1574,13 @@
     ),
 
     #--------------------------------------------------------------------------
-    # sceneIndexInputArgsSchema
+    # sceneIndexCreateArgsSchema
     dict(
-        SCHEMA_NAME = 'SceneIndexInputArgs',
+        SCHEMA_NAME = 'SceneIndexCreateArgs',
         DOC = '''Schema for the container data source returned by
-        HdRendererPlugin::GetSceneIndexInputArgs. The application forwards it (possibly
+        HdRendererPlugin::GetSceneIndexCreateArgs. The application forwards it (possibly
         overlayed with its own container data source) to the scene index constructors
-        or scene index plugins. In other words, HdRendererPlugin::GetSceneIndexInputArgs
+        or scene index plugins. In other words, HdRendererPlugin::GetSceneIndexCreateArgs
         gives a renderer the opportunity to configure scene indices.
 
         Examples are: A scene index might use execution which is non-lazy and needs to

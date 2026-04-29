@@ -13,9 +13,10 @@
 /// which are the basis for invertible rigging.
 ///
 /// Controllers define forward computations that take the values of input
-/// attributes and produce output values. Controllers also define inverse
-/// computations that take desired values for outputs and produce the input
-/// values necessary for the forward computation to produce the desired results.
+/// attributes and produce values for output attributes. Controllers also define
+/// inverse computations that take desired values for invertible output
+/// attributes and produce values for invertible input attributs that are
+/// necessary for the forward computation to produce the desired results.
 ///
 
 #include "pxr/pxr.h"
@@ -23,9 +24,11 @@
 #include "pxr/exec/execIr/tokens.h"
 #include "pxr/exec/execIr/types.h"
 
+#include "pxr/base/tf/token.h"
 #include "pxr/exec/exec/builtinComputations.h"
 #include "pxr/exec/exec/computationBuilders.h"
 #include "pxr/exec/vdf/executionTypeRegistry.h"
+#include "pxr/exec/vdf/readIteratorRange.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -39,14 +42,16 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// register controller atributes as inputs, outputs, switches, etc. (see the
 /// documentation on the corresonding registration methods for details). These
 /// registrations, in turn, generate the computation inputs for the callbacks
-/// (as documented in the class function documentation), as well as other
+/// (as documented in the member function documentation), as well as other
 /// computations that are required to implement invertible controllers within
 /// OpenExec.
 ///
 /// # Example
 ///
 /// ```cpp
-/// 
+/// // A simple invertible controller where the forward compute takes an input
+/// // value and produces an output value that is one greater than the input.
+///
 /// // Forward declare forward and inverse functions.
 /// static ExecIrResult _ForwardCompute(const VdfContext &ctx);
 /// static ExecIrResult _InverseCompute(const VdfContext &ctx);
@@ -126,6 +131,9 @@ public:
         Callback forwardCallback,
         Callback inverseCallback);
 
+    EXECIR_API
+    ~ExecIrControllerBuilder();
+
     /// Registers an invertible input attribute.
     ///
     /// - Invertible input attributes provide input to the forward computation.
@@ -184,14 +192,23 @@ public:
         const TfToken &attributeName);
 
 private:
-    // Returns a private token used to name constant inputs.
-    EXECIR_API
-    static const TfToken &_GetConstantInputName();
+    // Returns a pointer to the desired value provided by the
+    // 'explicitDesiredValue' and 'computedDesiredValue' inputs; otherwise,
+    // returns null.
+    //
+    // If more than one input value is provided, an error is emitted.
+    //
+    template <typename ValueType>
+    static const ValueType *
+    _GetExactlyOneDesiredValue(
+        const VdfContext &ctx);
 
 private:
     ExecComputationBuilder &_self;
     ExecPrimComputationBuilder _forwardComputeReg;
     ExecPrimComputationBuilder _inverseComputeReg;
+    TfTokenVector _invertibleOutputAttributeNames;
+    Callback _inverseCallback;
 };
 
 template <typename ValueType>
@@ -201,9 +218,93 @@ ExecIrControllerBuilder::InvertibleInputAttribute(
 {
     using namespace exec_registration;
 
-    // All input attributes (invertible or not) are inputs to the forward
-    // computation.
-    _forwardComputeReg.Inputs(AttributeValue<ValueType>(attributeName));
+    // Invertible input attributes define 'computeDesiredValue' computations
+    // that extract their values from the inverse computation.
+    //
+    // TODO: When we have core inversion support, this plugin computation will
+    // be registered using a builtin computation token that the core will
+    // provide, as a plugin point for plugins that provide inversion behavior.
+    _self.AttributeComputation(
+        attributeName, ExecIrComputationTokens->computeDesiredValue)
+        .Callback<ValueType>([attributeName](const VdfContext &ctx) {
+            const ExecIrResult &resultMap = ctx.GetInputValue<ExecIrResult>(
+                    ExecIrComputationTokens->inverseCompute);
+
+            // If the inverse computation computed a value for this attribute,
+            // return it; otherwise, set an empty result.
+            if (const auto it = resultMap.find(attributeName);
+                it != resultMap.end()) {
+                ctx.SetOutput(it->second.Get<ValueType>());
+            }
+            else {
+                ctx.SetEmptyOutput();
+            }
+        })
+        .Inputs(
+            Prim().Computation<ExecIrResult>(
+                ExecIrComputationTokens->inverseCompute));
+
+    // Invertible input attributes define 'computeInvertedForwardValue'
+    // computations that get their values from the inverse computation, but only
+    // if they are evaluated in a context where the inverse is being computed
+    // (i.e., when the inverse directly or transitively receives desired value
+    // overrides). Otherwise, this computation falls back to the computed value
+    // of the input attribute.
+    // 
+    // This allows for correct computation of inverses for "non-spanning"
+    // controllers. I.e., this is important in cases where controller inverses
+    // can't always satisfy all desired output values, and when one controller
+    // is dependent on another. In such situations, computing "inverted forward
+    // values" allows for controller networks to produce "best try" solutions.
+    _self.AttributeComputation(
+        attributeName, ExecIrComputationTokens->computeInvertedForwardValue)
+        .Callback(+[](const VdfContext &ctx) -> ValueType {
+            // If we have a computed desired value, that takes precedence.
+            if (const ValueType *const desiredValue =
+                ctx.GetInputValuePtr<ValueType>(
+                    ExecIrComputationTokens->computeDesiredValue)) {
+                return *desiredValue;
+            }
+
+            // Otherwise, return the attribute's computed value.
+            return ctx.GetInputValue<ValueType>(
+                ExecBuiltinComputations->computeValue);
+        })
+        .Inputs(
+            Computation<ValueType>(ExecIrComputationTokens->computeDesiredValue),
+            Computation<ValueType>(ExecBuiltinComputations->computeValue));
+
+    // Invertible input attributes provide inputs to the forward computation via
+    // the 'computeInvertedForwardValue' computation.
+    _forwardComputeReg.Inputs(
+        Attribute(attributeName)
+            .Computation<ValueType>(
+                ExecIrComputationTokens->computeInvertedForwardValue)
+            .InputName(attributeName));
+
+    // All input attributes (invertible or not) support dataflow across
+    // connections.
+    //
+    // TODO: This expression won't be needed when the OpenExec core defines
+    // default attribute connection dataflow behavior for all attributes.
+    _self.AttributeExpression(attributeName)
+        .Callback(+[](const VdfContext &ctx) -> ValueType {
+            // A value that flows across a connection takes precedence.
+            if (const ValueType *const connectedValuePtr =
+                ctx.GetInputValuePtr<ValueType>(
+                    ExecBuiltinComputations->computeValue)) {
+                return *connectedValuePtr;
+            }
+
+            // Otherwise, the attribute's resolved value is its computed value.
+            return ctx.GetInputValue<ValueType>(
+                ExecBuiltinComputations->computeResolvedValue);
+        })
+        .Inputs(
+            Connections<ValueType>(
+                ExecBuiltinComputations->computeValue),
+            Computation<ValueType>(
+                ExecBuiltinComputations->computeResolvedValue));
 }
 
 template <typename ValueType>
@@ -219,6 +320,30 @@ ExecIrControllerBuilder::NonInvertibleInputAttribute(
 
     // Non-invertible input attributes are inputs to the inverse computation.
     _inverseComputeReg.Inputs(AttributeValue<ValueType>(attributeName));
+
+    // All input attributes (invertible or not) support dataflow across
+    // connections.
+    //
+    // TODO: This expression won't be needed when the OpenExec core defines
+    // default attribute connection dataflow behavior for all attributes.
+    _self.AttributeExpression(attributeName)
+        .Callback(+[](const VdfContext &ctx) -> ValueType {
+            // A value that flows across a connection takes precedence.
+            if (const ValueType *const connectedValuePtr =
+                ctx.GetInputValuePtr<ValueType>(
+                    ExecBuiltinComputations->computeValue)) {
+                return *connectedValuePtr;
+            }
+
+            // Otherwise, the attribute's resolved value is its computed value.
+            return ctx.GetInputValue<ValueType>(
+                ExecBuiltinComputations->computeResolvedValue);
+        })
+        .Inputs(
+            Connections<ValueType>(
+                ExecBuiltinComputations->computeValue),
+            Computation<ValueType>(
+                ExecBuiltinComputations->computeResolvedValue));
 }
 
 template <typename ValueType>
@@ -228,42 +353,79 @@ ExecIrControllerBuilder::InvertibleOutputAttribute(
 {
     using namespace exec_registration;
 
-    // All outputs (invertible or not) are inputs to the inverse computation.
+    _invertibleOutputAttributeNames.push_back(attributeName);
+
+    // The 'explicitDesiredValue' computation only exists to provide an output
+    // where desired values can be specified as overrides passed to
+    // ComputeWithOverrides.
     //
-    // TODO: We pull on the resolved value because otherwise, for invertible
-    // outputs, we get the computed value from the forward computation. But what
-    // we really want here is the "desired value," i.e., the value the inversion
-    // is trying to satisfy. For now, we use the authored value as the way the
-    // desired value is specified.
+    // TODO: This plugin computation won't be necessary when OpenExec provides
+    // core inversion support.
+    _self.AttributeComputation(
+        attributeName, ExecIrComputationTokens->explicitDesiredValue)
+        .Callback<ValueType>(+[](const VdfContext &ctx) {
+            ctx.SetEmptyOutput();
+        });
+
+    // The 'computeDesiredValue' computation gets its value from the
+    // 'explicitDesiredValue' computation if it provides one, or from the
+    // 'computeDesiredValue' computation via incoming connections--but only if
+    // there is exactly one desired value present on these inputs. Otherwise,
+    // no value is returned. An error is emitted if more than one desired value
+    // is present.
+    //
+    // TODO: This plugin computation won't be necessary when OpenExec provides
+    // core inversion support.
+    _self.AttributeComputation(
+        attributeName, ExecIrComputationTokens->computeDesiredValue)
+        .Callback<ValueType>(+[](const VdfContext &ctx) {
+            if (const ValueType *const valuePtr =
+                _GetExactlyOneDesiredValue<ValueType>(ctx)) {
+                ctx.SetOutput(*valuePtr);
+            } else {
+                ctx.SetEmptyOutput();
+            }
+        })
+        .Inputs(
+            Computation<ValueType>(
+                ExecIrComputationTokens->explicitDesiredValue),
+            IncomingConnections<ValueType>(
+                ExecIrComputationTokens->computeDesiredValue));
+
+    // Invertible outputs provide inputs to the inverse computation, getting
+    // their values from the attribute's 'computeDesiredValue' computation.
     _inverseComputeReg.Inputs(
         Attribute(attributeName)
-        .Computation<ValueType>(ExecBuiltinComputations->computeResolvedValue)
-        .InputName(attributeName));
+            .Computation<ValueType>(
+                ExecIrComputationTokens->computeDesiredValue)
+            .InputName(attributeName));
 
     // Register an expression on the invertible output that pulls its value
     // from the forward computation result map.
     _self.AttributeExpression(attributeName)
-        .Callback(+[](const VdfContext &ctx) -> ValueType {
-            const TfToken &attributeName =
-                ctx.GetInputValue<TfToken>(_GetConstantInputName());
+        .Callback<ValueType>([attributeName](const VdfContext &ctx) {
             const ExecIrResult &resultMap =
-                ctx.GetInputValue<ExecIrResult>(ExecIrTokens->forwardCompute);
+                ctx.GetInputValue<ExecIrResult>(
+                    ExecIrComputationTokens->forwardCompute);
             const auto it = resultMap.find(attributeName);
             if (it != resultMap.end()) {
-                return it->second.Get<ValueType>();
+                ctx.SetOutput(it->second.Get<ValueType>());
             }
+            else {
+                TF_CODING_ERROR(
+                    "Failed to find a result value for output attribute '%s' "
+                    "when computing %s",
+                    attributeName.GetText(),
+                    ctx.GetNodeDebugName().c_str());
 
-            TF_CODING_ERROR(
-                "Failed to find a result value for output attribute '%s' "
-                "when computing %s",
-                attributeName.GetText(),
-                ctx.GetNodeDebugName().c_str());
-            return VdfExecutionTypeRegistry::GetInstance()
-                .GetFallback<ValueType>();
+                ctx.SetOutput(
+                    VdfExecutionTypeRegistry::GetInstance()
+                        .GetFallback<ValueType>());
+            }
         })
         .Inputs(
-            Prim().Computation<ExecIrResult>(ExecIrTokens->forwardCompute),
-            Constant(attributeName).InputName(_GetConstantInputName()));
+            Prim().Computation<ExecIrResult>(
+                ExecIrComputationTokens->forwardCompute));
 }
 
 template <typename ValueType>
@@ -289,6 +451,33 @@ ExecIrControllerBuilder::PassthroughAttribute(
     // computations.
     _forwardComputeReg.Inputs(AttributeValue<ValueType>(attributeName));
     _inverseComputeReg.Inputs(AttributeValue<ValueType>(attributeName));
+}
+
+template <typename ValueType>
+const ValueType *
+ExecIrControllerBuilder::_GetExactlyOneDesiredValue(
+    const VdfContext &ctx)
+{
+    const ValueType *foundInputValue = 
+        ctx.GetInputValuePtr<ValueType>(
+            ExecIrComputationTokens->explicitDesiredValue);
+
+    for (const ValueType &value :
+             VdfReadIteratorRange<ValueType>(
+                 ctx, ExecIrComputationTokens->computeDesiredValue)) {
+        if (!foundInputValue) {
+            foundInputValue = &value;
+        } else {
+            // TODO: We will introduce an ExecValidationErrorType enum to
+            // specifically identifiy this error condition.
+            TF_RUNTIME_ERROR(
+                "Found more than one desired value for node %s",
+                ctx.GetNodeDebugName().c_str());
+            return nullptr;
+        }
+    }
+
+    return foundInputValue;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -582,13 +582,15 @@ UsdUtils_LocalizationContext::_ValueTypeIsRelevant(
             val.IsHolding<VtDictionary>();
 }
 
-struct UsdUtils_ExtractExternalReferencesClient {
+class UsdUtils_ExtractExternalReferencesClient :
+    public UsdUtils_ReadOnlyLocalizationClient 
+{
+protected:
     UsdUtilsDependencyInfo 
-    Process (
+    _ProcessDependency (
         const SdfLayerRefPtr &, 
         const UsdUtilsDependencyInfo &depInfo,
-        UsdUtils_DependencyType dependencyType
-    )
+        UsdUtils_DependencyType dependencyType) override
     {
         if (depInfo.GetDependencies().empty()) {
             PlaceAsset(depInfo.GetAssetPath(), dependencyType);
@@ -602,6 +604,7 @@ struct UsdUtils_ExtractExternalReferencesClient {
         return {};
     }
 
+private:
     void PlaceAsset(
         const std::string &dependency, 
         UsdUtils_DependencyType dependencyType)
@@ -620,6 +623,7 @@ struct UsdUtils_ExtractExternalReferencesClient {
         }
     }
 
+public:
     void SortAndRemoveDuplicates() {
         std::sort(sublayers.begin(), sublayers.end());
         sublayers.erase(std::unique(sublayers.begin(), sublayers.end()),
@@ -648,11 +652,7 @@ void UsdUtils_ExtractExternalReferences(
     TRACE_FUNCTION();
 
     UsdUtils_ExtractExternalReferencesClient client;
-    UsdUtils_ReadOnlyLocalizationDelegate delegate(
-        std::bind(&UsdUtils_ExtractExternalReferencesClient::Process, &client,
-        std::placeholders::_1, std::placeholders::_2, 
-        std::placeholders::_3));
-    UsdUtils_LocalizationContext context(&delegate);
+    UsdUtils_LocalizationContext context(&client);
     context.SetRefTypesToInclude(refTypesToInclude);
     context.SetRecurseLayerDependencies(false);
     context.SetResolveUdimPaths(params.GetResolveUdimPaths());

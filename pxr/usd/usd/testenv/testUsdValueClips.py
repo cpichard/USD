@@ -1144,6 +1144,33 @@ class TestUsdValueClips(unittest.TestCase):
         self.assertEqual(attr.GetTimeSamplesInInterval(Gf.Interval(0, 3)), 
                          [1.0, 2.0, 3.0])
 
+    def test_MultipleClipsWithTimesSpanningClipsWithDifferentTypes(self):
+        """Tests that clip time mappings that span multiple clips with different
+           attribute types specified in various clips work as expected"""
+        stage = Usd.Stage.Open('multiclip/root.usda')
+
+        model = stage.GetPrimAtPath(
+            '/ModelWithTimesSpanningClipsWithDifferentTypes')
+        attr = model.GetAttribute('size')
+
+        # The clip time mappings specified for this prim span a time range
+        # where two different clips are active. For a given stage time, the
+        # corresponding clip time should be determined from the mapping first,
+        # independent of what clip is active. The active clip should then be
+        # consulted at that clip time to retrieve the final value. The type of
+        # the attribute from the active clip should be respected as well.
+        self.CheckValue(attr, time=1, expected=100.0)
+        self.CheckValue(attr, time=1.5, expected=150.5)
+        self.CheckValue(attr, time=2, expected=201.0)
+        self.CheckValue(attr, time=2.5, expected=201.0)
+        self.CheckValue(attr, time=3, expected="three")
+        self.CheckValue(attr, time=3.5, expected="three")
+        self.CheckValue(attr, time=4, expected="four")
+
+        self.assertEqual(attr.GetTimeSamples(), [1.0, 2.0, 3.0, 4.0])
+        self.assertEqual(attr.GetTimeSamplesInInterval(Gf.Interval(0, 3)), 
+                         [1.0, 2.0, 3.0])
+
     def test_MultipleClipsWithTimesSpanningClips2(self):
         """Another test similar to test_MultipleClipsWithTimesSpanningClips"""
         stage = Usd.Stage.Open('multiclip/root.usda')

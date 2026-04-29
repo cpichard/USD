@@ -24,6 +24,7 @@ pxr_library(execIr
 
     CPPFILES
         fkController.cpp
+        transformable.cpp
 
     RESOURCE_FILES
         plugInfo.json
@@ -71,5 +72,23 @@ pxr_build_test(testExecIrFkController
 
 pxr_register_test(testExecIrFkController
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecIrFkController"
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_build_test(testExecIrJointScope
+    LIBRARIES
+        exec
+        execIr
+        execUsd
+        gf
+        sdf
+        tf
+        usd
+    CPPFILES
+        testenv/testExecIrJointScope.cpp
+)
+
+pxr_register_test(testExecIrJointScope
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecIrJointScope"
     EXPECTED_RETURN_CODE 0
 )

@@ -103,7 +103,16 @@ TfDiagnosticTrap::GetStatuses() const
 TfDiagnosticTransport
 TfDiagnosticTrap::Transport()
 {
-    TfDiagnosticTransport transport { std::move(_container) };
+    TfDiagnosticTransport transport;
+    if (IsClean()) {
+        return transport;
+    }
+    TfDiagnosticMgr::_LogTextPin pin =
+        TfDiagnosticMgr::GetInstance()._PinDiagnosticsLogText(_container);
+    transport = TfDiagnosticTransport {
+        std::move(_container),
+        std::move(pin)
+    };
     _container.Clear();
     _OnContentsChanged();
     return transport;
@@ -112,7 +121,7 @@ TfDiagnosticTrap::Transport()
 void
 TfDiagnosticTrap::_OnContentsChanged() const
 {
-    TfDiagnosticMgr::GetInstance()._RebuildTrappedDiagnosticsLogText();
+    TfDiagnosticMgr::GetInstance()._RebuildTrappedDiagnosticsLogText(_logStart);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -123,6 +123,24 @@ public:
     TS_API
     Ts_SegmentPrototypeIterator& operator ++();
 
+    /// Steps the iterator forward or backward regardless of the given
+    /// interval, and returns true if the action was successful, false
+    /// otherwise.
+    ///
+    /// Note that StepForward steps in the same direction as operator++.
+    /// StepBackward steps in the opposite direction.
+    ///
+    /// Stepping is unsuccessful if:
+    /// - The current segment has a prototype region start or end knot and
+    ///   the step direction is towards that boundary knot.
+    /// - The interval provided at iterator initialization time is empty.
+    /// {@
+    TS_API
+    bool StepForward();
+    TS_API
+    bool StepBackward();
+    /// @}
+
 private:
     /// Update the segment after the iterators change.
     void _UpdateSegment();
@@ -182,6 +200,23 @@ public:
     TS_API
     Ts_SegmentLoopIterator& operator ++();
 
+    /// Steps the iterator forward or backward regardless of the given
+    /// interval, and returns true if the action was successful, false
+    /// otherwise.
+    ///
+    /// Note that StepForward steps in the same direction as operator++.
+    /// StepBackward steps in the opposite direction.
+    ///
+    /// Stepping is unsuccessful if:
+    /// - The current segment has a looped region start or end knot and
+    ///   the step direction is towards that boundary knot.
+    /// - The interval provided at iterator initialization time is empty.
+    TS_API
+    bool StepForward();
+    TS_API
+    bool StepBackward();
+    /// @}
+
 private:
     /// Update the segment after the iterators change.
     void _UpdateSegment();
@@ -204,6 +239,8 @@ private:
 
     bool _reversed = false;
     bool _atEnd = true;
+    bool _steppingBackward = false;
+    bool _initializedPrototypeItBackward = false;
 };
 
 /// \brief Iterate over all the region of the spline that is defined by knots
@@ -248,6 +285,23 @@ public:
     TS_API
     Ts_SegmentKnotIterator& operator ++();
 
+    /// Steps the iterator forward or backward regardless of the given
+    /// interval, and returns true if the action was successful, false
+    /// otherwise.
+    ///
+    /// Note that StepForward steps in the same direction as operator++.
+    /// StepBackward steps in the opposite direction.
+    ///
+    /// Stepping is unsuccessful if:
+    /// - The current segment has a spline start or end knot and the step
+    ///   direction is towards that boundary knot.
+    /// - The interval provided at iterator initialization time is empty.
+    TS_API
+    bool StepForward();
+    TS_API
+    bool StepBackward();
+    /// @}
+
 private:
     /// Update the segment after the iterators change.
     void _UpdateSegment();
@@ -259,7 +313,11 @@ private:
 
     Ts_Segment _segment;
 
-    // Which section of the knots are we iterating over
+    // Which section of the knots are we iterating over.
+    // PreInnerLooping: Covers the time region preceding inner looping.
+    // PostInnerLooping: Covers the time region following inner looping.
+    //     This is the section for all knots if there is no
+    //     inner looping.
     enum KnotSection {
         PreInnerLooping,
         InnerLooping,
@@ -271,6 +329,8 @@ private:
     bool _reversed = false;
     bool _atEnd = true;
     bool _hasInnerLoops = false;
+    bool _steppingBackward = false;
+    bool _initializedLoopItBackward = false;
     decltype(_data->times.begin()) _timesIt;
 
     GfInterval _loopedInterval;
@@ -318,6 +378,26 @@ public:
     TS_API
     Ts_SegmentIterator& operator ++();
 
+    /// Steps the iterator forward or backward regardless of the given
+    /// interval, and returns true if the action was successful, false
+    /// otherwise.
+    ///
+    /// Note that StepForward steps in the same direction as operator++.
+    /// StepBackward steps in the opposite direction.
+    ///
+    /// Stepping is unsuccessful if:
+    /// - StepForward is invoked when the current segment has upper bound
+    ///   time +inf
+    /// - StepForward is invoked when the current segment has lower bound
+    ///   time -inf
+    /// - The interval provided at iterator initialization time is empty.
+    /// {@
+    TS_API
+    bool StepForward();
+    TS_API
+    bool StepBackward();
+    /// @}
+
 private:
     /// Update _knotIt
     void _UpdateKnotIterator();
@@ -363,6 +443,7 @@ private:
     bool _postExtrapLooped = false;
     bool _oscillating = false;
     bool _reversing = false;
+    bool _initializedKnotItBackward = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

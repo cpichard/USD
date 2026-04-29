@@ -20,8 +20,8 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
-static ExecIrResult _Compute(const VdfContext &ctx);
-static ExecIrResult _Invert(const VdfContext &ctx);
+static ExecIrResult _Compute(const VdfContext &);
+static ExecIrResult _Invert(const VdfContext &);
 
 EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrFkController)
 {
@@ -76,11 +76,11 @@ _Compute(const VdfContext &ctx)
 static ExecIrResult
 _Invert(const VdfContext &ctx)
 {
-    const GfMatrix4d &posedSpace =
-        ctx.GetInputValue<GfMatrix4d>(ExecIrTokens->outSpaceToken);
-
     const GfMatrix4d startingSpace =
         ExecIr_UtilsComputeStandardStartingSpace(ctx);
+
+    const GfMatrix4d posedSpace =
+        ctx.GetInputValue<GfMatrix4d>(ExecIrTokens->outSpaceToken);
 
     const ExecIr_UtilsParams params = {
         startingSpace,

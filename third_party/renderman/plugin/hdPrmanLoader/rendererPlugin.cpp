@@ -13,11 +13,32 @@
 #include "pxr/base/tf/getenv.h"
 #include "pxr/base/tf/setenv.h"
 #include "pxr/base/tf/stringUtils.h"
+#if HD_API_VERSION >= 90
+#include "pxr/imaging/hd/renderDelegateInfo.h"
+#endif
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
+#if HD_API_VERSION >= 90
+#include "pxr/imaging/hd/retainedDataSource.h"
+#if HD_API_VERSION >= 101
+#include "pxr/imaging/hd/sceneIndexCreateArgsSchema.h"
+#else
+#include "pxr/imaging/hd/sceneIndexInputArgsSchema.h"
+#endif
+#endif
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PUBLIC_TOKENS(HdPrmanLoaderTokens, HDPRMAN_LOADER_TOKENS);
+
+TF_DEFINE_PRIVATE_TOKENS(
+    _tokens,
+    (ri)
+    (mtlx)
+    (OSL)
+    (RmanCpp)
+
+    ((outputsRi, "outputs:ri"))
+);
 
 typedef HdRenderDelegate* (*CreateDelegateFunc)(
     HdRenderSettingsMap const& settingsMap,
@@ -169,6 +190,86 @@ HdPrmanLoaderRendererPlugin::HdPrmanLoaderRendererPlugin()
 HdPrmanLoaderRendererPlugin::~HdPrmanLoaderRendererPlugin()
 {
 }
+
+#if HD_API_VERSION >= 90
+
+static
+HdRenderDelegateInfo
+_GetRenderDelegateInfo()
+{
+    HdRenderDelegateInfo info;
+
+    // Re-implemented from HdPrmanRenderDelegate::GetMaterialBindingPurpose()
+    info.materialBindingPurpose = HdTokens->full;
+
+    // Re-implemented from HdPrmanRenderDelegate::GetMaterialRenderContexts()
+    info.materialRenderContexts = {
+          _tokens->ri
+#ifdef PXR_MATERIALX_SUPPORT_ENABLED
+        , _tokens->mtlx
+#endif
+    };
+
+    // Re-reimplemented from HdPrmanRenderDelegate::GetRenderSettingsNamespaces().
+    info.renderSettingsNamespaces = {
+        _tokens->ri, _tokens->outputsRi
+    };
+
+    // Default from HdRenderDelegate:IsPrimvarFilteringNeeded()
+    info.isPrimvarFilteringNeeded = false;
+
+    // Re-implemented from HdPrmanMaterial::GetShaderSourceTypes()
+    if (TfGetenvInt("PRMAN_OSL_BEFORE_RIXPLUGINS", 1)) {
+        info.shaderSourceTypes = {
+            _tokens->OSL
+            , _tokens->RmanCpp
+#ifdef PXR_MATERIALX_SUPPORT_ENABLED
+            , _tokens->mtlx
+#endif
+        };
+    } else {
+        info.shaderSourceTypes = {
+            _tokens->RmanCpp
+            , _tokens->OSL
+#ifdef PXR_MATERIALX_SUPPORT_ENABLED
+            , _tokens->mtlx
+#endif
+        };
+    }
+
+    // true since HdPrmanDelegate::GetSupportedSprimTypes contains
+    // coordSys.
+    info.isCoordSysSupported = true;
+
+    return info;
+}
+
+HdContainerDataSourceHandle
+#if HD_API_VERSION >= 101
+HdPrmanLoaderRendererPlugin::GetSceneIndexCreateArgs() const
+#else
+HdPrmanLoaderRendererPlugin::GetSceneIndexInputArgs() const
+#endif
+{
+    static HdContainerDataSourceHandle const result =
+#if HD_API_VERSION >= 101
+        HdSceneIndexCreateArgsSchema::Builder()
+#else
+        HdSceneIndexInputArgsSchema::Builder()
+#endif
+            .SetMotionBlurSupport(
+                HdRetainedTypedSampledDataSource<bool>::New(true))
+            .SetCameraMotionBlurSupport(
+                HdRetainedTypedSampledDataSource<bool>::New(true))
+            .SetLegacyRenderDelegateInfo(
+                HdRetainedTypedSampledDataSource<HdRenderDelegateInfo>::New(
+                    _GetRenderDelegateInfo()))
+            .Build();
+
+    return result;
+}
+
+#endif // HD_API_VERSION >= 90
 
 int HdPrmanLoaderRendererPlugin::_GetCpuConfig(
     HdRenderSettingsMap const& settingsMap)

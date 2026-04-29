@@ -80,20 +80,6 @@ if (${PXR_BUILD_TESTS})
     )
 endif()
 
-if (${PXR_BUILD_MAYAPY_TESTS})
-    list(APPEND pyfiles
-        TsTest_MayapyDriver.py
-        TsTest_MayapyEvaluator.py
-    )
-endif()
-
-if (${PXR_BUILD_ANIMX_TESTS})
-    list(APPEND libs ${ANIMX_LIBRARY})
-    list(APPEND include ${ANIMX_INCLUDES})
-    list(APPEND classes tsTest_AnimXEvaluator)
-    list(APPEND pycpp wrapTsTest_AnimXEvaluator.cpp)
-endif()
-
 pxr_library(ts
     LIBRARIES
         ${libs}
@@ -138,13 +124,6 @@ pxr_library(ts
 if (${PXR_BUILD_TESTS})
     if (TARGET _ts)
         target_compile_definitions(_ts PRIVATE TS_BUILD_TEST_FRAMEWORK)
-    endif()
-endif()
-
-if (${PXR_BUILD_ANIMX_TESTS})
-    target_compile_definitions(ts PRIVATE TS_BUILD_ANIMX_TEST_FRAMEWORK)
-    if (TARGET _ts)
-        target_compile_definitions(_ts PRIVATE TS_BUILD_ANIMX_TEST_FRAMEWORK)
     endif()
 endif()
 
@@ -357,50 +336,3 @@ pxr_register_test(
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/tsTest_TsVsBezier"
 )
-
-if (${PXR_BUILD_MAYAPY_TESTS})
-    pxr_test_scripts(
-        testenv/tsTest_MayapyFramework.py
-        testenv/tsTest_TsVsMayapy.py
-    )
-
-    set(mayapyBin "${MAYAPY_LOCATION}/mayapy")
-
-    set(cmd "${CMAKE_INSTALL_PREFIX}/tests/tsTest_MayapyFramework")
-    pxr_register_test(
-        tsTest_MayapyFramework
-        PYTHON
-        COMMAND "${cmd} ${mayapyBin}"
-        TESTENV testenv/tsTest_MayapyFramework.testenv
-    )
-
-    set(cmd "${CMAKE_INSTALL_PREFIX}/tests/tsTest_TsVsMayapy")
-    pxr_register_test(
-        tsTest_TsVsMayapy
-        PYTHON
-        COMMAND "${cmd} ${mayapyBin}"
-    )
-endif()
-
-if (${PXR_BUILD_ANIMX_TESTS})
-    pxr_test_scripts(testenv/tsTest_AnimXFramework.py)
-
-    pxr_register_test(
-        tsTest_AnimXFramework
-        PYTHON
-        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/tsTest_AnimXFramework"
-        TESTENV testenv/tsTest_AnimXFramework.testenv
-    )
-endif()
-
-if (${PXR_BUILD_MAYAPY_TESTS} AND ${PXR_BUILD_ANIMX_TESTS})
-    pxr_test_scripts(testenv/tsTest_MayapyVsAnimX.py)
-
-    set(cmd "${CMAKE_INSTALL_PREFIX}/tests/tsTest_MayapyVsAnimX")
-    set(mayapyBin "${MAYAPY_LOCATION}/mayapy")
-    pxr_register_test(
-        tsTest_MayapyVsAnimX
-        PYTHON
-        COMMAND "${cmd} ${mayapyBin}"
-    )
-endif()

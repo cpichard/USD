@@ -54,3 +54,91 @@ class IrFkController "IrFkController" (
     )
 }
 
+class "IrTransformable" (
+    customData = {
+        string userDocBrief = """An abstract schema that provides an animation interface for an animatable
+    coordinate space."""
+    }
+)
+{
+    matrix4d avars:defaultSpace = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double avars:defaultTotalSize = 0
+    token avars:rotationOrder = "XYZ" (
+        allowedTokens = ["XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX"]
+    )
+    double avars:rspin = 0
+    double avars:rx = 0
+    double avars:ry = 0
+    double avars:rz = 0
+    double avars:totalSize = 0
+    double avars:tx = 0
+    double avars:ty = 0
+    double avars:tz = 0
+    double avars:unitScaleFactor = 0
+    double default:rx = 0
+    double default:ry = 0
+    double default:rz = 0
+    matrix4d default:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double default:totalSize = 0
+    double default:tx = 0
+    double default:ty = 0
+    double default:tz = 0
+    matrix4d parent:defaultSpace = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double parent:defaultTotalSize = 0
+    matrix4d parent:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double parent:totalSize
+    matrix4d posed:defaultSpace = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    matrix4d posed:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double rest:rx = 0
+    double rest:ry = 0
+    double rest:rz = 0
+    matrix4d rest:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double rest:tx = 0
+    double rest:ty = 0
+    double rest:tz = 0
+}
+
+class IrJointScope "IrJointScope" (
+    customData = {
+        string userDocBrief = """A concrete typed schema that represents the joint of an armature-based
+    model."""
+    }
+)
+{
+    matrix4d avars:defaultSpace = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double avars:defaultTotalSize = 0
+    token avars:rotationOrder = "XYZ" (
+        allowedTokens = ["XYZ", "XZY", "YXZ", "YZX", "ZXY", "ZYX"]
+    )
+    double avars:rspin = 0
+    double avars:rx = 0
+    double avars:ry = 0
+    double avars:rz = 0
+    double avars:totalSize = 0
+    double avars:tx = 0
+    double avars:ty = 0
+    double avars:tz = 0
+    double avars:unitScaleFactor = 0
+    double default:rx = 0
+    double default:ry = 0
+    double default:rz = 0
+    matrix4d default:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double default:totalSize = 0
+    double default:tx = 0
+    double default:ty = 0
+    double default:tz = 0
+    matrix4d parent:defaultSpace = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double parent:defaultTotalSize = 0
+    matrix4d parent:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double parent:totalSize
+    matrix4d posed:defaultSpace = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    matrix4d posed:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double rest:rx = 0
+    double rest:ry = 0
+    double rest:rz = 0
+    matrix4d rest:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
+    double rest:tx = 0
+    double rest:ty = 0
+    double rest:tz = 0
+}
+

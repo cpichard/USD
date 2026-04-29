@@ -45,9 +45,6 @@ creating USD assets. The high-level grouping of classes and functions is as foll
     \ref UsdUtilsStageCache for managing a singleton instance \ref UsdStageCache
     to be shared amongst various clients.
 
-\li complianceChecker.py provides a set of Python classes and methods used for 
-    checking the compliance of a given USD asset or USDZ package.
-
 \section usdUtils_userProcessingFunctions User Processing Functions
 
 Localization routines can be customized by supplying your own processing 

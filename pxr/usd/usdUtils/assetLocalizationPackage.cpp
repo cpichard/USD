@@ -77,7 +77,7 @@ UsdUtils_AssetLocalizationPackage::Build(
         ? TfGetBaseName(_rootLayer->GetRealPath()) 
         : firstLayerName;
 
-    UsdUtils_LocalizationContext context(&_delegate);
+    UsdUtils_LocalizationContext context(this);
     context.SetMetadataFilteringEnabled(true);
     context.SetDependenciesToSkip(_dependenciesToSkip);
 
@@ -431,8 +431,7 @@ UsdUtils_AssetLocalizationPackage::_AddLayerToPackage(
     SdfLayerRefPtr sourceLayer,
     const std::string &destPath)
 {
-    SdfLayerConstHandle layer = 
-        _delegate.GetLayerUsedForWriting(sourceLayer);
+    SdfLayerConstHandle layer = GetLayerUsedForWriting(sourceLayer);
     TF_DEBUG(USDUTILS_CREATE_PACKAGE).Msg(
         ".. adding layer @%s@ to package at path '%s'.\n", 
         layer->GetIdentifier().c_str(), destPath.c_str());
@@ -507,7 +506,7 @@ UsdUtils_AssetLocalizationPackage::_AddLayerToPackage(
             // layers used for layer modifications need to be cleared to
             // prevent a mapped file descriptor from being held after
             // export to temporary file.
-            _delegate.ClearLayerUsedForWriting(sourceLayer);
+            ClearLayerUsedForWriting(sourceLayer);
             TfDeleteFile(tmpLayerExportPath);
         }
     }

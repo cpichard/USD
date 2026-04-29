@@ -4499,9 +4499,19 @@ static void _EmitFVarAccessor(
         case HdSt_GeometricShader::FvarPatchType::PATCH_REFINED_QUADS:
         {
             if (hasGS) {
-                str << "  vec2 lut[4] = vec2[4](vec2(0,0), vec2(1,0), "
-                    << "vec2(1,1), vec2(0,1));\n"
-                    << "  vec2 localST = lut[localIndex];\n";
+                if (HdSt_GeometricShader::IsPrimTypeTriQuads(primType)) {
+                    str << "  const vec2 lut[2][3] = {\n"
+                           "    { vec2(0,0), vec2(1,0), vec2(1,1) },\n"
+                           "    { vec2(1,1), vec2(0,1), vec2(0,0) },\n"
+                           "  };\n"
+                           "  const vec2 localST = "
+                           "lut[GetTriQuadID()][localIndex];\n";
+                } else {
+                    str << "  const vec2 lut[4] = {\n"
+                           "    vec2(0,0), vec2(1,0), vec2(1,1), vec2(0,1)\n"
+                           "  };\n"
+                        << "  const vec2 localST = lut[localIndex];\n";
+                }
             } else {
                 str << "  vec2 localST = GetPatchCoordLocalST();\n";
             }
