@@ -130,14 +130,6 @@ HdRendererPlugin::GetDisplayName() const
 }
 
 bool
-HdRendererPlugin::IsSupported(bool gpuEnabled) const
-{
-    HdRendererCreateArgs rendererCreateArgs;
-    rendererCreateArgs.gpuEnabled = gpuEnabled;
-    return IsSupported(rendererCreateArgs);
-}
-
-bool
 HdRendererPlugin::IsSupported(
     const HdRendererCreateArgsSchema &rendererCreateArgs,
     std::string * const reasonWhyNot) const

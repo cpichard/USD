@@ -10,11 +10,12 @@
 #include "pxr/base/tf/fileUtils.h"
 #include "pxr/base/tf/pathUtils.h"
 
-#include "pxr/usd/sdf/layerUtils.h"
 #include "pxr/usd/ar/packageUtils.h"
 #include "pxr/usd/ar/resolver.h"
+#include "pxr/usd/sdf/layerUtils.h"
 #include "pxr/usd/sdf/usdFileFormat.h"
 #include "pxr/usd/usd/stage.h"
+#include "pxr/usd/usdShade/udimUtils.h"
 #include "pxr/usd/usdUtils/assetLocalization.h"
 #include "pxr/usd/usdUtils/assetLocalizationDelegate.h"
 #include "pxr/usd/usdUtils/assetLocalizationPackage.h"
@@ -49,7 +50,32 @@ UsdUtils_DirectoryRemapper::Remap(
             TfStringPrintf("%zu", _nextDirectoryNum++);
     }
     
-    return TfStringCatPaths(insertStatus.first->second, baseName);
+    const std::string remappedPath = 
+         TfStringCatPaths(insertStatus.first->second, baseName);
+    
+    if (insertStatus.second) {
+        _remappedDirectories.insert(remappedPath);
+    }
+
+    return remappedPath;
+}
+
+bool 
+UsdUtils_AssetLocalizationPackage::PathShouldResolve(const std::string &path) {
+    // Remapped paths are not expected to resolve due to the fact that they
+    // are synthesized for use within the package that is currently being
+    // built.
+    if (_directoryRemapper.PathIsRemapped(path)) {
+        return false;
+    }
+
+    // Raw Udim paths are not expected to resolve because they are only a
+    // template for a number of potential concrete paths.
+    if (UsdShadeUdimUtils::IsUdimIdentifier(path)) {
+        return false;
+    }
+
+    return true;
 }
 
 bool 

@@ -11,6 +11,7 @@
 #include "pxr/pxr.h"
 #include "pxr/base/ts/api.h"
 
+#include <optional>
 #include <string>
 #include <set>
 
@@ -143,6 +144,7 @@ public:
     {
         ExtrapMethod method = ExtrapHeld;
         double slope = 0;
+        std::optional<double> loopBoundaryTime;
         LoopMode loopMode = LoopNone;
 
     public:

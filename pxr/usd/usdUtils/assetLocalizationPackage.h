@@ -14,6 +14,7 @@
 #include "pxr/usd/usdUtils/assetLocalizationDelegate.h"
 
 #include <string>
+#include <unordered_set>
 #include <vector>
 
 /// \file usdUtils/assetLocalizationPackage.h
@@ -30,9 +31,15 @@ public:
     // subsequent call to Remap.
     std::string Remap(const std::string& filePath);
 
+    // Returns true if the supplied path is a remapped path.
+    bool PathIsRemapped(const std::string &path) {
+        return _remappedDirectories.count(path) > 0;
+    }
+
 private:
     size_t _nextDirectoryNum;
     std::unordered_map<std::string, std::string> _oldToNewDirectory;
+    std::unordered_set<std::string> _remappedDirectories;
 };
 
 class UsdUtils_AssetLocalizationPackage : 
@@ -76,6 +83,8 @@ public:
         return _directoryRemapper.Remap(path);
     }
 
+    bool PathShouldResolve(const std::string &path) override;
+
 protected:
     virtual 
     std::string  _RemapAssetPath(
@@ -89,7 +98,7 @@ protected:
         const std::string& dest) = 0;
 
 protected:
-    virtual UsdUtilsDependencyInfo _ProcessDependency( 
+    UsdUtilsDependencyInfo _ProcessDependency( 
         const SdfLayerRefPtr &layer, 
         const UsdUtilsDependencyInfo &dependencyInfo,
         UsdUtils_DependencyType dependencyType) override;

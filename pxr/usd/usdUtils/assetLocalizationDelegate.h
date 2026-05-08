@@ -99,6 +99,13 @@ public:
         const std::string &templateAssetPath,
         std::vector<std::string> dependencies) { return {}; }
 
+    // Returns true if the supplied path is expected to resolve.
+    // An example case where a path would not be expected is if it represents
+    // a remapped path (such as in a USDZ archive)
+    virtual bool PathShouldResolve(const std::string &path) {
+        return true;
+    }
+
 protected:
     virtual UsdUtilsDependencyInfo _ProcessDependency( 
         const SdfLayerRefPtr &layer, 

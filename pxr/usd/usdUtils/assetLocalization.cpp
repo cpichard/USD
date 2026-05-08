@@ -95,8 +95,14 @@ UsdUtils_LocalizationContext::_EnqueueDependency(
         return;
     }
 
+    _encounteredPaths.insert(anchoredPath);
+
     const std::pair<std::string, std::string> splitIdentifier =
         SdfLayer::SplitIdentifier(anchoredPath);
+
+    if (!_delegate->PathShouldResolve(splitIdentifier.first)) {
+        return;
+    }
 
     ArResolvedPath resolvedPath = ArGetResolver().Resolve(
         splitIdentifier.first);
@@ -106,10 +112,9 @@ UsdUtils_LocalizationContext::_EnqueueDependency(
             assetPath.c_str(),
             anchoredPath.c_str(),
             layer->GetRealPath().c_str());
+
         return;
     }
-
-    _encounteredPaths.insert(anchoredPath);
 
     _queue.emplace_back(anchoredPath);
 }

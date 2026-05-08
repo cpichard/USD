@@ -228,6 +228,48 @@ class TestUsdUtilsAssetLocalization(unittest.TestCase):
         for expectedAsset in expectedAssets:
             self.assertTrue(os.path.exists(
                 os.path.join(localizationDir, expectedAsset)), expectedAsset)
+            
+    def test_RemappedAssetPathsDoNotTriggerWarning(self):
+        assetPath = "warnings/root_remaped.usda"
+        archivePath = "warnings.usdz"
+        context = Ar.GetResolver().CreateDefaultContextForAsset(assetPath)
+
+        with Ar.ResolverContextBinder(context):
+            with Tf.DiagnosticTrap() as trap:
+                self.assertTrue(UsdUtils.CreateNewUsdzPackage(
+                    assetPath, archivePath, editLayersInPlace=True))
+                
+                self.assertFalse(trap.HasWarnings())
+
+
+        zf = Sdf.ZipFile.Open(archivePath)
+        expectedAssets = [
+            "root_remaped.usda", 
+            "0/sub.usda",
+        ]
+        self.assertEqual(expectedAssets, zf.GetFileNames())
+
+    def test_WarningsAreGeneratedForFilesThatCouldNotBeResolved(self):
+        assetPath = "warnings/root_unresolved.usda"
+        archivePath = "unresolved.usdz"
+        context = Ar.GetResolver().CreateDefaultContextForAsset(assetPath)
+
+        with Ar.ResolverContextBinder(context):
+            with Tf.DiagnosticTrap() as trap:
+                self.assertTrue(UsdUtils.CreateNewUsdzPackage(
+                    assetPath, archivePath, editLayersInPlace=True))
+                
+                # Note: there is one warning for failing to enqueue the
+                # unresolvable asset, and one warning for failing to open
+                # the asset for writing.
+                self.assertEqual(len(trap.GetWarnings()), 2)
+
+                self.assertTrue(
+                    "Failed to resolve reference @unresolvable.usda@" 
+                    in trap.GetWarnings()[0].commentary)
+                self.assertTrue(
+                    "Skipping export of dependency @/unresolvable.usda@" 
+                    in trap.GetWarnings()[1].commentary)
 
 if __name__=="__main__":
     unittest.main()

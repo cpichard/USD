@@ -58,14 +58,23 @@ static TsExtrapolation _MakeExtrap(
             switch (extrapIn.loopMode)
             {
                 case SData::LoopRepeat:
-                    return TsExtrapolation(TsExtrapLoopRepeat);
-
+                {
+                    TsExtrapolation result(TsExtrapLoopRepeat);
+                    result.loopBoundaryTime = extrapIn.loopBoundaryTime;
+                    return result;
+                }
                 case SData::LoopReset:
-                    return TsExtrapolation(TsExtrapLoopReset);
-
+                {
+                    TsExtrapolation result(TsExtrapLoopReset);
+                    result.loopBoundaryTime = extrapIn.loopBoundaryTime;
+                    return result;
+                }
                 case SData::LoopOscillate:
-                    return TsExtrapolation(TsExtrapLoopOscillate);
-
+                {
+                    TsExtrapolation result(TsExtrapLoopOscillate);
+                    result.loopBoundaryTime = extrapIn.loopBoundaryTime;
+                    return result;
+                }
                 default:
                     TF_CODING_ERROR("Unexpected extrapolating loop mode");
                     return TsExtrapolation();
@@ -235,6 +244,7 @@ static SData::Extrapolation _MakeExtrap(
         {
             SData::Extrapolation result(SData::ExtrapLoop);
             result.loopMode = SData::LoopRepeat;
+            result.loopBoundaryTime = extrapIn.loopBoundaryTime;
             return result;
         }
 
@@ -242,6 +252,7 @@ static SData::Extrapolation _MakeExtrap(
         {
             SData::Extrapolation result(SData::ExtrapLoop);
             result.loopMode = SData::LoopReset;
+            result.loopBoundaryTime = extrapIn.loopBoundaryTime;
             return result;
         }
 
@@ -249,6 +260,7 @@ static SData::Extrapolation _MakeExtrap(
         {
             SData::Extrapolation result(SData::ExtrapLoop);
             result.loopMode = SData::LoopOscillate;
+            result.loopBoundaryTime = extrapIn.loopBoundaryTime;
             return result;
         }
 

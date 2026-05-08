@@ -31,6 +31,7 @@ pxr_library(vt
         wrapArray
 
     PUBLIC_HEADERS
+        addExtVisitValueType.h
         api.h
         traits.h
         typeHeaders.h

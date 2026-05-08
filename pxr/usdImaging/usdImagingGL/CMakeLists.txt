@@ -1242,6 +1242,28 @@ pxr_register_test(testUsdImagingGLHighlight_pi_ni
     TESTENV testenv/testUsdImagingGLHighlight
 )
 
+pxr_register_test(testUsdImagingGLHighlight_ni_ni_ni
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLHighlight -offscreen -frameAll -stage ni_ni_ni.usda -write testUsdImagingGLHighlight_ni_ni_ni.png"
+    IMAGE_DIFF_COMPARE
+        testUsdImagingGLHighlight_ni_ni_ni_000.png
+        testUsdImagingGLHighlight_ni_ni_ni_001.png
+        testUsdImagingGLHighlight_ni_ni_ni_002.png
+        testUsdImagingGLHighlight_ni_ni_ni_003.png
+        testUsdImagingGLHighlight_ni_ni_ni_004.png
+        testUsdImagingGLHighlight_ni_ni_ni_005.png
+        testUsdImagingGLHighlight_ni_ni_ni_006.png
+        testUsdImagingGLHighlight_ni_ni_ni_007.png
+        testUsdImagingGLHighlight_ni_ni_ni_008.png
+        testUsdImagingGLHighlight_ni_ni_ni_009.png
+        testUsdImagingGLHighlight_ni_ni_ni_010.png
+        testUsdImagingGLHighlight_ni_ni_ni_011.png
+    FAIL .05
+    FAIL_PERCENT .03
+    PERCEPTUAL
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testUsdImagingGLHighlight
+)
+
 pxr_register_test(testUsdImagingGLSurfaceShader_1_2_5
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLSurfaceShader -offscreen -frameAll -stage shader_change.usda -lighting"
     IMAGE_DIFF_COMPARE

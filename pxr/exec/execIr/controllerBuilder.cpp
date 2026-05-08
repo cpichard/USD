@@ -10,11 +10,23 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+// ExecIr_ControllerBuilderBase
+
+ExecIr_ControllerBuilderBase::ExecIr_ControllerBuilderBase(
+    ExecComputationBuilder &self)
+    : _self(self)
+{
+}
+
+ExecIr_ControllerBuilderBase::~ExecIr_ControllerBuilderBase() = default;
+
+// ExecIrControllerBuilder
+
 ExecIrControllerBuilder::ExecIrControllerBuilder(
     ExecComputationBuilder &self,
     Callback forwardCallback,
     Callback inverseCallback)
-    : _self(self)
+    : ExecIr_ControllerBuilderBase(self)
     , _forwardComputeReg(
         self.PrimComputation(ExecIrComputationTokens->forwardCompute))
     , _inverseComputeReg(

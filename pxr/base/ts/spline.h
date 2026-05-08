@@ -121,6 +121,11 @@ public:
     /// \name Extrapolation
     /// @{
 
+    /// Sets pre extrapolation.
+    ///
+    /// Issues a coding error if the spline has non-default inner loop
+    /// params and `extrap` is looping extrapolation with a specified
+    /// loopBoundaryTime.
     TS_API
     void SetPreExtrapolation(
         const TsExtrapolation &extrap);
@@ -128,12 +133,37 @@ public:
     TS_API
     TsExtrapolation GetPreExtrapolation() const;
 
+    /// Sets post extrapolation.
+    ///
+    /// Issues a coding error if the spline has non-default inner loop
+    /// params and `extrap` is looping extrapolation with a specified
+    /// loopBoundaryTime.
     TS_API
     void SetPostExtrapolation(
         const TsExtrapolation &extrap);
 
     TS_API
     TsExtrapolation GetPostExtrapolation() const;
+
+    // Returns whether pre extrapolation is valid.
+    //
+    // Pre extrapolation is invalid if it is looping and loopBoundaryTime
+    // is set to a value for which the spline does not have an associated
+    // knot time.
+    //
+    // Invalid extrapolation regions evaluate to value block.
+    TS_API
+    bool IsPreExtrapolationValid() const;
+
+    // Returns whether post extrapolation is valid.
+    //
+    // Post extrapolation is invalid if it is looping and loopBoundaryTime
+    // is set to a value for which the spline does not have an associated
+    // knot time.
+    //
+    // Invalid extrapolation regions evaluate to value block.
+    TS_API
+    bool IsPostExtrapolationValid() const;
 
     /// @}
     /// \name Inner loops

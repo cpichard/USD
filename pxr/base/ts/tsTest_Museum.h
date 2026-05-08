@@ -43,9 +43,14 @@ public:
         InnerLoopPost,
         ExtrapLoopRepeat,
         ExtrapLoopRepeatDualValued,
+        ExtrapLoopRepeatBoundary,
+        ExtrapLoopRepeatDualValuedBoundary,
         ExtrapLoopReset,
         ExtrapLoopResetDualValued,
+        ExtrapLoopResetBoundary,
+        ExtrapLoopResetInvalidBoundary,
         ExtrapLoopOscillate,
+        ExtrapLoopOscillateBoundary,
         InnerAndExtrapLoops,
 
         // Tests of several regressive Bezier cases.

@@ -399,6 +399,10 @@ public:
     /// @}
 
 private:
+    // Initialize fields related to extrapolation looping. Returns true
+    // when extrapolation has looping behavior, false otherwise.
+    bool _InitExtrapLooping(bool isPre);
+
     /// Update _knotIt
     void _UpdateKnotIterator();
 
@@ -421,6 +425,10 @@ private:
     // spline. Since _knotIt handles regular knot and inner looping iteration,
     // all we really use here are the pre- and post-extrapolation values and
     // TsSourceKnotInterp.
+    //
+    // Note that _splineRegion has a value of TsSourcePreExtrap or
+    // TsSourcePostExtrap not only when extrapolation is non-looping, but also
+    // when extrapolation is "looping" but manifests as held or value block.
     TsSplineSampleSource _splineRegion;
 
     int32_t _minIteration, _maxIteration, _curIteration;
@@ -428,6 +436,15 @@ private:
     TsTime _firstKnotTime, _lastKnotTime;
     double _firstKnotPreValue, _firstKnotValue;
     double _lastKnotPreValue, _lastKnotValue;
+
+    // Data for extrapolation looping
+    double _lastPreExtrapKnotTime, _lastPreExtrapKnotValue;
+    double _firstPostExtrapKnotTime, _firstPostExtrapKnotPreValue;
+    // _preExtrapLooped, _postExtrapLooped are true when the extrapolation is
+    // looping and not a degenerate case (see `loopBoundaryTime` in types.h).
+    bool _preExtrapLooped = false;
+    bool _postExtrapLooped = false;
+    bool _oscillating = false;
 
     // Call the time the spline API uses "splineTime". When extrapolation looping
     // is in effect, this maps into a "knotTime" that's inside the interval defined
@@ -438,10 +455,14 @@ private:
     //    splineTime = invert * (knotTime - shift2) + shift1;
     double _shift1, _shift2, _valueShift;
 
+    // The full knot interval for the current iteration. For iteration 0,
+    // this is always the interval from _firstKnotTime to _lastKnotTime. For
+    // extrapolation iterations, the interval may be smaller when
+    // loopBoundaryTime is specified. We need to keep track of this to support
+    // subregion extrapolation looping.
+    GfInterval _fullKnotRegion;
+
     bool _atEnd = true;
-    bool _preExtrapLooped = false;
-    bool _postExtrapLooped = false;
-    bool _oscillating = false;
     bool _reversing = false;
     bool _initializedKnotItBackward = false;
 };

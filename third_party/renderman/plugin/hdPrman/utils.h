@@ -28,6 +28,10 @@ class TfToken;
 class SdfAssetPath;
 class VtValue;
 
+// TfStringify overload for RtParamList.  Useful for diagnostics.
+HDPRMAN_API
+std::string TfStringify(RtParamList const&);
+
 namespace HdPrman_Utils {
 
 /// Adds (or updates) a VtValue parameter to \p params and returns true if

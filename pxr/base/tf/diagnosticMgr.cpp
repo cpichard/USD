@@ -141,6 +141,19 @@ TfDiagnosticMgr::_LogTextPin::~_LogTextPin()
     }
 }
 
+TfDiagnosticMgr::_LogTextPin &
+TfDiagnosticMgr::_LogTextPin::_LogTextPin::operator=(_LogTextPin &&other)
+{
+    if (this != &other) {
+        if (_lines) {
+            ArchSetExtraLogInfoForErrors(_key, nullptr);
+        }
+        _key   = std::move(other._key);
+        _lines = std::move(other._lines);
+    }
+    return *this;
+}
+
 // _LogTextBuffer implementation
 //
 // The requirement at the Arch level for ArchSetExtraLogInfoForErrors is that
@@ -327,17 +340,19 @@ TfDiagnosticMgr::_ForEachDelegate(Fn const &fn) const
     return true;
 }
 
-void
+void *
 TfDiagnosticMgr::_PushTrap(TfDiagnosticTrap *trap)
 {
-    _markCountsAndTrapStacks.local().trapStack.push_back(trap);
+    _TrapStack &stack = _markCountsAndTrapStacks.local().trapStack;
+    stack.push_back(trap);
+    return &stack;
 }
 
 void
-TfDiagnosticMgr::_PopTrap(TfDiagnosticTrap *trap)
+TfDiagnosticMgr::_PopTrap(TfDiagnosticTrap *trap, void *key)
 {
     const bool wasClean = trap->IsClean();
-    auto &stack = _markCountsAndTrapStacks.local().trapStack;
+    auto &stack = *static_cast<_TrapStack *>(key);
     if (TF_VERIFY(!stack.empty() && stack.back() == trap)) {
         stack.pop_back();
     }

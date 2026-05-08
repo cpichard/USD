@@ -5,8 +5,20 @@ set(PXR_PACKAGE usdExecImaging)
 # PXR_BUILD_EXEC=OFF, the library does not link to any exec libraries.
 
 if (PXR_BUILD_EXEC)
+    set(USDEXECIMAGING_LIBRARIES
+        execUsd
+        execGeom)
+
     set(USDEXECIMAGING_PRIVATE_CLASSES
-        stageSceneIndex)
+        adapterRegistry
+        debugCodes
+        request
+        requestBuilderImpl
+        stageSceneIndex
+        xformablePrimAdapter)
+
+    set(USDEXECIMAGING_PRIVATE_HEADERS
+        valueKeyMap.h)
 
     set(USDEXECIMAGING_CPPFILES
         stageSceneIndexFactory_execOn.cpp)
@@ -20,19 +32,32 @@ endif()
 
 pxr_library(usdExecImaging
     LIBRARIES
+        ${USDEXECIMAGING_LIBRARIES}
         hd
+        sdf
         tf
+        trace
         usd
+        usdGeom
+        vt
 
     PUBLIC_CLASSES
+        computedDataSource
+        primAdapter
+        requestAccessor
+        requestBuilder
         stageSceneIndexInterface
 
     PUBLIC_HEADERS
         api.h
         stageSceneIndexFactory.h
+        valueKey.h
 
     PRIVATE_CLASSES
         ${USDEXECIMAGING_PRIVATE_CLASSES}
+
+    PRIVATE_HEADERS
+        ${USDEXECIMAGING_PRIVATE_HEADERS}
 
     CPPFILES
         ${USDEXECIMAGING_CPPFILES}

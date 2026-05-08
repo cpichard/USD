@@ -31,9 +31,14 @@ TF_REGISTRY_FUNCTION(TfEnum)
     TF_ADD_ENUM_NAME(TsTest_Museum::InnerLoopPost);
     TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopRepeat);
     TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopRepeatDualValued);
+    TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopRepeatDualValuedBoundary);
+    TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopRepeatBoundary);
     TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopReset);
     TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopResetDualValued);
+    TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopResetBoundary);
+    TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopResetInvalidBoundary);
     TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopOscillate);
+    TF_ADD_ENUM_NAME(TsTest_Museum::ExtrapLoopOscillateBoundary);
     TF_ADD_ENUM_NAME(TsTest_Museum::InnerAndExtrapLoops);
     TF_ADD_ENUM_NAME(TsTest_Museum::RegressiveLoop);
     TF_ADD_ENUM_NAME(TsTest_Museum::RegressiveS);
@@ -508,6 +513,74 @@ static TsTest_SplineData _ExtrapLoopRepeatDualValued()
     return data;
 }
 
+static TsTest_SplineData _ExtrapLoopRepeatBoundary()
+{
+    SData::Knot knot1;
+    knot1.time = 100.0;
+    knot1.nextSegInterpMethod = SData::InterpCurve;
+    knot1.value = 10.0;
+    knot1.postSlope = 0.0;
+    knot1.postLen = 3.0;
+
+    SData::Knot knot2;
+    knot2.time = 105.0;
+    knot2.nextSegInterpMethod = SData::InterpLinear;
+    knot2.value = 20.0;
+    knot2.preSlope = 0.0;
+    knot2.preLen = 3.0;
+
+    SData::Knot knot3;
+    knot3.time = 110.0;
+    knot3.nextSegInterpMethod = SData::InterpHeld;
+    knot3.value = 15.0;
+
+    SData data;
+    data.SetKnots({knot1, knot2, knot3});
+    SData::Extrapolation extrap(SData::ExtrapLoop);
+    extrap.loopMode = SData::LoopRepeat;
+    extrap.loopBoundaryTime = 105.0;
+    data.SetPreExtrapolation(extrap);
+
+    extrap.loopBoundaryTime = 100.0;
+    data.SetPostExtrapolation(extrap);
+    return data;
+}
+
+static TsTest_SplineData _ExtrapLoopRepeatDualValuedBoundary()
+{
+    SData::Knot knot1;
+    knot1.time = 100.0;
+    knot1.nextSegInterpMethod = SData::InterpCurve;
+    knot1.value = 10.0;
+    knot1.preValue = -10.0;
+    knot1.isDualValued = true;
+    knot1.postSlope = 0.0;
+    knot1.postLen = 3.0;
+
+    SData::Knot knot2;
+    knot2.time = 105.0;
+    knot2.nextSegInterpMethod = SData::InterpLinear;
+    knot2.value = 20.0;
+    knot2.preSlope = 0.0;
+    knot2.preLen = 3.0;
+
+    SData::Knot knot3;
+    knot3.time = 110.0;
+    knot3.nextSegInterpMethod = SData::InterpHeld;
+    knot3.value = 15.0;
+
+    SData data;
+    data.SetKnots({knot1, knot2, knot3});
+    SData::Extrapolation extrap(SData::ExtrapLoop);
+    extrap.loopMode = SData::LoopRepeat;
+    extrap.loopBoundaryTime = 110.0;
+    data.SetPreExtrapolation(extrap);
+
+    extrap.loopBoundaryTime = 105.0;
+    data.SetPostExtrapolation(extrap);
+    return data;
+}
+
 static TsTest_SplineData _ExtrapLoopReset()
 {
     SData::Knot knot1;
@@ -570,6 +643,72 @@ static TsTest_SplineData _ExtrapLoopResetDualValued()
     return data;
 }
 
+static TsTest_SplineData _ExtrapLoopResetBoundary()
+{
+    SData::Knot knot1;
+    knot1.time = 100.0;
+    knot1.nextSegInterpMethod = SData::InterpCurve;
+    knot1.value = 10.0;
+    knot1.postSlope = 0.0;
+    knot1.postLen = 3.0;
+
+    SData::Knot knot2;
+    knot2.time = 105.0;
+    knot2.nextSegInterpMethod = SData::InterpLinear;
+    knot2.value = 20.0;
+    knot2.preSlope = 0.0;
+    knot2.preLen = 3.0;
+
+    SData::Knot knot3;
+    knot3.time = 110.0;
+    knot3.nextSegInterpMethod = SData::InterpHeld;
+    knot3.value = 15.0;
+
+    SData data;
+    data.SetKnots({knot1, knot2, knot3});
+    SData::Extrapolation extrap(SData::ExtrapLoop);
+    extrap.loopMode = SData::LoopReset;
+    extrap.loopBoundaryTime = 105.0;
+    data.SetPreExtrapolation(extrap);
+
+    extrap.loopBoundaryTime = 105.0;
+    data.SetPostExtrapolation(extrap);
+    return data;
+}
+
+static TsTest_SplineData _ExtrapLoopResetInvalidBoundary()
+{
+    SData::Knot knot1;
+    knot1.time = 100.0;
+    knot1.nextSegInterpMethod = SData::InterpCurve;
+    knot1.value = 10.0;
+    knot1.postSlope = 0.0;
+    knot1.postLen = 3.0;
+
+    SData::Knot knot2;
+    knot2.time = 105.0;
+    knot2.nextSegInterpMethod = SData::InterpLinear;
+    knot2.value = 20.0;
+    knot2.preSlope = 0.0;
+    knot2.preLen = 3.0;
+
+    SData::Knot knot3;
+    knot3.time = 110.0;
+    knot3.nextSegInterpMethod = SData::InterpHeld;
+    knot3.value = 15.0;
+
+    SData data;
+    data.SetKnots({knot1, knot2, knot3});
+    SData::Extrapolation extrap(SData::ExtrapLoop);
+    extrap.loopMode = SData::LoopReset;
+    extrap.loopBoundaryTime = 99.0;
+    data.SetPreExtrapolation(extrap);
+
+    extrap.loopBoundaryTime = 107.0;
+    data.SetPostExtrapolation(extrap);
+    return data;
+}
+
 static TsTest_SplineData _ExtrapLoopOscillate()
 {
     SData::Knot knot1;
@@ -596,6 +735,39 @@ static TsTest_SplineData _ExtrapLoopOscillate()
     SData::Extrapolation extrap(SData::ExtrapLoop);
     extrap.loopMode = SData::LoopOscillate;
     data.SetPreExtrapolation(extrap);
+    data.SetPostExtrapolation(extrap);
+    return data;
+}
+
+static TsTest_SplineData _ExtrapLoopOscillateBoundary()
+{
+    SData::Knot knot1;
+    knot1.time = 100.0;
+    knot1.nextSegInterpMethod = SData::InterpCurve;
+    knot1.value = 10.0;
+    knot1.postSlope = 0.0;
+    knot1.postLen = 3.0;
+
+    SData::Knot knot2;
+    knot2.time = 105.0;
+    knot2.nextSegInterpMethod = SData::InterpLinear;
+    knot2.value = 20.0;
+    knot2.preSlope = 0.0;
+    knot2.preLen = 3.0;
+
+    SData::Knot knot3;
+    knot3.time = 110.0;
+    knot3.nextSegInterpMethod = SData::InterpHeld;
+    knot3.value = 15.0;
+
+    SData data;
+    data.SetKnots({knot1, knot2, knot3});
+    SData::Extrapolation extrap(SData::ExtrapLoop);
+    extrap.loopMode = SData::LoopOscillate;
+    extrap.loopBoundaryTime = 105.0;
+    data.SetPreExtrapolation(extrap);
+
+    extrap.loopBoundaryTime = 110.0;
     data.SetPostExtrapolation(extrap);
     return data;
 }
@@ -1253,9 +1425,14 @@ TsTest_Museum::GetData(const DataId id)
         case InnerLoopPost: return _InnerLoopPost();
         case ExtrapLoopRepeat: return _ExtrapLoopRepeat();
         case ExtrapLoopRepeatDualValued: return _ExtrapLoopRepeatDualValued();
+        case ExtrapLoopRepeatBoundary: return _ExtrapLoopRepeatBoundary();
+        case ExtrapLoopRepeatDualValuedBoundary: return _ExtrapLoopRepeatDualValuedBoundary();
         case ExtrapLoopReset: return _ExtrapLoopReset();
         case ExtrapLoopResetDualValued: return _ExtrapLoopResetDualValued();
+        case ExtrapLoopResetBoundary: return _ExtrapLoopResetBoundary();
+        case ExtrapLoopResetInvalidBoundary: return _ExtrapLoopResetInvalidBoundary();
         case ExtrapLoopOscillate: return _ExtrapLoopOscillate();
+        case ExtrapLoopOscillateBoundary: return _ExtrapLoopOscillateBoundary();
         case InnerAndExtrapLoops: return _InnerAndExtrapLoops();
         case RegressiveLoop: return _RegressiveLoop();
         case RegressiveS: return _RegressiveS();

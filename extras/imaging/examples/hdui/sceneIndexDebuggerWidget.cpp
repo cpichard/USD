@@ -13,6 +13,7 @@
 #include "sceneIndexObserverLoggingTreeView.h"
 
 #include "pxr/imaging/hd/filteringSceneIndex.h"
+#include "pxr/imaging/hd/instanceProxyViewSceneIndex.h"
 #include "pxr/imaging/hd/utils.h"
 
 #include "pxr/base/arch/fileSystem.h"
@@ -62,6 +63,13 @@ HduiSceneIndexDebuggerWidget::HduiSceneIndexDebuggerWidget(
 
     toolbarLayout->addStretch();
 
+    QHBoxLayout *viewOptionsLayout = new QHBoxLayout;
+    mainLayout->addLayout(viewOptionsLayout);
+
+    _instanceProxyViewCheckBox = new QCheckBox("Instance Proxy View");
+    viewOptionsLayout->addWidget(_instanceProxyViewCheckBox);
+    viewOptionsLayout->addStretch();
+
     _splitter = new QSplitter(Qt::Horizontal);
     mainLayout->addWidget(_splitter, 10);
 
@@ -102,6 +110,11 @@ HduiSceneIndexDebuggerWidget::HduiSceneIndexDebuggerWidget(
             this->SetRegisteredSceneIndex(name, sceneIndex);
     });
 
+    QObject::connect(_valueTreeView, &HduiDataSourceValueTreeView::JumpToPrim,
+        [this](const SdfPath &primPath) {
+            this->_siTreeWidget->SetSelectedPrimPath(primPath);
+    });
+
     if (_goToInputButtonMenu) {
         QObject::connect(_goToInputButtonMenu, &QMenu::aboutToShow, this,
                          &HduiSceneIndexDebuggerWidget::_FillGoToInputMenu);
@@ -121,6 +134,22 @@ HduiSceneIndexDebuggerWidget::HduiSceneIndexDebuggerWidget(
                     this->_currentSceneIndex);
             }
     });
+
+    QObject::connect(_instanceProxyViewCheckBox, &QCheckBox::toggled,
+        [this](bool checked) {
+            if (!_targetSceneIndex) {
+                return;
+            }
+            if (checked) {
+                _currentSceneIndex =
+                    HdInstanceProxyViewSceneIndex::New(_targetSceneIndex);
+            } else {
+                _currentSceneIndex = _targetSceneIndex;
+            }
+            
+            _siTreeWidget->SetSceneIndex(_currentSceneIndex);
+            _siTreeWidget->Requery();
+        });
 
     QObject::connect(writeToFileButton, &QPushButton::clicked,
         [this](){
@@ -162,18 +191,19 @@ void
 HduiSceneIndexDebuggerWidget::SetSceneIndex(const std::string &displayName,
     HdSceneIndexBaseRefPtr sceneIndex, bool pullRoot)
 {
-    _currentSceneIndex = sceneIndex;
-
-    bool inputsPresent = false;
-    if (HdFilteringSceneIndexBaseRefPtr filteringSi =
-            TfDynamic_cast<HdFilteringSceneIndexBaseRefPtr>(sceneIndex)) {
-        if (!filteringSi->GetInputScenes().empty()) {
-            inputsPresent = true;
-        }
+    if (!sceneIndex) {
+        TF_CODING_ERROR("Null scene index provided to SetSceneIndex");
+        return;
     }
 
-    if (_goToInputButton) {
-        _goToInputButton->setEnabled(inputsPresent);
+    _targetSceneIndex = sceneIndex;
+
+    if (_instanceProxyViewCheckBox &&
+            _instanceProxyViewCheckBox->isChecked()) {
+        _currentSceneIndex = HdInstanceProxyViewSceneIndex::New(
+            _targetSceneIndex);
+    } else {
+        _currentSceneIndex = _targetSceneIndex;
     }
 
     std::ostringstream buffer;
@@ -185,16 +215,34 @@ HduiSceneIndexDebuggerWidget::SetSceneIndex(const std::string &displayName,
     buffer << displayName;
 
     _nameLabel->setText(buffer.str().c_str());
+    _dsTreeWidget->SetPrimDataSource(SdfPath(), nullptr);
+    _valueTreeView->SetDataSource(nullptr);
 
-    this->_nameLabel->setText(buffer.str().c_str());
-    this->_dsTreeWidget->SetPrimDataSource(SdfPath(), nullptr);
-    this->_valueTreeView->SetDataSource(nullptr);
-
-    _siTreeWidget->SetSceneIndex(sceneIndex);
+    _siTreeWidget->SetSceneIndex(_currentSceneIndex);
 
     if (pullRoot) {
         _siTreeWidget->Requery();
     }
+
+    _UpdateInputsButton(_targetSceneIndex);
+}
+
+void
+HduiSceneIndexDebuggerWidget::_UpdateInputsButton(
+    HdSceneIndexBaseRefPtr sceneIndex)
+{
+    if (!_goToInputButton) {
+        return;
+    }
+
+    bool inputsPresent = false;
+    if (HdFilteringSceneIndexBaseRefPtr filteringSi =
+            TfDynamic_cast<HdFilteringSceneIndexBaseRefPtr>(sceneIndex)) {
+        if (!filteringSi->GetInputScenes().empty()) {
+            inputsPresent = true;
+        }
+    }
+    _goToInputButton->setEnabled(inputsPresent);
 }
 
 namespace
@@ -245,7 +293,7 @@ HduiSceneIndexDebuggerWidget::_FillGoToInputMenu()
     });
 
     _AddSceneIndexToTreeMenu(menuTreeWidget->invisibleRootItem(),
-            _currentSceneIndex, false);
+        _targetSceneIndex, false);
 
     QWidgetAction *widgetAction = new QWidgetAction(menu);
     widgetAction->setDefaultWidget(menuTreeWidget);

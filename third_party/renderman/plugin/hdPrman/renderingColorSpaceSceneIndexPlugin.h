@@ -65,6 +65,23 @@ public:
         const TfToken& terminalNodeName,
         const GfColorSpace& renderingColorSpace);
 
+    // Callback to add any custom light filtering. It should return true if
+    // the material network interface has been modified and should no longer 
+    // be modified. Otherwise it should return false.
+    using FilterLightCallback = bool (*) (
+        HdMaterialNetworkInterface* interface,
+        const SdfPath& primPath,
+        const TfToken& nodeName,
+        const GfColorSpace& renderingCS);
+    static void
+    RegisterFilterLightCallback(const FilterLightCallback& callback);
+    static bool
+    FilterLight(
+        HdMaterialNetworkInterface* interface,
+        const SdfPath& primPath,
+        const TfToken& nodeName,
+        const GfColorSpace& renderingColorSpace);
+
     // Callback should return true if the color space transformation applied by
     // this scene index should be disabled. Otherwise it should return false.
     using DisableTransformCallback = bool (*) (const HdSceneIndexBaseRefPtr &si);

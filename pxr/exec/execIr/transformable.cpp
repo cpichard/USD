@@ -10,7 +10,6 @@
 #include "pxr/exec/execIr/tokens.h"
 #include "pxr/exec/execIr/utils.h"
 
-#include "pxr/base/gf/matrix3d.h"
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/base/tf/type.h"
@@ -29,10 +28,10 @@ namespace {
 // connection data flow and for inversion, we won't need to define any of the
 // plugin computations defined by this builder.
 // 
-class _Builder {
+class _Builder : ExecIr_ControllerBuilderBase {
 public:
     _Builder(ExecComputationBuilder &self)
-        : _self(self)
+        : ExecIr_ControllerBuilderBase(self)
     {}
 
     // Defines the computations needed for an attribute that provides input
@@ -67,31 +66,6 @@ public:
         const TfToken &computationName,
         const TfToken &ancestorComputationName,
         const TfToken &spaceAttributeName);
-
-private:
-    // Registers an expression that implements dataflow across attribute
-    // connections.
-    //
-    // TODO: This expression won't be needed when the OpenExec core defines
-    // default attribute connection dataflow behavior for all attributes.
-    template <typename ValueType>
-    void
-    _ConnectionDataflowExpression(
-        const TfToken &attributeName);
-
-    // Returns a pointer to the desired value provided by the
-    // 'explicitDesiredValue' and 'computedDesiredValue' inputs; otherwise,
-    // returns null.
-    //
-    // If more than one input value is provided, an error is emitted.
-    //
-    template <typename ValueType>
-    static const ValueType *
-    _GetExactlyOneDesiredValue(
-        const VdfContext &ctx);
-
-private:
-    ExecComputationBuilder &_self;
 };
 
 } // anonymous namespace
@@ -108,7 +82,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (restTransRotOffsetXf)
 );
 
-EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrJointScope)
+EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrTransformable)
 {
     _Builder builder(self);
 
@@ -294,19 +268,9 @@ _Builder::InputAttribute(const TfToken &attributeName)
     // 'computeDesiredValue' computation via incoming connections--but only if
     // there is exactly one desired value present. Otherwise, no value is
     // returned. An error is emitted if more than one desired value is present.
-    //
-    // TODO: This plugin computation won't be necessary when OpenExec provides
-    // core inversion support.
     _self.AttributeComputation(
         attributeName, ExecIrComputationTokens->computeDesiredValue)
-        .Callback<ValueType>(+[](const VdfContext &ctx) {
-            if (const ValueType *const valuePtr =
-                _GetExactlyOneDesiredValue<ValueType>(ctx)) {
-                ctx.SetOutput(*valuePtr);
-            } else {
-                ctx.SetEmptyOutput();
-            }
-        })
+        .Callback<ValueType>(&_GetExactlyOneDesiredValue<ValueType>)
         .Inputs(
             IncomingConnections<ValueType>(
                 ExecIrComputationTokens->computeDesiredValue));
@@ -316,103 +280,11 @@ template <typename ValueType>
 void
 _Builder::OutputAttribute(const TfToken &attributeName)
 {
-    using namespace exec_registration;
-
     // Output attributes support dataflow across connections.
     _ConnectionDataflowExpression<ValueType>(attributeName);
 
-    // The 'explicitDesiredValue' computation only exists to provide an
-    // output where desired values can be specified as overrides passed to
-    // ComputeWithOverrides.
-    //
-    // TODO: This plugin computation won't be necessary when OpenExec
-    // provides core inversion support.
-    _self.AttributeComputation(
-        attributeName, ExecIrComputationTokens->explicitDesiredValue)
-        .Callback<ValueType>(+[](const VdfContext &ctx) {
-            ctx.SetEmptyOutput();
-        });
-
-    // The 'computeDesiredValue' computation gets its value from the
-    // 'explicitDesiredValue' computation if it provides one, or the
-    // `computeDesiredValue` via incoming connections if it provides
-    // one. Otherwise, no value is returned.
-    //
-    // TODO: This plugin computation won't be necessary when OpenExec
-    // provides core inversion support.
-    _self.AttributeComputation(
-        attributeName, ExecIrComputationTokens->computeDesiredValue)
-        .Callback<ValueType>(+[](const VdfContext &ctx) {
-            if (const ValueType *const valuePtr =
-                ctx.GetInputValuePtr<ValueType>(
-                    ExecIrComputationTokens->explicitDesiredValue)) {
-                ctx.SetOutput(*valuePtr);
-            } else if (const ValueType *const valuePtr =
-                       ctx.GetInputValuePtr<ValueType>(
-                           ExecIrComputationTokens->computeDesiredValue)) {
-                ctx.SetOutput(*valuePtr);
-            } else {
-                ctx.SetEmptyOutput();
-            }
-        })
-        .Inputs(
-            Computation<ValueType>(
-                ExecIrComputationTokens->explicitDesiredValue),
-            IncomingConnections<ValueType>(
-                ExecIrComputationTokens->computeDesiredValue));
-}
-
-template <typename ValueType>
-void
-_Builder::_ConnectionDataflowExpression(
-    const TfToken &attributeName)
-{
-    using namespace exec_registration;
-
-    _self.AttributeExpression(attributeName)
-        .Inputs(
-            Connections<ValueType>(
-                ExecBuiltinComputations->computeValue),
-            Computation<ValueType>(
-                ExecBuiltinComputations->computeResolvedValue))
-        .Callback(+[](const VdfContext &ctx) -> ValueType {
-            // A value that flows across a connection takes precedence.
-            if (const ValueType *const connectedValuePtr =
-                ctx.GetInputValuePtr<ValueType>(
-                    ExecBuiltinComputations->computeValue)) {
-                return *connectedValuePtr;
-            }
-
-            // Otherwise, the attribute's resolved value is its computed value.
-            return ctx.GetInputValue<ValueType>(
-                ExecBuiltinComputations->computeResolvedValue);
-        });
-}
-
-template <typename ValueType>
-const ValueType *
-_Builder::_GetExactlyOneDesiredValue(const VdfContext &ctx)
-{
-    const ValueType *foundInputValue = 
-        ctx.GetInputValuePtr<ValueType>(
-            ExecIrComputationTokens->explicitDesiredValue);
-
-    for (const ValueType &value :
-             VdfReadIteratorRange<ValueType>(
-                 ctx, ExecIrComputationTokens->computeDesiredValue)) {
-        if (!foundInputValue) {
-            foundInputValue = &value;
-        } else {
-            // TODO: We will introduce an ExecValidationErrorType enum to
-            // specifically identifiy this error condition.
-            TF_RUNTIME_ERROR(
-                "Found more than one desired value for node %s",
-                ctx.GetNodeDebugName().c_str());
-            return nullptr;
-        }
-    }
-
-    return foundInputValue;
+    // Output attributes support computing desired values, for inversion.
+    _DesiredValueComputations<ValueType>(attributeName);
 }
 
 void

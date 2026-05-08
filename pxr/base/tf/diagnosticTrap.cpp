@@ -15,9 +15,8 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 TfDiagnosticTrap::TfDiagnosticTrap()
+    : _trapKey(TfDiagnosticMgr::GetInstance()._PushTrap(this))
 {
-    TfDiagnosticMgr::GetInstance()._PushTrap(this);
-    _active = true;
 }
 
 TfDiagnosticTrap::~TfDiagnosticTrap()
@@ -28,11 +27,11 @@ TfDiagnosticTrap::~TfDiagnosticTrap()
 void
 TfDiagnosticTrap::Dismiss()
 {
-    if (!std::exchange(_active, false)) {
-        return;
+    if (_trapKey) {
+        TfDiagnosticMgr::GetInstance()._PopTrap(this, _trapKey);
+        _trapKey = nullptr;
+        _container.Post();
     }
-    TfDiagnosticMgr::GetInstance()._PopTrap(this);
-    _container.Post();
 }
 
 void

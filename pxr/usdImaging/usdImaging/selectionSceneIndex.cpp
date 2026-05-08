@@ -7,6 +7,7 @@
 #include "pxr/usdImaging/usdImaging/selectionSceneIndex.h"
 
 #include "pxr/usdImaging/usdImaging/debugCodes.h"
+#include "pxr/usdImaging/usdImaging/tokens.h"
 #include "pxr/usdImaging/usdImaging/usdPrimInfoSchema.h"
 #include "pxr/imaging/hd/instanceSchema.h"
 #include "pxr/imaging/hd/instancedBySchema.h"
@@ -887,8 +888,26 @@ _ExpandToDescendants(
             "        Processing seed %s\n",
             seeds[i].prim.GetText());
 
-        for (const SdfPath &descendant :
-                 HdSceneIndexPrimView(sceneIndex, seeds[i].prim)) {
+        HdSceneIndexPrimView view(sceneIndex, seeds[i].prim);
+
+        for (auto it = view.begin(); it != view.end(); ++it) {
+            const SdfPath &descendant = *it;
+
+            if (descendant.GetNameToken() ==
+                            UsdImagingTokens->niPropagatedPrototypesScope) {
+                //
+                // Do not descend into the NI propagated prototypes here.
+                //
+                // That is: the fact that the user selects a namespace ancestor
+                // of a NI propagated prototype is accidental. The relevant
+                // information for populating the selection schema of the
+                // geometry in a NI propagated prototype is which corresponding
+                // instances are selected. See HYD-3646.
+                //
+                it.SkipDescendants();
+                continue;
+            }
+
             const HdSceneIndexPrim prim =
                 sceneIndex->GetPrim(descendant);
 

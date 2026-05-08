@@ -162,6 +162,7 @@ class TfErrorMark
     void _ReportErrors(TfDiagnosticMgr &mgr) const;
 
     size_t _mark;
+    void  *_markKey = nullptr;
 };
 
 

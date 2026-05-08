@@ -87,19 +87,6 @@ public:
     inline const T *
     GetInputValuePtr(const TfToken &name, const T *defPtr) const;
 
-    /// Returns `true` if there are input values from the input named \p name
-    /// of type \p T.
-    ///
-    /// \warning
-    /// If the input spec has a data type that is not \p T, a fatal error is
-    /// emitted.
-    ///
-    /// \deprecated
-    /// This funcion is deprecated in favor of the untemplated overload.
-    ///
-    template<typename T>
-    inline bool HasInputValue(const TfToken &name) const;
-
     /// Returns `true` if there are input values from the input named \p name.
     ///
     VDF_API
@@ -339,24 +326,6 @@ VdfContext::GetInputValuePtr(const TfToken &name, const T *defPtr) const
 {
     const T *value = _GetFirstInputValue<T>(name);
     return value ? value : defPtr;
-}
-
-template<typename T>
-bool
-VdfContext::HasInputValue(const TfToken &name) const
-{
-    // Note that we generally shouldn't have to check the result of
-    // _GetFirstInputValue(name) here, as opposed to simply checking whether
-    // there are any connections with non-zero masks on input.
-    //
-    // The one exception, unfortunately, is the EfSelectNode, which selects
-    // amongst its inputs.  In the case where it doesn't have any inputs, it
-    // doesn't set an output at all even though it is connected.  We technically
-    // shouldn't be compiling a select node at all when there is no input, but
-    // we do so to make sure that "first-time" constraints is fast.  We should
-    // revisit that.
-
-    return _GetFirstInputValue<T>(name);
 }
 
 template<typename T>

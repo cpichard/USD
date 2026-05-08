@@ -241,8 +241,6 @@ if (NOT EMSCRIPTEN)
     pxr_register_test(
         testTsSplineSampling
         COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTsSplineSampling"
-        TESTENV testenv/testTsSplineSampling.testenv
-        DIFF_COMPARE testTsSplineSampling.txt
     )
 endif()
 

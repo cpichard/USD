@@ -209,6 +209,8 @@ void wrapSpline()
         .def("GetPreExtrapolation", &This::GetPreExtrapolation)
         .def("SetPostExtrapolation", &This::SetPostExtrapolation)
         .def("GetPostExtrapolation", &This::GetPostExtrapolation)
+        .def("IsPreExtrapolationValid", &This::IsPreExtrapolationValid)
+        .def("IsPostExtrapolationValid", &This::IsPostExtrapolationValid)
 
         .def("SetInnerLoopParams", &This::SetInnerLoopParams)
         .def("GetInnerLoopParams", &This::GetInnerLoopParams)

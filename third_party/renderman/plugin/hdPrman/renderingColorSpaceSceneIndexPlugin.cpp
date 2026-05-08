@@ -104,6 +104,14 @@ TF_MAKE_STATIC_DATA(
 
 TF_MAKE_STATIC_DATA(
     std::vector<
+        HdPrman_RenderingColorSpaceSceneIndexPlugin::FilterLightCallback>,
+    _filterLightCallbacks)
+{
+    _filterLightCallbacks->clear();
+}
+
+TF_MAKE_STATIC_DATA(
+    std::vector<
         HdPrman_RenderingColorSpaceSceneIndexPlugin::DisableTransformCallback>,
     _disableTransformCallbacks)
 {
@@ -910,9 +918,13 @@ public:
             const auto conn = interface.GetTerminalConnection(_terminalName);
             if (conn.first) {
                 const GfColorSpace renderingCS = _GetRenderingColorSpace(_si);
-                // Convert the colors inputs in the node.
-                _ConvertLightNodeColors(_primPath,
-                    conn.second.upstreamNodeName, interface, renderingCS);
+                if (!HdPrman_RenderingColorSpaceSceneIndexPlugin::FilterLight(
+                        &interface, _primPath, conn.second.upstreamNodeName, 
+                        renderingCS)) {
+                    // Convert the colors inputs in the node.
+                    _ConvertLightNodeColors(_primPath,
+                        conn.second.upstreamNodeName, interface, renderingCS);
+                }
             }
 
             return interface.Finish();
@@ -1163,6 +1175,29 @@ HdPrman_RenderingColorSpaceSceneIndexPlugin::FilterMaterial(
 {
     for (const auto& callback : *_filterMaterialCallbacks) {
         if (callback(interface, terminalNodeName, renderingCS)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* static */
+void
+HdPrman_RenderingColorSpaceSceneIndexPlugin::
+RegisterFilterLightCallback(const FilterLightCallback& callback)
+{
+    _filterLightCallbacks->push_back(callback);
+}
+
+bool
+HdPrman_RenderingColorSpaceSceneIndexPlugin::FilterLight(
+    HdMaterialNetworkInterface* interface,
+    const SdfPath& primPath,
+    const TfToken& nodeName,
+    const GfColorSpace& renderingCS)
+{
+    for (const auto& callback : *_filterLightCallbacks) {
+        if (callback(interface, primPath, nodeName, renderingCS)) {
             return true;
         }
     }

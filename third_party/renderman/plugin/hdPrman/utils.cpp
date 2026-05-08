@@ -62,6 +62,153 @@ extern TfEnvSetting<bool> HD_PRMAN_ENABLE_MOTIONBLUR;
 extern TfEnvSetting<int> HD_PRMAN_NTHREADS;
 extern TfEnvSetting<int> HD_PRMAN_OSL_VERBOSE;
 
+
+std::string
+TfStringify(RtParamList const& params)
+{
+    // XXX If RenderMan exposed its ParamListAsString() function
+    // we could invoke that here, instead.
+
+    // Helper: return a short type name string for a DataType.
+    auto typeName = [](RtDataType t) -> const char* {
+        switch (t) {
+        case RtDataType::k_integer:      return "integer";
+        case RtDataType::k_float:        return "float";
+        case RtDataType::k_color:        return "color";
+        case RtDataType::k_point:        return "point";
+        case RtDataType::k_vector:       return "vector";
+        case RtDataType::k_normal:       return "normal";
+        case RtDataType::k_hpoint:       return "hpoint";
+        case RtDataType::k_mpoint:       return "mpoint";
+        case RtDataType::k_matrix:       return "matrix";
+        case RtDataType::k_string:       return "string";
+        case RtDataType::k_bxdf:         return "bxdf";
+        case RtDataType::k_lightfilter:  return "lightfilter";
+        case RtDataType::k_samplefilter: return "samplefilter";
+        case RtDataType::k_displayfilter:return "displayfilter";
+        case RtDataType::k_volumefilter: return "volumefilter";
+        case RtDataType::k_struct:       return "struct";
+        default:                         return "unknown";
+        }
+    };
+
+    std::string result;
+    for (unsigned i = 0, n = params.GetNumParams(); i < n; ++i) {
+        RtParamList::ParamInfo info;
+        if (!TF_VERIFY(params.GetParamInfo(i, info))) {
+            continue;
+        }
+        void const* data = params.GetParam(i);
+
+        // Format: "type[length] name = value ..." or "type name = value"
+        // References store a UString target regardless of nominal type.
+        const bool isRef = (info.detail == RtDetailType::k_reference);
+        const uint32_t len = info.length;
+
+        if (info.array || len > 1) {
+            result += TfStringPrintf("%s[%u]", typeName(info.type), len);
+        } else {
+            result += typeName(info.type);
+        }
+        if (isRef) {
+            result += '&';
+        }
+        if (info.motion) {
+            result += '~';
+        }
+        result += ' ';
+        result += info.name.CStr();
+        result += " = ";
+
+        if (!data) {
+            result += "<null>\n";
+            continue;
+        }
+
+        if (isRef) {
+            auto* us = static_cast<RtUString const*>(data);
+            for (uint32_t j = 0; j < len; ++j) {
+                if (j) result += ' ';
+                result += us[j].CStr();
+            }
+        } else {
+            switch (info.type) {
+            case RtDataType::k_integer: {
+                auto* v = static_cast<int32_t const*>(data);
+                for (uint32_t j = 0; j < len; ++j) {
+                    if (j) result += ' ';
+                    result += TfStringPrintf("%d", v[j]);
+                }
+                break;
+            }
+            case RtDataType::k_float: {
+                auto* v = static_cast<float const*>(data);
+                for (uint32_t j = 0; j < len; ++j) {
+                    if (j) result += ' ';
+                    result += TfStringPrintf("%g", v[j]);
+                }
+                break;
+            }
+            case RtDataType::k_color: {
+                auto* v = static_cast<RtColorRGB const*>(data);
+                for (uint32_t j = 0; j < len; ++j) {
+                    if (j) result += ' ';
+                    result += TfStringPrintf("(%g %g %g)", v[j].r, v[j].g, v[j].b);
+                }
+                break;
+            }
+            case RtDataType::k_point:
+            case RtDataType::k_vector:
+            case RtDataType::k_normal: {
+                auto* v = static_cast<RtFloat3 const*>(data);
+                for (uint32_t j = 0; j < len; ++j) {
+                    if (j) result += ' ';
+                    result += TfStringPrintf("(%g %g %g)", v[j].x, v[j].y, v[j].z);
+                }
+                break;
+            }
+            case RtDataType::k_hpoint: {
+                auto* v = static_cast<RtFloat4 const*>(data);
+                for (uint32_t j = 0; j < len; ++j) {
+                    if (j) result += ' ';
+                    result += TfStringPrintf("(%g %g %g %g)",
+                        v[j].x, v[j].y, v[j].z, v[j].w);
+                }
+                break;
+            }
+            case RtDataType::k_mpoint:
+            case RtDataType::k_matrix: {
+                auto* v = static_cast<RtMatrix4x4 const*>(data);
+                for (uint32_t j = 0; j < len; ++j) {
+                    if (j) result += ' ';
+                    const float* m = &v[j].m[0][0];
+                    result += TfStringPrintf(
+                        "(%g %g %g %g  %g %g %g %g  %g %g %g %g  %g %g %g %g)",
+                        m[0],m[1],m[2],m[3], m[4],m[5],m[6],m[7],
+                        m[8],m[9],m[10],m[11], m[12],m[13],m[14],m[15]);
+                }
+                break;
+            }
+            case RtDataType::k_string: {
+                auto* v = static_cast<RtUString const*>(data);
+                for (uint32_t j = 0; j < len; ++j) {
+                    if (j) result += ' ';
+                    result += '"';
+                    result += v[j].CStr();
+                    result += '"';
+                }
+                break;
+            }
+            default:
+                result += "<unsupported>";
+                break;
+            }
+        }
+        result += '\n';
+    }
+    return result;
+}
+
 namespace {
 
 // _VtValueToRtParamList is a helper used with VtVisitValue to handle

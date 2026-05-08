@@ -1902,7 +1902,19 @@ Exec_ComputationBuilderBase::_ValidateInputs() {
         "Invalid type used as an input registration.");
     static_assert(
         regType::allowedProviders & allowed,
-        "Input is not allowed on a provider of this type.");
+        "This input registration is not allowed on a provider of this type.");
+    static_assert(
+        (regType::allowedProviders & allowed) ||
+        (allowed ==
+         Exec_ComputationBuilderProviderTypes::Attribute),
+        "This input registration is only allowed on a provider attribute; "
+        "there may be a missing Attribute(attributeName) registration.");
+    static_assert(
+        (regType::allowedProviders & allowed) ||
+        (allowed ==
+         Exec_ComputationBuilderProviderTypes::Prim),
+        "This input registration is only allowed on a provider prim; "
+        "there may be a missing Prim() registration.");
 }
 
 //

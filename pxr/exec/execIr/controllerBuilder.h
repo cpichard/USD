@@ -32,6 +32,62 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+// Builder base class used to share common code.
+//
+class ExecIr_ControllerBuilderBase {
+protected:
+    EXECIR_API
+    ExecIr_ControllerBuilderBase(
+        ExecComputationBuilder &self);
+
+    // The destructor is protected so that it's not possible to delete through
+    // a base class pointer.
+    //
+    virtual ~ExecIr_ControllerBuilderBase();
+
+    // Registers an expression that implements dataflow across attribute
+    // connections.
+    //
+    // TODO: This expression won't be needed when the OpenExec core defines
+    // default attribute connection dataflow behavior for all attributes.
+    //
+    template <typename ValueType>
+    void
+    _ConnectionDataflowExpression(
+        const TfToken &attributeName);
+
+    // Registers the 'explicitDesiredValue' and 'computedDesiredValue'
+    // computations that are required to compute desired values, including
+    // desired values that are expressed as overrides.
+    //
+    // TODO: These plugin computations won't be necessary when OpenExec provides
+    // core inversion support.
+    //
+    template <typename ValueType>
+    void
+    _DesiredValueComputations(
+        const TfToken &attributeName);
+
+    // Sets the computation output to the value from the 'explicitDesiredValue'
+    // input if it provides one; otherwise sets the output to the the
+    // 'computeDesiredValue' input, if it has one; otherwise sets an empty
+    // output value.
+    //
+    // If, among all considered inputs, more than one input value is provided,
+    // an error is emitted.
+    //
+    // TODO: The compuations that use this callback won't be necessary when
+    // OpenExec provides core inversion support.
+    //
+    template <typename ValueType>
+    static void
+    _GetExactlyOneDesiredValue(
+        const VdfContext &ctx);
+
+protected:
+    ExecComputationBuilder &_self;
+};
+
 /// Builder class used to register invertible controller computations.
 ///
 /// This class can only be used in the context of schema computation
@@ -110,7 +166,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// }
 /// ```
 ///
-class ExecIrControllerBuilder {
+class ExecIrControllerBuilder : ExecIr_ControllerBuilderBase {
 public:
 
     /// The type for forward and inverse controller computation calbacks.
@@ -132,7 +188,7 @@ public:
         Callback inverseCallback);
 
     EXECIR_API
-    ~ExecIrControllerBuilder();
+    ~ExecIrControllerBuilder() override;
 
     /// Registers an invertible input attribute.
     ///
@@ -165,7 +221,6 @@ public:
             InvertibleInputAttribute<ValueType>(attributeName);
         }
     }
-
 
     /// Registers an invertible output attribute.
     ///
@@ -218,29 +273,6 @@ public:
 
 private:
 
-    // Registers an expression that implements dataflow across attribute
-    // connections.
-    //
-    // TODO: This expression won't be needed when the OpenExec core defines
-    // default attribute connection dataflow behavior for all attributes.
-    template <typename ValueType>
-    void
-    _ConnectionDataflowExpression(
-        const TfToken &attributeName);
-
-    // Returns a pointer to the desired value provided by the
-    // 'explicitDesiredValue' and 'computedDesiredValue' inputs; otherwise,
-    // returns null.
-    //
-    // If more than one input value is provided, an error is emitted.
-    //
-    template <typename ValueType>
-    static const ValueType *
-    _GetExactlyOneDesiredValue(
-        const VdfContext &ctx);
-
-private:
-    ExecComputationBuilder &_self;
     ExecPrimComputationBuilder _forwardComputeReg;
     ExecPrimComputationBuilder _inverseComputeReg;
     TfTokenVector _invertibleOutputAttributeNames;
@@ -351,42 +383,8 @@ ExecIrControllerBuilder::InvertibleOutputAttribute(
 
     _invertibleOutputAttributeNames.push_back(attributeName);
 
-    // The 'explicitDesiredValue' computation only exists to provide an output
-    // where desired values can be specified as overrides passed to
-    // ComputeWithOverrides.
-    //
-    // TODO: This plugin computation won't be necessary when OpenExec provides
-    // core inversion support.
-    _self.AttributeComputation(
-        attributeName, ExecIrComputationTokens->explicitDesiredValue)
-        .Callback<ValueType>(+[](const VdfContext &ctx) {
-            ctx.SetEmptyOutput();
-        });
-
-    // The 'computeDesiredValue' computation gets its value from the
-    // 'explicitDesiredValue' computation if it provides one, or from the
-    // 'computeDesiredValue' computation via incoming connections--but only if
-    // there is exactly one desired value present on these inputs. Otherwise,
-    // no value is returned. An error is emitted if more than one desired value
-    // is present.
-    //
-    // TODO: This plugin computation won't be necessary when OpenExec provides
-    // core inversion support.
-    _self.AttributeComputation(
-        attributeName, ExecIrComputationTokens->computeDesiredValue)
-        .Callback<ValueType>(+[](const VdfContext &ctx) {
-            if (const ValueType *const valuePtr =
-                _GetExactlyOneDesiredValue<ValueType>(ctx)) {
-                ctx.SetOutput(*valuePtr);
-            } else {
-                ctx.SetEmptyOutput();
-            }
-        })
-        .Inputs(
-            Computation<ValueType>(
-                ExecIrComputationTokens->explicitDesiredValue),
-            IncomingConnections<ValueType>(
-                ExecIrComputationTokens->computeDesiredValue));
+    // Invertible outputs support computing desired values, for inversion.
+    _DesiredValueComputations<ValueType>(attributeName);
 
     // Invertible outputs provide inputs to the inverse computation, getting
     // their values from the attribute's 'computeDesiredValue' computation.
@@ -467,7 +465,7 @@ ExecIrControllerBuilder::PassthroughAttributes(
 
 template <typename ValueType>
 void
-ExecIrControllerBuilder::_ConnectionDataflowExpression(
+ExecIr_ControllerBuilderBase::_ConnectionDataflowExpression(
     const TfToken &attributeName)
 {
     using namespace exec_registration;
@@ -493,30 +491,71 @@ ExecIrControllerBuilder::_ConnectionDataflowExpression(
 }
 
 template <typename ValueType>
-const ValueType *
-ExecIrControllerBuilder::_GetExactlyOneDesiredValue(
+void
+ExecIr_ControllerBuilderBase::_DesiredValueComputations(
+    const TfToken &attributeName)
+{
+    using namespace exec_registration;
+
+    // The 'explicitDesiredValue' computation only exists to provide an output
+    // where desired values can be specified as overrides passed to
+    // ComputeWithOverrides.
+    _self.AttributeComputation(
+        attributeName, ExecIrComputationTokens->explicitDesiredValue)
+        .Callback<ValueType>(+[](const VdfContext &ctx) {
+            ctx.SetEmptyOutput();
+        });
+
+    // The 'computeDesiredValue' computation gets its value from the
+    // 'explicitDesiredValue' computation if it provides one, or from the
+    // 'computeDesiredValue' computation via incoming connections--but only if
+    // there is exactly one desired value present on these inputs. Otherwise, no
+    // value is returned. An error is emitted if more than one desired value is
+    // present.
+    _self.AttributeComputation(
+        attributeName, ExecIrComputationTokens->computeDesiredValue)
+        .Callback<ValueType>(&_GetExactlyOneDesiredValue<ValueType>)
+        .Inputs(
+            Computation<ValueType>(
+                ExecIrComputationTokens->explicitDesiredValue),
+            IncomingConnections<ValueType>(
+                ExecIrComputationTokens->computeDesiredValue));
+}
+
+template <typename ValueType>
+void
+ExecIr_ControllerBuilderBase::_GetExactlyOneDesiredValue(
     const VdfContext &ctx)
 {
-    const ValueType *foundInputValue = 
-        ctx.GetInputValuePtr<ValueType>(
-            ExecIrComputationTokens->explicitDesiredValue);
+    const ValueType *const inputValue = [&]() -> const ValueType*
+    {
+        const ValueType *foundInputValue =
+            ctx.GetInputValuePtr<ValueType>(
+                ExecIrComputationTokens->explicitDesiredValue);
 
-    for (const ValueType &value :
-             VdfReadIteratorRange<ValueType>(
-                 ctx, ExecIrComputationTokens->computeDesiredValue)) {
-        if (!foundInputValue) {
-            foundInputValue = &value;
-        } else {
-            // TODO: We will introduce an ExecValidationErrorType enum to
-            // specifically identifiy this error condition.
-            TF_RUNTIME_ERROR(
-                "Found more than one desired value for node %s",
-                ctx.GetNodeDebugName().c_str());
-            return nullptr;
+        for (const ValueType &value :
+                 VdfReadIteratorRange<ValueType>(
+                     ctx, ExecIrComputationTokens->computeDesiredValue)) {
+            if (!foundInputValue) {
+                foundInputValue = &value;
+            } else {
+                // TODO: We will introduce an ExecValidationErrorType enum to
+                // specifically identifiy this error condition.
+                TF_RUNTIME_ERROR(
+                    "Found more than one desired value for node %s",
+                    ctx.GetNodeDebugName().c_str());
+                return nullptr;
+            }
         }
-    }
 
-    return foundInputValue;
+        return foundInputValue;
+    }();
+
+    if (inputValue) {
+        ctx.SetOutput(*inputValue);
+    } else {
+        ctx.SetEmptyOutput();
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

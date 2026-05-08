@@ -812,12 +812,20 @@ function(pxr_register_test TEST_NAME)
     # e.g. by changing the environment, changing the expected return code, etc.
     set(testWrapperCmd ${PROJECT_SOURCE_DIR}/cmake/macros/testWrapper.py --verbose)
 
-    # For Emscripten we want to explicitly run the test with node.  The tests
-    # themselves are javascript files which contain a shebang, however if we are
-    # trying to run them on windows this will result in errors when trying to
-    # spawn the test process.
+    # For Emscripten we want to explicitly run the test with the emsdk provided
+    # node (this make sure we are using emscripten with compatible node and not
+    # use an outdated node available on the system). The test themselves are
+    # javascript files which contain a shebang, however if we are trying to run
+    # them on windows this will result in errors when trying to spawn the test
+    # process.
     if (EMSCRIPTEN)
-        set(testWrapperCmd ${testWrapperCmd} --test-runner node)
+        if (DEFINED ENV{EMSDK_NODE})
+            message(STATUS "Using EMSDK_NODE node for tests: $ENV{EMSDK_NODE}")
+            set(testWrapperCmd ${testWrapperCmd} --test-runner $ENV{EMSDK_NODE})
+        else()
+            message(STATUS "EMSDK_NODE not set, falling back to system provided node")
+            set(testWrapperCmd ${testWrapperCmd} --test-runner node)
+        endif()
     endif()
 
     if (bt_STDOUT_REDIRECT)

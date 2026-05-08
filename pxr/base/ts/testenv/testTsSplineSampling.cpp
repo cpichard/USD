@@ -20,7 +20,7 @@
 PXR_NAMESPACE_USING_DIRECTIVE
 
 static int testCase = 0;
-static bool verbose = true;
+static bool verbose = false;
 
 using Polyline = std::vector<GfVec2d>;
 using Polylines = std::vector<Polyline>;
@@ -210,7 +210,17 @@ static bool VerifySamples(std::ostream& out,
                 const double u = k / 4.0;
                 samplePts[k] = GfLerp(u, prev, next);
                 splinePts[k] = samplePts[k];
-                if (!spline.Eval(splinePts[k][0], &splinePts[k][1])) {
+                bool result;
+                // Evaluate a pre-value at the end of the segment
+                if (k == 4) {
+                    result = spline.EvalPreValue(splinePts[k][0],
+                                                 &splinePts[k][1]);
+                } else {
+                    result = spline.Eval(splinePts[k][0],
+                                         &splinePts[k][1]);
+                }
+
+                if (!result) {
                     // Output to both out and cerr so the message is both
                     // in context and highlighted.
                     std::ostringstream msg;
@@ -277,7 +287,7 @@ static bool VerifySamples(std::ostream& out,
                 while (true) {
                     // Correct the values of the intermediate points
                     spline.Eval(testPts[1][0], &testPts[1][1]);
-                    spline.Eval(testPts[3][0], &testPts[3][1]);
+                    spline.EvalPreValue(testPts[3][0], &testPts[3][1]);
 
                     double minErrorSq = std::numeric_limits<double>::infinity();
                     int errIndex = -1;
@@ -543,6 +553,14 @@ void DoTest(std::ostream& out, const std::string& sampleFunc)
         GfInterval shortSpan(knotSpan.GetMin() + 0.25 * knotSpanSize,
                              knotSpan.GetMax() - 0.25 * knotSpanSize);
 
+        // Calculate a span entirely in the pre-extrap region
+        GfInterval preSpan(knotSpan.GetMin() - 1.5 * knotSpanSize,
+                           knotSpan.GetMin() - 0.5 * knotSpanSize);
+
+        // Calculate a span entirely in the post-extrap region
+        GfInterval postSpan(knotSpan.GetMax() + 0.5 * knotSpanSize,
+                            knotSpan.GetMax() + 1.5 * knotSpanSize);
+
         // We would like to use spline.GetValueRange() but it is
         // "not yet implemented." Estimate by scanning through
         // the knot times and calling eval.  We're only using it
@@ -579,6 +597,14 @@ void DoTest(std::ostream& out, const std::string& sampleFunc)
         // Sample the short range but more rigor
         DoOneSample<double, GfVec2d>(out, data, sampleFunc,
                                      shortSpan, timeScale, valueScale, 0.5);
+
+        // Sample the pre-extrap region
+        DoOneSample<float, GfVec2f>(out, data, sampleFunc,
+                                    preSpan, timeScale, valueScale, 1.0);
+
+        // Sample the post-extrap region
+        DoOneSample<float, GfVec2f>(out, data, sampleFunc,
+                                    postSpan, timeScale, valueScale, 1.0);
     }
 }
 

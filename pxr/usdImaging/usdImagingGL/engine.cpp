@@ -573,13 +573,6 @@ UsdImagingGLEngine::PrepareBatch(
                 _usdImagingSceneIndex->
                     GetPostInstancingNoticeBatchingSceneIndex());
 
-            // Set timeCodesPerSecond in HdsiSceneGlobalsSceneIndex.
-            if (_appSceneIndices) {
-                if (auto &sgsi = _appSceneIndices->sceneGlobalsSceneIndex) {
-                    sgsi->SetTimeCodesPerSecond(stage->GetTimeCodesPerSecond());
-                }
-            }
-
             // XXX(USD-7113): Add pruning based on _rootPath
 
             // XXX(USD-7115): Add invis overrides from _invisedPrimPaths.

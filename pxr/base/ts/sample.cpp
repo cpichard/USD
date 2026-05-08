@@ -309,26 +309,43 @@ Ts_Sample(
                 y1 = segment.interp == Ts_SegmentInterp::Held ? y0
                                                               : segment.p1[1];
 
-                // Get the slope from extrapolation segments.
-                // slope = (y1-y0)/(x1-x0)
+                // Clamp this segment to timeInterval. We need to interpolate
+                // the y value at the edge of timeInterval. This is a little
+                // tricky because extrapolation segments end with an infinite
+                // time value and a slope instead of a value.  We first need to
+                // clamp the infinite values so we can get rid of the
+                // infinities, then we can clamp finite segment end points.
+                //
+                // Note: We add 0.0 so that -0 converts to 0.
+                //
+                // Compute the slope. Start by assuming it is 0.0
                 double slope = 0.0;
-                if (segment.p0[0] == -inf) {
+                if (x0 == -inf) {
+                    // Pre-extrapolation, p0[1] is the slope.
                     slope = segment.p0[1];
-                } else if (segment.p1[0] == +inf) {
+                    // Since we know it's infinite, clamp it.
+                    x0 = timeInterval.GetMin();
+                    y0 = y1 - slope * (x1 - x0) + 0.0;
+                } else if (x1 == +inf) {
+                    // Post-extrapolation, p1[1] is the slope
                     slope = segment.p1[1];
+                    // Since we know it's infinite, clamp it.
+                    x1 = timeInterval.GetMax();
+                    y1 = y0 + slope * (x1 - x0) + 0.0;
                 } else if (segment.interp == Ts_SegmentInterp::Linear) {
+                    // Finite linear segment. The math is safe.
                     slope = (segment.p1[1] - segment.p0[1])
                         / (segment.p1[0] - segment.p0[0]);
                 }
 
-                // Add 0.0 so that -0 displays as 0 instead.
+                // Now clamp the segment to timeInterval.
                 if (timeInterval.GetMin() > x0) {
                     x0 = timeInterval.GetMin();
-                    y0 = -(slope * (x1-x0) - y1) + 0.0;
+                    y0 = y1 - slope * (x1 - x0) + 0.0;
                 }
                 if (timeInterval.GetMax() < x1) {
                     x1 = timeInterval.GetMax();
-                    y1 = slope * (x1 - x0) + y0 + 0.0;
+                    y1 = y0 + slope * (x1 - x0) + 0.0;
                 }
                 const TsSplineSampleSource source =
                     _GetSegmentSource(&segment, data);

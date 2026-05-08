@@ -23,7 +23,14 @@ UsdExecImaging_StageSceneIndex::~UsdExecImaging_StageSceneIndex() = default;
 HdSceneIndexPrim
 UsdExecImaging_StageSceneIndex::GetPrim(const SdfPath &primPath) const
 {
-    return {};
+    return {
+        // UsdExecImaging_StageSceneIndex provides no opinion for the prim type.
+        // The prim type is overridden by UsdImagingStageSceneIndex.
+        TfToken(),
+
+        // Data source.
+        _request ? _request->GetPrimData(primPath) : nullptr
+    };
 }
 
 SdfPathVector
@@ -35,6 +42,12 @@ UsdExecImaging_StageSceneIndex::GetChildPrimPaths(const SdfPath &primPath) const
 void
 UsdExecImaging_StageSceneIndex::SetStage(UsdStageRefPtr stage)
 {
+    if (stage) {
+        _request = UsdExecImaging_Request::New(std::move(stage));
+    }
+    else {
+        _request.reset();
+    }
 }
 
 void
@@ -45,6 +58,9 @@ UsdExecImaging_StageSceneIndex::SetTime(UsdTimeCode time)
 void
 UsdExecImaging_StageSceneIndex::ApplyPendingUpdates()
 {
+    if (_request) {
+        _request->Refresh();
+    }
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -34,11 +34,6 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-TF_DEFINE_PRIVATE_TOKENS(
-    _tokens,
-    ((propagatedPrototypesScope, "UsdNiPropagatedPrototypes")));
-
-
 namespace UsdImaging_NiInstanceAggregationSceneIndex_Impl {
 
 // Gets primvars from prim at given path in scene index.
@@ -879,7 +874,7 @@ struct _InstanceInfo {
     SdfPath GetBindingPrimPath() const {
         return
             enclosingPrototypeRoot
-                .AppendChild(_tokens->propagatedPrototypesScope)
+                .AppendChild(UsdImagingTokens->niPropagatedPrototypesScope)
                 .AppendChild(bindingHash);
     }
 

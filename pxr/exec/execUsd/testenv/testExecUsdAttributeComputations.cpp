@@ -18,6 +18,7 @@
 #include "pxr/base/tf/staticTokens.h"
 #include "pxr/base/tf/token.h"
 #include "pxr/exec/exec/registerSchema.h"
+#include "pxr/exec/exec/systemDiagnostics.h"
 #include "pxr/exec/vdf/context.h"
 #include "pxr/exec/vdf/readIterator.h"
 #include "pxr/usd/sdf/layer.h"
@@ -230,6 +231,12 @@ TestAttributeComputations()
             "'sibling attribute computation result' "
             "'prim computation result'");
     }
+
+    // TODO: There doesn't seem to currently be a good place for basic testing
+    // of computation, invalidation, etc., which would be the right place to
+    // make sure that we call InvalidateAll. This is here, for now, to provide
+    // some basic coverage for this function.
+    ExecSystem::Diagnostics(&execSystem).InvalidateAll();
 }
 
 // Test dispatched attribute computations.

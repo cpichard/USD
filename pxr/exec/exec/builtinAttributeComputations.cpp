@@ -16,8 +16,6 @@
 #include "pxr/exec/esf/attribute.h"
 #include "pxr/usd/sdf/valueTypeName.h"
 
-#include <initializer_list>
-
 PXR_NAMESPACE_OPEN_SCOPE
 
 //
@@ -105,8 +103,7 @@ Exec_ComputeResolvedValueComputationDefinition::CompileNode(
 Exec_InputKeyVectorConstRefPtr
 Exec_ComputeResolvedValueComputationDefinition::_MakeInputKeys()
 {
-    const Exec_InputKeyVectorRefPtr inputKeys =
-        Exec_InputKeyVector::MakeShared(std::initializer_list<Exec_InputKey>{{
+    return Exec_InputKeyVector::MakeConstShared({{
                 Exec_AttributeInputNodeTokens->time,
                 ExecBuiltinComputations->computeTime,
                 /* disambiguatingId */ TfToken(),
@@ -117,8 +114,6 @@ Exec_ComputeResolvedValueComputationDefinition::_MakeInputKeys()
                 },
                 /* optional */ false
         }});
-
-    return Exec_InputKeyVectorConstRefPtr(inputKeys);
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

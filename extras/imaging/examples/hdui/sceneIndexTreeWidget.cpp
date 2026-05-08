@@ -6,6 +6,10 @@
 //
 #include "sceneIndexTreeWidget.h"
 
+#include "pxr/imaging/hd/instanceProxySchema.h"
+#include "pxr/imaging/hd/instanceSchema.h"
+
+#include <QBrush>
 #include <QClipboard>
 #include <QContextMenuEvent>
 #include <QGuiApplication>
@@ -17,6 +21,55 @@
 #include <unordered_set>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+//-----------------------------------------------------------------------------
+
+namespace
+{
+
+// Returns the foreground color for a prim tree item based on its data source.
+// Instance prims (with the "instance" data source) are light blue.
+// Instance proxy prims (with the "instanceProxy" data source) are dark blue.
+// All other prims use the default (invalid QColor = no override).
+QColor
+_PrimForegroundColor(const HdContainerDataSourceHandle &primContainer)
+{
+    if (!primContainer) {
+        return {};
+    }
+
+    // Instance proxy prims: manufactured by HdInstanceProxyViewSceneIndex with
+    // an "instanceProxy" top-level container key.
+    if (HdInstanceProxySchema::GetFromParent(primContainer)) {
+         // dark blue (matches usdviewq prototype color)
+        return QColor(118, 136, 217);
+    }
+    // Instance prims: updated by the UsdImagingNiInstanceAggregationSceneIndex
+    // with an "instance" top-level container key.
+    if (HdInstanceSchema::GetFromParent(primContainer)) {
+        // light blue (matches usdviewq instance color)
+        return QColor(135, 206, 250);
+    }
+    return {};
+}
+
+void
+_ApplyPrimColor(QTreeWidgetItem *item,
+                const HdContainerDataSourceHandle &dataSource)
+{
+    const QColor color = _PrimForegroundColor(dataSource);
+    if (color.isValid()) {
+        const QBrush brush(color);
+        item->setForeground(0, brush);
+        item->setForeground(1, brush);
+    } else {
+        // Reset to default (palette color).
+        item->setData(0, Qt::ForegroundRole, QVariant());
+        item->setData(1, Qt::ForegroundRole, QVariant());
+    }
+}
+
+} // namespace
 
 //-----------------------------------------------------------------------------
 
@@ -91,11 +144,12 @@ public:
             HdSceneIndexPrim prim =
                 treeWidget->_inputSceneIndex->GetPrim(childPath);
 
-            Hdui_SceneIndexPrimTreeWidgetItem * childItem = 
+            Hdui_SceneIndexPrimTreeWidgetItem * childItem =
                    new Hdui_SceneIndexPrimTreeWidgetItem(this, childPath, true);
 
             treeWidget->_AddPrimItem(childPath, childItem);
             childItem->setText(1, prim.primType.data());
+            _ApplyPrimColor(childItem, prim.dataSource);
 
             // if current item has no children, we can hide the expand indicator
             if (!sceneIndex->GetChildPrimPaths(childPath).size()) {
@@ -206,6 +260,9 @@ HduiSceneIndexTreeWidget::PrimsAdded(
         if (Hdui_SceneIndexPrimTreeWidgetItem *item = _GetPrimItem(
                 entry.primPath)) {
             item->setText(1, entry.primType.data());
+
+            const HdSceneIndexPrim prim = _inputSceneIndex->GetPrim(entry.primPath);
+            _ApplyPrimColor(item, prim.dataSource);
 
             if (item->isSelected()) {
                 Q_EMIT itemSelectionChanged();
@@ -330,23 +387,33 @@ HduiSceneIndexTreeWidget::SetSelectedPrimPath(const SdfPath &primPath)
         return;
     }
 
-    Hdui_SceneIndexPrimTreeWidgetItem *item =
-        _GetPrimItem(primPath, /* createIfNecessary*/ true);
-
-    if (item) {
-        // Parents must be expanded for the item to be visible.
-        QTreeWidgetItem * parent = item->parent();
-        while (parent) {
-            parent->setExpanded(true);
-            parent = parent->parent();
+    // Expanding bottom-up won't work: when a higher ancestor's WasExpanded()
+    // fires it can clear and rebuild its subtree, invalidating any items that
+    // were pre-created for the deeper levels, leaving a stale item pointer.
+    //
+    // So, below we first expand ancestors top-down, resulting in the child
+    // items being created and cached in _primItems.
+    //
+    Hdui_SceneIndexPrimTreeWidgetItem *item = nullptr;
+    for (const SdfPath &curPath : primPath.GetPrefixes()) {
+        item = _GetPrimItem(curPath, /* createIfNecessary */ false);
+        
+        if (!TF_VERIFY(item, "Expected cached prim item for path '%s'",
+            curPath.GetText())) {
+            return;
         }
-
-        // XXX For some reason, this doesn't show the item as selected if
-        // it isn't already visible. Using a timer to defer it doesn't seem
-        // to help either.
-        setCurrentItem(item, 0, QItemSelectionModel::ClearAndSelect);
-        scrollToItem(item);
+        item->setExpanded(true);
     }
+
+    if (!TF_VERIFY(item->GetPrimPath() == primPath,
+        "Expected cached prim item for selected prim path '%s'",
+            primPath.GetText())) {
+        return;
+    }
+
+    setCurrentItem(item, 0, QItemSelectionModel::ClearAndSelect);
+    scrollToItem(item);
+    setFocus();
 }
 
 Hdui_SceneIndexPrimTreeWidgetItem *

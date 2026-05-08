@@ -136,6 +136,14 @@ void TsSpline::SetPreExtrapolation(
     const TsExtrapolation &extrap)
 {
     _PrepareForWrite();
+    if (extrap.IsLooping() && extrap.loopBoundaryTime.has_value() &&
+        _data->loopParams != TsLoopParams())
+    {
+        TF_CODING_ERROR("Cannot set extrapolation looping with a non-null "
+                        "loopBoundaryTime when inner loops are possibly "
+                        "present.");
+        return;
+    }
     _data->preExtrapolation = extrap;
 }
 
@@ -148,12 +156,48 @@ void TsSpline::SetPostExtrapolation(
     const TsExtrapolation &extrap)
 {
     _PrepareForWrite();
+    if (extrap.IsLooping() && extrap.loopBoundaryTime.has_value() &&
+        _data->loopParams != TsLoopParams())
+    {
+        TF_CODING_ERROR("Cannot set extrapolation looping with a non-null "
+                        "loopBoundaryTime when inner loops are possibly "
+                        "present.");
+        return;
+    }
     _data->postExtrapolation = extrap;
 }
 
 TsExtrapolation TsSpline::GetPostExtrapolation() const
 {
     return _GetData()->postExtrapolation;
+}
+
+bool
+TsSpline::IsPreExtrapolationValid() const
+{
+    const TsExtrapolation& extrap = _GetData()->preExtrapolation;
+    if (!extrap.IsLooping() || !extrap.loopBoundaryTime.has_value()) {
+        return true;
+    }
+
+    const std::vector<TsTime>& times = _GetData()->times;
+    return std::binary_search(times.begin(),
+                              times.end(),
+                              extrap.loopBoundaryTime.value());
+}
+
+bool
+TsSpline::IsPostExtrapolationValid() const
+{
+    const TsExtrapolation& extrap = _GetData()->postExtrapolation;
+    if (!extrap.IsLooping() || !extrap.loopBoundaryTime.has_value()) {
+        return true;
+    }
+
+    const std::vector<TsTime>& times = _GetData()->times;
+    return std::binary_search(times.begin(),
+                              times.end(),
+                              extrap.loopBoundaryTime.value());
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -163,6 +207,21 @@ void TsSpline::SetInnerLoopParams(
     const TsLoopParams &params)
 {
     _PrepareForWrite();
+
+    // Don't set inner looping if it causes non-default inner looping and
+    // extrapolation looping with loopBoundaryTime to be active simultaneously.
+    if (params != TsLoopParams()) {
+        const TsExtrapolation& preExtrap = GetPreExtrapolation();
+        const TsExtrapolation& postExtrap = GetPostExtrapolation();
+        if ((preExtrap.IsLooping() && preExtrap.loopBoundaryTime.has_value()) ||
+            (postExtrap.IsLooping() && postExtrap.loopBoundaryTime.has_value()))
+        {
+            TF_CODING_ERROR("Cannot set non-default inner loop params when "
+                            "spline has extrapolation looping with non-null "
+                            "loopBoundaryTime.");
+            return;
+        }
+    }
 
     // Store a copy.
     _data->loopParams = params;

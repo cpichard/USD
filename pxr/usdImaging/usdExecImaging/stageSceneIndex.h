@@ -11,6 +11,7 @@
 
 #include "pxr/pxr.h"
 
+#include "pxr/usdImaging/usdExecImaging/request.h"
 #include "pxr/usdImaging/usdExecImaging/stageSceneIndexInterface.h"
 
 #include "pxr/base/tf/declarePtrs.h"
@@ -50,6 +51,9 @@ public:
 
 private:
     UsdExecImaging_StageSceneIndex();
+
+private:
+    UsdExecImaging_RequestSharedPtr _request;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

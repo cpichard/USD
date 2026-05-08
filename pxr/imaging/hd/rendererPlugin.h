@@ -168,20 +168,6 @@ public:
     ///
     virtual void DeleteRenderDelegate(HdRenderDelegate *renderDelegate) = 0;
 
-    ///
-    /// \deprecated Use overload taking HdRendererCreateArgsSchema
-    ///
-    /// Returns \c true if this renderer plugin is supported in the running 
-    /// process and \c false if not.
-    /// 
-    /// This gives the plugin a chance to perform some runtime checks to make
-    /// sure that the system meets minimum requirements.  The \p gpuEnabled
-    /// parameter indicates if the GPU is available for use by the plugin in
-    /// case this information is necessary to make this determination.
-    ///
-    HD_API
-    virtual bool IsSupported(bool gpuEnabled = true) const;
-
     /// @}
 
 protected:

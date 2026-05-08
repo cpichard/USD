@@ -55,6 +55,67 @@ using std::cout;
 using std::endl;
 PXR_NAMESPACE_USING_DIRECTIVE
 
+// Types for testing extended VtVisitValue dispatch.
+struct _ExtTypeA {
+    int value;
+    friend bool operator==(_ExtTypeA const &l, _ExtTypeA const &r) {
+        return l.value == r.value;
+    }
+};
+
+struct _ExtTypeB {
+    std::string name;
+    friend bool operator==(_ExtTypeB const &l, _ExtTypeB const &r) {
+        return l.name == r.name;
+    }
+};
+
+// Additional types to exercise the hash-table dispatch path (need > 8 total).
+template <int I>
+struct _ExtType {
+    int x;
+    friend bool operator==(_ExtType const &l, _ExtType const &r) {
+        return l.x == r.x;
+    }
+};
+
+using _ExtTypeC = _ExtType<0>;
+using _ExtTypeD = _ExtType<1>;
+using _ExtTypeE = _ExtType<2>;
+using _ExtTypeF = _ExtType<3>;
+using _ExtTypeG = _ExtType<4>;
+using _ExtTypeH = _ExtType<5>;
+using _ExtTypeI = _ExtType<6>;
+
+// Register them for VtVisitValue
+
+#define VT_ADD_EXT_VISIT_VALUE_TYPE _ExtTypeA
+#include "pxr/base/vt/addExtVisitValueType.h"
+
+#define VT_ADD_EXT_VISIT_VALUE_TYPE _ExtTypeB
+#include "pxr/base/vt/addExtVisitValueType.h"
+
+#define VT_ADD_EXT_VISIT_VALUE_TYPE _ExtTypeC
+#include "pxr/base/vt/addExtVisitValueType.h"
+
+#define VT_ADD_EXT_VISIT_VALUE_TYPE _ExtTypeD
+#include "pxr/base/vt/addExtVisitValueType.h"
+
+#define VT_ADD_EXT_VISIT_VALUE_TYPE _ExtTypeE
+#include "pxr/base/vt/addExtVisitValueType.h"
+
+#define VT_ADD_EXT_VISIT_VALUE_TYPE _ExtTypeF
+#include "pxr/base/vt/addExtVisitValueType.h"
+
+#define VT_ADD_EXT_VISIT_VALUE_TYPE _ExtTypeG
+#include "pxr/base/vt/addExtVisitValueType.h"
+
+#define VT_ADD_EXT_VISIT_VALUE_TYPE _ExtTypeH
+#include "pxr/base/vt/addExtVisitValueType.h"
+
+#define VT_ADD_EXT_VISIT_VALUE_TYPE _ExtTypeI
+#include "pxr/base/vt/addExtVisitValueType.h"
+
 static void die(const std::string &msg) {
     TF_FATAL_ERROR("ERROR: %s failed.", msg.c_str());
 }
@@ -1864,6 +1925,18 @@ struct IsSameOrArrayOfVisitor
     }
 };
 
+template <class T>
+struct GetSizeOfVisitor
+{
+    static size_t Visit() { return sizeof(T); }
+};
+
+template <class T, class U>
+struct IsSameTypeVisitor
+{
+    static bool Visit() { return std::is_same_v<T, U>; }
+};
+
 template <class T, class U>
 struct IsSameOrArrayOfVisitor<VtArray<T>, U>
 {
@@ -2014,6 +2087,145 @@ testVisitValue()
             VtVisitValueType<MakeNew, ArrayWrapper>(sv, 123);
         TF_AXIOM(dynamic_cast<ArrayWrapper<std::string> *>(sawrap.get()));
     }
+}
+
+static void
+testExtVisitValue()
+{
+    // Extended types -- registered via VT_ADD_EXT_VISIT_VALUE_TYPE above.
+    VtValue extA(_ExtTypeA{42});
+    VtValue extB(_ExtTypeB{"hello"});
+
+    // Known type and truly unknown type for comparison.
+    VtValue iv(123);
+    VtValue ov(std::vector<float>(5));
+
+    struct Visitor {
+        std::string operator()(_ExtTypeA const &a) const {
+            return TfStringPrintf("ExtTypeA: %d", a.value);
+        }
+        std::string operator()(_ExtTypeB const &b) const {
+            return TfStringPrintf("ExtTypeB: %s", b.name.c_str());
+        }
+        std::string operator()(int x) const {
+            return TfStringPrintf("int: %d", x);
+        }
+        std::string operator()(VtValue const &) const {
+            return "fallback";
+        }
+    };
+
+    // Extended types should dispatch to their specific overloads.
+    TF_AXIOM(VtVisitValue(extA, Visitor()) == "ExtTypeA: 42");
+    TF_AXIOM(VtVisitValue(extB, Visitor()) == "ExtTypeB: hello");
+
+    // Known types still dispatch correctly.
+    TF_AXIOM(VtVisitValue(iv, Visitor()) == "int: 123");
+
+    // Truly unknown types still get the VtValue fallback.
+    TF_AXIOM(VtVisitValue(ov, Visitor()) == "fallback");
+
+    // Without ext types, extended types get the fallback.
+    TF_AXIOM(VtVisitValueWithExtTypes<TfMetaList<>>
+             ::VisitValue(extA, Visitor()) == "fallback");
+    TF_AXIOM(VtVisitValueWithExtTypes<TfMetaList<>>
+             ::VisitValue(extB, Visitor()) == "fallback");
+
+    // SFINAE: visitor that can't accept _ExtTypeA should fall back to VtValue.
+    struct PartialVisitor {
+        std::string operator()(_ExtTypeB const &b) const {
+            return "got B";
+        }
+        std::string operator()(VtValue const &) const {
+            return "fallback";
+        }
+    };
+
+    TF_AXIOM(VtVisitValue(extA, PartialVisitor()) == "fallback");
+    TF_AXIOM(VtVisitValue(extB, PartialVisitor()) == "got B");
+
+    // --- VtVisitValueType with extended types ---
+
+    TF_AXIOM((VtVisitValueType<GetSizeOfVisitor>(iv) == sizeof(int)));
+    TF_AXIOM((VtVisitValueType<GetSizeOfVisitor>(extA) == sizeof(_ExtTypeA)));
+    TF_AXIOM((VtVisitValueType<GetSizeOfVisitor>(extB) == sizeof(_ExtTypeB)));
+    TF_AXIOM((VtVisitValueType<GetSizeOfVisitor>(ov) == sizeof(VtValue)));
+
+    // Without ext types, extended types get VtValue.
+    TF_AXIOM((VtVisitValueWithExtTypes<TfMetaList<>>
+              ::VisitType<GetSizeOfVisitor>(extA) == sizeof(VtValue)));
+    TF_AXIOM((VtVisitValueWithExtTypes<TfMetaList<>>
+              ::VisitType<GetSizeOfVisitor>(extB) == sizeof(VtValue)));
+
+    // VtVisitValueType with type args and extended types.
+    TF_AXIOM((VtVisitValueType<IsSameTypeVisitor, _ExtTypeA>(extA) == true));
+    TF_AXIOM((VtVisitValueType<IsSameTypeVisitor, _ExtTypeA>(extB) == false));
+    TF_AXIOM((VtVisitValueType<IsSameTypeVisitor, _ExtTypeB>(extB) == true));
+    TF_AXIOM((VtVisitValueType<IsSameTypeVisitor, int>(iv) == true));
+    TF_AXIOM((VtVisitValueType<IsSameTypeVisitor, int>(ov) == false));
+}
+
+static void
+testExtVisitValueHashDispatch()
+{
+    // This test exercises the hash-table dispatch path, which is used when
+    // the extended type list exceeds Vt_VisitValueHashThreshold (currently 8).
+    // We have 9 registered ext types (A-I), so all dispatch goes through the
+    // hash table.
+    static_assert(9 > Vt_VisitValueHashThreshold);
+
+    VtValue a(_ExtTypeA{7});
+    VtValue b(_ExtTypeB{"world"});
+    VtValue c(_ExtTypeC{10});
+    VtValue d(_ExtTypeD{20});
+    VtValue e(_ExtTypeE{30});
+    VtValue f(_ExtTypeF{40});
+    VtValue g(_ExtTypeG{50});
+    VtValue h(_ExtTypeH{60});
+    VtValue i(_ExtTypeI{70});
+
+    VtValue iv(123);
+    VtValue ov(std::vector<float>(5));
+
+    // VtVisitValue: check all ext types dispatch correctly.
+    struct Visitor {
+        int operator()(_ExtTypeA const &x) const { return x.value; }
+        int operator()(_ExtTypeB const &x) const { return -2; }
+        int operator()(_ExtTypeC const &x) const { return x.x; }
+        int operator()(_ExtTypeD const &x) const { return x.x; }
+        int operator()(_ExtTypeE const &x) const { return x.x; }
+        int operator()(_ExtTypeF const &x) const { return x.x; }
+        int operator()(_ExtTypeG const &x) const { return x.x; }
+        int operator()(_ExtTypeH const &x) const { return x.x; }
+        int operator()(_ExtTypeI const &x) const { return x.x; }
+        int operator()(int x) const { return x; }
+        int operator()(VtValue const &) const { return -1; }
+    };
+
+    TF_AXIOM(VtVisitValue(a, Visitor()) == 7);
+    TF_AXIOM(VtVisitValue(b, Visitor()) == -2);
+    TF_AXIOM(VtVisitValue(c, Visitor()) == 10);
+    TF_AXIOM(VtVisitValue(d, Visitor()) == 20);
+    TF_AXIOM(VtVisitValue(e, Visitor()) == 30);
+    TF_AXIOM(VtVisitValue(f, Visitor()) == 40);
+    TF_AXIOM(VtVisitValue(g, Visitor()) == 50);
+    TF_AXIOM(VtVisitValue(h, Visitor()) == 60);
+    TF_AXIOM(VtVisitValue(i, Visitor()) == 70);
+
+    // Known types still go through the jump table.
+    TF_AXIOM(VtVisitValue(iv, Visitor()) == 123);
+
+    // Unknown types still fall through.
+    TF_AXIOM(VtVisitValue(ov, Visitor()) == -1);
+
+    // VtVisitValueType: check ext types dispatch via hash table.
+    TF_AXIOM((VtVisitValueType<GetSizeOfVisitor>(a)  == sizeof(_ExtTypeA)));
+    TF_AXIOM((VtVisitValueType<GetSizeOfVisitor>(i)  == sizeof(_ExtTypeI)));
+    TF_AXIOM((VtVisitValueType<GetSizeOfVisitor>(iv) == sizeof(int)));
+    TF_AXIOM((VtVisitValueType<GetSizeOfVisitor>(ov) == sizeof(VtValue)));
+
+    TF_AXIOM((VtVisitValueType<IsSameTypeVisitor, _ExtTypeI>(i) == true));
+    TF_AXIOM((VtVisitValueType<IsSameTypeVisitor, _ExtTypeI>(a) == false));
 }
 
 template <typename T>
@@ -2467,6 +2679,8 @@ int main(int argc, char *argv[])
     testCombinedVtValueProxies();
 
     testVisitValue();
+    testExtVisitValue();
+    testExtVisitValueHashDispatch();
     testKnownValueTypeIndex();
     testVtCheapToCopy();
     testVtValueRef();
