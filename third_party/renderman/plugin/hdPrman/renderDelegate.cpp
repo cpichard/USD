@@ -318,6 +318,21 @@ _GetExtraArgs(const HdRenderSettingsMap &settingsMap)
     return TfStringTokenize(extraArgs, " ");
 }
 
+TF_MAKE_STATIC_DATA(
+    std::vector<HdPrmanRenderDelegate::DidCreateRenderPassCallback>,
+    _didCreateRenderPassCallbacks)
+{
+    _didCreateRenderPassCallbacks->clear();
+}
+
+TF_MAKE_STATIC_DATA(
+    std::vector<HdPrmanRenderDelegate::WillDestructRenderPassCallback>,
+    _willDestructRenderPassCallbacks)
+{
+    _willDestructRenderPassCallbacks->clear();
+}
+
+
 HdPrmanRenderDelegate::HdPrmanRenderDelegate(
     HdRenderSettingsMap const& settingsMap,
         TfToken const& rileyVariant,
@@ -431,7 +446,16 @@ HdPrmanRenderDelegate::_Initialize()
         _renderParam);
 }
 
-HdPrmanRenderDelegate::~HdPrmanRenderDelegate() = default;
+HdPrmanRenderDelegate::~HdPrmanRenderDelegate()
+{
+    // Invoke destruction callback for render pass.
+    if (_renderPass) {
+        for(auto const& cb: *_willDestructRenderPassCallbacks) {
+            cb(this, _renderPass);
+        }
+        _renderPass.reset();
+    }
+}
 
 HdRenderSettingsMap
 HdPrmanRenderDelegate::GetRenderSettingsMap() const
@@ -496,6 +520,11 @@ HdPrmanRenderDelegate::CreateRenderPass(HdRenderIndex *index,
     if (!_renderPass) {
         _renderPass = std::make_shared<HdPrman_RenderPass>(
             index, collection, _renderParam);
+        // Invoke render pass creation callback.  This represents the first
+        // opportunity for HdPrman extensions to access the HdRenderIndex.
+        for(auto const& cb: *_didCreateRenderPassCallbacks) {
+            cb(this, _renderPass);
+        }
     }
     return _renderPass;
 }
@@ -895,6 +924,28 @@ HdPrmanRenderDelegate::GetRenderIndex() const
         return _renderPass->GetRenderIndex();
     }
     return nullptr;
+}
+
+void
+HdPrmanRenderDelegate::RegisterDidCreateRenderPassCallback(
+    DidCreateRenderPassCallback const& callback)
+{
+    if (!callback) {
+        TF_CODING_ERROR("Null callback provided; ignoring");
+        return;
+    }
+    _didCreateRenderPassCallbacks->push_back(callback);
+}
+
+void
+HdPrmanRenderDelegate::RegisterWillDestructRenderPassCallback(
+    WillDestructRenderPassCallback const& callback)
+{
+    if (!callback) {
+        TF_CODING_ERROR("Null callback provided; ignoring");
+        return;
+    }
+    _willDestructRenderPassCallbacks->push_back(callback);
 }
 
 #if HD_API_VERSION >= 55

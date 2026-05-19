@@ -6,16 +6,18 @@ set(PXR_PACKAGE usdExecImaging)
 
 if (PXR_BUILD_EXEC)
     set(USDEXECIMAGING_LIBRARIES
-        execUsd
-        execGeom)
+        execGeom
+        execIr
+        execUsd)
 
     set(USDEXECIMAGING_PRIVATE_CLASSES
         adapterRegistry
         debugCodes
+        geomXformablePrimAdapter
+        irTransformablePrimAdapter
         request
-        requestBuilderImpl
-        stageSceneIndex
-        xformablePrimAdapter)
+        requestBuilder
+        stageSceneIndex)
 
     set(USDEXECIMAGING_PRIVATE_HEADERS
         valueKeyMap.h)
@@ -43,9 +45,9 @@ pxr_library(usdExecImaging
 
     PUBLIC_CLASSES
         computedDataSource
-        primAdapter
-        requestAccessor
-        requestBuilder
+        primAdapterInterface
+        requestAccessorInterface
+        requestBuilderInterface
         stageSceneIndexInterface
 
     PUBLIC_HEADERS

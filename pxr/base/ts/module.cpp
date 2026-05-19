@@ -24,7 +24,6 @@ TF_WRAP_MODULE
     TF_WRAP(TsTest_Museum);
     TF_WRAP(TsTest_SampleBezier);
     TF_WRAP(TsTest_SampleTimes);
-    TF_WRAP(TsTest_SplineData);
     TF_WRAP(TsTest_TsEvaluator);
     TF_WRAP(TsTest_Types);
 #endif

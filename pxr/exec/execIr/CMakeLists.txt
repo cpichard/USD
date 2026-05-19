@@ -113,3 +113,22 @@ pxr_register_test(testExecIrSwitchController
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecIrSwitchController"
     EXPECTED_RETURN_CODE 0
 )
+
+pxr_build_test(testExecIrWaddlerRig
+    LIBRARIES
+        exec
+        execIr
+        execUsd
+        gf
+        sdf
+        tf
+        ts
+        usd
+    CPPFILES
+        testenv/testExecIrWaddlerRig.cpp
+)
+
+pxr_register_test(testExecIrWaddlerRig
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecIrWaddlerRig"
+    EXPECTED_RETURN_CODE 0
+)

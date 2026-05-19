@@ -5,6 +5,7 @@ set(DIRS
     usdProcImaging
     usdSkelImaging
     usdVolImaging
+    usdIrImaging
     usdAppUtils
     usdviewq
     bin

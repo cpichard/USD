@@ -171,6 +171,9 @@ class IrJointScope "IrJointScope" (
     double default:tx = 0
     double default:ty = 0
     double default:tz = 0
+    color3f guide:displayColor = (1, 0.3, 0.3)
+    float guide:displayOpacity = 0.5
+    double guide:length = 0
     matrix4d parent:defaultSpace = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
     matrix4d parent:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )
     matrix4d posed:defaultSpace = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) )

@@ -292,6 +292,7 @@ _GetSdrContextFromShaderType(const TfToken &shaderType)
 {
     static const std::unordered_map<TfToken, TfToken, TfHash> contextMapping({
         { TfToken("displayfilter"), SdrNodeContext->DisplayFilter },
+        { TfToken("energyfilter"), SdrNodeContext->EnergyFilter },
         { TfToken("lightfilter"), SdrNodeContext->LightFilter },
         { TfToken("pixelfilter"), SdrNodeContext->PixelFilter },
         { TfToken("samplefilter"), SdrNodeContext->SampleFilter },

@@ -78,6 +78,10 @@ class Launcher(object):
 
             app, appController = self.LaunchPreamble(arg_parse_result)
 
+            if arg_parse_result.viewportSize and appController._stageView:
+                w, h = arg_parse_result.viewportSize
+                appController._stageView.SetPhysicalWindowSize(w, h)
+
             if arg_parse_result.dumpFirstImage:
                 appController.SaveViewerImageToFile(arg_parse_result.dumpFirstImage)
 
@@ -225,6 +229,13 @@ class Launcher(object):
                             dest='dumpFirstImage',
                             default=None,
                             help='Dumps the first image to file (as png)')
+
+        parser.add_argument('--viewportSize', action='store',
+                            type=lambda s: tuple(int(x) for x in s.split('x')),
+                            dest='viewportSize',
+                            default=None,
+                            help='Fix the viewport to a specific size (WxH) '
+                                 'for deterministic rendering, e.g. 601x458')
 
         parser.add_argument('--numThreads', action='store',
                             type=int, default=0,

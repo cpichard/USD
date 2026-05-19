@@ -15,8 +15,10 @@
 
 #include <QCheckBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QPushButton>
 #include <QMenu>
+#include <QStatusBar>
 #include <QTreeWidgetItem>
 #include <QSplitter>
 
@@ -80,6 +82,11 @@ private:
     QMenu *_goToInputButtonMenu;
 
     QCheckBox *_instanceProxyViewCheckBox;
+
+    QCheckBox *_filterAsYouTypeCheckBox;
+    QLineEdit *_filterLineEdit;
+    
+    QStatusBar *_statusBar;
 
     // The scene index as set by SetRegisteredSceneIndex/SetSceneIndex.
     HdSceneIndexBaseRefPtr _targetSceneIndex;

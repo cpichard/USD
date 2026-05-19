@@ -127,7 +127,7 @@ protected:
         RtPrimVarList *primvars,
         std::vector<HdGeomSubset> *geomSubsets,
         std::vector<RtPrimVarList> *geomSubsetPrimvars) = 0;
-    
+
     // Allow subclasses to inject additional geometry primvars.
     virtual void
     _AddPrimvars(RtPrimVarList*) const
@@ -258,7 +258,8 @@ HdPrman_Gprim<BASE>::Sync(HdSceneDelegate* sceneDelegate,
         HdChangeTracker::DirtySubdivTags |
         HdChangeTracker::DirtyVolumeField |
         HdChangeTracker::DirtyCategories |
-        HdChangeTracker::DirtyPrimvar;
+        HdChangeTracker::DirtyPrimvar |
+        HdChangeTracker::DirtyRenderTag;
 
     // These two bitmasks intersect, so we check them against dirtyBits
     // prior to clearing either mask.
@@ -540,7 +541,7 @@ HdPrman_Gprim<BASE>::Sync(HdSceneDelegate* sceneDelegate,
             if (instancer) {
                 instancer->Populate(
                     renderParam,
-                    dirtyBits,
+                    *dirtyBits,
                     id,
                     _prototypeIds,
                     coordSysList,

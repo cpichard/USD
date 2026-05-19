@@ -206,6 +206,7 @@ pxr_plugin(${PXR_PACKAGE}
 
     PUBLIC_HEADERS
         api.h
+        concurrentMap.h
         rileySchemaTypeDefs.h
 
     PRIVATE_HEADERS

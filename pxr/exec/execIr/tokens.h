@@ -40,6 +40,8 @@ TF_DECLARE_PUBLIC_TOKENS(
     ExecIrRotationOrderTokens, EXECIR_API, EXEC_IR_ROTATION_ORDER_TOKENS);
 
 #define EXEC_IR_FK_CONTROLLER_TOKENS                                            \
+    (IrFkController)                                                            \
+                                                                                \
     ((parentInSpace, "parentIn:space"))                                         \
     ((parentInDefaultSpace, "parentIn:defaultSpace"))                           \
                                                                                 \
@@ -60,7 +62,19 @@ TF_DECLARE_PUBLIC_TOKENS(
 TF_DECLARE_PUBLIC_TOKENS(
     ExecIrFkControllerTokens, EXECIR_API, EXEC_IR_FK_CONTROLLER_TOKENS);
 
+#define EXEC_IR_JOINT_SCOPE_TOKENS                                              \
+    (IrJointScope)                                                              \
+                                                                                \
+    ((guideLength, "guide:length"))                                             \
+    ((guideDisplayColor, "guide:displayColor"))                                 \
+    ((guideDisplayOpacity, "guide:displayOpacity"))
+
+TF_DECLARE_PUBLIC_TOKENS(
+    ExecIrJointScopeTokens, EXECIR_API, EXEC_IR_JOINT_SCOPE_TOKENS);
+
 #define EXEC_IR_SWITCH_CONTROLLER_TOKENS                                        \
+    (IrSwitchController)                                                        \
+                                                                                \
     (rig1)                                                                      \
     (rig2)                                                                      \
                                                                                 \
@@ -79,6 +93,8 @@ TF_DECLARE_PUBLIC_TOKENS(
     ExecIrSwitchControllerTokens, EXECIR_API, EXEC_IR_SWITCH_CONTROLLER_TOKENS);
 
 #define EXEC_IR_TRANSFORMABLE_TOKENS                                            \
+    (IrTransformable)                                                           \
+                                                                                \
     ((avarsTx, "avars:tx"))                                                     \
     ((avarsTy, "avars:ty"))                                                     \
     ((avarsTz, "avars:tz"))                                                     \

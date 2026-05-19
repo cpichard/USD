@@ -17,9 +17,12 @@
 #include "pxr/imaging/hd/utils.h"
 
 #include "pxr/base/arch/fileSystem.h"
+#include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/stringUtils.h"
 
 #include <QHBoxLayout>
+#include <QShortcut>
+#include <QStyle>
 #include <QVBoxLayout>
 #include <QWidgetAction>
 
@@ -30,12 +33,17 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+TF_DEFINE_ENV_SETTING(HDUI_ENABLE_HSD_FILTER, true,
+    "Enable the path expression / regex filter UI in the HSD widget.");
+
 HduiSceneIndexDebuggerWidget::HduiSceneIndexDebuggerWidget(
     QWidget *parent,
     const Options &options)
 : QWidget(parent)
 , _goToInputButton(Q_NULLPTR)
 , _goToInputButtonMenu(Q_NULLPTR)
+, _filterAsYouTypeCheckBox(Q_NULLPTR)
+, _filterLineEdit(Q_NULLPTR)
 {
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     QHBoxLayout *toolbarLayout = new QHBoxLayout;
@@ -66,12 +74,54 @@ HduiSceneIndexDebuggerWidget::HduiSceneIndexDebuggerWidget(
     QHBoxLayout *viewOptionsLayout = new QHBoxLayout;
     mainLayout->addLayout(viewOptionsLayout);
 
-    _instanceProxyViewCheckBox = new QCheckBox("Instance Proxy View");
-    viewOptionsLayout->addWidget(_instanceProxyViewCheckBox);
-    viewOptionsLayout->addStretch();
+    {
+        _instanceProxyViewCheckBox = new QCheckBox("Instance Proxy View");
+        viewOptionsLayout->addWidget(_instanceProxyViewCheckBox);
+    }
+
+    // Filter UI.
+    QAction *filterClearAction = nullptr;
+    QShortcut *filterEscShortcut = nullptr;
+    if (TfGetEnvSetting(HDUI_ENABLE_HSD_FILTER)) {
+        QFrame *filterSeparator = new QFrame;
+        filterSeparator->setFrameShape(QFrame::VLine);
+        filterSeparator->setFrameShadow(QFrame::Sunken);
+        viewOptionsLayout->addWidget(filterSeparator);
+
+        _filterAsYouTypeCheckBox = new QCheckBox("Filter as you type");
+        _filterAsYouTypeCheckBox->setToolTip(
+            "When checked, the tree is filtered on every keystroke.\n"
+            "When unchecked, type a filter expression and press Return to apply.");
+        viewOptionsLayout->addWidget(_filterAsYouTypeCheckBox);
+
+        _filterLineEdit = new QLineEdit;
+        _filterLineEdit->setPlaceholderText("path expression or regex");
+
+        filterClearAction = _filterLineEdit->addAction(
+            _filterLineEdit->style()->standardIcon(
+                QStyle::SP_LineEditClearButton),
+            QLineEdit::TrailingPosition);
+        filterClearAction->setVisible(false);
+
+        filterEscShortcut = new QShortcut(
+            Qt::Key_Escape, _filterLineEdit,
+            nullptr, nullptr, Qt::WidgetShortcut);
+
+        viewOptionsLayout->addWidget(_filterLineEdit, /*stretch=*/5);
+        viewOptionsLayout->addStretch(/*stretch=*/5);
+    }
 
     _splitter = new QSplitter(Qt::Horizontal);
     mainLayout->addWidget(_splitter, 10);
+
+    QFrame *statusBarSeparator = new QFrame;
+    statusBarSeparator->setFrameShape(QFrame::HLine);
+    statusBarSeparator->setFrameShadow(QFrame::Sunken);
+    mainLayout->addWidget(statusBarSeparator);
+
+    _statusBar = new QStatusBar(this);
+    _statusBar->setSizeGripEnabled(false);
+    mainLayout->addWidget(_statusBar);
 
     _siTreeWidget = new HduiSceneIndexTreeWidget;
     _splitter->addWidget(_siTreeWidget);
@@ -95,6 +145,15 @@ HduiSceneIndexDebuggerWidget::HduiSceneIndexDebuggerWidget(
             this->_valueTreeView->SetDataSource(
                     HdSampledDataSource::Cast(dataSource));
     });
+
+    auto showStatus = [this](const QString &msg) {
+        _statusBar->showMessage(msg);
+    };
+
+    QObject::connect(_siChooser,
+        &HduiRegisteredSceneIndexChooser::StatusMessage, showStatus);
+    QObject::connect(_siTreeWidget,
+        &HduiSceneIndexTreeWidget::StatusMessage, showStatus);
 
     QObject::connect(_siTreeWidget, &HduiSceneIndexTreeWidget::PrimDirtied,
             [this] (const SdfPath &primPath,
@@ -134,6 +193,67 @@ HduiSceneIndexDebuggerWidget::HduiSceneIndexDebuggerWidget(
                     this->_currentSceneIndex);
             }
     });
+
+    if (TfGetEnvSetting(HDUI_ENABLE_HSD_FILTER)) {
+        auto clearFilter = [this, filterClearAction]() {
+            this->_filterLineEdit->clear();
+            this->_filterLineEdit->setStyleSheet("");
+            this->_statusBar->clearMessage();
+            this->_siTreeWidget->ResetFilter();
+            filterClearAction->setVisible(false);
+        };
+
+        // Apply the current line edit text as a filter. Called when the
+        // checkbox is on and the user types, when the checkbox is toggled on,
+        // or when Return is pressed.
+        auto applyCurrentFilter = [this, clearFilter]() {
+            const QString text = this->_filterLineEdit->text();
+            if (text.isEmpty()) {
+                clearFilter();
+                return;
+            }
+            HduiSceneIndexTreeWidget::FilterVariant filter;
+            if (HduiSceneIndexTreeWidget::IsValidFilter(text, &filter)) {
+                this->_filterLineEdit->setStyleSheet("");
+                this->_siTreeWidget->SetFilter(filter);
+            } else {
+                this->_filterLineEdit->setStyleSheet(
+                    "QLineEdit { background-color: rgba(255, 0, 0, 128); }");
+                // Reset so an unfiltered view is shown rather than an empty one.
+                this->_siTreeWidget->ResetFilter();
+                this->_statusBar->showMessage("Filter: invalid expression");
+            }
+        };
+
+        // The clear action and Escape both explicitly clear text and filter
+        // state, bypassing the checkbox.
+        QObject::connect(filterClearAction, &QAction::triggered, clearFilter);
+        QObject::connect(filterEscShortcut, &QShortcut::activated, clearFilter);
+
+        // Update the clear button visibility as the user types, and apply
+        // the filter when "filter as you type" is on.
+        QObject::connect(_filterLineEdit, &QLineEdit::textChanged,
+            [this, filterClearAction, applyCurrentFilter](const QString &text) {
+                filterClearAction->setVisible(!text.isEmpty());
+                if (this->_filterAsYouTypeCheckBox->isChecked()) {
+                    applyCurrentFilter();
+                }
+            });
+
+        // Toggling the checkbox on applies the current text; toggling it off
+        // leaves the active filter in place so the user can still see what
+        // they typed.
+        QObject::connect(_filterAsYouTypeCheckBox, &QCheckBox::toggled,
+            [applyCurrentFilter](bool checked) {
+                if (checked) {
+                    applyCurrentFilter();
+                }
+            });
+
+        // Return always applies, regardless of checkbox state.
+        QObject::connect(_filterLineEdit, &QLineEdit::returnPressed,
+            [applyCurrentFilter]() { applyCurrentFilter(); });
+    }
 
     QObject::connect(_instanceProxyViewCheckBox, &QCheckBox::toggled,
         [this](bool checked) {

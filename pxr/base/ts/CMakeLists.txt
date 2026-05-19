@@ -59,7 +59,6 @@ if (${PXR_BUILD_TESTS})
         tsTest_Museum
         tsTest_SampleBezier
         tsTest_SampleTimes
-        tsTest_SplineData
         tsTest_TsEvaluator
     )
     list(APPEND headers
@@ -69,7 +68,6 @@ if (${PXR_BUILD_TESTS})
         wrapTsTest_Museum.cpp
         wrapTsTest_SampleBezier.cpp
         wrapTsTest_SampleTimes.cpp
-        wrapTsTest_SplineData.cpp
         wrapTsTest_TsEvaluator.cpp
         wrapTsTest_Types.cpp
     )

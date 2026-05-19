@@ -91,6 +91,7 @@ R"(#if NUM_LIGHTS > 0
                             ? normalize(light.position.xyz)
                             : normalize(light.position - Peye).xyz;
                 intensityAdj = lightSpotAttenuation(l, i);
+                intensityAdj *= lightDistanceAttenuation(Peye, i);
             }
             // Treat all other lights as Point lights
             else {
@@ -99,6 +100,10 @@ R"(#if NUM_LIGHTS > 0
                 // Position (Hydra position in ViewSpace)
                 $lightData[u_numActiveLightSources].position = 
                     (HdGet_worldToViewInverseMatrix() * light.position).xyz;
+                
+                // Pre-apply Attenuation to the intensity instead of using 
+                // MaterialX's attenuation calculation. 
+                intensityAdj = lightDistanceAttenuation(Peye, i);
             }
 
             // Color and Intensity 
@@ -109,19 +114,12 @@ R"(#if NUM_LIGHTS > 0
                 ? light.diffuse.rgb : light.diffuse.rgb/intensity;
             $lightData[u_numActiveLightSources].color = lightColor;
             $lightData[u_numActiveLightSources].intensity = intensity * intensityAdj;
-            
+
             // Attenuation 
-            // Hydra: vec3(const, linear, quadratic)
-            // MaterialX: const = 0.0, linear = 1.0, quadratic = 2.0
-            if (light.attenuation.z > 0) {
-                $lightData[u_numActiveLightSources].decay_rate = 2.0;
-            }
-            else if (light.attenuation.y > 0) {
-                $lightData[u_numActiveLightSources].decay_rate = 1.0;
-            }
-            else {
-                $lightData[u_numActiveLightSources].decay_rate = 0.0;
-            }
+            // We use MaterialX's constant attenuation (decay_rate of 0.0) 
+            // because we are pre-applying the USD calculation for light 
+            // distance Attenuation when applicable.
+            $lightData[u_numActiveLightSources].decay_rate = 0.0;
 
             // ShadowOcclusion value
             #if USE_SHADOWS

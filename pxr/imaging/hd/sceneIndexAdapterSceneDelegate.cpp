@@ -154,11 +154,10 @@ HdSceneIndexAdapterSceneDelegate::HdSceneIndexAdapterSceneDelegate(
 , _cachedDirtyBits(0)
 , _cachedPrimType()
 {
-
+    // The registered name is typically used in UI tools like the HSD.
+    // Make it simple to read.
     std::string registeredName = ArchStringPrintf(
-        "delegate adapter: %s @ %s",
-            delegateID.GetString().c_str(),
-            parentIndex->GetInstanceName().c_str());
+        "[Terminal SI] %s", parentIndex->GetInstanceName().c_str());
 
     HdSceneIndexNameRegistry::GetInstance().RegisterNamedSceneIndex(
         registeredName, inputSceneIndex);

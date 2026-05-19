@@ -226,6 +226,7 @@ void mxInit(vec4 Peye, vec3 Neye)
                             ? normalize(light.position.xyz)
                             : normalize(light.position - Peye).xyz;
                 intensityAdj = lightSpotAttenuation(l, i);
+                intensityAdj *= lightDistanceAttenuation(Peye, i);
             }
             // Treat all other lights as Point lights
             else {
@@ -234,6 +235,10 @@ void mxInit(vec4 Peye, vec3 Neye)
                 // Position (Hydra position in ViewSpace)
                 u_lightData[u_numActiveLightSources].position = 
                     (HdGet_worldToViewInverseMatrix() * light.position).xyz;
+                
+                // Pre-apply Attenuation to the intensity instead of using 
+                // MaterialX's attenuation calculation. 
+                intensityAdj = lightDistanceAttenuation(Peye, i);
             }
 
             // Color and Intensity 
@@ -244,19 +249,12 @@ void mxInit(vec4 Peye, vec3 Neye)
                 ? light.diffuse.rgb : light.diffuse.rgb/intensity;
             u_lightData[u_numActiveLightSources].color = lightColor;
             u_lightData[u_numActiveLightSources].intensity = intensity * intensityAdj;
-            
+
             // Attenuation 
-            // Hydra: vec3(const, linear, quadratic)
-            // MaterialX: const = 0.0, linear = 1.0, quadratic = 2.0
-            if (light.attenuation.z > 0) {
-                u_lightData[u_numActiveLightSources].decay_rate = 2.0;
-            }
-            else if (light.attenuation.y > 0) {
-                u_lightData[u_numActiveLightSources].decay_rate = 1.0;
-            }
-            else {
-                u_lightData[u_numActiveLightSources].decay_rate = 0.0;
-            }
+            // We use MaterialX's constant attenuation (decay_rate of 0.0) 
+            // because we are pre-applying the USD calculation for light 
+            // distance Attenuation when applicable.
+            u_lightData[u_numActiveLightSources].decay_rate = 0.0;
 
             // ShadowOcclusion value
             #if USE_SHADOWS

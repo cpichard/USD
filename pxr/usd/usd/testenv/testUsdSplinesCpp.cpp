@@ -19,7 +19,6 @@
 
 #include "pxr/base/ts/spline.h"
 #include "pxr/base/ts/tsTest_Museum.h"
-#include "pxr/base/ts/tsTest_TsEvaluator.h"
 
 #include <iostream>
 
@@ -230,9 +229,7 @@ void
 TestSerializationMuseum()
 {
     for (const std::string exhibit : {"TwoKnotBezier", "ComplexParams"}) {
-        const TsSpline spline = 
-            TsTest_TsEvaluator().SplineDataToSpline(
-                TsTest_Museum::GetDataByName(exhibit));
+        const TsSpline spline = TsTest_Museum::GetSplineByName(exhibit);
         _DoSerializationTest("Museum." + exhibit, spline);
     }
 }

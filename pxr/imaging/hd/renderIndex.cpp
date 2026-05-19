@@ -944,7 +944,17 @@ HdRenderIndex::GetInstanceName() const
         return _instanceName;
     }
 
-    return ArchStringPrintf("%p", (void *)this);
+    // Use the renderer plugin provided display name if available as the
+    // instance name.
+    const std::string &rendererDisplayName =
+        _renderDelegate->GetRendererDisplayName();
+    if (!rendererDisplayName.empty()) {
+        return ArchStringPrintf("Renderer: %s", rendererDisplayName.c_str());
+    }
+
+    // Fallback to the demangled type name.
+    return ArchStringPrintf("Renderer: %s",
+        ArchGetDemangled(typeid(*_renderDelegate)).c_str());
 }
 
 bool

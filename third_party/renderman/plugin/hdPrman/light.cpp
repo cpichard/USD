@@ -215,7 +215,7 @@ _AddLightFilterCombiner(std::vector<riley::ShadingNode>* lightFilterNodes)
             modeMap[mode].push_back(lightFilterNode.handle);
         }
 
-        shouldCombineShadows = 
+        shouldCombineShadows =
             (shouldCombineShadows ||
             lightFilterNode.name == cheatShadowName);
     }
@@ -1166,7 +1166,7 @@ HdPrmanLight::Sync(HdSceneDelegate *sceneDelegate,
                 );
                 instancer->Populate(
                     renderParam,
-                    &instanceDirtyBits,
+                    instanceDirtyBits,
                     id,
                     { _geometryPrototypeId },
                     coordSysList,

@@ -13,15 +13,16 @@ PXR_NAMESPACE_OPEN_SCOPE
 namespace
 {
 
-// A stub implementation of UsdExecImagingRequestAccessor that always produces
-// empty values.
+// A stub implementation of UsdExecImagingRequestAccessorInterface that always
+// produces empty values.
 //
 // This implementation is used when a client erroneously constructs a data
 // source with a null request accessor. By using this stub implementation, the
 // data sources can always dereference their request accessors without fear of
 // dereferencing a null pointer.
 //
-class _EmptyRequestAccessor final : public UsdExecImagingRequestAccessor
+class _EmptyRequestAccessor final
+    : public UsdExecImagingRequestAccessorInterface
 {
 public:
     VtValue GetComputedValue(const UsdExecImagingValueKey &valueKey) override {
@@ -32,7 +33,7 @@ public:
 } // anonymous namespace
 
 UsdExecImaging_ComputedDataSourceImpl::UsdExecImaging_ComputedDataSourceImpl(
-    UsdExecImagingRequestAccessorSharedPtr requestAccessor,
+    UsdExecImagingRequestAccessorInterfaceSharedPtr requestAccessor,
     UsdExecImagingValueKey valueKey)
     : _requestAccessor(std::move(requestAccessor))
     , _valueKey(std::move(valueKey))

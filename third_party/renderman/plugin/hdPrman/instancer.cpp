@@ -12,7 +12,6 @@
 #include "hdPrman/light.h"
 #include "hdPrman/renderParam.h"
 #include "hdPrman/rixStrings.h"
-#include "hdPrman/tokens.h"
 #include "hdPrman/utils.h"
 
 #include "pxr/imaging/hd/changeTracker.h"
@@ -34,6 +33,7 @@
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/gf/quatd.h"
+#include "pxr/base/gf/vec2f.h"
 #include "pxr/base/gf/vec3d.h"
 #include "pxr/base/tf/callContext.h"
 #include "pxr/base/tf/debug.h"
@@ -41,10 +41,11 @@
 #include "pxr/base/tf/enum.h"
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/getenv.h"
+#include "pxr/base/tf/staticData.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/trace/trace.h"
 #include "pxr/base/vt/array.h"
-#include "pxr/base/vt/typeHeaders.h"
+#include "pxr/base/vt/typeHeaders.h" // IWYU pragma: keep
 #include "pxr/base/vt/types.h"
 #include "pxr/base/vt/visitValue.h"
 #include "pxr/base/work/loops.h"
@@ -57,12 +58,21 @@
 #include <RiTypesHelper.h>
 #include <stats/Roz.h>
 
+#include <tbb/concurrent_unordered_set.h>
+#include <tbb/queuing_mutex.h>
+#include <tbb/spin_mutex.h>
 #include <tbb/spin_rw_mutex.h>
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstdarg>
 #include <cstddef>
+#include <cstdint>
 #include <iterator>
+#include <sstream>
 #include <string>
+#include <thread>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -78,12 +88,15 @@ TF_DEFINE_ENV_SETTING(HD_PRMAN_DISABLE_NESTED_INSTANCING, false,
 
 const int HDPRMAN_MAX_SUPPORTED_NESTING_DEPTH = 4;
 
+TF_MAKE_STATIC_DATA(tbb::queuing_mutex, _clockLock)
+{ }
+
 // **********************************************
 // **        Internal helper functions         **
 // **********************************************
 namespace {
 
-static std::string
+std::string
 _JoinIdentifiers(
     RtUString const& prefix,
     RtUString const& suffix)
@@ -94,10 +107,56 @@ _JoinIdentifiers(
                 std::string(suffix.CStr());
         }
         return std::string(prefix.CStr());
-    } else if (suffix.CStr()) {
+    }
+    if (suffix.CStr()) {
         return std::string(suffix.CStr());
     }
     return std::string();
+}
+
+long
+_Clock()
+{
+    using namespace std::chrono;
+    const time_point now = high_resolution_clock::now();
+    const auto dur = duration_cast<nanoseconds>(now.time_since_epoch());
+    return dur.count();
+}
+
+std::string
+_ThreadId()
+{
+    std::stringstream ss;
+    ss << std::this_thread::get_id();
+    return ss.str();
+}
+
+void
+_ClockMsg(const char* fmt)
+{
+    // Better to avoid locking when the debug flag is disabled than to
+    // lock immediately, although this could very rarely lead to messages
+    // being timestamped out of order
+    if (TfDebug::IsEnabled(HDPRMAN_INSTANCERS_CONCURRENCY)) {
+        tbb::queuing_mutex::scoped_lock lock(*_clockLock);
+        TF_DEBUG(HDPRMAN_INSTANCERS_CONCURRENCY).Msg(
+            "%li - <%s> %s\n", _Clock(), _ThreadId().c_str(), fmt);
+    }
+}
+
+template <typename... Args>
+void
+_ClockMsg(const char* fmt, Args... args)
+{
+    // Better to avoid locking when the debug flag is disabled than to
+    // lock immediately, although this could very rarely lead to messages
+    // being timestamped out of order
+    if (TfDebug::IsEnabled(HDPRMAN_INSTANCERS_CONCURRENCY)) {
+        tbb::queuing_mutex::scoped_lock lock(*_clockLock);
+        const std::string s = TfStringPrintf(fmt, args...);
+        TF_DEBUG(HDPRMAN_INSTANCERS_CONCURRENCY).Msg(
+            "%li - <%s> %s\n", _Clock(), _ThreadId().c_str(), s.c_str());
+    }
 }
 
 template <typename T1, typename T2, unsigned int C>
@@ -122,14 +181,14 @@ void _AccumulateSampleTimes(
 struct _GetValueAtIndex {
     _GetValueAtIndex(const size_t index) : _index(index) { }
     template <class T>
-    const VtValue operator()(const VtArray<T>& array) const
+    VtValue operator()(const VtArray<T>& array) const
     {
         if (array.size() > _index) {
             return VtValue(array[_index]);
         }
         return VtValue();
     }
-    const VtValue operator()(const VtValue& val) const
+    VtValue operator()(const VtValue&) const
     {
         return VtValue();
     }
@@ -144,7 +203,7 @@ template<>
 GfMatrix4d _ConvertMatrix<GfMatrix4d>(GfMatrix4d&& src) { return src; }
 
 template<>
-RtMatrix4x4 _ConvertMatrix<RtMatrix4x4>(GfMatrix4d&& src) { 
+RtMatrix4x4 _ConvertMatrix<RtMatrix4x4>(GfMatrix4d&& src) {
     return HdPrman_Utils::GfMatrixToRtMatrix(src);
 }
 
@@ -176,9 +235,9 @@ HdTimeSampleArray<M,C> _MultiplyTransforms(
 }
 
 void _BuildStatsId(
-    const SdfPath& instancerId, 
-    const size_t index, 
-    const SdfPath& protoId, 
+    const SdfPath& instancerId,
+    const size_t index,
+    const SdfPath& protoId,
     RtParamList& params)
 {
     // The stats id is a human readable unique identifier in the form:
@@ -186,22 +245,21 @@ void _BuildStatsId(
     // It is used for diagnostic purposes to identify instances in a
     // Disgust log. It is somewhat costly to construct, so we only do so
     // when generating a Disgust log.
-    static const bool disabled = TfGetenv("RILEY_CAPTURE").empty();
-    if (disabled) { return; }
+    if (TfGetenv("RILEY_CAPTURE").empty()) { return; }
     RtUString val;
     if (params.HasParam(RixStr.k_stats_identifier)) {
         params.GetString(RixStr.k_stats_identifier, val);
         std::string valStr(val.CStr());
         valStr = TfStringReplace(
-            valStr, 
-            instancerId.GetString(), 
+            valStr,
+            instancerId.GetString(),
             TfStringPrintf("%s[%zu]", instancerId.GetText(), index));
         val = RtUString(valStr.c_str());
     } else {
         std::string valStr = TfStringPrintf(
-            "%s[%zu]{%s}", 
-            instancerId.GetText(), 
-            index, 
+            "%s[%zu]{%s}",
+            instancerId.GetText(),
+            index,
             protoId.GetName().c_str());
         val = RtUString(valStr.c_str());
     }
@@ -244,6 +302,51 @@ _ParallelFor(size_t n, Fn &&cb, size_t grainSize = 1) {
     }, grainSize);
 }
 
+bool UnboxOrientations(
+    HdTimeSampleArray<VtValue, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES> const& box,
+    HdTimeSampleArray<VtQuatfArray, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES>*
+        outRotates)
+{
+    HdTimeSampleArray<VtQuathArray, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES> rotates;
+    if (outRotates->UnboxFrom(box)) {
+        if (outRotates->count > 0 && !outRotates->values[0].empty()){
+            return true;
+        }
+    }
+    if (rotates.UnboxFrom(box)) {
+        // convert to quatf
+        outRotates->Resize(rotates.count);
+        outRotates->times = rotates.times;
+        for (size_t i=0; i < rotates.count; ++i) {
+            if (!rotates.values[i].empty()) {
+                VtQuathArray halfs = rotates.values[i];
+                VtQuatfArray floats(halfs.cbegin(), halfs.cend());
+                outRotates->values[i] = floats;
+            }
+        }
+        return true;
+    }
+    return false;
+}
+
+template <typename T>
+void
+_ValidateSamplesTimes(
+    HdTimeSampleArray<T, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES>& samples)
+{
+    for (size_t i = 0; i < samples.count; ++i) {
+        if (samples.values[i].size() != samples.values[0].size()) {
+            HdTimeSampleArray<T, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES>
+                new_samples;
+            new_samples.Resize(1);
+            new_samples.times[0] = 0.f;
+            new_samples.values[0] = samples.Resample(0.f);
+            samples = new_samples;
+            return;
+        }
+    }
+}
+
 } // anonymous namespace
 
 // **********************************************
@@ -258,7 +361,7 @@ HdPrmanInstancer::HdPrmanInstancer(
 
 HdPrmanInstancer::~HdPrmanInstancer() = default;
 
-HdDirtyBits 
+HdDirtyBits
 HdPrmanInstancer::GetInitialDirtyBitsMask() const
 {
     static const HdDirtyBits dirtyBits =
@@ -290,9 +393,9 @@ HdPrmanInstancer::Sync(
         if (HdChangeTracker::IsAnyPrimvarDirty(*dirtyBits, id)) {
             for (HdInterpolation i = HdInterpolationConstant;
                 i != HdInterpolationCount; i = HdInterpolation(i+1)){
-                for (const HdPrimvarDescriptor& primvar : 
+                for (const HdPrimvarDescriptor& primvar :
                     delegate->GetPrimvarDescriptors(id, i)) {
-                    if (HdChangeTracker::IsPrimvarDirty(*dirtyBits, id, 
+                    if (HdChangeTracker::IsPrimvarDirty(*dirtyBits, id,
                         primvar.name)) {
                         if (dps.empty()) {
                             dps += "    dirty primvars    : ";
@@ -301,7 +404,7 @@ HdPrmanInstancer::Sync(
                         }
                         const VtValue& val = delegate->Get(id, primvar.name);
                         dps += TfStringPrintf("(%s) (%s) %s\n",
-                            TfEnum::GetName(i).c_str(), 
+                            TfEnum::GetName(i).c_str(),
                             val.GetTypeName().c_str(),
                             primvar.name.GetText());
                     }
@@ -322,7 +425,7 @@ HdPrmanInstancer::Sync(
 
     _UpdateInstancer(delegate, dirtyBits);
 
-    auto* param = static_cast<HdPrman_RenderParam*>(renderParam);
+    auto* param = dynamic_cast<HdPrman_RenderParam*>(renderParam);
 
     // Convert (and cache) instancer coordinate systems.
     if (HdPrman_RenderParam::RileyCoordSysIdVecRefPtr convertedCoordSys =
@@ -336,12 +439,15 @@ HdPrmanInstancer::Sync(
 
     // cache the instancer and instance transforms
     _SyncTransforms(dirtyBits, param);
-    
+
     // cache the instancer and instance categories
     _SyncCategories(dirtyBits);
 
     // cache the instancer visibility
     _SyncVisibility(dirtyBits);
+
+    // cache the instancer render tag
+    _SyncRenderTag(dirtyBits);
 
     // If anything has changed, internally flag all previously-populated
     // instances as dirty. Since instances are grouped by prototype prim id
@@ -353,6 +459,7 @@ HdPrmanInstancer::Sync(
         HdChangeTracker::IsTransformDirty(*dirtyBits, id) ||
         *dirtyBits & HdChangeTracker::DirtyCategories ||
         HdChangeTracker::IsVisibilityDirty(*dirtyBits, id) ||
+        *dirtyBits & HdChangeTracker::DirtyRenderTag ||
         HdChangeTracker::IsInstanceIndexDirty(*dirtyBits, id)) {
         _SetPrototypesDirty();
     }
@@ -364,12 +471,12 @@ HdPrmanInstancer::Finalize(HdRenderParam *renderParam)
     HD_TRACE_FUNCTION();
     TF_DEBUG(HDPRMAN_INSTANCERS).Msg("*** Finalize called on <%s>\n\n",
         GetId().GetText());
-    auto* param = static_cast<HdPrman_RenderParam*>(renderParam);
+    auto* param = dynamic_cast<HdPrman_RenderParam*>(renderParam);
     riley::Riley *riley = param->AcquireRiley();
 
     // Release retained conversions of coordSys bindings.
     param->ReleaseCoordSysBindings(GetId());
-    
+
     // Delete all my riley instances
     if (riley) {
         _protoMap.citerate([riley](const SdfPath& /* path */,
@@ -379,10 +486,18 @@ HdPrmanInstancer::Finalize(HdRenderParam *renderParam)
                 _ParallelFor(ids.size(), [&](size_t i) {
                     const _RileyInstanceId& ri = ids[i];
                     if (ri.lightInstanceId != riley::LightInstanceId::InvalidId()) {
-                        riley->DeleteLightInstance(ri.groupId, ri.lightInstanceId);
+                        riley->DeleteLightInstance(
+                            ri.groupId, ri.lightInstanceId);
+                        _ClockMsg("Delete Light Instance (g: %i, i: %i)",
+                            ri.groupId.AsUInt32(),
+                            ri.lightInstanceId.AsUInt32());
                     } else if (ri.geoInstanceId !=
                         riley::GeometryInstanceId::InvalidId()) {
-                        riley->DeleteGeometryInstance(ri.groupId, ri.geoInstanceId);
+                        riley->DeleteGeometryInstance(
+                            ri.groupId, ri.geoInstanceId);
+                        _ClockMsg("Delete GeometryInstance (g: %i, i: %i)",
+                            ri.groupId.AsUInt32(),
+                            ri.geoInstanceId.AsUInt32());
                     }
                 });
             }
@@ -395,7 +510,9 @@ HdPrmanInstancer::Finalize(HdRenderParam *renderParam)
     // Depopulate instances of my groups
     HdPrmanInstancer* parent = _GetParentInstancer();
     if (parent) {
-        parent->Depopulate(renderParam, GetId());
+        const SdfPath& instancerId = GetId();
+        parent->_DepopulateInstancesForChild(
+            renderParam, instancerId, instancerId);
     }
 
     // Delete my prototype groups
@@ -404,18 +521,20 @@ HdPrmanInstancer::Finalize(HdRenderParam *renderParam)
             const riley::GeometryPrototypeId& gp) {
             if (gp != riley::GeometryPrototypeId::InvalidId()) {
                 riley->DeleteGeometryPrototype(gp);
+                _ClockMsg("Delete Geometry Prototype (g: %s)", gp.AsUInt32());
             }
         });
     }
-    
+
     // Clear my group map
     _groupMap.clear();
     _groupCounters.clear();
+    _ClockMsg("Cleared All Group Counters!");
 }
 
 void HdPrmanInstancer::Populate(
     HdRenderParam* renderParam,
-    HdDirtyBits* dirtyBits,
+    const HdDirtyBits& dirtyBits,
     const SdfPath& hydraPrototypeId,
     const std::vector<riley::GeometryPrototypeId>& rileyPrototypeIds,
     const riley::CoordinateSystemList& coordSysList,
@@ -427,7 +546,7 @@ void HdPrmanInstancer::Populate(
     const riley::LightShaderId& lightShaderId)
 {
     // This public Populate signature does not accept the last two arguments
-    // that the private _PopulateInstances does; those are only available to 
+    // that the private _PopulateInstances does; those are only available to
     // HdPrmanInstancer. This lets us keep their messy types private.
 
     HdTimeSampleArray<GfMatrix4d, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES>
@@ -457,24 +576,9 @@ void HdPrmanInstancer::Populate(
 void HdPrmanInstancer::Depopulate(
     HdRenderParam* renderParam,
     const SdfPath& prototypePrimPath,
-    const std::vector<riley::GeometryPrototypeId>& excludedPrototypeIds)
+    const std::vector<riley::GeometryPrototypeId>& protoIdsToKeep)
 {
-    HD_TRACE_FUNCTION();
-    if (TfDebug::IsEnabled(HDPRMAN_INSTANCERS)) {
-        TF_DEBUG(HDPRMAN_INSTANCERS).Msg(
-            "*** Depopulate called on Instancer <%s>\n"
-            "    prototypePrimPath : <%s>\n"
-            "    excludedIds       : [%s]\n"
-            "    caller            : %s\n\n",
-            GetId().GetText(), prototypePrimPath.GetText(),
-            HdPrmanDebugUtil::RileyIdVecToString(excludedPrototypeIds).c_str(),
-            HdPrmanDebugUtil::GetCallerAsString(TF_CALL_CONTEXT).c_str());
-    }
-    auto* param = static_cast<HdPrman_RenderParam*>(renderParam);
-    riley::Riley* riley = param->AcquireRiley();
-
-    _RemoveDeadInstances(riley, prototypePrimPath, excludedPrototypeIds);
-    _CleanDisusedGroupIds(param);
+    _DepopulateInstances(renderParam, prototypePrimPath, protoIdsToKeep);
 }
 
 // **********************************************
@@ -499,7 +603,7 @@ void HdPrmanInstancer::_SyncPrimvars(const HdDirtyBits* dirtyBits)
     // theory, those should be inherited by prototypes that are descendants of
     // the point instancer, and we make an explicit attempt to capture those
     // elsewhere. But "constant" and "uniform" primvars on the point instancer
-    // cannot be inherited by prototypes that are not also descendants, and in 
+    // cannot be inherited by prototypes that are not also descendants, and in
     // that case we will not be able to apply them to instances.
     //
     // Some users have requested the ability to use constant primvars authored
@@ -563,51 +667,6 @@ void HdPrmanInstancer::_SyncPrimvars(const HdDirtyBits* dirtyBits)
                     }
                 }
             }
-        }
-    }
-}
-
-bool UnboxOrientations(
-    HdTimeSampleArray<VtValue, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES> const& box,
-    HdTimeSampleArray<VtQuatfArray, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES>*
-        outRotates)
-{
-    HdTimeSampleArray<VtQuathArray, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES> rotates;
-    if (outRotates->UnboxFrom(box)) {
-        if (outRotates->count > 0 && outRotates->values[0].size() > 0){
-            return true;
-        }
-    }
-    if (rotates.UnboxFrom(box)) {
-        // convert to quatf
-        outRotates->Resize(rotates.count);
-        outRotates->times = rotates.times;
-        for (size_t i=0; i < rotates.count; ++i) {
-            if (rotates.values[i].size() > 0) {
-                VtQuathArray halfs = rotates.values[i];
-                VtQuatfArray floats(halfs.cbegin(), halfs.cend());
-                outRotates->values[i] = floats;
-            }
-        }
-        return true;
-    }   
-    return false;
-}
-
-template <typename T>
-void
-_ValidateSamplesTimes(
-    HdTimeSampleArray<T, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES>& samples)
-{
-    for (size_t i = 0; i < samples.count; ++i) {
-        if (samples.values[i].size() != samples.values[0].size()) {
-            HdTimeSampleArray<T, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES>
-                new_samples;
-            new_samples.Resize(1);
-            new_samples.times[0] = 0.f;
-            new_samples.values[0] = samples.Resample(0.f);
-            samples = new_samples;
-            return;
         }
     }
 }
@@ -681,7 +740,7 @@ HdPrmanInstancer::_SyncTransforms(const HdDirtyBits* dirtyBits,
                                 param->GetShutterInterval()[0],
                                 param->GetShutterInterval()[1],
 #endif
-                                
+
                                 &boxedInstanceXforms);
         delegate->SamplePrimvar(id, instanceTranslationsToken,
 #if HD_API_VERSION >= 68
@@ -768,10 +827,10 @@ HdPrmanInstancer::_SyncTransforms(const HdDirtyBits* dirtyBits,
                 scale = scales.Resample(t);
             }
 
-            size_t size = std::max({ 
-                ixf.size(), 
-                trans.size(), 
-                rot.size(), 
+            size_t size = std::max({
+                ixf.size(),
+                trans.size(),
+                rot.size(),
                 scale.size()
             });
 
@@ -819,7 +878,7 @@ HdPrmanInstancer::_SyncCategories(const HdDirtyBits* dirtyBits)
     // this way. It instead returns an empty vector, leaving it to us to notice
     // and call GetCategories() for the instancer ourselves, something we
     // wouldn't otherwise want to do.
-    // 
+    //
     // Under point instancing, once we've called GetCategories(), we don't
     // bother copying those categories into _instanceCategories, since we don't
     // really know at this point how many instances we will have; we store them
@@ -868,7 +927,7 @@ HdPrmanInstancer::_SyncCategories(const HdDirtyBits* dirtyBits)
                 }
                 intersection = newIntersection;
             }
-            if (intersection.size() > 0) {
+            if (!intersection.empty()) {
                 for (auto& instCats : _instanceCategories) {
                      // already sorted above
                     VtTokenArray newCats;
@@ -878,7 +937,7 @@ HdPrmanInstancer::_SyncCategories(const HdDirtyBits* dirtyBits)
                         std::back_inserter(newCats));
                     instCats = newCats;
                 }
-                _instancerFlat.categories.insert(intersection.cbegin(), 
+                _instancerFlat.categories.insert(intersection.cbegin(),
                     intersection.cend());
             }
         }
@@ -893,6 +952,16 @@ HdPrmanInstancer::_SyncVisibility(const HdDirtyBits* dirtyBits)
 
     if (HdChangeTracker::IsVisibilityDirty(*dirtyBits, id)) {
         _instancerFlat.SetVisibility(delegate->GetVisible(id));
+    }
+}
+
+void
+HdPrmanInstancer::_SyncRenderTag(const HdDirtyBits* dirtyBits)
+{
+    if (*dirtyBits & HdChangeTracker::DirtyRenderTag) {
+        HdSceneDelegate* delegate = GetDelegate();
+        const SdfPath& id = GetId();
+        _instancerFlat.renderTag = delegate->GetRenderTag(id);
     }
 }
 
@@ -914,10 +983,10 @@ HdPrmanInstancer::_SetPrototypesDirty()
 // **********************************************
 
 void
-HdPrmanInstancer::_PopulateInstancesFromChild(
+HdPrmanInstancer::_PopulateInstancesForChild(
     HdRenderParam* renderParam,
-    HdDirtyBits* dirtyBits,
-    const SdfPath& hydraPrototypeId,
+    const HdDirtyBits& dirtyBits,
+    const SdfPath& childInstancerId,
     const SdfPath& prototypePrimPath,
     const std::vector<riley::GeometryPrototypeId>& rileyPrototypeIds,
     const riley::CoordinateSystemList& coordSysList,
@@ -930,28 +999,44 @@ HdPrmanInstancer::_PopulateInstancesFromChild(
     const std::vector<_InstanceData>& subInstances,
     const std::vector<_FlattenData>& prototypeFlats)
 {
-    // When a child instancer has multiple prototype prims, that child instancer
-    // may call this method simultaneously from different threads. That can lead
-    // to duplicate calls from this instancer to create or delete instances of
-    // the child instancer's prototype groups. Both of those are problematic
-    // when done in parallel. We expect such calls to be identical, so while
-    // we are locked we can throw away any additional calls from the same
-    // child instancer (identified by prototypePrimPath).
-    tbb::spin_rw_mutex& mutex = _childPopulateLocks.get(prototypePrimPath);
-    if (mutex.try_lock()) {
-        _PopulateInstances(renderParam, dirtyBits, hydraPrototypeId,
-            prototypePrimPath, rileyPrototypeIds, coordSysList, prototypeParams,
-            prototypeXform, rileyMaterialIds, prototypePaths, lightShaderId,
-            subInstances, prototypeFlats);
-        _childPopulateLocks.erase(prototypePrimPath);
-        mutex.unlock();
-    }
+    // Populate and Depopulate calls from the same child instancer for the
+    // same prototype must be serialized!
+    _ClockMsg("Populate Instances of <%s> from Child <%s> : Queue",
+        prototypePrimPath.GetText(), childInstancerId.GetText());
+    tbb::queuing_mutex& mutex = _childPopulateLocks.get(
+        { childInstancerId, prototypePrimPath});
+    tbb::queuing_mutex::scoped_lock lock(mutex);
+    _ClockMsg("Populate Instances of <%s> from Child <%s> : Run",
+        prototypePrimPath.GetText(), childInstancerId.GetText());
+    _PopulateInstances(renderParam, dirtyBits, childInstancerId,
+        prototypePrimPath, rileyPrototypeIds, coordSysList, prototypeParams,
+        prototypeXform, rileyMaterialIds, prototypePaths, lightShaderId,
+        subInstances, prototypeFlats);
+}
+
+void
+HdPrmanInstancer::_DepopulateInstancesForChild(
+    HdRenderParam* renderParam,
+    const SdfPath& childInstancerId,
+    const SdfPath& prototypePrimPath,
+    const std::vector<riley::GeometryPrototypeId>& protoIdsToKeep)
+{
+    // Populate and Depopulate calls from the same child instancer for the
+    // same prototype must be serialized!
+    _ClockMsg("Depopulate Instances of <%s> from Child <%s> : Queue",
+        prototypePrimPath.GetText(), childInstancerId.GetText());
+    tbb::queuing_mutex& mutex = _childPopulateLocks.get(
+        { childInstancerId, prototypePrimPath});
+    tbb::queuing_mutex::scoped_lock lock(mutex);
+    _ClockMsg("Depopulate Instances of <%s> from Child <%s> : Run",
+        prototypePrimPath.GetText(), childInstancerId.GetText());
+    _DepopulateInstances(renderParam, prototypePrimPath, protoIdsToKeep);
 }
 
 void
 HdPrmanInstancer::_PopulateInstances(
     HdRenderParam* renderParam,
-    HdDirtyBits* dirtyBits,
+    const HdDirtyBits& dirtyBits,
     const SdfPath& hydraPrototypeId,
     const SdfPath& prototypePrimPath,
     const std::vector<riley::GeometryPrototypeId>& rileyPrototypeIds,
@@ -990,20 +1075,54 @@ HdPrmanInstancer::_PopulateInstances(
     // Further complicating issues, this method may be called concurrently from
     // multiple threads, so some actions must be gated behind mutex locks.
 
-    auto* param = static_cast<HdPrman_RenderParam*>(renderParam);
+    auto* param = dynamic_cast<HdPrman_RenderParam*>(renderParam);
     riley::Riley* riley = param->AcquireRiley();
     HdSceneDelegate* delegate = GetDelegate();
     HdRenderIndex& renderIndex = delegate->GetRenderIndex();
     const SdfPath& instancerId = GetId();
     HdPrmanInstancer* parentInstancer = _GetParentInstancer();
     const int depth = _Depth();
-    bool instancesNeedUpdate = _protoMap.get(prototypePrimPath).dirty
-        || (*dirtyBits & HdChangeTracker::DirtyPrimvar)
-        || (*dirtyBits & HdChangeTracker::DirtyMaterialId)
-        || (*dirtyBits & HdChangeTracker::DirtyTransform)
-        || (*dirtyBits & HdChangeTracker::DirtyCategories)
-        || (*dirtyBits & HdChangeTracker::DirtyVisibility);
-    bool anyGroupIdChanged = false;
+
+    // This creates the protoMap entry if it does not exist.
+    _ProtoMapEntry& protoMapEntry = _protoMap.get(prototypePrimPath);
+
+    static const HdDirtyBits prmanInstAttrBits =
+        HdChangeTracker::DirtyMaterialId |
+        HdChangeTracker::DirtyTransform |
+        HdChangeTracker::DirtyVisibility |
+        HdChangeTracker::DirtyDoubleSided |
+        HdChangeTracker::DirtySubdivTags |
+        HdChangeTracker::DirtyVolumeField |
+        HdChangeTracker::DirtyCategories |
+        HdChangeTracker::DirtyPrimvar |
+        HdChangeTracker::DirtyRenderTag;
+
+    // instances need updating if this instancer dirtied them during
+    // its last sync cycle
+    bool instancesNeedUpdate = protoMapEntry.dirty;
+
+    // instances need updating if the prototype prim is dirty in a
+    // way that affects the riley instance. Note that this cannot happen
+    // when the prototype prim is a child instancer that isn't being
+    // flattened into this one.
+    instancesNeedUpdate = instancesNeedUpdate ||
+        (dirtyBits & prmanInstAttrBits);
+
+    // instances need updating if the prototype is a child instancer that is
+    // too deep to create groups. It wouldn't have called this instancer
+    // if the sub-instances weren't dirty.
+    instancesNeedUpdate = instancesNeedUpdate ||
+        (hydraPrototypeId != prototypePrimPath);
+
+    // instances need updating if the set of live prototype ids has changed
+    std::vector<riley::GeometryPrototypeId> newProtoIds;
+    std::vector<riley::GeometryPrototypeId> deadProtoIds;
+    // XXX: Ordered with _GatherChangedPrototypeIds() first to
+    // avoid short-circuiting.
+    instancesNeedUpdate = _GatherChangedPrototypeIds(
+        protoMapEntry, rileyPrototypeIds, newProtoIds, deadProtoIds) ||
+        instancesNeedUpdate;
+
     bool const isLight = lightShaderId != riley::LightShaderId::InvalidId();
 
     if (TfDebug::IsEnabled(HDPRMAN_INSTANCERS)) {
@@ -1019,7 +1138,7 @@ HdPrmanInstancer::_PopulateInstances(
 
         std::string ins = TfStringPrintf("%lu instances ", instanceIndices.size());
         size_t total = instanceIndices.size();
-        if (subInstances.size() > 0) {
+        if (!subInstances.empty()) {
             ins += TfStringPrintf("of %lu subInstances ", subInstances.size());
             total *= subInstances.size();
         }
@@ -1031,49 +1150,64 @@ HdPrmanInstancer::_PopulateInstances(
         if (lightShaderId != riley::LightShaderId::InvalidId()) {
             lsi = TfStringPrintf("(%u)", lightShaderId.AsUInt32());
         }
-    
+
         const HdDirtyBits instDirtyBits = renderIndex.GetChangeTracker()
             .GetInstancerDirtyBits(instancerId);
-        const std::string dbs = HdChangeTracker::StringifyDirtyBits(*dirtyBits);
+        const std::string dbs = HdChangeTracker::StringifyDirtyBits(dirtyBits);
         const std::string idb = HdChangeTracker::StringifyDirtyBits(instDirtyBits);
         const std::string pro = RileyIdVecToString(rileyPrototypeIds);
         const std::string mid = RileyIdVecToString(rileyMaterialIds);
         const std::string pps = SdfPathVecToString(prototypePaths);
         const std::string clr = GetCallerAsString(TF_CALL_CONTEXT);
-        const std::string pat = RtParamListToString(prototypeParams, 24);
-        const std::string pxf = MatrixToString(prototypeXform.values[0], 24, 3);
+        const std::string pat = RtParamListToString(prototypeParams, 26);
+        const std::string pxf = MatrixToString(prototypeXform.values[0], 26, 3);
 
         std::string str;
         str += TfStringPrintf("*** Populate called on <%s>\n", instancerId.GetText());
-        str += TfStringPrintf("    dirtyBits         : %s\n", dbs.c_str());
-        str += TfStringPrintf("    instDirtyBits     : %s\n", idb.c_str());
-        str += TfStringPrintf("    hydraPrototypeId  : <%s>\n", hydraPrototypeId.GetText());
-        str += TfStringPrintf("    prototypePrimPath : <%s>\n", prototypePrimPath.GetText());
-        str += TfStringPrintf("    rileyPrototypeIds : (%s)\n", pro.c_str());
-        str += TfStringPrintf("    rileyMaterialIds  : (%s)\n", mid.c_str());
-        str += TfStringPrintf("    prototypePaths    : [%s]\n", pps.c_str());
-        str += TfStringPrintf("    lightShaderId     : %s\n", lsi.c_str());
-        str += TfStringPrintf("    prototypeParams   : %s\n", pat.c_str());
-        str += TfStringPrintf("    prototypeXform    : %s\n", pxf.c_str());
-        str += TfStringPrintf("    instances         : %lu\n", instanceIndices.size());
-        str += TfStringPrintf("    subInstances      : %lu\n", subInstances.size());
-        str += TfStringPrintf("    total instances   : %s\n", ins.c_str());
-        str += TfStringPrintf("    parentInstancer   : <%s>\n", pid.c_str());
-        str += TfStringPrintf("    depth             : %i\n", depth);
-        str += TfStringPrintf("    caller            : %s\n", clr.c_str());
+        str += TfStringPrintf("    dirtyBits           : %s\n", dbs.c_str());
+        str += TfStringPrintf("    instDirtyBits       : %s\n", idb.c_str());
+        str += TfStringPrintf("    hydraPrototypeId    : <%s>\n", hydraPrototypeId.GetText());
+        str += TfStringPrintf("    prototypePrimPath   : <%s>\n", prototypePrimPath.GetText());
+        str += TfStringPrintf("    rileyPrototypeIds   : (%s)\n", pro.c_str());
+        str += TfStringPrintf("    rileyMaterialIds    : (%s)\n", mid.c_str());
+        if (!deadProtoIds.empty()) {
+            str += TfStringPrintf("                   dead : (%s)\n",
+                RileyIdVecToString(deadProtoIds).c_str());
+        }
+        if (!newProtoIds.empty()) {
+            str += TfStringPrintf("                    new : (%s)\n",
+                RileyIdVecToString(newProtoIds).c_str());
+        }
+        str += TfStringPrintf("    prototypePaths      : [%s]\n", pps.c_str());
+        str += TfStringPrintf("    lightShaderId       : %s\n", lsi.c_str());
+        str += TfStringPrintf("    prototypeParams     : %s\n", pat.c_str());
+        str += TfStringPrintf("    prototypeXform      : %s\n", pxf.c_str());
+        str += TfStringPrintf("    instances           : %lu\n", instanceIndices.size());
+        str += TfStringPrintf("    subInstances        : %lu\n", subInstances.size());
+        str += TfStringPrintf("    total instances     : %s\n", ins.c_str());
+        str += TfStringPrintf("    parentInstancer     : <%s>\n", pid.c_str());
+        str += TfStringPrintf("    depth               : %i\n", depth);
+        str += TfStringPrintf("    caller              : %s\n", clr.c_str());
+        str += TfStringPrintf("    instancesNeedUpdate : %s\n",
+            instancesNeedUpdate ? "true" : "false");
         TF_DEBUG(HDPRMAN_INSTANCERS).Msg("%s\n", str.c_str());
     }
 
+    if (!instancesNeedUpdate) {
+        // No work to do
+        return;
+    }
+
     TF_VERIFY(
-        rileyMaterialIds.size() == rileyPrototypeIds.size(), 
-        "rileyMaterialIds size mismatch: %lu != %lu", 
+        rileyMaterialIds.size() == rileyPrototypeIds.size(),
+        "rileyMaterialIds size mismatch: %lu != %lu",
         rileyMaterialIds.size(), rileyPrototypeIds.size());
     TF_VERIFY(
         prototypePaths.size() == rileyPrototypeIds.size(),
         "prototypePaths size mismatch: %lu != %lu",
         prototypePaths.size(), rileyPrototypeIds.size());
     TF_VERIFY(
-        prototypeFlats.size() == 0 || 
+        prototypeFlats.size() == 0 ||
         prototypeFlats.size() == rileyPrototypeIds.size(),
         "prototypeFlats size mismatch: %lu != %lu",
         prototypeFlats.size(), rileyPrototypeIds.size());
@@ -1086,16 +1220,11 @@ HdPrmanInstancer::_PopulateInstances(
             "When called with a single invalid "
             "prototype id, a light shader id is required");
     }
-    
-    instancesNeedUpdate = _RemoveDeadInstances(riley, prototypePrimPath,
-        rileyPrototypeIds) || instancesNeedUpdate;
-
-    std::vector<_InstanceData> instances;
 
     // hydraPrototypeId corresponds to the hydra prototype, which might be a
-    // child instancer. prototypePrimPath corresponds to the prim represented by
-    // the rileyPrototypeIds, which could be a child instancer or prototype
-    // geometry. In most cases, they are equal:
+    // child instancer or prototype geometry. prototypePrimPath corresponds to
+    // the prim represented by the rileyPrototypeIds, which also could be a
+    // child instancer or prototype geometry. In most cases, they are equal:
     //  1. Both paths are the same, and point to a geometry prim that is one of
     //     this instancer's prototypes and has already been represented in riley
     //     during GPrim::Sync(), resulting in the ids in rileyPrototypeIds which
@@ -1105,21 +1234,36 @@ HdPrmanInstancer::_PopulateInstances(
     //     by the child instancer, resulting in the ids in rileyPrototypeIds
     //     which are all of primType "Group".
     // They differ only when the prototype is an instancer and that instancer
-    // was too deep to put its riley instances into a group. In that case, 
-    // hydraPrototypeId will be the instancer below, while prototypePrimPath 
+    // was too deep to put its riley instances into a group. In that case,
+    // hydraPrototypeId will be the instancer below, while prototypePrimPath
     // will be the prototype prim path originally given to Populate, because
     // that's the prim represented by the rileyPrototypeIds we've been given.
     // We need the former to retrieve instance indices, params, and
     // transforms for the nested instancer prototype, while we use the latter to
     // track our riley instances and their prototype ids in _protoMap and
-    // retrieve USD primvars affecting the prototype.
-    
+    // retrieve Hydra primvars affecting the prototype.
+
     // We might receive no instances from the too-deep nested instacer, because
     // the nested instancer no longer has any instances of this prototype. In
     // that case, we should not make any instances of this prototype here, and
     // delete any we already have.
 
-    if (hydraPrototypeId == prototypePrimPath || subInstances.size() > 0) {
+    // Destroy any instances of dead prototype ids
+    if (!deadProtoIds.empty()) {
+        _ResizeProtoMap(riley, prototypePrimPath, deadProtoIds, 0);
+    }
+
+    std::vector<_InstanceData> instances;
+
+    // We do not need to generate any instances when the prototype is an
+    // (inner) instancer that is too deep to put its instances in a prototype
+    // group AND it has sent this (outer) instancer no sub-instances to
+    // instance. This happens when the inner instancer stops instancing this
+    // prototype. The instances were already deleted above when we resized
+    // the protoMap. This check avoids the overhead of the call to
+    // _ComposeInstances in this situation where we know there are no
+    // instances to compose.
+    if (hydraPrototypeId == prototypePrimPath || !subInstances.empty()) {
         _ComposeInstances(hydraPrototypeId, subInstances, instances);
     }
 
@@ -1136,11 +1280,20 @@ HdPrmanInstancer::_PopulateInstances(
     if (parentInstancer &&
         (TfGetEnvSetting(HD_PRMAN_DISABLE_NESTED_INSTANCING) ||
             depth > HDPRMAN_MAX_SUPPORTED_NESTING_DEPTH)) {
-
-        // TODO: Instancer params?
-
-        // Ensure the protoMap is clear of instances (perhaps depth increased?)
+        // Ensure the protoMap is clear of ANY instances. If this instancer's
+        // depth increased beyond the supported level, it may own some
+        // previously created instances that now need to be removed.
         _ResizeProtoMap(riley, prototypePrimPath, rileyPrototypeIds, 0);
+
+        if (instances.empty()) {
+            // If there are no instances to pass up to the parent, tell the
+            // parent to depopulate all instances for this instancer/prototype.
+            parentInstancer->_DepopulateInstancesForChild(
+                renderParam,
+                instancerId,
+                prototypePrimPath);
+            return;
+        }
 
         // Sample this instancer's transform. The instance transforms do not
         // include it. We must multiply the instance transforms by this
@@ -1152,7 +1305,7 @@ HdPrmanInstancer::_PopulateInstances(
                                            param->GetShutterInterval()[1],
 #endif
                                            &xf);
-        
+
         if (xf.count > 0) {
             for (_InstanceData& instance : instances) {
                 instance.transform = _MultiplyTransforms<GfMatrix4d>(
@@ -1161,13 +1314,15 @@ HdPrmanInstancer::_PopulateInstances(
         }
 
         // Send allInstances up to the parent to populate
-        parentInstancer->_PopulateInstancesFromChild(
+        parentInstancer->_PopulateInstancesForChild(
             renderParam,
+            // Thses are the dirty bits this instancer received, which
+            // correspond to the prototype this instancer was asked to instance.
             dirtyBits,
             instancerId,
             prototypePrimPath,
             rileyPrototypeIds,
-            coordSysList, 
+            coordSysList,
             prototypeParams,
             prototypeXform,
             rileyMaterialIds,
@@ -1179,29 +1334,30 @@ HdPrmanInstancer::_PopulateInstances(
         return;
     }
 
-    if (instancesNeedUpdate) {
-        // Allocate the protoMap; this deletes instances if instances is empty
-        _ResizeProtoMap(riley, prototypePrimPath, rileyPrototypeIds, instances.size());
-    }
+    // Allocate the protoMap for the current set of live prototype ids. This
+    // also deletes any instances that no longer exist.
+    _ResizeProtoMap(
+        riley, prototypePrimPath, rileyPrototypeIds, instances.size());
 
-    if (instancesNeedUpdate && instances.size() > 0) {
+    bool addedNewGroups = false;
+
+    // Skip sending instances to Riley if there are no instances
+    if (!instances.empty()) {
 
         // Finalize the prototype-derived params & flats
         std::vector<RtParamList> protoParams;
         std::vector<_FlattenData> protoFlats;
-        std::vector<TfToken> protoRenderTags;
 
         _ComposePrototypeData(
             prototypePrimPath,
             prototypeParams,
             isLight,
-            rileyPrototypeIds, 
+            rileyPrototypeIds,
             prototypePaths,
             prototypeFlats,
             protoParams,
-            protoFlats,
-            protoRenderTags);
-        
+            protoFlats);
+
         // Prepare each instance to be sent to riley
         _ParallelFor(instances.size(), [&](size_t i) {
 
@@ -1230,13 +1386,13 @@ HdPrmanInstancer::_PopulateInstances(
             };
 
             // If the hydra prototype prim consists of multiple riley
-            // prototypes (e.g., in the case of GeomSubsets), we must make 
+            // prototypes (e.g., in the case of GeomSubsets), we must make
             // one riley instance for each riley prototype
             for (size_t j = 0; j < rileyPrototypeIds.size(); ++j) {
                 // This is expected to be InvalidId for analytic lights
-                const riley::GeometryPrototypeId& protoId = 
+                const riley::GeometryPrototypeId& protoId =
                     rileyPrototypeIds[j];
-                
+
                 riley::MaterialId matId = rileyMaterialIds[j];
                 RtParamList params = instance.params; // a copy
                 // Merge in params derived from the hydra prototype prim, which
@@ -1244,9 +1400,10 @@ HdPrmanInstancer::_PopulateInstances(
                 // so that the prototype-derived params will overwrite the
                 // instance-derived ones.
                 params.Update(protoParams[j]);
-                
+
                 // append subset name to stats:identifier
-                if (prototypePaths[j] != hydraPrototypeId) {
+                if (!TfGetenv("RILEY_CAPTURE").empty() &&
+                    prototypePaths[j] != hydraPrototypeId) {
                     std::string protoName = TfStringPrintf(
                         "{%s}", prototypePaths[j].GetName().c_str());
                     RtUString sid;
@@ -1262,20 +1419,14 @@ HdPrmanInstancer::_PopulateInstances(
 
                 // compose the final flats
                 _FlattenData flats = instance.flattenData; // a copy
-                
+
                 // Merge the visibility params derived from the hydra
                 // prototype prim. Because these are either present (and set to
                 // 0, indicating invisibility) or absent, we use Inherit to
                 // obtain the logical OR superset of present params. Inherit
-                // also merges the light linking categories.
+                // also merges the light linking categories and sets the
+                // render tag if the instance doesn't have one.
                 flats.Inherit(protoFlats[j]);
-
-                // Acquire the id of the prototype group that will house
-                // all instances that share this specific set of flatten data.
-                // This group id will be InvalidId when there is no parent
-                // instancer.
-                riley::GeometryPrototypeId groupId;
-                anyGroupIdChanged |= _AcquireGroupId(param, flats, groupId);
 
                 if (!parentInstancer) {
                     // If there is no parent, we can safely set the params
@@ -1289,11 +1440,35 @@ HdPrmanInstancer::_PopulateInstances(
                         instancerId,
                         { flats.categories.cbegin(), flats.categories.cend() },
                         params);
+                    param->AddRenderTagToGroupingMembership(
+                        flats.renderTag, params);
                 }
 
                 // Retrieve the riley instance id
-                _RileyInstanceId& instId = _protoMap.get(prototypePrimPath)
-                    .map[protoId][i];
+                _RileyInstanceId& instId = protoMapEntry.map[protoId][i];
+
+                // Acquire the id of the prototype group that will house
+                // all instances that share this specific set of flatten data,
+                // and simulatneously increment the group's instance counter.
+                //
+                // XXX: We will need to decrement the counter again if we end up
+                // modifying an existing instance instead of creating a new one.
+                //
+                // XXX: This call is serialized across all threads to avoid
+                // potential race conditions. First, multiple threads may try to
+                // populate prototypes into groups based on identical flatten
+                // data, leading to a race to create the shared prototype group.
+                // Second, the group counter increment must happen atomically
+                // with the group allocation. Another thread could call
+                // _CleanDisusedGroupIds(), which could result in deletion
+                // of a newly created prototype group during any gap between
+                // group allocation and counter increment.
+
+                // This group id will stay InvalidId when there is no
+                // parent instancer.
+                riley::GeometryPrototypeId groupId;
+                addedNewGroups |= _AcquireGroupIdAndIncrementCounter(
+                    param, flats, groupId);
 
                 // Check if the instance already exists, and if so, whether
                 // it was created in the right prototype group. We can reuse the
@@ -1305,7 +1480,11 @@ HdPrmanInstancer::_PopulateInstances(
                     // the instanceId is valid but the groupId is different
                     riley->DeleteGeometryInstance(
                         instId.groupId, instId.geoInstanceId);
-                    _groupCounters.get(instId.groupId)--;
+                    _ClockMsg("Delete Geometry Instance (g: %i i: %i)",
+                        instId.groupId.AsUInt32(),
+                        instId.geoInstanceId.AsUInt32());
+                    // Decrement the OLD group's counter
+                    _DecrementGroupCounter(instId.groupId);
                     instId.geoInstanceId = riley::GeometryInstanceId::InvalidId();
                 }
                 if (instId.lightInstanceId != riley::LightInstanceId::InvalidId()
@@ -1313,20 +1492,19 @@ HdPrmanInstancer::_PopulateInstances(
                     // the instanceId is valid but the groupId is different
                     riley->DeleteLightInstance(
                         instId.groupId, instId.lightInstanceId);
-                    _groupCounters.get(instId.groupId)--;
+                    _ClockMsg("Delete Light Instance (g: %i i: %i)",
+                        instId.groupId.AsUInt32(),
+                        instId.lightInstanceId.AsUInt32());
+                    // Decrement the OLD group's counter
+                    _DecrementGroupCounter(instId.groupId);
                     instId.lightInstanceId = riley::LightInstanceId::InvalidId();
                 }
 
                 instId.groupId = groupId;
-                _groupCounters.get(instId.groupId)++;
-
-                // Now we branch based on whether we're dealing with lights
-                // or geometry
 
                 // XXX: The stats userId will not be unique in the case of
                 // nested instancing, but this approach preserves prior
                 // behavior in the unnested case.
-
                 const SdfPath instancePath = delegate->GetScenePrimPath(
                     prototypePaths[j], static_cast<int>(i), nullptr);
                 riley::UserId userId = riley::UserId(
@@ -1347,7 +1525,6 @@ HdPrmanInstancer::_PopulateInstances(
                 // We must assemble these two pieces here, and not
                 // before, because the Hydra scene index does not
                 // provide a way to express per-prim per-instance data.
-                //
                 const static RtUString instLocKey("user:instanceLocations");
                 const static RtUString primOriginKey("user:primOrigin");
                 RtUString instLoc, protoPrimOrigin;
@@ -1371,16 +1548,27 @@ HdPrmanInstancer::_PopulateInstances(
                       /*instanceId = */ (int) i },
                     &params);
 
+                // Now we branch based on whether we're dealing with lights
+                // or geometry
                 if (lightShaderId != riley::LightShaderId::InvalidId()) {
 
                     // XXX: Temporary workaround for RMAN-20704
                     // Destroy the light instance so it will be recreated instead
-                    // of being updated, since ModifyLightInstance may crash.
-
+                    // of being updated, since ModifyLightInstance() may crash.
                     if (instId.lightInstanceId != riley::LightInstanceId::InvalidId()) {
                         riley->DeleteLightInstance(
                             instId.groupId, instId.lightInstanceId);
+                        _ClockMsg("Delete Light Instance (g: %i i: %i) "
+                            "(RMAN-20704)", instId.groupId.AsUInt32(),
+                            instId.lightInstanceId.AsUInt32());
                         instId.lightInstanceId = riley::LightInstanceId::InvalidId();
+                        // Decrement the counter even though we will immediately
+                        // recreate the instance. We incremented the counter
+                        // during group id acquisition above, so need to
+                        // decrement on all "modify" paths. As a workaround
+                        // for the ModifyLightInstance() bug, this counts
+                        // as a "modify" path.
+                        _DecrementGroupCounter(instId.groupId);
                     }
                     // XXX: End of RMAN-20704 workaround
 
@@ -1395,7 +1583,12 @@ HdPrmanInstancer::_PopulateInstances(
                             coordSysList,
                             rileyXform,
                             params);
-                    } else if (*dirtyBits) {
+                        _ClockMsg("Create Light Instance (g: %i i: %i)",
+                            instId.groupId.AsUInt32(),
+                            instId.lightInstanceId.AsUInt32());
+                        // No need to increment the group counter; increment
+                        // already happened during group id acquisition.
+                    } else {
                         TRACE_SCOPE("riley::ModifyLightInstance");
                         riley->ModifyLightInstance(
                             instId.groupId,
@@ -1405,22 +1598,31 @@ HdPrmanInstancer::_PopulateInstances(
                             &coordSysList,
                             &rileyXform,
                             &params);
+                        _ClockMsg("Modify Light Instance (g: %i, i: %i)",
+                            instId.groupId.AsUInt32(),
+                            instId.lightInstanceId.AsUInt32());
+                        // We incremented the counter during group id
+                        // acquisition above, so need to decrement on all
+                        // "modify" paths.
+                        _DecrementGroupCounter(instId.groupId);
                     }
                 } else {
-                    // Very last thing: prepend renderTag to grouping:membership
-                    param->AddRenderTagToGroupingMembership(
-                        protoRenderTags[j], params);
                     if (instId.geoInstanceId == riley::GeometryInstanceId::InvalidId()) {
                         TRACE_SCOPE("riley::CreateGeometryInstance");
                         instId.geoInstanceId = riley->CreateGeometryInstance(
                             userId,
-                            instId.groupId, 
-                            protoId, 
-                            matId, 
-                            coordSysList, 
-                            rileyXform, 
+                            instId.groupId,
+                            protoId,
+                            matId,
+                            coordSysList,
+                            rileyXform,
                             params);
-                    } else if (*dirtyBits) {
+                        _ClockMsg("Create Geometry Instance (g: %i i: %i)",
+                            instId.groupId.AsUInt32(),
+                            instId.geoInstanceId.AsUInt32());
+                        // No need to increment the group counter; increment
+                        // already happened during group id acquisition.
+                    } else {
                         TRACE_SCOPE("riley::ModifyGeometryInstance");
                         riley->ModifyGeometryInstance(
                             instId.groupId,
@@ -1429,6 +1631,13 @@ HdPrmanInstancer::_PopulateInstances(
                             &coordSysList,
                             &rileyXform,
                             &params);
+                        _ClockMsg("Modify Geometry Instance (g: %i, i: %i)",
+                            instId.groupId.AsUInt32(),
+                            instId.geoInstanceId.AsUInt32());
+                        // We incremented the counter during group id
+                        // acquisition above, so need to decrement on all
+                        // "modify" paths.
+                        _DecrementGroupCounter(instId.groupId);
                     }
                 }
             }
@@ -1437,14 +1646,15 @@ HdPrmanInstancer::_PopulateInstances(
         // We have now fully processed all changes from the last time the
         // instancer was synced down to the riley instances for this particular
         // hydra prototype prim.
-        _protoMap.get(prototypePrimPath).dirty = false;
+        protoMapEntry.dirty = false;
     }
 
-    // clean up disused prototype groups
-    anyGroupIdChanged |= _CleanDisusedGroupIds(param);
+    // Clean up any empty prototype groups. This will depopulate instances
+    // of the now-empty prototype groups from the parent instancer, then delete
+    // the prototype groups in Riley.
+    _CleanDisusedGroupIds(param);
 
-    if (parentInstancer && (anyGroupIdChanged || 
-        HdChangeTracker::IsInstancerDirty(*dirtyBits, instancerId))) {
+    if (addedNewGroups) {
         // Now we need to tell the parent instancer to make geometry instances
         // of my groups (my groups, my groups, my lovely proto groups).
 
@@ -1452,36 +1662,43 @@ HdPrmanInstancer::_PopulateInstances(
         // include it. The parent instancer will instead include it on the
         // instances it makes of this instancer's prototype groups.
         HdTimeSampleArray<GfMatrix4d, HDPRMAN_INSTANCER_MAX_TIME_SAMPLES> xf;
-        delegate->SampleInstancerTransform(instancerId,
 #if HD_API_VERSION >= 68
-                                           param->GetShutterInterval()[0],
-                                           param->GetShutterInterval()[1],
+        const GfVec2f& shutter = param->GetShutterInterval();
 #endif
-                                           &xf);
+        delegate->SampleInstancerTransform(
+            instancerId,
+#if HD_API_VERSION >= 68
+            shutter[0], shutter[1],
+#endif
+            &xf);
 
         // Get this instancer's params
         const RtParamList instancerParams = param->ConvertAttributes(
             delegate, instancerId, false);
 
-        // Build the lists of flatten groups and prototype group ids, and 
+        // Build the lists of flatten groups and prototype group ids, and
         // prototype prim paths and material ids, these latter two all being
         // the same for each group.
         std::vector<_FlattenData> flats;
         std::vector<riley::GeometryPrototypeId> ids;
         std::vector<riley::MaterialId> mats;
         SdfPathVector paths;
-        _groupMap.citerate([&](const _FlattenData& fd, const riley::GeometryPrototypeId& gp) {
-            flats.push_back(fd);
-            ids.push_back(gp);
-            paths.push_back(instancerId);
-            mats.push_back(riley::MaterialId::InvalidId());
-        });
+        _groupMap.citerate(
+            [&](const _FlattenData& fd, const riley::GeometryPrototypeId& gp) {
+                flats.push_back(fd);
+                ids.push_back(gp);
+                paths.push_back(instancerId);
+                mats.push_back(riley::MaterialId::InvalidId());
+            });
 
         // Populate the parent using _PopulateInstancesFromChild so that we can
         // pass the flatten groups up to it.
-        parentInstancer->_PopulateInstancesFromChild(
+        parentInstancer->_PopulateInstancesForChild(
             renderParam,
-            dirtyBits,
+            // These are the dirty bits associated with this (child) instancer,
+            // which should be clean since _SyncInstancerAndParents() should
+            // have been called before Populate() on the innermost instancer.
+            renderIndex.GetChangeTracker().GetInstancerDirtyBits(instancerId),
             instancerId,
             instancerId,
             ids,
@@ -1498,6 +1715,35 @@ HdPrmanInstancer::_PopulateInstances(
             { },
             flats);
     }
+}
+
+void
+HdPrmanInstancer::_DepopulateInstances(
+    HdRenderParam* renderParam,
+    const SdfPath& prototypePrimPath,
+    const std::vector<riley::GeometryPrototypeId>& protoIdsToKeep)
+{
+    HD_TRACE_FUNCTION();
+    if (TfDebug::IsEnabled(HDPRMAN_INSTANCERS)) {
+        TF_DEBUG(HDPRMAN_INSTANCERS).Msg(
+            "*** Depopulate called on Instancer <%s>\n"
+            "    prototypePrimPath : <%s>\n"
+            "    protoIdsToKeep    : [%s]\n"
+            "    caller            : %s\n\n",
+            GetId().GetText(), prototypePrimPath.GetText(),
+            HdPrmanDebugUtil::RileyIdVecToString(protoIdsToKeep).c_str(),
+            HdPrmanDebugUtil::GetCallerAsString(TF_CALL_CONTEXT).c_str());
+    }
+    auto* param = dynamic_cast<HdPrman_RenderParam*>(renderParam);
+    riley::Riley* riley = param->AcquireRiley();
+    _ProtoMapEntry& protoMapEntry = _protoMap.get(prototypePrimPath);
+    std::vector<riley::GeometryPrototypeId> newProtoIds, deadProtoIds;
+    _GatherChangedPrototypeIds(
+        protoMapEntry, protoIdsToKeep, newProtoIds, deadProtoIds);
+    if (!deadProtoIds.empty()) {
+        _ResizeProtoMap(riley, prototypePrimPath, deadProtoIds, 0);
+    }
+    _CleanDisusedGroupIds(param);
 }
 
 void
@@ -1557,9 +1803,9 @@ HdPrmanInstancer::_ComposeInstances(
             instance.params.SetString(instLoc, RtUString(joinedName.c_str()));
             _BuildStatsId(id, index, protoId, instance.params);
             _ComposeInstanceFlattenData(
-                index, 
-                instance.params, 
-                instance.flattenData, 
+                index,
+                instance.params,
+                instance.flattenData,
                 subInstance.flattenData);
             _GetInstanceTransform(
                 index,
@@ -1585,53 +1831,38 @@ HdPrmanInstancer::_ComposeInstanceFlattenData(
     // instancer as instance-varying USD primvars or the native instance; remove
     // these from instanceParams if they exist.
     instance.UpdateVisAndFilterParamList(instanceParams);
-    
+
     fd.Update(_instancerFlat);
     fd.Update(instance);
     fd.Update(fromBelow);
 }
 
 bool
-HdPrmanInstancer::_RemoveDeadInstances(
-    riley::Riley* riley,
-    const SdfPath& prototypePrimPath,
-    const std::vector<riley::GeometryPrototypeId>& protoIds)
+HdPrmanInstancer::_GatherChangedPrototypeIds(
+    const _ProtoMapEntry& protoMapEntry,
+    const std::vector<riley::GeometryPrototypeId>& inputProtoIds,
+    std::vector<riley::GeometryPrototypeId>& newProtoIds,
+    std::vector<riley::GeometryPrototypeId>& deadProtoIds)
 {
     HD_TRACE_FUNCTION();
-    // Can't do anything with an empty path
-    if (prototypePrimPath.IsEmpty()) { return false; }
-    // Check if the protoMap has this path in it first;
-    // otherwise the call to get() will insert it.
-    if (!_protoMap.has(prototypePrimPath)) { return false; }
-    using ProtoMapPair = std::pair<riley::GeometryPrototypeId, _InstanceIdVec>;
-    const _ProtoInstMap& protoMap = _protoMap.get(prototypePrimPath).map;
-    std::vector<riley::GeometryPrototypeId> oldProtoIds;
+    std::vector<riley::GeometryPrototypeId> knownProtoIds;
     std::transform(
-        protoMap.begin(), protoMap.end(),
-        std::back_inserter(oldProtoIds),
-        [](const ProtoMapPair& pair) { return pair.first; });
-    std::vector<riley::GeometryPrototypeId> newProtoIds(
-            protoIds.begin(), protoIds.end());
-
-    std::sort(oldProtoIds.begin(), oldProtoIds.end());
-    std::sort(newProtoIds.begin(), newProtoIds.end());
-
-    std::vector<riley::GeometryPrototypeId> toRemove;
+        protoMapEntry.map.cbegin(), protoMapEntry.map.cend(),
+        std::back_inserter(knownProtoIds),
+        [](const auto& pair) { return pair.first; });
+    std::vector<riley::GeometryPrototypeId> liveProtoIds(
+        inputProtoIds.cbegin(), inputProtoIds.cend());
+    std::sort(knownProtoIds.begin(), knownProtoIds.end());
+    std::sort(liveProtoIds.begin(), liveProtoIds.end());
     std::set_difference(
-        oldProtoIds.cbegin(), oldProtoIds.cend(),
-        newProtoIds.cbegin(), newProtoIds.cend(),
-        std::back_inserter(toRemove));
-    if (toRemove.size() > 0) {
-        _ResizeProtoMap(riley, prototypePrimPath, toRemove, 0);
-    }
-
-    // returns true if there are new geometry prototype ids for this prototype
-    std::vector<riley::GeometryPrototypeId> toAdd;
+        knownProtoIds.cbegin(), knownProtoIds.cend(),
+        liveProtoIds.cbegin(), liveProtoIds.cend(),
+        std::back_inserter(deadProtoIds));
     std::set_difference(
-        protoIds.cbegin(), protoIds.cend(),
-        oldProtoIds.cbegin(), oldProtoIds.cend(),
-        std::back_inserter(toAdd));
-    return toAdd.size() > 0;
+        liveProtoIds.cbegin(), liveProtoIds.cend(),
+        knownProtoIds.cbegin(), knownProtoIds.cend(),
+        std::back_inserter(newProtoIds));
+    return !(newProtoIds.empty() && deadProtoIds.empty());
 }
 
 void
@@ -1643,8 +1874,7 @@ HdPrmanInstancer::_ComposePrototypeData(
     const SdfPathVector& subProtoPaths,
     const std::vector<_FlattenData>& subProtoFlats,
     std::vector<RtParamList>& protoParams,
-    std::vector<_FlattenData>& protoFlats,
-    std::vector<TfToken>& protoRenderTags)
+    std::vector<_FlattenData>& protoFlats)
 {
     HD_TRACE_FUNCTION();
     HdSceneDelegate* delegate = GetDelegate();
@@ -1688,12 +1918,11 @@ HdPrmanInstancer::_ComposePrototypeData(
 
     protoParams.resize(count);
     protoFlats.resize(count);
-    protoRenderTags.resize(count);
 
     for (size_t i = 0; i < count; ++i) {
         SetProtoParams(protoPath, protoParams[i], protoFlats[i]);
         if (!isLight) {
-            protoRenderTags[i] = delegate->GetRenderTag(protoPath);
+            protoFlats[i].renderTag = delegate->GetRenderTag(protoPath);
         }
 
         // If prototype is a subset, also get the subset params. While geom
@@ -1721,8 +1950,8 @@ HdPrmanInstancer::_ComposePrototypeData(
 void
 HdPrmanInstancer::_ResizeProtoMap(
     riley::Riley* riley,
-    const SdfPath& prototypePrimPath, 
-    const std::vector<riley::GeometryPrototypeId>& rileyPrototypeIds, 
+    const SdfPath& prototypePrimPath,
+    const std::vector<riley::GeometryPrototypeId>& rileyPrototypeIds,
     const size_t newSize)
 {
     HD_TRACE_FUNCTION();
@@ -1738,11 +1967,16 @@ HdPrmanInstancer::_ResizeProtoMap(
                 const _RileyInstanceId& id = instIdVec[i];
                 if (id.lightInstanceId != riley::LightInstanceId::InvalidId()) {
                     riley->DeleteLightInstance(id.groupId, id.lightInstanceId);
-                    _groupCounters.get(id.groupId)--;
+                    _ClockMsg("Delete Light Instance (g: %i, i: %i)",
+                        id.groupId.AsUInt32(), id.lightInstanceId.AsUInt32());
                 }
                 if (id.geoInstanceId != riley::GeometryInstanceId::InvalidId()) {
                     riley->DeleteGeometryInstance(id.groupId, id.geoInstanceId);
-                    _groupCounters.get(id.groupId)--;
+                    _ClockMsg("Delete Geometry Instance (g: %i, i: %i)",
+                        id.groupId.AsUInt32(), id.geoInstanceId.AsUInt32());
+                }
+                if (id.groupId != riley::GeometryPrototypeId::InvalidId()) {
+                    _DecrementGroupCounter(id.groupId);
                 }
             });
         }
@@ -1762,46 +1996,67 @@ bool
 HdPrmanInstancer::_CleanDisusedGroupIds(HdPrman_RenderParam* param)
 {
     HD_TRACE_FUNCTION();
-    tbb::spin_rw_mutex::scoped_lock lock(_groupIdAcquisitionLock, true);
+    tbb::spin_mutex::scoped_lock lock(_groupIdAcquisitionLock);
     riley::Riley* riley = param->AcquireRiley();
 
     // Gather active and disused
     std::vector<_FlattenData> toDestroy;
     std::unordered_set<riley::GeometryPrototypeId, _ProtoIdHash> active;
-    _groupMap.citerate([&](const _FlattenData& fd, const riley::GeometryPrototypeId& gp){
-        if (gp != riley::GeometryPrototypeId::InvalidId()) {
-            if (_groupCounters.get(gp).load() < 1) {
-                toDestroy.push_back(fd);
-            } else {
-                active.insert(gp);
+    _groupMap.citerate(
+        [&](const _FlattenData& fd, const riley::GeometryPrototypeId& gp) {
+            if (gp != riley::GeometryPrototypeId::InvalidId()) {
+                int k = 0;
+                if (TfDebug::IsEnabled(HDPRMAN_INSTANCERS_CONCURRENCY)) {
+                    const bool found = _groupCounters.withIfPresent(gp,
+                        [&k](std::atomic<int>& counter)
+                        { k = counter.load(); });
+                    if (found) {
+                        _ClockMsg("Read Counter for Group (g: %i) = %i",
+                            gp.AsUInt32(), k);
+                    } else {
+                        _ClockMsg(
+                            "Read Counter for Group (g: %i) = <no entry>",
+                            gp.AsUInt32());
+                    }
+                } else {
+                    k = _groupCounters.load(gp);
+                }
+                if (k < 1) {
+                    toDestroy.push_back(fd);
+                } else {
+                    active.insert(gp);
+                }
             }
-        }
-    });
+        });
     // If there are groups to remove and a parent instancer, depopulate the
     // parent preserving the still-active groups
-    if (toDestroy.size() > 0) {
+    if (!toDestroy.empty()) {
         HdPrmanInstancer* parent = _GetParentInstancer();
+        const SdfPath& instancerId = GetId();
         if (parent) {
-            parent->Depopulate(param, GetId(),
+            parent->_DepopulateInstancesForChild(
+                param,
+                instancerId, instancerId,
                 { active.cbegin(), active.cend() });
         }
     }
     // Destroy the disused prototype groups
     for (const _FlattenData& fd : toDestroy) {
-        riley::GeometryPrototypeId& groupId = _groupMap.get(fd);
+        const riley::GeometryPrototypeId& groupId = _groupMap.get(fd);
         if (groupId != riley::GeometryPrototypeId::InvalidId()) {
             riley->DeleteGeometryPrototype(groupId);
-            groupId = riley::GeometryPrototypeId::InvalidId();
+            _ClockMsg("Delete Geometry Prototype (g: %i)", groupId.AsUInt32());
+            _groupCounters.erase(groupId);
+            _ClockMsg("Erase Counter for Group (g: %i)", groupId.AsUInt32());
         }
         _groupMap.erase(fd);
-        _groupCounters.erase(groupId);
     }
     // Return true if any were destroyed
-    return toDestroy.size() > 0;
+    return !toDestroy.empty();
 }
 
 bool
-HdPrmanInstancer::_AcquireGroupId(
+HdPrmanInstancer::_AcquireGroupIdAndIncrementCounter(
     HdPrman_RenderParam* param,
     const _FlattenData& flattenGroup,
     riley::GeometryPrototypeId& groupId)
@@ -1814,8 +2069,8 @@ HdPrmanInstancer::_AcquireGroupId(
 
     // This lock prevents concurrent calls to Populate from creating separate
     // riley groups for the same set of flatten data.
-    tbb::spin_rw_mutex::scoped_lock lock(_groupIdAcquisitionLock, false);
-    
+    tbb::spin_mutex::scoped_lock lock(_groupIdAcquisitionLock);
+
     // We use the flatten data to look up whether this instancer has
     // a riley group that it will use for all instances across all
     // prototypes that will share that flatten data. When this instancer
@@ -1829,33 +2084,29 @@ HdPrmanInstancer::_AcquireGroupId(
     //
     // In short, If the instancer detects variability in the flatten data
     // across its instances, it will put them into separate buckets.
-
+    bool created = false;
     groupId = _groupMap.get(flattenGroup);
     if (groupId == riley::GeometryPrototypeId::InvalidId()) {
         HD_TRACE_FUNCTION();
-
-        bool found = false;
-        if (!lock.upgrade_to_writer()) {
-            groupId = _groupMap.get(flattenGroup);
-            if (groupId != riley::GeometryPrototypeId::InvalidId()) {
-                found = true;
-            }
+        RtPrimVarList groupPrimvars;
+        groupPrimvars.SetString(RixStr.k_stats_prototypeIdentifier,
+            RtUString(GetId().GetText()));
+        if (!TfGetenv("RILEY_CAPTURE").empty()) {
+            groupPrimvars.SetString(
+                RtUString("user:hdPrmanFlatteningGroup"),
+                RtUString(flattenGroup.ToString().c_str()));
         }
-
-        if (!found) {
-            RtPrimVarList groupPrimvars;
-            groupPrimvars.SetString(RixStr.k_stats_prototypeIdentifier,
-                RtUString(GetId().GetText()));
-            groupId = param->AcquireRiley()->CreateGeometryPrototype(
-                riley::UserId(stats::AddDataLocation(GetId().GetText()).GetValue()),
-                RixStr.k_Ri_Group,
-                riley::DisplacementId::InvalidId(),
-                groupPrimvars);
-            _groupMap.set(flattenGroup, groupId);
-            return true;
-        }
+        groupId = param->AcquireRiley()->CreateGeometryPrototype(
+            riley::UserId(stats::AddDataLocation(GetId().GetText()).GetValue()),
+            RixStr.k_Ri_Group,
+            riley::DisplacementId::InvalidId(),
+            groupPrimvars);
+        _ClockMsg("Create Geometry Prototype (g: %i)", groupId.AsUInt32());
+        _groupMap.set(flattenGroup, groupId);
+        created = true;
     }
-    return false;
+    _IncrementGroupCounter(groupId);
+    return created;
 }
 
 HdPrmanInstancer*
@@ -1877,7 +2128,7 @@ HdPrmanInstancer::_GetParentInstancer()
     HdRenderIndex& renderIndex = delegate->GetRenderIndex();
     SdfPath parentId = GetParentId();
     while (!parentId.IsEmpty() && !parentId.IsAbsoluteRootPath()) {
-        auto* instancer = static_cast<HdPrmanInstancer*>(
+        auto* instancer = dynamic_cast<HdPrmanInstancer*>(
             renderIndex.GetInstancer(parentId));
         if (instancer) {
             return instancer;
@@ -1913,7 +2164,7 @@ HdPrmanInstancer::_GetInstanceParams(
 {
     for (const auto& entry : _primvarMap) {
         const HdPrimvarDescriptor& primvar = entry.second.desc;
-        
+
         // 'constant' and 'uniform' USD primvars are inherited in toto by
         // instances, while 'varying', 'vertex', and 'faceVarying' USD primvars
         // (and those marked as instance-rate by hydra) are inherited per
@@ -1940,7 +2191,7 @@ HdPrmanInstancer::_GetInstanceParams(
         }
 
         const RtUString name = _FixupParamName(entry.first);
-        
+
         // USD primvars in the "ri:attributes" and "primvars:ri:attributes"
         // namespaces end up having the same fixed-up param name, potentially
         // causing collisions in the param list. When both "ri:attributes" and
@@ -2021,6 +2272,79 @@ HdPrmanInstancer::_GetInstanceTransform(
             }
         }
     }
+}
+
+void
+HdPrmanInstancer::_IncrementGroupCounter(const riley::GeometryPrototypeId& id)
+{
+    if (id == riley::GeometryPrototypeId::InvalidId()) { return; }
+    if (TfDebug::IsEnabled(HDPRMAN_INSTANCERS_CONCURRENCY)) {
+        const int after = _groupCounters.inc(id);
+        _ClockMsg("Increment Group Counter (g: %i) %i -> %i",
+            id.AsUInt32(), after-1, after);
+    } else {
+        _groupCounters.inc(id);
+    }
+}
+
+void
+HdPrmanInstancer::_DecrementGroupCounter(const riley::GeometryPrototypeId& id)
+{
+    if (id == riley::GeometryPrototypeId::InvalidId()) { return; }
+    if (TfDebug::IsEnabled(HDPRMAN_INSTANCERS_CONCURRENCY)) {
+        const int after = _groupCounters.dec(id);
+        _ClockMsg("Decrement Group Counter (g: %i) %i -> %i",
+            id.AsUInt32(), after+1, after);
+    } else {
+        _groupCounters.dec(id);
+    }
+}
+
+std::string
+HdPrmanInstancer::_FlattenData::ToString() const
+{
+    std::vector<std::pair<std::string, std::string>> m;
+    if (!categories.empty()) {
+        std::vector<std::string> cats;
+        for (const auto& cat : categories) {
+            cats.push_back(cat.GetString());
+        }
+        std::sort(cats.begin(), cats.end());
+        m.emplace_back("categories", TfStringJoin(cats, ","));
+    }
+    const unsigned int n = params.GetNumParams();
+    RtParamList::ParamInfo info;
+    for (unsigned int i = 0; i < n; ++i) {
+        params.GetParamInfo(i, info);
+        if (info.type == RtDataType::k_integer) {
+            int32_t val = 0;
+            params.GetInteger(info.name, val);
+            m.emplace_back(info.name.CStr(), TfStringPrintf("%i", val));
+            continue;
+        }
+        if (info.type == RtDataType::k_string) {
+            RtUString val;
+            params.GetString(info.name, val);
+            m.emplace_back(info.name.CStr(), val.Empty() ? "``" : val.CStr());
+            continue;
+        }
+        TF_WARN("Unhandled type! name: %s, type: %i",
+            info.name.CStr(), int(info.type));
+    }
+    if (!renderTag.IsEmpty()) {
+        m.emplace_back("renderTag", renderTag.GetString());
+    }
+    std::sort(m.begin(), m.end(), [](const auto& a, const auto& b) {
+        return a.first < b.first;
+    });
+    std::string s;
+    for (const auto& a : m) {
+        if (!s.empty()) {
+            s += "|";
+        }
+        s += a.first + "=" + a.second;
+    }
+    return s;
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

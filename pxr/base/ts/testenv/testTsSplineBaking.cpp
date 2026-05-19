@@ -11,7 +11,6 @@
 #include "pxr/base/ts/raii.h"
 #include "pxr/base/ts/spline.h"
 #include "pxr/base/ts/tsTest_Museum.h"
-#include "pxr/base/ts/tsTest_Museum.h"
 #include "pxr/base/ts/tsTest_TsEvaluator.h"
 
 #include "pxr/base/gf/math.h"
@@ -51,10 +50,8 @@ public:
         // _names = {"InnerAndExtrapLoops"};
 
         for (const auto& name : _names) {
-            const TsTest_SplineData data = TsTest_Museum::GetDataByName(name);
-
-            // Convert the generic spline data to an actual spline
-            const TsSpline spline = _evaluator.SplineDataToSpline(data);
+            const TsSpline spline = TsTest_Museum::GetSplineByName(
+                name, Ts_GetType<double>());
             const TsKnotMap knots = spline.GetKnots();
             GfInterval knotInterval = knots.GetTimeSpan();
 
@@ -80,8 +77,7 @@ public:
     TsSpline Get(const std::string& name,
                  const TfType& valueType = Ts_GetType<double>())
     {
-        const TsTest_SplineData data = TsTest_Museum::GetDataByName(name);
-        return _evaluator.SplineDataToSpline(data, valueType);
+        return TsTest_Museum::GetSplineByName(name, valueType);
     }
 };
 

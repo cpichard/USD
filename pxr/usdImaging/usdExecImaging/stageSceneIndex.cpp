@@ -53,6 +53,11 @@ UsdExecImaging_StageSceneIndex::SetStage(UsdStageRefPtr stage)
 void
 UsdExecImaging_StageSceneIndex::SetTime(UsdTimeCode time)
 {
+    if (_request) {
+        _request->SetTime(time);
+        _request->Refresh();
+        _SendPrimsDirtied(_request->TakeDirtiedPrimEntries());
+    }
 }
 
 void
@@ -60,6 +65,7 @@ UsdExecImaging_StageSceneIndex::ApplyPendingUpdates()
 {
     if (_request) {
         _request->Refresh();
+        _SendPrimsDirtied(_request->TakeDirtiedPrimEntries());
     }
 }
 

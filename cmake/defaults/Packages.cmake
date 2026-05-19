@@ -66,10 +66,11 @@ if(PXR_ENABLE_PYTHON_SUPPORT)
             endif()
         endif()
 
-        # This option indicates that we don't want to explicitly link to the
-        # python libraries. See BUILDING.md for details.
+        # This option indicates that we don't want libraries to explicitly link
+        # to the Python libraries. However, executables must link to the Python
+        # libraries to avoid missing symbol errors. See BUILDING.md for details.
         if(PXR_PY_UNDEFINED_DYNAMIC_LOOKUP AND NOT WIN32)
-            set(PYTHON_LIBRARIES "")
+            set(PYTHON_LIBRARIES "$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:${package}::Python>")
         else()
             set(PYTHON_LIBRARIES "${package}::Python")
         endif()

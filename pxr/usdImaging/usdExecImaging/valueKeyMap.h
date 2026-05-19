@@ -21,7 +21,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class UsdExecImagingPrimAdapter;
+class UsdExecImagingPrimAdapterInterface;
 
 /// UsdExecImaging_ValueKeyMap stores additional information about the value
 /// keys in a UsdExecImaging_Request.
@@ -41,7 +41,7 @@ struct UsdExecImaging_ValueKeyMap
         SdfPath adaptedPrimPath;
 
         /// The adapter that added the value key.
-        const UsdExecImagingPrimAdapter *primAdapter;
+        const UsdExecImagingPrimAdapterInterface *primAdapter;
     };
 
     /// The ValueKeyInfo at index i provides information about the value key
@@ -55,8 +55,8 @@ struct UsdExecImaging_ValueKeyMap
     ValueKeyToIndexMap valueKeyToIndexMap;
 
     /// Maps each adapted prim to its adapter.
-    using PrimToAdapterMap =
-        pxr_tsl::robin_map<SdfPath, const UsdExecImagingPrimAdapter *, TfHash>;
+    using PrimToAdapterMap = pxr_tsl::robin_map<
+        SdfPath, const UsdExecImagingPrimAdapterInterface *, TfHash>;
     PrimToAdapterMap primToAdapterMap;
 };
 

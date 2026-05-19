@@ -12,7 +12,7 @@
 #include "pxr/pxr.h"
 
 #include "pxr/usdImaging/usdExecImaging/api.h"
-#include "pxr/usdImaging/usdExecImaging/requestAccessor.h"
+#include "pxr/usdImaging/usdExecImaging/requestAccessorInterface.h"
 #include "pxr/usdImaging/usdExecImaging/valueKey.h"
 
 #include "pxr/base/vt/value.h"
@@ -36,7 +36,7 @@ public:
 
     USDEXECIMAGING_API
     UsdExecImaging_ComputedDataSourceImpl(
-        UsdExecImagingRequestAccessorSharedPtr requestAccessor,
+        UsdExecImagingRequestAccessorInterfaceSharedPtr requestAccessor,
         UsdExecImagingValueKey valueKey);
 
     USDEXECIMAGING_API
@@ -49,14 +49,14 @@ public:
         std::vector<Time> * outSampleTimes) const;
 
 private:
-    UsdExecImagingRequestAccessorSharedPtr _requestAccessor;
+    UsdExecImagingRequestAccessorInterfaceSharedPtr _requestAccessor;
     UsdExecImagingValueKey _valueKey;
 };
 
 /// An HdSampledDataSource that produces exec-computed values.
 ///
 /// The data source produces a computed value by reading it from a
-/// UsdExecImagingRequestAccessor specified in the constructor.
+/// UsdExecImagingRequestAccessorInterface specified in the constructor.
 ///
 class UsdExecImagingComputedSampledDataSource : public HdSampledDataSource
 {
@@ -80,7 +80,7 @@ public:
 
 private:
     UsdExecImagingComputedSampledDataSource(
-        UsdExecImagingRequestAccessorSharedPtr requestAccessor,
+        UsdExecImagingRequestAccessorInterfaceSharedPtr requestAccessor,
         UsdExecImagingValueKey valueKey)
         : _impl(std::move(requestAccessor), std::move(valueKey))
     {}
@@ -92,7 +92,7 @@ private:
 /// An HdTypedSampledDataSource that produces exec-computed values.
 ///
 /// The data source produces a computed value by reading it from a
-/// UsdExecImagingRequestAccessor specified in the constructor.
+/// UsdExecImagingRequestAccessorInterface specified in the constructor.
 ///
 template <class ValueType>
 class UsdExecImagingComputedTypedSampledDataSource
@@ -122,7 +122,7 @@ public:
 
 private:
     UsdExecImagingComputedTypedSampledDataSource(
-        UsdExecImagingRequestAccessorSharedPtr requestAccessor,
+        UsdExecImagingRequestAccessorInterfaceSharedPtr requestAccessor,
         UsdExecImagingValueKey valueKey)
         : _impl(std::move(requestAccessor), std::move(valueKey))
     {}

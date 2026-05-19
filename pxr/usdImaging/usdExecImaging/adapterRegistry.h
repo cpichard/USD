@@ -13,7 +13,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class UsdExecImagingPrimAdapter;
+class UsdExecImagingPrimAdapterInterface;
 class UsdPrim;
 
 /// A singleton class that organizes all registered prim adapters.
@@ -30,7 +30,8 @@ public:
     /// If there is no registered adapter for the type of \p prim, this returns
     /// a null pointer.
     ///
-    static UsdExecImagingPrimAdapter *GetPrimAdapter(const UsdPrim &prim);
+    static UsdExecImagingPrimAdapterInterface *GetPrimAdapter(
+        const UsdPrim &prim);
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

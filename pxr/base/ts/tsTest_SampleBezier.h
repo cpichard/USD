@@ -10,7 +10,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/base/ts/api.h"
-#include "pxr/base/ts/tsTest_SplineData.h"
+#include "pxr/base/ts/spline.h"
 #include "pxr/base/ts/tsTest_Types.h"
 
 #include <vector>
@@ -28,7 +28,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 TS_API
 TsTest_SampleVec
 TsTest_SampleBezier(
-    const TsTest_SplineData &splineData,
+    const TsSpline& spline,
     int numSamples);
 
 PXR_NAMESPACE_CLOSE_SCOPE

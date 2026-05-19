@@ -41,20 +41,26 @@ public:
     SdfAssetPath
     GetTypedValue(const HdSampledDataSource::Time shutterOffset) override
     {
+        if (shutterOffset == 0.0 && _result != SdfAssetPath()) {
+            return _result;
+        }
         using Parent = UsdImagingDataSourceAttribute<SdfAssetPath>;
         SdfAssetPath result = Parent::GetTypedValue(shutterOffset);
-        if (!UsdShadeUdimUtils::IsUdimIdentifier(result.GetAssetPath())) {
-            return result;
+        if (UsdShadeUdimUtils::IsUdimIdentifier(result.GetAssetPath())) {
+            UsdTimeCode time = _stageGlobals.GetTime();
+            if (time.IsNumeric()) {
+                time = UsdTimeCode(time.GetValue() + shutterOffset);
+            }
+            const std::string resolvedPath = UsdShadeUdimUtils::ResolveUdimPath(
+                result.GetAssetPath(),
+                _FindLayerHandle(_usdAttrQuery.GetAttribute(), time));
+            if (!resolvedPath.empty()) {
+                result = SdfAssetPath(result.GetAssetPath(), resolvedPath);
+            }
         }
-        UsdTimeCode time = _stageGlobals.GetTime();
-        if (time.IsNumeric()) {
-            time = UsdTimeCode(time.GetValue() + shutterOffset);
-        }
-        const std::string resolvedPath = UsdShadeUdimUtils::ResolveUdimPath(
-            result.GetAssetPath(),
-            _FindLayerHandle(_usdAttrQuery.GetAttribute(), time));
-        if (!resolvedPath.empty()) {
-            result = SdfAssetPath(result.GetAssetPath(), resolvedPath);
+        if (shutterOffset == 0.0) {
+            // Cache result.
+            _result = result;
         }
         return result;
     }
@@ -79,6 +85,10 @@ protected:
         : UsdImagingDataSourceAttribute<SdfAssetPath>(
             usdAttrQuery, stageGlobals, sceneIndexPath, timeVaryingFlagLocator)
     { }
+
+private:
+    // Cached result at shutterOffset=0.0
+    SdfAssetPath _result;
 };
 
 typedef HdSampledDataSourceHandle (*_DataSourceFactory)(

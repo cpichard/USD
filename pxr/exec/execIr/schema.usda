@@ -262,4 +262,7 @@ class IrJointScope "IrJointScope" (
     }
 )
 {
+    double guide:length = 0
+    color3f guide:displayColor = (1.0, 0.3, 0.3)
+    float guide:displayOpacity = 0.5
 }

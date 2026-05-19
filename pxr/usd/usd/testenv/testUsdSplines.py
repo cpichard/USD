@@ -111,8 +111,7 @@ class TestUsdSplines(unittest.TestCase):
         """
         for exhibit in ["TwoKnotBezier", "ComplexParams"]:
 
-            splineData = Ts.TsTest_Museum.GetDataByName(exhibit)
-            spline = Ts.TsTest_TsEvaluator().SplineDataToSpline(splineData)
+            spline = Ts.TsTest_Museum.GetSplineByName(exhibit)
             self._DoSerializationTest(f"Museum.{exhibit}", spline)
 
     def test_Serialization_Complex(self):
