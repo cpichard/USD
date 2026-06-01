@@ -7,11 +7,11 @@
 #include "pxr/usdImaging/usdExecImaging/adapterRegistry.h"
 
 #include "pxr/usdImaging/usdExecImaging/geomXformablePrimAdapter.h"
-#include "pxr/usdImaging/usdExecImaging/irTransformablePrimAdapter.h"
+#include "pxr/usdImaging/usdExecImaging/irXformablePrimAdapter.h"
 #include "pxr/usdImaging/usdExecImaging/primAdapterInterface.h"
 
 #include "pxr/base/tf/envSetting.h"
-#include "pxr/exec/execIr/tokens.h"
+#include "pxr/exec/execIr/xformable.h"
 #include "pxr/usd/usdGeom/xformable.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
@@ -41,8 +41,8 @@ UsdExecImaging_AdapterRegistry::GetPrimAdapter(const UsdPrim &prim)
         return &adapter;
     }
 
-    if (prim.IsA(ExecIrTransformableTokens->IrTransformable)) {
-        using Adapter = UsdExecImaging_IrTransformablePrimAdapter;
+    if (prim.IsA<ExecIrXformable>()) {
+        using Adapter = UsdExecImaging_IrXformablePrimAdapter;
         static Adapter adapter;
         return &adapter;
     }

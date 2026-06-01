@@ -76,27 +76,15 @@ class IrSwitchController "IrSwitchController" (
     }
 )
 {
-    matrix4d out:joint1:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) ) (
+    matrix4d out:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) ) (
         irIsInvertible = true
         irRole = "OutputAttribute"
     )
-    matrix4d out:joint2:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) ) (
-        irIsInvertible = true
-        irRole = "OutputAttribute"
-    )
-    matrix4d rig1:joint1:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) ) (
+    matrix4d rig1:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) ) (
         irIsInvertible = true
         irRole = "InputAttribute"
     )
-    matrix4d rig1:joint2:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) ) (
-        irIsInvertible = true
-        irRole = "InputAttribute"
-    )
-    matrix4d rig2:joint1:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) ) (
-        irIsInvertible = true
-        irRole = "InputAttribute"
-    )
-    matrix4d rig2:joint2:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) ) (
+    matrix4d rig2:space = ( (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1) ) (
         irIsInvertible = true
         irRole = "InputAttribute"
     )
@@ -106,7 +94,7 @@ class IrSwitchController "IrSwitchController" (
     )
 }
 
-class "IrTransformable" (
+class "IrXformable" (
     customData = {
         string userDocBrief = """An abstract schema that provides an animation interface for an animatable
     coordinate space."""

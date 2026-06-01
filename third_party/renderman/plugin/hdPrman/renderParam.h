@@ -448,6 +448,21 @@ public:
     void CreateDisplayFilterNetwork(HdSceneDelegate *sceneDelegate);
     riley::DisplayFilterList GetDisplayFilterList();
 
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+    // Riley Data from the Energy Filter Prim
+    void SetEnergyFilterPaths(HdSceneDelegate *sceneDelegate,
+        SdfPathVector const& energyFilterPaths);
+    SdfPathVector GetEnergyFilterPaths() {
+        return _energyFilterPaths;
+    }
+    void AddEnergyFilter(
+        HdSceneDelegate *sceneDelegate,
+        SdfPath const& path,
+        riley::ShadingNode const& node,
+        RtParamList const& properties);
+    void CreateEnergyFilterNetwork(HdSceneDelegate *sceneDelegate);
+#endif // _PRMANAPI_VERSION_MAJOR_ >= 27
+
     void FatalError(const char* msg);
 
     // Instancer by id
@@ -658,7 +673,7 @@ private:
 
     // Render terminals
     // Since parallel sync is enabled for sample and display filters, filter
-    // nodes may be addeed in parallel via AddSampleFilter/AddDisplayFilter.
+    // nodes may be added in parallel via Add{Sample,Display}Filter.
     using _PathToRileyFilterMap =
         tbb::concurrent_unordered_map<SdfPath, riley::ShadingNode, SdfPath::Hash>;
 
@@ -673,6 +688,19 @@ private:
     SdfPathVector _displayFilterPaths;
     _PathToRileyFilterMap _displayFilterNodes;
     riley::DisplayFilterId _displayFiltersId;
+
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+    struct _EnergyFilterData {
+        riley::ShadingNode node;
+        RtParamList properties;
+        riley::EnergyFilterId id = riley::EnergyFilterId::InvalidId();
+    };
+    using _PathToEnergyFilterDataMap =
+        std::unordered_map<SdfPath, _EnergyFilterData, SdfPath::Hash>;
+
+    SdfPathVector _energyFilterPaths;
+    _PathToEnergyFilterDataMap _energyFilterNodes;
+#endif // _PRMANAPI_VERSION_MAJOR_ >= 27
     /// ------------------------------------------------------------------------
 
     /// ------------------------------------------------------------------------

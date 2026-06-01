@@ -10,7 +10,6 @@ def "GLOBAL" (
     customData = {
         string libraryName = "execIr"
         string libraryPath = "pxr/exec/execIr"
-        bool skipCodeGeneration = true
     }
 )
 {
@@ -117,11 +116,10 @@ class IrSwitchController "IrSwitchController" (
 
     Note: The functionality provided by this schema is extremely limited,
     subject to change, and not yet ready for production use. In particular, this
-    schema is hard coded to support two rigs, each of which controls two joint
-    scopes. In the future, a general switch controller schema will be
-    configurable via application of multi-apply schemas. This will allow switch
-    controllers to switch among more than two rigs and to support any number of
-    joint scopes.
+    schema is hard coded to support two rigs, named "rig1" and "rig2". In the
+    future, a general switch controller schema will likely be configurable via
+    application of multi-apply schemas. This will allow switch controllers to
+    switch among more than two rigs with arbitrary names.
     """
     inherits = </IrController>
     customData = {
@@ -132,49 +130,43 @@ class IrSwitchController "IrSwitchController" (
     token switch = "rig1" (
         irRole = "SwitchAttribute"
         allowedTokens = ["rig1", "rig2"]
+
+        customData = {
+            # TODO: The switch must be disabled from code generation, because
+            # there is a bug in usdGenSchema. 'switch' is a reserved C++
+            # keyword. While usdGenSchema properly fixes the token name to
+            # 'ExecIrTokens->switch_', the generated schema class continues to
+            # refer to the token by the unfixed name 'ExecIrTokens->switch'.
+            # By setting apiName to the empty string, we disable generation of
+            # schema methods for this attribute, which sidesteps the bug.
+            string apiName = ""
+        }
     )
 
-    matrix4d rig1:joint1:space = (
+    matrix4d rig1:space = (
         (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)) (
         irRole = "InputAttribute"
         irIsInvertible = True
     )
-    matrix4d rig1:joint2:space = (
+    matrix4d rig2:space = (
         (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)) (
         irRole = "InputAttribute"
         irIsInvertible = True
     )
-
-    matrix4d rig2:joint1:space = (
-        (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)) (
-        irRole = "InputAttribute"
-        irIsInvertible = True
-    )
-    matrix4d rig2:joint2:space = (
-        (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)) (
-        irRole = "InputAttribute"
-        irIsInvertible = True
-    )
-
-    matrix4d out:joint1:space = (
-        (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)) (
-        irRole = "OutputAttribute"
-        irIsInvertible = True
-    )
-    matrix4d out:joint2:space = (
+    matrix4d out:space = (
         (1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0), (0, 0, 0, 1)) (
         irRole = "OutputAttribute"
         irIsInvertible = True
     )
 }
 
-class "IrTransformable" (
+class "IrXformable" (
     doc = """
     An abstract schema that provides an animation interface for an animatable
     coordinate space.
 
-    IrTransformable defines rest, default, and posed spaces, along with a group
-    of animation avars that can feed into controllers for posing.
+    IrXformable defines rest, default, and posed spaces, along with a group of
+    animation avars that can feed into controllers for posing.
    
     restSpace - A world space transform representing the position of the
     transformable object "at rest" -- generally meaning before any posing has
@@ -197,7 +189,7 @@ class "IrTransformable" (
     """
     inherits = </Typed>
     customData = {
-        string className = "Transformable"
+        string className = "Xformable"
     }
 )
 {
@@ -249,14 +241,14 @@ class IrJointScope "IrJointScope" (
     A concrete typed schema that represents the joint of an armature-based
     model.
 
-    The base schema IrTransformable defines the behavior; this schema exists
-    mainly so we can specialize drawing of guides, etc. In the future, other
-    concrete schemas will also extend IrTransformable.
+    The base schema IrXformable defines the behavior; this schema exists mainly
+    so we can specialize drawing of guides, etc. In the future, other concrete
+    schemas will also extend IrXformable.
 
     Note: The functionality provided by this schema is extremely limited,
     subject to change, and not yet ready for production use.
     """
-    inherits = </IrTransformable>
+    inherits = </IrXformable>
     customData = {
         string className = "JointScope"
     }

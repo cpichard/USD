@@ -290,7 +290,7 @@ UsdAttribute::GetSpline() const
 }
 
 bool
-UsdAttribute::SetSpline(const TsSpline &spline)
+UsdAttribute::SetSpline(const TsSpline &spline) const
 {
     static const TfType doubleType = TfType::Find<double>();
     static const TfType timecodeType = TfType::Find<SdfTimeCode>();

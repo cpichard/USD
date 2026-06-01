@@ -47,7 +47,10 @@ if (${PXR_ENABLE_MATERIALX_SUPPORT})
         MaterialXRender
         hdMtlx
     )
-    list(APPEND optionalPublicClasses matfiltMaterialX)
+    list(APPEND optionalPublicClasses 
+        matfiltMaterialX
+        pxr/imaging/hdMtlx/hdMtlx
+    )
 
     if (${PXR_ENABLE_OSL_SUPPORT})
         if (DEFINED OSL_SHADER_INSTALL_DIR)
@@ -99,6 +102,7 @@ pxr_plugin(${PXR_PACKAGE}
         dependencySceneIndexPlugin
         dependencyForwardingSceneIndexPlugin
         displayFilter
+        energyFilter
         displayColorSpaceSceneIndexPlugin
         gprim
         gprimbase
@@ -124,6 +128,7 @@ pxr_plugin(${PXR_PACKAGE}
         rileyCoordinateSystemSchema
         rileyDisplacementSchema
         rileyDisplayFilterSchema
+        rileyEnergyFilterSchema
         rileyDisplaySchema
         rileyGeometryInstanceSchema
         rileyGeometryPrototypeSchema
@@ -178,6 +183,7 @@ pxr_plugin(${PXR_PACKAGE}
         rileyClippingPlanePrim
         rileyDisplacementPrim
         rileyDisplayFilterPrim
+        rileyEnergyFilterPrim
         rileyDisplayPrim
         rileyFallbackMaterial
         rileyGeometryInstancePrim

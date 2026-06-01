@@ -32,6 +32,7 @@ TF_DECLARE_PUBLIC_TOKENS(HdPrmanTokens, HDPRMAN_API, HD_PRMAN_TOKENS);
     ((displacement,       "riley:displacement"))      \
     ((display,            "riley:display"))            \
     ((displayFilter,      "riley:displayFilter"))      \
+    ((energyFilter,       "riley:energyFilter"))       \
     ((geometryInstance,   "riley:geometryInstance"))   \
     ((geometryPrototype,  "riley:geometryPrototype"))  \
     ((globals,            "riley:globals"))            \

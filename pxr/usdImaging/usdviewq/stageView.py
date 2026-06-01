@@ -2320,6 +2320,13 @@ class StageView(QGLWidget):
         try:
             (inImageBounds, pickFrustum) = self.computePickFrustum(x,y)
 
+            selectedPoint = [-1, -1]
+            selectedPrimPath = Sdf.Path.emptyPath
+            selectedInstanceIndex = -1
+            selectedTLPath, selectedTLIndex = Sdf.Path.emptyPath, -1
+
+            # If we're picking outside the image viewport (maybe because
+            # camera guides are on), treat that as a de-select.
             if inImageBounds:
                 hits = self.pick(pickFrustum)
                 if len(hits) > 0:
@@ -2331,13 +2338,6 @@ class StageView(QGLWidget):
                         selectedTLPath, selectedTLIndex = hit.instancerContext[0]
                     else:
                         selectedTLPath, selectedTLIndex = Sdf.Path.emptyPath, -1
-            else:
-                # If we're picking outside the image viewport (maybe because
-                # camera guides are on), treat that as a de-select.
-                selectedPoint = [-1, -1]
-                selectedPrimPath = Sdf.Path.emptyPath
-                selectedInstanceIndex = -1
-                selectedTLPath, selectedTLIndex = Sdf.Path.emptyPath, -1
 
             # Correct for high DPI displays
             # Cast to int explicitly as some versions of PySide/Shiboken throw

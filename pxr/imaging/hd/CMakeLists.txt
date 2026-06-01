@@ -61,6 +61,7 @@ pxr_library(hd
         dirtyBitsTranslator
         dirtyList
         displayFilterSchema
+        energyFilterSchema
         drawingCoord
         drawItem
         engine

@@ -85,50 +85,56 @@ _GetPrototypePath(
     return {};
 }
 
-bool
-_IsValid(HdSceneIndexPrim const &prim)
-{
-    return !prim.primType.IsEmpty() || prim.dataSource;
-}
-
 SdfPath
 _TranslatePath(
     SdfPath const& path,
     HdSceneIndexBaseConstRefPtr const& sceneIndex)
 {
     TRACE_FUNCTION();
-    // Don't translate a path to a valid scene index prim.
-    // We do this for two reasons:
-    // 1. Avoid querying the scene index at each path prefix for the general
-    //    case where the prim is not a descendant of an instance prim.
-    // 2. To not incorreclty translate an instance prim path to its
-    //    prototype path. We want to do this only for *descendant* paths of
-    //    instance prims that don't have a corresponding prim in the scene
-    //    index.
-    //
-    const HdSceneIndexPrim prim = sceneIndex->GetPrim(path);
-    if (_IsValid(prim)) {
-        return path;
-    }
 
-    // Iterate over the prefixes, adding the terminal path element of each
-    // prefix and checking if the prim at the resulting path is an instance.
-    // If it is, replace the result with the prototype path of the instance and
-    // continue iterating over the prefixes.
-    //
-    SdfPath result = SdfPath::AbsoluteRootPath();
+    // If the provided path refers to a valid scene index prim, no
+    // further translation is required:
+    // - In the case where the path is not a descendant of an instance
+    //   prim, this saves doing extra work.
+    // - In the case where the path identifies an instance, rather than
+    //   descendant of an instance, we want to leave the path unchanged.
 
-    for (SdfPath const& p: path.GetPrefixes()) {
-        result = result.AppendChild(p.GetNameToken());
+    SdfPath result(path);
 
-        HdInstanceSchema instanceSchema = 
-            HdInstanceSchema::GetFromParent(
-                sceneIndex->GetPrim(result).dataSource);
-        
-        if (const std::optional<SdfPath> prototypePath =
-                _GetPrototypePath(instanceSchema, sceneIndex)) {
-            result = *prototypePath;
+    // Limit iterations just in case.
+    int i = 0;
+    static const int maxIters = 1000;
+    for (; i < maxIters && !sceneIndex->GetPrim(result).IsDefined(); ++i)
+    {
+        // Work back-to-front, until we find an ancestor prim that exists
+        bool loopAgain = false;
+        for (SdfPath const& ancestorPath : result.GetAncestorsRange()) {
+            if (HdSceneIndexPrim ancestor = sceneIndex->GetPrim(ancestorPath);
+                ancestor.IsDefined()) {
+                HdInstanceSchema instanceSchema = 
+                    HdInstanceSchema::GetFromParent(ancestor.dataSource);
+                // If the ancestor has an instanceSchema that provides a new
+                // prototype path, replace the prefix of our working path and
+                // start the loop again with this new path.
+                if (const std::optional<SdfPath> prototypePath =
+                        _GetPrototypePath(instanceSchema, sceneIndex)) {
+                    result = result.ReplacePrefix(
+                        ancestorPath, *prototypePath);
+                    loopAgain = true;
+                    break;
+                }
+            }
         }
+        // If we've checked all the ancestors and not found any prototype paths
+        // then we're done.
+        if (!loopAgain) {
+            break;
+        }
+    }
+    if (i >= maxIters) {
+        TF_RUNTIME_ERROR(
+            "UsdImaging_InstanceProxyPathTranslationSceneIndex hit max "
+            "iterations translating path <%s>\n", path.GetText());
     }
 
     return result;
@@ -202,6 +208,9 @@ public:
         return _underlyingDs->GetNames();
     }
     HdDataSourceBaseHandle Get(TfToken const& name) override {
+        if (!_sceneIndex) {
+            return nullptr;
+        }
         return _data->ShouldTranslatePathsForDataSourceName(name)
             ? _TranslateDataSource(_underlyingDs->Get(name), _sceneIndex)
             : _underlyingDs->Get(name);
@@ -209,7 +218,7 @@ public:
 
 private:
     _PrimDs(
-        HdSceneIndexBaseRefPtr const& inputSceneIndex,
+        HdSceneIndexBasePtr const& inputSceneIndex,
         HdContainerDataSourceHandle const& underlyingDs,
         ImplDataSharedPtr const& data)
     : _sceneIndex(inputSceneIndex)
@@ -218,7 +227,7 @@ private:
     {
     }
 
-    const HdSceneIndexBaseConstRefPtr _sceneIndex;
+    const HdSceneIndexBasePtr _sceneIndex;
     const HdContainerDataSourceHandle _underlyingDs;
     const ImplDataSharedPtr _data;
 };

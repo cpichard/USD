@@ -6,6 +6,7 @@
 //
 #include "pxr/pxr.h"
 
+#include "pxr/exec/execIr/computations.h"
 #include "pxr/exec/execIr/tokens.h"
 #include "pxr/exec/execIr/types.h"
 
@@ -97,17 +98,17 @@ Test_JointScopeBasic()
     const UsdPrim joint = usdStage->GetPrimAtPath(SdfPath("/Root/Joint"));
     TF_AXIOM(joint);
     const UsdAttribute posedSpace =
-        joint.GetAttribute(ExecIrTransformableTokens->posedSpace);
+        joint.GetAttribute(ExecIrTokens->posedSpace);
     TF_AXIOM(posedSpace);
 
     const std::vector<UsdAttribute> inputAttributes = {
-        joint.GetAttribute(ExecIrTransformableTokens->avarsRx),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsRy),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsRz),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsRspin),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsTx),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsTy),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsTz),
+        joint.GetAttribute(ExecIrTokens->avarsRx),
+        joint.GetAttribute(ExecIrTokens->avarsRy),
+        joint.GetAttribute(ExecIrTokens->avarsRz),
+        joint.GetAttribute(ExecIrTokens->avarsRspin),
+        joint.GetAttribute(ExecIrTokens->avarsTx),
+        joint.GetAttribute(ExecIrTokens->avarsTy),
+        joint.GetAttribute(ExecIrTokens->avarsTz),
     };
     for (const UsdAttribute &attr : inputAttributes) {
         TF_AXIOM(attr);
@@ -135,7 +136,7 @@ Test_JointScopeBasic()
 
         // Translate the rest space and compute again.
         UsdAttribute restTz =
-            joint.GetAttribute(ExecIrTransformableTokens->restTz);
+            joint.GetAttribute(ExecIrTokens->restTz);
         TF_AXIOM(restTz);
         restTz.Set(10.0);
 
@@ -154,7 +155,7 @@ Test_JointScopeBasic()
         std::vector<ExecUsdValueKey> valueKeys;
         for (const UsdAttribute &attr : inputAttributes) {
             valueKeys.emplace_back(
-                attr, ExecIrComputationTokens->computeDesiredValue);
+                attr, ExecIrComputations->computeDesiredValue);
         }
         const ExecUsdRequest request =
             execSystem.BuildRequest(std::move(valueKeys));
@@ -168,7 +169,7 @@ Test_JointScopeBasic()
                                                     1,  0,  0, 0,
                                                     6,  7, 18, 1);
             ExecUsdValueOverrideVector overrides {
-                {{posedSpace, ExecIrComputationTokens->explicitDesiredValue},
+                {{posedSpace, ExecIrComputations->explicitDesiredValue},
                  VtValue(desiredPosedSpaceValue)}
             };
             ExecUsdCacheView cache =
@@ -229,17 +230,17 @@ Test_JointScopeRestSpace()
     const UsdPrim joint = usdStage->GetPrimAtPath(SdfPath("/Root/Joint"));
     TF_AXIOM(joint);
     const UsdAttribute posedSpace =
-        joint.GetAttribute(ExecIrTransformableTokens->posedSpace);
+        joint.GetAttribute(ExecIrTokens->posedSpace);
     TF_AXIOM(posedSpace);
 
     const std::vector<UsdAttribute> inputAttributes = {
-        joint.GetAttribute(ExecIrTransformableTokens->avarsRx),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsRy),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsRz),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsRspin),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsTx),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsTy),
-        joint.GetAttribute(ExecIrTransformableTokens->avarsTz),
+        joint.GetAttribute(ExecIrTokens->avarsRx),
+        joint.GetAttribute(ExecIrTokens->avarsRy),
+        joint.GetAttribute(ExecIrTokens->avarsRz),
+        joint.GetAttribute(ExecIrTokens->avarsRspin),
+        joint.GetAttribute(ExecIrTokens->avarsTx),
+        joint.GetAttribute(ExecIrTokens->avarsTy),
+        joint.GetAttribute(ExecIrTokens->avarsTz),
     };
     for (const UsdAttribute &attr : inputAttributes) {
         TF_AXIOM(attr);
@@ -266,7 +267,7 @@ Test_JointScopeRestSpace()
     // Rotate the posed space around the X axis.
     {
         const UsdAttribute avarsRx =
-            joint.GetAttribute(ExecIrTransformableTokens->avarsRx);
+            joint.GetAttribute(ExecIrTokens->avarsRx);
         TF_AXIOM(avarsRx);
         avarsRx.Set(90.0);
 
@@ -282,7 +283,7 @@ Test_JointScopeRestSpace()
     // Translate the rest space along the Z axis.
     {
         const UsdAttribute restTz =
-            joint.GetAttribute(ExecIrTransformableTokens->restTz);
+            joint.GetAttribute(ExecIrTokens->restTz);
         TF_AXIOM(restTz);
         restTz.Set(5.0);
 
@@ -377,27 +378,27 @@ Test_JointScopeParentChild()
     TF_AXIOM(parent && child);
 
     const UsdAttribute parentPosedSpace =
-        parent.GetAttribute(ExecIrTransformableTokens->posedSpace);
+        parent.GetAttribute(ExecIrTokens->posedSpace);
     const UsdAttribute childPosedSpace =
-        child.GetAttribute(ExecIrTransformableTokens->posedSpace);
+        child.GetAttribute(ExecIrTokens->posedSpace);
     TF_AXIOM(parentPosedSpace && childPosedSpace);
 
     const std::vector<UsdAttribute> inputAttributes = {
-        parent.GetAttribute(ExecIrTransformableTokens->avarsRx),
-        parent.GetAttribute(ExecIrTransformableTokens->avarsRy),
-        parent.GetAttribute(ExecIrTransformableTokens->avarsRz),
-        parent.GetAttribute(ExecIrTransformableTokens->avarsRspin),
-        parent.GetAttribute(ExecIrTransformableTokens->avarsTx),
-        parent.GetAttribute(ExecIrTransformableTokens->avarsTy),
-        parent.GetAttribute(ExecIrTransformableTokens->avarsTz),
+        parent.GetAttribute(ExecIrTokens->avarsRx),
+        parent.GetAttribute(ExecIrTokens->avarsRy),
+        parent.GetAttribute(ExecIrTokens->avarsRz),
+        parent.GetAttribute(ExecIrTokens->avarsRspin),
+        parent.GetAttribute(ExecIrTokens->avarsTx),
+        parent.GetAttribute(ExecIrTokens->avarsTy),
+        parent.GetAttribute(ExecIrTokens->avarsTz),
 
-        child.GetAttribute(ExecIrTransformableTokens->avarsRx),
-        child.GetAttribute(ExecIrTransformableTokens->avarsRy),
-        child.GetAttribute(ExecIrTransformableTokens->avarsRz),
-        child.GetAttribute(ExecIrTransformableTokens->avarsRspin),
-        child.GetAttribute(ExecIrTransformableTokens->avarsTx),
-        child.GetAttribute(ExecIrTransformableTokens->avarsTy),
-        child.GetAttribute(ExecIrTransformableTokens->avarsTz),
+        child.GetAttribute(ExecIrTokens->avarsRx),
+        child.GetAttribute(ExecIrTokens->avarsRy),
+        child.GetAttribute(ExecIrTokens->avarsRz),
+        child.GetAttribute(ExecIrTokens->avarsRspin),
+        child.GetAttribute(ExecIrTokens->avarsTx),
+        child.GetAttribute(ExecIrTokens->avarsTy),
+        child.GetAttribute(ExecIrTokens->avarsTz),
     };
     for (const UsdAttribute &attr : inputAttributes) {
         TF_AXIOM(attr);
@@ -429,7 +430,7 @@ Test_JointScopeParentChild()
     std::vector<ExecUsdValueKey> valueKeys;
     for (const UsdAttribute &attr : inputAttributes) {
         valueKeys.emplace_back(
-            attr, ExecIrComputationTokens->computeDesiredValue);
+            attr, ExecIrComputations->computeDesiredValue);
     }
     const ExecUsdRequest inputRequest =
         execSystem.BuildRequest(std::move(valueKeys));
@@ -453,9 +454,9 @@ Test_JointScopeParentChild()
 
     {
         ExecUsdValueOverrideVector overrides {
-            {{parentPosedSpace, ExecIrComputationTokens->explicitDesiredValue},
+            {{parentPosedSpace, ExecIrComputations->explicitDesiredValue},
              VtValue(desiredParentPosedSpaceValue)},
-            {{childPosedSpace, ExecIrComputationTokens->explicitDesiredValue},
+            {{childPosedSpace, ExecIrComputations->explicitDesiredValue},
              VtValue(desiredChildPosedSpaceValue)},
         };
         ExecUsdCacheView cache =

@@ -3249,6 +3249,7 @@ _DeleteAndResetDisplayFilter(
     }
 }
 
+
 void
 HdPrman_RenderParam::_DeleteInternalPrims()
 {
@@ -3267,6 +3268,15 @@ HdPrman_RenderParam::_DeleteInternalPrims()
     _DeleteAndResetIntegrator(riley, &_quickIntegratorId);
     _DeleteAndResetSampleFilter(riley, &_sampleFiltersId);
     _DeleteAndResetDisplayFilter(riley, &_displayFiltersId);
+
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+    for (auto &kv : _energyFilterNodes) {
+        if (kv.second.id != riley::EnergyFilterId::InvalidId()) {
+            riley->DeleteEnergyFilter(kv.second.id);
+        }
+    }
+    _energyFilterNodes.clear();
+#endif // _PRMANAPI_VERSION_MAJOR_ >= 27
 }
 
 void
@@ -4783,6 +4793,100 @@ HdPrman_RenderParam::AddDisplayFilter(
         CreateDisplayFilterNetwork(sceneDelegate);
     }
 }
+
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+
+void
+HdPrman_RenderParam::SetEnergyFilterPaths(
+    HdSceneDelegate *sceneDelegate,
+    SdfPathVector const &energyFilterPaths)
+{
+    if (_energyFilterPaths != energyFilterPaths) {
+        // Delete existing Riley energy filters and reset state
+        riley::Riley *riley = AcquireRiley();
+        for (auto &kv : _energyFilterNodes) {
+            if (kv.second.id != riley::EnergyFilterId::InvalidId()) {
+                riley->DeleteEnergyFilter(kv.second.id);
+            }
+        }
+        _energyFilterNodes.clear();
+        _energyFilterPaths = energyFilterPaths;
+
+#if HD_API_VERSION < 99
+        // Explicitly dirty all energy filter sprims so they re-sync and
+        // re-add their nodes after we cleared _energyFilterNodes above.
+        for (const SdfPath &path : energyFilterPaths) {
+            sceneDelegate->GetRenderIndex().GetChangeTracker()
+                .MarkSprimDirty(path, HdChangeTracker::DirtyParams);
+        }
+#endif
+    }
+}
+
+void
+HdPrman_RenderParam::CreateEnergyFilterNetwork(HdSceneDelegate *sceneDelegate)
+{
+    riley::Riley *riley = AcquireRiley();
+
+    for (const SdfPath &path : _energyFilterPaths) {
+        if (!sceneDelegate->GetVisible(path)) {
+            continue;
+        }
+        const auto nodeIt = _energyFilterNodes.find(path);
+        if (nodeIt == _energyFilterNodes.end()) {
+            // Node not yet available; will be created when the sprim syncs.
+            continue;
+        }
+        if (!nodeIt->second.node.name) {
+            continue;
+        }
+
+        riley::ShadingNetwork const network = { 1, &nodeIt->second.node };
+        const RtParamList &properties = nodeIt->second.properties;
+
+        if (nodeIt->second.id == riley::EnergyFilterId::InvalidId()) {
+            riley::UserId userId(
+                stats::AddDataLocation(path.GetText()).GetValue());
+            nodeIt->second.id =
+                riley->CreateEnergyFilter(userId, network, properties);
+            if (nodeIt->second.id == riley::EnergyFilterId::InvalidId()) {
+                TF_WARN("Failed to create energy filter <%s>\n",
+                        path.GetText());
+            }
+        } else {
+            riley->ModifyEnergyFilter(nodeIt->second.id, nullptr, &network,
+                                      &properties);
+        }
+    }
+}
+
+void
+HdPrman_RenderParam::AddEnergyFilter(
+    HdSceneDelegate *sceneDelegate,
+    SdfPath const& path,
+    riley::ShadingNode const& node,
+    RtParamList const& properties)
+{
+    _EnergyFilterData data;
+    data.node = node;
+    data.properties = properties;
+
+    const auto filterIt = _energyFilterNodes.insert({ path, data });
+    if (!filterIt.second) {
+        // Preserve the existing riley::EnergyFilterId - only update the
+        // shading node and properties so ModifyEnergyFilter is used instead
+        // of CreateEnergyFilter on subsequent syncs.
+        filterIt.first->second.node = node;
+        filterIt.first->second.properties = properties;
+    }
+
+    // Create/update this filter's Riley resource immediately. Since each
+    // energy filter has its own riley::EnergyFilterId, we don't need to
+    // wait for all nodes (unlike sample/display filters with a combined network).
+    CreateEnergyFilterNetwork(sceneDelegate);
+}
+
+#endif // _PRMANAPI_VERSION_MAJOR_ >= 27
 
 riley::SampleFilterList
 HdPrman_RenderParam::GetSampleFilterList()

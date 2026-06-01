@@ -1,114 +1,181 @@
 //
-// Copyright 2026 Pixar
+// Copyright 2016 Pixar
 //
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#include "pxr/pxr.h"
+#include "pxr/exec/execIr/switchController.h"
+#include "pxr/usd/usd/schemaRegistry.h"
+#include "pxr/usd/usd/typed.h"
 
-#include "pxr/exec/execIr/controllerBuilder.h"
-#include "pxr/exec/execIr/tokens.h"
-#include "pxr/exec/execIr/types.h"
+#include "pxr/usd/sdf/types.h"
+#include "pxr/usd/sdf/assetPath.h"
 
-#include "pxr/exec/exec/registerSchema.h"
-#include "pxr/exec/vdf/context.h"
+PXR_NAMESPACE_OPEN_SCOPE
 
-#include "pxr/base/gf/matrix4d.h"
-#include "pxr/base/tf/token.h"
-
-PXR_NAMESPACE_USING_DIRECTIVE
-
-static ExecIrResult _Compute(const VdfContext &);
-static ExecIrResult _Invert(const VdfContext &);
-
-// TODO: This switch controller is hard coded to support two rigs, each of which
-// controls two joint scopes. In the future, a general switch controller schema
-// will be configurable via application of multi-apply schemas.
-EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrSwitchController)
+// Register the schema with the TfType system.
+TF_REGISTRY_FUNCTION(TfType)
 {
-    ExecIrControllerBuilder builder(self, &_Compute, &_Invert);
-
-    builder.SwitchAttribute<TfToken>(
-        ExecIrSwitchControllerTokens->switchToken);
-
-    builder.InvertibleInputAttributes<GfMatrix4d>({
-        ExecIrSwitchControllerTokens->rig1Joint1Space,
-        ExecIrSwitchControllerTokens->rig1Joint2Space,
-
-        ExecIrSwitchControllerTokens->rig2Joint1Space,
-        ExecIrSwitchControllerTokens->rig2Joint2Space,
-    });
-
-    builder.InvertibleOutputAttributes<GfMatrix4d>({
-        ExecIrSwitchControllerTokens->outJoint1Space,
-        ExecIrSwitchControllerTokens->outJoint2Space,
-    });
+    TfType::Define<ExecIrSwitchController,
+        TfType::Bases< ExecIrIrController > >();
+    
+    // Register the usd prim typename as an alias under UsdSchemaBase. This
+    // enables one to call
+    // TfType::Find<UsdSchemaBase>().FindDerivedByName("IrSwitchController")
+    // to find TfType<ExecIrSwitchController>, which is how IsA queries are
+    // answered.
+    TfType::AddAlias<UsdSchemaBase, ExecIrSwitchController>("IrSwitchController");
 }
 
-// The switch controller forward computation passes through the computed values
-// for the rig that is currently selected, based on the value of the swtich
-// avar.
+/* virtual */
+ExecIrSwitchController::~ExecIrSwitchController()
+{
+}
+
+/* static */
+ExecIrSwitchController
+ExecIrSwitchController::Get(const UsdStagePtr &stage, const SdfPath &path)
+{
+    if (!stage) {
+        TF_CODING_ERROR("Invalid stage");
+        return ExecIrSwitchController();
+    }
+    return ExecIrSwitchController(stage->GetPrimAtPath(path));
+}
+
+/* static */
+ExecIrSwitchController
+ExecIrSwitchController::Define(
+    const UsdStagePtr &stage, const SdfPath &path)
+{
+    static TfToken usdPrimTypeName("IrSwitchController");
+    if (!stage) {
+        TF_CODING_ERROR("Invalid stage");
+        return ExecIrSwitchController();
+    }
+    return ExecIrSwitchController(
+        stage->DefinePrim(path, usdPrimTypeName));
+}
+
+/* virtual */
+UsdSchemaKind ExecIrSwitchController::_GetSchemaKind() const
+{
+    return ExecIrSwitchController::schemaKind;
+}
+
+/* static */
+const TfType &
+ExecIrSwitchController::_GetStaticTfType()
+{
+    static TfType tfType = TfType::Find<ExecIrSwitchController>();
+    return tfType;
+}
+
+/* static */
+bool 
+ExecIrSwitchController::_IsTypedSchema()
+{
+    static bool isTyped = _GetStaticTfType().IsA<UsdTyped>();
+    return isTyped;
+}
+
+/* virtual */
+const TfType &
+ExecIrSwitchController::_GetTfType() const
+{
+    return _GetStaticTfType();
+}
+
+UsdAttribute
+ExecIrSwitchController::GetRig1SpaceAttr() const
+{
+    return GetPrim().GetAttribute(ExecIrTokens->rig1Space);
+}
+
+UsdAttribute
+ExecIrSwitchController::CreateRig1SpaceAttr(VtValue const &defaultValue, bool writeSparsely) const
+{
+    return UsdSchemaBase::_CreateAttr(ExecIrTokens->rig1Space,
+                       SdfValueTypeNames->Matrix4d,
+                       /* custom = */ false,
+                       SdfVariabilityVarying,
+                       defaultValue,
+                       writeSparsely);
+}
+
+UsdAttribute
+ExecIrSwitchController::GetRig2SpaceAttr() const
+{
+    return GetPrim().GetAttribute(ExecIrTokens->rig2Space);
+}
+
+UsdAttribute
+ExecIrSwitchController::CreateRig2SpaceAttr(VtValue const &defaultValue, bool writeSparsely) const
+{
+    return UsdSchemaBase::_CreateAttr(ExecIrTokens->rig2Space,
+                       SdfValueTypeNames->Matrix4d,
+                       /* custom = */ false,
+                       SdfVariabilityVarying,
+                       defaultValue,
+                       writeSparsely);
+}
+
+UsdAttribute
+ExecIrSwitchController::GetOutSpaceAttr() const
+{
+    return GetPrim().GetAttribute(ExecIrTokens->outSpace);
+}
+
+UsdAttribute
+ExecIrSwitchController::CreateOutSpaceAttr(VtValue const &defaultValue, bool writeSparsely) const
+{
+    return UsdSchemaBase::_CreateAttr(ExecIrTokens->outSpace,
+                       SdfValueTypeNames->Matrix4d,
+                       /* custom = */ false,
+                       SdfVariabilityVarying,
+                       defaultValue,
+                       writeSparsely);
+}
+
+namespace {
+static inline TfTokenVector
+_ConcatenateAttributeNames(const TfTokenVector& left,const TfTokenVector& right)
+{
+    TfTokenVector result;
+    result.reserve(left.size() + right.size());
+    result.insert(result.end(), left.begin(), left.end());
+    result.insert(result.end(), right.begin(), right.end());
+    return result;
+}
+}
+
+/*static*/
+const TfTokenVector&
+ExecIrSwitchController::GetSchemaAttributeNames(bool includeInherited)
+{
+    static TfTokenVector localNames = {
+        ExecIrTokens->rig1Space,
+        ExecIrTokens->rig2Space,
+        ExecIrTokens->outSpace,
+    };
+    static TfTokenVector allNames =
+        _ConcatenateAttributeNames(
+            ExecIrIrController::GetSchemaAttributeNames(true),
+            localNames);
+
+    if (includeInherited)
+        return allNames;
+    else
+        return localNames;
+}
+
+PXR_NAMESPACE_CLOSE_SCOPE
+
+// ===================================================================== //
+// Feel free to add custom code below this line. It will be preserved by
+// the code generator.
 //
-static ExecIrResult
-_Compute(const VdfContext &ctx)
-{
-    const TfToken &switchValue = ctx.GetInputValue<TfToken>(
-            ExecIrSwitchControllerTokens->switchToken);
-    if (switchValue == ExecIrSwitchControllerTokens->rig1) {
-        return {{
-            {ExecIrSwitchControllerTokens->outJoint1Space,
-             VtValue(ctx.GetInputValue<GfMatrix4d>(
-                         ExecIrSwitchControllerTokens->rig1Joint1Space))},
-            {ExecIrSwitchControllerTokens->outJoint2Space,
-             VtValue(ctx.GetInputValue<GfMatrix4d>(
-                         ExecIrSwitchControllerTokens->rig1Joint2Space))},
-        }};
-    }
-    else if (switchValue == ExecIrSwitchControllerTokens->rig2) {
-        return {{
-            {ExecIrSwitchControllerTokens->outJoint1Space,
-             VtValue(ctx.GetInputValue<GfMatrix4d>(
-                         ExecIrSwitchControllerTokens->rig2Joint1Space))},
-            {ExecIrSwitchControllerTokens->outJoint2Space,
-             VtValue(ctx.GetInputValue<GfMatrix4d>(
-                         ExecIrSwitchControllerTokens->rig2Joint2Space))},
-        }};
-    } else {
-        TF_VERIFY(false, "Unexpected switch value '%s'", switchValue.GetText());
-        return {{}};
-    }
-}
-
-// The switch controller inverse computation passes through the inverted values
-// for the rig that is currently selected, based on the value of the swtich
-// avar.
-//
-static ExecIrResult
-_Invert(const VdfContext &ctx)
-{
-    const TfToken &switchValue = ctx.GetInputValue<TfToken>(
-            ExecIrSwitchControllerTokens->switchToken);
-    if (switchValue == ExecIrSwitchControllerTokens->rig1) {
-        return {{
-            {ExecIrSwitchControllerTokens->rig1Joint1Space,
-             VtValue(ctx.GetInputValue<GfMatrix4d>(
-                         ExecIrSwitchControllerTokens->outJoint1Space))},
-            {ExecIrSwitchControllerTokens->rig1Joint2Space,
-             VtValue(ctx.GetInputValue<GfMatrix4d>(
-                         ExecIrSwitchControllerTokens->outJoint2Space))},
-        }};
-    }
-    else if (switchValue == ExecIrSwitchControllerTokens->rig2) {
-        return {{
-            {ExecIrSwitchControllerTokens->rig2Joint1Space,
-             VtValue(ctx.GetInputValue<GfMatrix4d>(
-                         ExecIrSwitchControllerTokens->outJoint1Space))},
-            {ExecIrSwitchControllerTokens->rig2Joint2Space,
-             VtValue(ctx.GetInputValue<GfMatrix4d>(
-                         ExecIrSwitchControllerTokens->outJoint2Space))},
-        }};
-    } else {
-        TF_VERIFY(false, "Unexpected switch value '%s'", switchValue.GetText());
-        return {{}};
-    }
-}
+// Just remember to wrap code in the appropriate delimiters:
+// 'PXR_NAMESPACE_OPEN_SCOPE', 'PXR_NAMESPACE_CLOSE_SCOPE'.
+// ===================================================================== //
+// --(BEGIN CUSTOM CODE)--

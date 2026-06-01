@@ -43,7 +43,7 @@ struct _InstanceIndices
     // The instancer.
     SdfPath instancer;
     // The index of the prototype within the prototypes of the above instancer.
-    int prototypeIndex;
+    int prototypeIndex = 0;
     // The selected instances.
     VtIntArray instanceIndices;
 };
@@ -228,7 +228,7 @@ _GetPath(HdPathArrayDataSourceHandle const dataSource,
 //
 // Get the index of the given prototype in that array.
 int
-_GetIndexOfPrototype(HdInstancerTopologySchema &schema,
+_GetIndexOfPrototype(const HdInstancerTopologySchema &schema,
                      const SdfPath &prototype)
 {
     HdPathArrayDataSourceHandle const prototypesDs = schema.GetPrototypes();
@@ -244,32 +244,18 @@ _GetIndexOfPrototype(HdInstancerTopologySchema &schema,
     return 0;
 }
 
-// Get how often the prototype identified by prototypeIndex is
-// instantiated by the instancer.
-size_t
-_NumInstances(HdInstancerTopologySchema &schema,
-              const size_t prototypeIndex)
-{
-    HdIntArrayDataSourceHandle const indicesDs =
-        schema.GetInstanceIndices().GetElement(prototypeIndex);
-    if (!indicesDs) {
-        return 0;
-    }
-
-    const VtIntArray &indices = indicesDs->GetTypedValue(0.0f);
-    return indices.size();
-}
-
-// [0, 1, 2, ..., n - 1]
-//
+// All instances for the prototype.
 VtIntArray
-_Range(const size_t n)
+_GetInstanceIndicesForPrototype(
+    const HdInstancerTopologySchema &instancerTopologySchema,
+    const int prototypeIndex)
 {
-    VtIntArray result(n);
-    for (size_t i = 0; i < n; i++) {
-        result[i] = i;
+    const HdIntArrayDataSourceHandle ds =
+        instancerTopologySchema.GetInstanceIndices().GetElement(prototypeIndex);
+    if (!ds) {
+        return {};
     }
-    return result;
+    return ds->GetTypedValue(0.0f);    
 }
 
 // If the prim in the scene index at prototypePath is a prototype,
@@ -291,16 +277,17 @@ _ComputeAllInstanceIndicesForPrototype(
 
     HdContainerDataSourceHandle const primSource =
         sceneIndex->GetPrim(prototypePath).dataSource;
-    HdInstancedBySchema instancedBySchema =
+    const HdInstancedBySchema instancedBySchema =
         HdInstancedBySchema::GetFromParent(primSource);
-    HdPathArrayDataSourceHandle instancersDs = instancedBySchema.GetPaths();
+    HdPathArrayDataSourceHandle const instancersDs =
+        instancedBySchema.GetPaths();
     if (!instancersDs) {
-        return { SdfPath(), 0, {}};
+        return { };
     }
 
     const VtArray<SdfPath> &instancers = instancersDs->GetTypedValue(0.0f);
     if (instancers.empty()) {
-        return { SdfPath(), 0, {}};
+        return { };
     }
 
     if (instancers.size() > 1) {
@@ -308,16 +295,18 @@ _ComputeAllInstanceIndicesForPrototype(
     }
 
     const SdfPath &instancer = instancers[0];
-    HdInstancerTopologySchema instancerTopologySchema =
+    const HdInstancerTopologySchema instancerTopologySchema =
         HdInstancerTopologySchema::GetFromParent(
             sceneIndex->GetPrim(instancer).dataSource);
     const int prototypeIndex =
         _GetIndexOfPrototype(instancerTopologySchema, prototypePath);
 
-    const VtIntArray instanceIndices =
-        _Range(_NumInstances(instancerTopologySchema, prototypeIndex));
-
-    return { instancer, prototypeIndex, instanceIndices};
+    return {
+        instancer,
+        prototypeIndex,
+        _GetInstanceIndicesForPrototype(
+            instancerTopologySchema, prototypeIndex)
+    };
 }
 
 // If a prim in the scene index at prototypePath is a prototype (see above),

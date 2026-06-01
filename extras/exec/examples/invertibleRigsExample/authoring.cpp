@@ -8,6 +8,7 @@
 
 #include "authoring.h"
 
+#include "pxr/exec/execIr/computations.h"
 #include "pxr/exec/execIr/tokens.h"
 
 #include "pxr/exec/exec/builtinComputations.h"
@@ -19,6 +20,7 @@
 
 #include "pxr/base/gf/matrix4d.h"
 #include "pxr/base/tf/diagnosticLite.h"
+#include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/type.h"
 #include "pxr/base/ts/spline.h"
 #include "pxr/usd/sdf/valueTypeName.h"
@@ -45,17 +47,17 @@ InvertibleRigsExample_Authoring::InvertibleRigsExample_Authoring(
     // rigs.
 
     static const std::vector<TfToken> inputAvarNames = {
-        ExecIrTransformableTokens->avarsTx,
-        ExecIrTransformableTokens->avarsTy,
-        ExecIrTransformableTokens->avarsTz,
-        ExecIrTransformableTokens->avarsRx,
-        ExecIrTransformableTokens->avarsRy,
-        ExecIrTransformableTokens->avarsRz,
-        ExecIrTransformableTokens->avarsRspin
+        ExecIrTokens->avarsTx,
+        ExecIrTokens->avarsTy,
+        ExecIrTokens->avarsTz,
+        ExecIrTokens->avarsRx,
+        ExecIrTokens->avarsRy,
+        ExecIrTokens->avarsRz,
+        ExecIrTokens->avarsRspin
     };
 
     for (const UsdPrim &prim : stage->Traverse()) {
-        if (prim.IsA(ExecIrJointScopeTokens->IrJointScope)) {
+        if (prim.IsA(ExecIrTokens->IrJointScope)) {
             for (const TfToken &name : inputAvarNames) {
                 if (UsdAttribute attr = prim.GetAttribute(name)) {
                     _inputAvars.push_back(attr);
@@ -66,20 +68,20 @@ InvertibleRigsExample_Authoring::InvertibleRigsExample_Authoring(
                 }
             }
             if (UsdAttribute attr =
-                prim.GetAttribute(ExecIrTransformableTokens->posedSpace)) {
+                prim.GetAttribute(ExecIrTokens->posedSpace)) {
                 _outputSpaces.push_back(attr);
             } else {
                 TF_CODING_ERROR(
                     "Failed to find attribute '%s' on <%s>",
-                    ExecIrTransformableTokens->posedSpace.GetText(),
+                    ExecIrTokens->posedSpace.GetText(),
                     prim.GetPath().GetText());
             }
         }
     }
 }
 
-void
-InvertibleRigsExample_Authoring::SetSplineKnot(
+static void
+_SetSplineKnot(
     const UsdAttribute &attr,
     const UsdTimeCode &time,
     const VtValue &value)
@@ -89,7 +91,7 @@ InvertibleRigsExample_Authoring::SetSplineKnot(
     // If the attribute doesn't already have a spline, author an empty spline
     // onto it.
     if (!attr.HasSpline()) {
-        UsdAttribute(attr).SetSpline(TsSpline(valueType));
+        attr.SetSpline(TsSpline(valueType));
     }
     TsSpline spline = attr.GetSpline();
 
@@ -106,7 +108,7 @@ InvertibleRigsExample_Authoring::SetSplineKnot(
 
     // Set the knot on the spline and author the spline onto the attribute.
     spline.SetKnot(knot);
-    UsdAttribute(attr).SetSpline(spline);
+    attr.SetSpline(spline);
 }
 
 // Breaks down the given attribute's spline and copies all broken down values
@@ -119,6 +121,19 @@ _BreakdownPreTime(
     const UsdAttribute &attr,
     const UsdTimeCode &time)
 {
+    // If the attribute doesn't already have a spline, author a spline with a
+    // single knot with the attribute's default value.
+    if (!attr.HasSpline()) {
+        VtValue value;
+        if (!attr.Get(&value)) {
+            TF_CODING_ERROR("Can't get default value for <%s>", 
+                            attr.GetPath().GetText());
+            return;
+        }
+
+        _SetSplineKnot(attr, time, value);
+    }
+
     TsSpline spline = attr.GetSpline();
 
     if (spline.CanBreakdown(time.GetValue())) {
@@ -141,7 +156,49 @@ _BreakdownPreTime(
         return;
     }
 
-    UsdAttribute(attr).SetSpline(spline);
+    attr.SetSpline(spline);
+}
+
+void
+InvertibleRigsExample_Authoring::BreakdownInputAvars(
+    const UsdAttribute &switchAttribute,
+    const UsdTimeCode &time)
+{
+    // Author a time sample that breaks down the switch avar value.
+    VtValue value;
+    if (!switchAttribute.Get(&value, time)) {
+        TF_CODING_ERROR(
+            "Can't get value for switch attribute <%s> at time %s",
+            switchAttribute.GetPath().GetText(), TfStringify(time).c_str());
+    } else {
+        switchAttribute.Set(value, time);
+    }
+
+    for (const UsdAttribute &attr : _inputAvars) {
+        if (attr.HasSpline()) {
+            TsSpline spline = attr.GetSpline();
+
+            // We won't be able to break down if there is already a knot at the
+            // given time, but we don't need to break down if that's the case.
+            if (spline.CanBreakdown(time.GetValue())) {
+                spline.Breakdown(time.GetValue());
+                attr.SetSpline(spline);
+            }
+        }
+
+        // If the attribute doesn't have a spline, add one with a knot that
+        // breaks down the default or fallback value.
+        else {
+            VtValue value;
+            if (!attr.Get(&value)) {
+                TF_CODING_ERROR("Can't get default value for <%s>",
+                                attr.GetPath().GetText());
+                continue;
+            }
+
+            _SetSplineKnot(attr, time, value);
+        }
+    }
 }
 
 void
@@ -187,7 +244,7 @@ InvertibleRigsExample_Authoring::CompensateSwitch(
         std::vector<ExecUsdValueKey> valueKeys;
         for (const UsdAttribute &avar : _inputAvars) {
             valueKeys.emplace_back(
-                avar, ExecIrComputationTokens->computeDesiredValue);
+                avar, ExecIrComputations->computeDesiredValue);
         }
         const ExecUsdRequest request =
             _execSystem.BuildRequest(std::move(valueKeys));
@@ -204,7 +261,7 @@ InvertibleRigsExample_Authoring::CompensateSwitch(
         for (size_t i=0; i<_outputSpaces.size(); ++i) {
             overrides.push_back(
                 {{_outputSpaces[i],
-                  ExecIrComputationTokens->explicitDesiredValue},
+                  ExecIrComputations->explicitDesiredValue},
                  VtValue(preSwitchSpaceValues[i])});
         };
 
@@ -222,7 +279,7 @@ InvertibleRigsExample_Authoring::CompensateSwitch(
     // switch value change.
     switchAttribute.Set(VtValue(switchValue), time);
     for (unsigned int i=0; i<_inputAvars.size(); ++i) {
-        SetSplineKnot(_inputAvars[i], time, VtValue(inputAvarValues[i]));
+        _SetSplineKnot(_inputAvars[i], time, VtValue(inputAvarValues[i]));
     }
 }
 

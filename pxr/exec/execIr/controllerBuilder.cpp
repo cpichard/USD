@@ -28,9 +28,9 @@ ExecIrControllerBuilder::ExecIrControllerBuilder(
     Callback inverseCallback)
     : ExecIr_ControllerBuilderBase(self)
     , _forwardComputeReg(
-        self.PrimComputation(ExecIrComputationTokens->forwardCompute))
+        self.PrimComputation(_privateComputations->forwardCompute))
     , _inverseComputeReg(
-        self.PrimComputation(ExecIrComputationTokens->inverseCompute))
+        self.PrimComputation(_privateComputations->inverseCompute))
     , _inverseCallback(inverseCallback)
 {
     _forwardComputeReg.Callback<ExecIrResult>(forwardCallback);
@@ -41,6 +41,14 @@ ExecIrControllerBuilder::~ExecIrControllerBuilder()
     // Wrap the inverse callback in a lambda that checks if we have input values
     // for all invertible output attributes and returns an empty ExecIrResult if
     // any are missing.
+    //
+    // TODO: The Presto implementation calls the inverseCallback if we have
+    // input values for *any* invertible output attributes, instead of only
+    // doing so if we have values for *all* of them. We may ultimately want to
+    // change this code to follow that precedent, but for now we are sticking
+    // with this implementation because it means client callbacks don't need to
+    // test if values are available.
+    //
     _inverseComputeReg.Callback<ExecIrResult>(
         [inverseCallback = _inverseCallback,
          invertibleOutputAttributeNames =
@@ -56,5 +64,15 @@ ExecIrControllerBuilder::~ExecIrControllerBuilder()
             ctx.SetOutput(inverseCallback(ctx));
         });
 }
+
+ExecIrControllerBuilder::_PrivateComputationsType::_PrivateComputationsType()
+    : computeInvertedForwardValue(
+        "computeInvertedForwardValue", TfToken::Immortal)
+    , forwardCompute("forwardCompute", TfToken::Immortal)
+    , inverseCompute("inverseCompute", TfToken::Immortal)
+{}
+
+TfStaticData<ExecIrControllerBuilder::_PrivateComputationsType>
+    ExecIrControllerBuilder::_privateComputations;
 
 PXR_NAMESPACE_CLOSE_SCOPE

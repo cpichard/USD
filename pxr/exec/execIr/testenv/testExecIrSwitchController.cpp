@@ -6,6 +6,7 @@
 //
 #include "pxr/pxr.h"
 
+#include "pxr/exec/execIr/computations.h"
 #include "pxr/exec/execIr/tokens.h"
 
 #include "pxr/exec/exec/builtinComputations.h"
@@ -91,14 +92,14 @@ void _VerifySwitchInverseAndForwardResults(
 
     std::vector<UsdAttribute> inputAvars;
     for (const UsdPrim &prim : inputPrims) {
-        inputAvars.push_back(prim.GetAttribute(ExecIrFkControllerTokens->inRx));
-        inputAvars.push_back(prim.GetAttribute(ExecIrFkControllerTokens->inRy));
-        inputAvars.push_back(prim.GetAttribute(ExecIrFkControllerTokens->inRz));
+        inputAvars.push_back(prim.GetAttribute(ExecIrTokens->inRx));
+        inputAvars.push_back(prim.GetAttribute(ExecIrTokens->inRy));
+        inputAvars.push_back(prim.GetAttribute(ExecIrTokens->inRz));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrFkControllerTokens->inRspin));
-        inputAvars.push_back(prim.GetAttribute(ExecIrFkControllerTokens->inTx));
-        inputAvars.push_back(prim.GetAttribute(ExecIrFkControllerTokens->inTy));
-        inputAvars.push_back(prim.GetAttribute(ExecIrFkControllerTokens->inTz));
+            prim.GetAttribute(ExecIrTokens->inRspin));
+        inputAvars.push_back(prim.GetAttribute(ExecIrTokens->inTx));
+        inputAvars.push_back(prim.GetAttribute(ExecIrTokens->inTy));
+        inputAvars.push_back(prim.GetAttribute(ExecIrTokens->inTz));
     }
     TF_AXIOM(inputAvars.size() == expectedInputValues.size());
 
@@ -108,7 +109,7 @@ void _VerifySwitchInverseAndForwardResults(
         std::vector<ExecUsdValueKey> valueKeys;
         for (const UsdAttribute &avar : inputAvars) {
             valueKeys.emplace_back(
-                avar, ExecIrComputationTokens->computeDesiredValue);
+                avar, ExecIrComputations->computeDesiredValue);
         }
         TF_AXIOM(valueKeys.size() == expectedInputValues.size());
         const ExecUsdRequest request =
@@ -123,7 +124,7 @@ void _VerifySwitchInverseAndForwardResults(
         for (size_t i=0; i<desiredValues.size(); ++i) {
             overrides.push_back(
                 {{outputSpaces[i],
-                  ExecIrComputationTokens->explicitDesiredValue},
+                  ExecIrComputations->explicitDesiredValue},
                  VtValue(desiredValues[i])});
         };
         ExecUsdCacheView cache =
@@ -176,6 +177,8 @@ Test_BasicSwitch()
         #usda 1.0
 
         def Scope "Root" {
+            token switch = "rig1"
+
             def Scope "Rig1" {
                 def IrFkController "FK1" {
                     double in:tx = 1.0
@@ -194,11 +197,16 @@ Test_BasicSwitch()
                 }
             }
 
-            def IrSwitchController "Switch" {
-                matrix4d rig1:joint1:space.connect = </Root/Rig1/FK1.out:space>
-                matrix4d rig1:joint2:space.connect = </Root/Rig1/FK2.out:space>
-                matrix4d rig2:joint1:space.connect = </Root/Rig2/FK1.out:space>
-                matrix4d rig2:joint2:space.connect = </Root/Rig2/FK2.out:space>
+            def IrSwitchController "Switch1" {
+                token switch.connect = </Root.switch>
+                matrix4d rig1:space.connect = </Root/Rig1/FK1.out:space>
+                matrix4d rig2:space.connect = </Root/Rig2/FK1.out:space>
+            }
+
+            def IrSwitchController "Switch2" {
+                token switch.connect = </Root.switch>
+                matrix4d rig1:space.connect = </Root/Rig1/FK2.out:space>
+                matrix4d rig2:space.connect = </Root/Rig2/FK2.out:space>
             }
         }
         )usda");
@@ -206,9 +214,9 @@ Test_BasicSwitch()
     TF_AXIOM(usdStage);
 
     const UsdAttribute joint1Space =
-        usdStage->GetAttributeAtPath(SdfPath("/Root/Switch.out:joint1:space"));
+        usdStage->GetAttributeAtPath(SdfPath("/Root/Switch1.out:space"));
     const UsdAttribute joint2Space =
-        usdStage->GetAttributeAtPath(SdfPath("/Root/Switch.out:joint2:space"));
+        usdStage->GetAttributeAtPath(SdfPath("/Root/Switch2.out:space"));
     TF_AXIOM(joint1Space && joint2Space);
 
     ExecUsdSystem execSystem(usdStage);
@@ -219,7 +227,7 @@ Test_BasicSwitch()
     TF_AXIOM(outputRequest.IsValid());
 
     const UsdAttribute switchAttr =
-        usdStage->GetAttributeAtPath(SdfPath("/Root/Switch.switch"));
+        usdStage->GetAttributeAtPath(SdfPath("/Root.switch"));
     TF_AXIOM(switchAttr);
 
     // With Rig1 active ('rig1' is the fallback value for the 'switch' avar),
@@ -237,7 +245,7 @@ Test_BasicSwitch()
 
     // Set the switch controller so Rig2 is active and compute in the forward
     // direction and confirm that we get the values Rig2 computes as authored.
-    switchAttr.Set(ExecIrSwitchControllerTokens->rig2);
+    switchAttr.Set(ExecIrTokens->rig2);
 
     {
         ExecUsdCacheView cache = execSystem.Compute(outputRequest);
@@ -251,7 +259,7 @@ Test_BasicSwitch()
 
     // Set the switch to Rig1 and test inverse computation with an override that
     // selects Rig2.
-    switchAttr.Set(ExecIrSwitchControllerTokens->rig1);
+    switchAttr.Set(ExecIrTokens->rig1);
 
     {
         const UsdPrim fk1 = usdStage->GetPrimAtPath(SdfPath("/Root/Rig2/FK1"));
@@ -271,7 +279,7 @@ Test_BasicSwitch()
         };
 
         _VerifySwitchInverseAndForwardResults(
-            switchAttr, ExecIrSwitchControllerTokens->rig2,
+            switchAttr, ExecIrTokens->rig2,
             {fk1, fk2},
             expectedInputValues,
             {joint1Space, joint2Space},
@@ -284,7 +292,7 @@ Test_BasicSwitch()
     {
         VtValue value;
         TF_AXIOM(switchAttr.Get(&value));
-        ASSERT_EQ(value, ExecIrSwitchControllerTokens->rig2);
+        ASSERT_EQ(value, ExecIrTokens->rig2);
 
         const UsdPrim fk1 = usdStage->GetPrimAtPath(SdfPath("/Root/Rig1/FK1"));
         const UsdPrim fk2 = usdStage->GetPrimAtPath(SdfPath("/Root/Rig1/FK2"));
@@ -303,7 +311,7 @@ Test_BasicSwitch()
         };
 
         _VerifySwitchInverseAndForwardResults(
-            switchAttr, ExecIrSwitchControllerTokens->rig1,
+            switchAttr, ExecIrTokens->rig1,
             {fk1, fk2},
             expectedInputValues,
             {joint1Space, joint2Space},

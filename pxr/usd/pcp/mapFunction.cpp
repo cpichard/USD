@@ -715,8 +715,6 @@ PcpMapFunction::Swap(PcpMapFunction& map)
 bool
 PcpMapFunction::operator==(const PcpMapFunction &map) const
 {
-    TRACE_FUNCTION();
-
     // Compare normalized map functions since we want to check that the
     // fully-composed source-to-target mappings are the same between
     // both functions, regardless of whether one or the other was
@@ -1213,8 +1211,6 @@ PcpMapFunction::GetInverse() const
 PcpMapFunction
 PcpMapFunction::_GetNormalized() const
 {
-    TRACE_FUNCTION();
-
     if (_mappings->IsPathPairs()) {
         return *this;
     }

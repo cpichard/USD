@@ -67,7 +67,7 @@ _GetDisplayColorDataSource(
     const UsdImagingDataSourceStageGlobals &stageGlobals)
 {
     const UsdAttribute colorAttr = prim.GetAttribute(
-        ExecIrJointScopeTokens->guideDisplayColor);
+        ExecIrTokens->guideDisplayColor);
     TF_VERIFY(colorAttr);
 
     return HdPrimvarSchema::Builder()
@@ -85,7 +85,7 @@ _GetDisplayOpacityDataSource(
     const UsdImagingDataSourceStageGlobals &stageGlobals)
 {
     const UsdAttribute opacityAttr = prim.GetAttribute(
-        ExecIrJointScopeTokens->guideDisplayOpacity);
+        ExecIrTokens->guideDisplayOpacity);
     TF_VERIFY(opacityAttr);
 
     return HdPrimvarSchema::Builder()
@@ -128,7 +128,7 @@ UsdIrImagingJointScopeAdapter::GetImagingSubprimData(
     }
     if (subprim == UsdIrImagingTokens->zAxisCone) {
         const UsdAttribute lengthAttr =
-            prim.GetAttribute(ExecIrJointScopeTokens->guideLength);
+            prim.GetAttribute(ExecIrTokens->guideLength);
         TF_VERIFY(lengthAttr);
 
         const HdDataSourceBaseHandle primvarValues[] = {
@@ -195,9 +195,9 @@ UsdIrImagingJointScopeAdapter::InvalidateImagingSubprim(
                 properties.begin(), properties.end(),
                 [](const TfToken &propName) {
                     return
-                        propName == ExecIrJointScopeTokens->guideLength ||
-                        propName == ExecIrJointScopeTokens->guideDisplayColor ||
-                        propName == ExecIrJointScopeTokens->guideDisplayOpacity;
+                        propName == ExecIrTokens->guideLength ||
+                        propName == ExecIrTokens->guideDisplayColor ||
+                        propName == ExecIrTokens->guideDisplayOpacity;
                 });
             it != properties.end()) {
             return HdDataSourceLocatorSet::UniversalSet();

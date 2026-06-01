@@ -177,6 +177,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (instBasisCurvesTopology)                   \
     (instBasisCurvesTopologyRange)              \
     (instExtComputationDataRange)               \
+    (instGlslProgram)                           \
     (instMeshTopology)                          \
     (instMeshTopologyRange)                     \
     (instPrimvarRange)                          \
@@ -314,6 +315,7 @@ PXR_NAMESPACE_OPEN_SCOPE
     (integrator)                                \
     (sampleFilter)                              \
     (displayFilter)                             \
+    (energyFilter)                              \
     (imageShader)                               \
                                                 \
     HD_LIGHT_TYPE_TOKENS                        \

@@ -6,6 +6,7 @@
 //
 #include "pxr/pxr.h"
 
+#include "pxr/exec/execIr/computations.h"
 #include "pxr/exec/execIr/tokens.h"
 
 #include "pxr/exec/exec/builtinComputations.h"
@@ -45,34 +46,33 @@ PXR_NAMESPACE_USING_DIRECTIVE
 static const std::string waddlerRigLayerContents = R"usda(#usda 1.0
     def Scope "Rig" {
         def Scope "Anim" {
+            token switch = "rig1"
+
             def IrJointScope "Joint1" {
                 matrix4d posed:space.connect = [
-                    </Rig/Control/Switch.out:joint1:space>
+                    </Rig/Control/Switch1.out:space>
                 ]
 
                 def IrJointScope "Joint2" {
                     double rest:tz = 10.0
                     matrix4d posed:space.connect = [
-                        </Rig/Control/Switch.out:joint2:space>
+                        </Rig/Control/Switch2.out:space>
                     ]
                 }
             }
         }
 
         def Scope "Control" {
-            def IrSwitchController "Switch" {
-                matrix4d rig1:joint1:space.connect = [
-                    </Rig/Control/Rig1/FK1.out:space>
-                ]
-                matrix4d rig1:joint2:space.connect = [
-                    </Rig/Control/Rig1/FK2.out:space>
-                ]
-                matrix4d rig2:joint1:space.connect = [
-                    </Rig/Control/Rig2/FK1.out:space>
-                ]
-                matrix4d rig2:joint2:space.connect = [
-                    </Rig/Control/Rig2/FK2.out:space>
-                ]
+            def IrSwitchController "Switch1" {
+                token switch.connect = </Rig/Anim.switch>
+                matrix4d rig1:space.connect = </Rig/Control/Rig1/FK1.out:space>
+                matrix4d rig2:space.connect = </Rig/Control/Rig2/FK1.out:space>
+            }
+
+            def IrSwitchController "Switch2" {
+                token switch.connect = </Rig/Anim.switch>
+                matrix4d rig1:space.connect = </Rig/Control/Rig1/FK2.out:space>
+                matrix4d rig2:space.connect = </Rig/Control/Rig2/FK2.out:space>
             }
 
             def Scope "Rig1" {
@@ -224,22 +224,22 @@ void _VerifySwitchInverseAndForwardResults(
     std::vector<UsdAttribute> outputSpaces;
     for (const UsdPrim &prim : jointScopes) {
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsRx));
+            prim.GetAttribute(ExecIrTokens->avarsRx));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsRy));
+            prim.GetAttribute(ExecIrTokens->avarsRy));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsRz));
+            prim.GetAttribute(ExecIrTokens->avarsRz));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsRspin));
+            prim.GetAttribute(ExecIrTokens->avarsRspin));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsTx));
+            prim.GetAttribute(ExecIrTokens->avarsTx));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsTy));
+            prim.GetAttribute(ExecIrTokens->avarsTy));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsTz));
+            prim.GetAttribute(ExecIrTokens->avarsTz));
 
         outputSpaces.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->posedSpace));
+            prim.GetAttribute(ExecIrTokens->posedSpace));
     }
     TF_AXIOM(inputAvars.size() == expectedInputValues.size());
     for (const UsdAttribute &attr : inputAvars) {
@@ -256,7 +256,7 @@ void _VerifySwitchInverseAndForwardResults(
         std::vector<ExecUsdValueKey> valueKeys;
         for (const UsdAttribute &avar : inputAvars) {
             valueKeys.emplace_back(
-                avar, ExecIrComputationTokens->computeDesiredValue);
+                avar, ExecIrComputations->computeDesiredValue);
         }
         TF_AXIOM(valueKeys.size() == expectedInputValues.size());
         const ExecUsdRequest request =
@@ -271,7 +271,7 @@ void _VerifySwitchInverseAndForwardResults(
         for (size_t i=0; i<desiredValues.size(); ++i) {
             overrides.push_back(
                 {{outputSpaces[i],
-                  ExecIrComputationTokens->explicitDesiredValue},
+                  ExecIrComputations->explicitDesiredValue},
                  VtValue(desiredValues[i])});
         };
         ExecUsdCacheView cache =
@@ -327,9 +327,9 @@ Test_WaddlerRigBasic()
     TF_AXIOM(joint1 && joint2);
 
     const UsdAttribute joint1Space =
-        joint1.GetAttribute(ExecIrTransformableTokens->posedSpace);
+        joint1.GetAttribute(ExecIrTokens->posedSpace);
     const UsdAttribute joint2Space =
-        joint2.GetAttribute(ExecIrTransformableTokens->posedSpace);
+        joint2.GetAttribute(ExecIrTokens->posedSpace);
     TF_AXIOM(joint1Space && joint2Space);
 
     ExecUsdSystem execSystem(usdStage);
@@ -340,12 +340,12 @@ Test_WaddlerRigBasic()
     TF_AXIOM(outputRequest.IsValid());
 
     const UsdAttribute switchAttr =
-        usdStage->GetAttributeAtPath(SdfPath("/Rig/Control/Switch.switch"));
+        usdStage->GetAttributeAtPath(SdfPath("/Rig/Anim.switch"));
     TF_AXIOM(switchAttr);
 
     // Set the switch to Rig2 and test inverse computation with an override that
     // selects Rig1.
-    switchAttr.Set(ExecIrSwitchControllerTokens->rig2);
+    switchAttr.Set(ExecIrTokens->rig2);
 
     {
         const GfMatrix4d desiredOutSpaceValue1(
@@ -361,7 +361,7 @@ Test_WaddlerRigBasic()
         };
 
         _VerifySwitchInverseAndForwardResults(
-            switchAttr, ExecIrSwitchControllerTokens->rig1,
+            switchAttr, ExecIrTokens->rig1,
             {joint1, joint2},
             expectedInputValues,
             {desiredOutSpaceValue1, desiredOutSpaceValue2},
@@ -373,7 +373,7 @@ Test_WaddlerRigBasic()
     {
         VtValue value;
         TF_AXIOM(switchAttr.Get(&value));
-        ASSERT_EQ(value, ExecIrSwitchControllerTokens->rig1);
+        ASSERT_EQ(value, ExecIrTokens->rig1);
 
         const GfMatrix4d desiredOutSpaceValue1(
             GfRotation({0, 1, 0}, -90),
@@ -388,7 +388,7 @@ Test_WaddlerRigBasic()
         };
 
         _VerifySwitchInverseAndForwardResults(
-            switchAttr, ExecIrSwitchControllerTokens->rig2,
+            switchAttr, ExecIrTokens->rig2,
             {joint1, joint2},
             expectedInputValues,
             {desiredOutSpaceValue1, desiredOutSpaceValue2},
@@ -410,7 +410,7 @@ _SetSplineKnot(
     // If the attribute doesn't already have a spline, author an empty spline
     // onto it.
     if (!attr.HasSpline()) {
-        UsdAttribute(attr).SetSpline(TsSpline(valueType));
+        attr.SetSpline(TsSpline(valueType));
     }
     TsSpline spline = attr.GetSpline();
 
@@ -427,7 +427,7 @@ _SetSplineKnot(
 
     // Set the knot on the spline and author the spline onto the attribute.
     spline.SetKnot(knot);
-    UsdAttribute(attr).SetSpline(spline);
+    attr.SetSpline(spline);
 }
 
 // Convenience template function that wraps the new knot value in a VtValue.
@@ -466,7 +466,7 @@ _BreakdownPreTime(
         }
     }
 
-    UsdAttribute(attr).SetSpline(spline);
+    attr.SetSpline(spline);
 }
 
 // Author a value to a switch attribute with compensation that authors input
@@ -517,7 +517,7 @@ _CompensateSwitch(
         std::vector<ExecUsdValueKey> valueKeys;
         for (const UsdAttribute &avar : inputAvars) {
             valueKeys.emplace_back(
-                avar, ExecIrComputationTokens->computeDesiredValue);
+                avar, ExecIrComputations->computeDesiredValue);
         }
         const ExecUsdRequest request =
             execSystem.BuildRequest(std::move(valueKeys));
@@ -531,7 +531,7 @@ _CompensateSwitch(
         for (size_t i=0; i<outputSpaces.size(); ++i) {
             overrides.push_back(
                 {{outputSpaces[i],
-                     ExecIrComputationTokens->explicitDesiredValue},
+                     ExecIrComputations->explicitDesiredValue},
                  VtValue(preSwitchSpaceValues[i])});
         };
 
@@ -602,7 +602,7 @@ _VerifyComputedValue(
 }
 
 static void
-Test_WaddlerRigAnimation()
+Test_WaddlerRigSwitchCompensation()
 {
     _EnsureNoErrors mark;
 
@@ -621,7 +621,7 @@ Test_WaddlerRigAnimation()
     TF_AXIOM(usdStage);
 
     UsdAttribute switchAttr =
-        usdStage->GetAttributeAtPath(SdfPath("/Root/Control/Switch.switch"));
+        usdStage->GetAttributeAtPath(SdfPath("/Root/Anim.switch"));
     TF_AXIOM(switchAttr);
 
     const UsdPrim joint1 =
@@ -631,34 +631,34 @@ Test_WaddlerRigAnimation()
     TF_AXIOM(joint1 && joint2);
 
     UsdAttribute ry1 =
-        joint1.GetAttribute(ExecIrTransformableTokens->avarsRy);
+        joint1.GetAttribute(ExecIrTokens->avarsRy);
     UsdAttribute ry2 =
-        joint2.GetAttribute(ExecIrTransformableTokens->avarsRy);
+        joint2.GetAttribute(ExecIrTokens->avarsRy);
     TF_AXIOM(ry1 && ry2);
 
     const UsdAttribute joint1Space =
-        joint1.GetAttribute(ExecIrTransformableTokens->posedSpace);
+        joint1.GetAttribute(ExecIrTokens->posedSpace);
     const UsdAttribute joint2Space =
-        joint2.GetAttribute(ExecIrTransformableTokens->posedSpace);
+        joint2.GetAttribute(ExecIrTokens->posedSpace);
     TF_AXIOM(joint1Space && joint2Space);
     std::vector<UsdAttribute> outputSpaces{joint1Space, joint2Space};
 
     std::vector<UsdAttribute> inputAvars;
     for (const UsdPrim &prim : {joint1, joint2}) {
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsTx));
+            prim.GetAttribute(ExecIrTokens->avarsTx));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsTy));
+            prim.GetAttribute(ExecIrTokens->avarsTy));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsTz));
+            prim.GetAttribute(ExecIrTokens->avarsTz));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsRx));
+            prim.GetAttribute(ExecIrTokens->avarsRx));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsRy));
+            prim.GetAttribute(ExecIrTokens->avarsRy));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsRz));
+            prim.GetAttribute(ExecIrTokens->avarsRz));
         inputAvars.push_back(
-            prim.GetAttribute(ExecIrTransformableTokens->avarsRspin));
+            prim.GetAttribute(ExecIrTokens->avarsRspin));
     }
     for (const UsdAttribute &attr : inputAvars) {
         TF_AXIOM(attr);
@@ -675,7 +675,7 @@ Test_WaddlerRigAnimation()
     for (const UsdAttribute &attr : inputAvars) {
         _SetSplineKnot(attr, currentTime, 0.0);
     }
-    switchAttr.Set(ExecIrSwitchControllerTokens->rig1, currentTime);
+    switchAttr.Set(ExecIrTokens->rig1, currentTime);
 
     // Verify that the posed spaces for both joints start where we expect:
     // - They both have the same orientation, which is the identity.
@@ -705,7 +705,7 @@ Test_WaddlerRigAnimation()
     // Switch from rig1 to rig2, compensating into the input avars.
     _CompensateSwitch(
         currentTime,
-        switchAttr, VtValue(ExecIrSwitchControllerTokens->rig2),
+        switchAttr, VtValue(ExecIrTokens->rig2),
         inputAvars, outputSpaces);
 
     // Verify the compensated input avar values:
@@ -730,7 +730,7 @@ Test_WaddlerRigAnimation()
     // Switch from rig2 to rig1, compensating into the input avars.
     _CompensateSwitch(
         currentTime,
-        switchAttr, VtValue(ExecIrSwitchControllerTokens->rig1),
+        switchAttr, VtValue(ExecIrTokens->rig1),
         inputAvars, outputSpaces);
 
     // Verify the compensated input avar values:
@@ -756,7 +756,7 @@ Test_WaddlerRigAnimation()
     // Switch from rig1 to rig2, compensating into the input avars.
     _CompensateSwitch(
         currentTime,
-        switchAttr, VtValue(ExecIrSwitchControllerTokens->rig2),
+        switchAttr, VtValue(ExecIrTokens->rig2),
         inputAvars, outputSpaces);
 
     // Verify the compensated input avar values:
@@ -802,5 +802,5 @@ Test_WaddlerRigAnimation()
 int main(int argc, char **argv)
 {
     Test_WaddlerRigBasic();
-    Test_WaddlerRigAnimation();
+    Test_WaddlerRigSwitchCompensation();
 }

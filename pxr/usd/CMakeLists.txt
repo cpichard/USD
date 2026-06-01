@@ -11,6 +11,7 @@ set(DIRS
     usdShade
     usdLux
     usdProc
+    usdProfiles
     usdRender
     usdHydra
     usdRi

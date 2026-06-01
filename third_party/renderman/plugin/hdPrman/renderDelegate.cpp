@@ -77,6 +77,9 @@
 #endif
 #if PXR_VERSION >= 2308
 #include "hdPrman/displayFilter.h"
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+#include "hdPrman/energyFilter.h"
+#endif
 #include "hdPrman/integrator.h"
 #include "hdPrman/renderSettings.h"
 #include "hdPrman/sampleFilter.h"
@@ -276,6 +279,9 @@ const TfTokenVector HdPrmanRenderDelegate::SUPPORTED_SPRIM_TYPES =
     HdPrimTypeTokens->integrator,
     HdPrimTypeTokens->sampleFilter,
     HdPrimTypeTokens->displayFilter,
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+    HdPrimTypeTokens->energyFilter,
+#endif
 #endif
 };
 
@@ -636,6 +642,10 @@ HdPrmanRenderDelegate::CreateSprim(TfToken const& typeId,
         sprim = new HdPrman_SampleFilter(sprimId);
     } else if (typeId == HdPrimTypeTokens->displayFilter) {
         sprim = new HdPrman_DisplayFilter(sprimId);
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+    } else if (typeId == HdPrimTypeTokens->energyFilter) {
+        sprim = new HdPrman_EnergyFilter(sprimId);
+#endif
 #endif
     } else {
         TF_CODING_ERROR("Unknown Sprim Type %s", typeId.GetText());
@@ -684,6 +694,10 @@ HdPrmanRenderDelegate::CreateFallbackSprim(TfToken const& typeId)
         return new HdPrman_SampleFilter(SdfPath::EmptyPath());
     } else if (typeId == HdPrimTypeTokens->displayFilter) {
         return new HdPrman_DisplayFilter(SdfPath::EmptyPath());
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+    } else if (typeId == HdPrimTypeTokens->energyFilter) {
+        return new HdPrman_EnergyFilter(SdfPath::EmptyPath());
+#endif
 #endif
     } else {
         TF_CODING_ERROR("Unknown Sprim Type %s", typeId.GetText());

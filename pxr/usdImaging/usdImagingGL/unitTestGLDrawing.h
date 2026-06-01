@@ -61,6 +61,7 @@ public:
     std::string const & GetOutputFilePath() const { return _outputFilePath; }
 
     std::string const & GetCameraPath() const { return _cameraPath; }
+    std::string const & GetPickCameraPath() const { return _pickCameraPath; }
     std::vector<GfVec4d> const & GetClipPlanes() const { return _clipPlanes; }
     std::vector<double> const& GetTimes() const { return _times; }
     GfVec4f const & GetClearColor() const { return _clearColor; }
@@ -123,8 +124,10 @@ private:
     bool _sceneLights;
     bool _cameraLight;
     std::string _cameraPath;
+    std::string _pickCameraPath;
     bool _enableSceneMaterials;
     bool _unloadedAsBounds;
+    bool _skipTestPlugins;
 
     std::string _stageFilePath;
     std::string _outputFilePath;

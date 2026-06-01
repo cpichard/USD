@@ -33,6 +33,16 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+#define HDX_PICK_RESOLVE_MODE_TOKENS \
+    (resolveNearestToCamera)         \
+    (resolveNearestToCenter)         \
+    (resolveUnique)                  \
+    (resolveAll)                     \
+    (resolveDeep)
+
+TF_DECLARE_PUBLIC_TOKENS(
+    HdxPickResolveModeTokens, HDX_API, HDX_PICK_RESOLVE_MODE_TOKENS);
+
 #define HDX_PICK_TOKENS              \
     /* Task context */               \
     (pickParams)                     \
@@ -44,14 +54,10 @@ PXR_NAMESPACE_OPEN_SCOPE
     (pickPoints)                     \
     (pickPointsAndInstances)         \
                                      \
-    /* Resolve mode */               \
-    (resolveNearestToCamera)         \
-    (resolveNearestToCenter)         \
-    (resolveUnique)                  \
-    (resolveAll)                     \
-    (resolveDeep)
+    HDX_PICK_RESOLVE_MODE_TOKENS
 
-TF_DECLARE_PUBLIC_TOKENS(HdxPickTokens, HDX_API, HDX_PICK_TOKENS);
+TF_DECLARE_PUBLIC_TOKENS(
+    HdxPickTokens, HDX_API, HDX_PICK_TOKENS);
 
 class HdStRenderBuffer;
 class HdStRenderPassState;

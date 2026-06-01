@@ -49,6 +49,7 @@
 #include "pxr/imaging/hd/cubeSchema.h"
 #include "pxr/imaging/hd/cylinderSchema.h"
 #include "pxr/imaging/hd/displayFilterSchema.h"
+#include "pxr/imaging/hd/energyFilterSchema.h"
 #include "pxr/imaging/hd/extComputationInputComputationSchema.h"
 #include "pxr/imaging/hd/extComputationOutputSchema.h"
 #include "pxr/imaging/hd/extComputationPrimvarSchema.h"
@@ -2135,6 +2136,21 @@ HdSceneIndexAdapterSceneDelegate::Get(SdfPath const &id, TfToken const &key)
     if (prim.primType == HdPrimTypeTokens->displayFilter) {
         if (key == HdDisplayFilterSchemaTokens->resource) {
             return _GetRenderTerminalResource<HdDisplayFilterSchema>(prim);
+        }
+        return VtValue();
+    }
+
+    // energyFilter use of Get().
+    if (prim.primType == HdPrimTypeTokens->energyFilter) {
+        if (key == HdEnergyFilterSchemaTokens->resource) {
+            return _GetRenderTerminalResource<HdEnergyFilterSchema>(prim);
+        }
+        // enabled, lpe, order are stored as flat attributes in the container.
+        if (prim.dataSource) {
+            if (const HdSampledDataSourceHandle ds =
+                    HdSampledDataSource::Cast(prim.dataSource->Get(key))) {
+                return ds->GetValue(0.0f);
+            }
         }
         return VtValue();
     }

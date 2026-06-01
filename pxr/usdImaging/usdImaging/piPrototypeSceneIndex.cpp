@@ -347,15 +347,24 @@ UsdImaging_PiPrototypeSceneIndex::_PrimsRemoved(
 {
     TRACE_FUNCTION();
 
-    for (const HdSceneIndexObserver::RemovedPrimEntry &entry : entries) {
-        // Remove all items in _instancersAndOvers that have the removed
-        // path as a prefix.
-        for (_PathSet::iterator i = _instancersAndOvers.begin();
-             i != _instancersAndOvers.end();) {
-            if (i->HasPrefix(entry.primPath)) {
-                i = _instancersAndOvers.erase(i);
-            } else {
-                ++i;
+    if (!_instancersAndOvers.empty()) {
+        // Collapse entries to their minimal subtree roots so we don't
+        // scan _instancersAndOvers once per leaf prim.
+        SdfPathVector roots;
+        roots.reserve(entries.size());
+        for (const auto &entry : entries) {
+            roots.push_back(entry.primPath);
+        }
+        SdfPath::RemoveDescendentPaths(&roots);
+
+        for (const SdfPath &root : roots) {
+            for (auto i = _instancersAndOvers.begin();
+                 i != _instancersAndOvers.end();) {
+                if (i->HasPrefix(root)) {
+                    i = _instancersAndOvers.erase(i);
+                } else {
+                    ++i;
+                }
             }
         }
     }

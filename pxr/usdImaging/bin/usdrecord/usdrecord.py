@@ -238,6 +238,12 @@ def main() -> int:
             'Will have no effect if MallocTags are not supported in the '
             'USD installation.'))
 
+    parser.add_argument('--abortOnError', action='store_true',
+        default=False, dest='abortOnError',
+        help=(
+            'Abort recording and return a non-zero exit code if a Tf '
+            'error is raised during rendering.'))
+
     args = parser.parse_args()
 
     args.imageWidth = max(args.imageWidth, 1)
@@ -387,9 +393,14 @@ def main() -> int:
         try:
             frameRecorder.Record(usdStage, usdCamera, timeCode, outputImagePath)
         except Tf.ErrorException as e:
-            _Err("Recording aborted due to the following failure at time code "
-                 "{0}: {1}".format(timeCode, str(e)))
-            return 1
+            if args.abortOnError:
+                _Err("Recording aborted due to the following failure at "
+                     "time code {0}: {1}".format(timeCode, str(e)))
+                return 1
+            else:
+                # By default just print the errors and contine.
+                _Msg("Errors encountered at time code {0}: "
+                     "{1}".format(timeCode, str(e)))
 
     # Release our reference to the frame recorder so it can be deleted before
     # the Qt stuff.

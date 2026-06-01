@@ -1,6 +1,12 @@
 set(PXR_PREFIX pxr/exec)
 set(PXR_PACKAGE execIr)
 
+# TODO: Currently, generated schema code only works with hidden symbol
+# visibility on Windows; therefore, we disable it on Linux for now. (Note that
+# OpenExec doesn't yet support hidden symbol visibility on Apple platforms and
+# that CMAKE_CXX_VISIBILITY_PRESET has no effect if the compiler is MSVC.
+unset(CMAKE_CXX_VISIBILITY_PRESET)
+
 pxr_library(execIr
     INCLUDE_SCHEMA_FILES
 
@@ -8,14 +14,17 @@ pxr_library(execIr
         execGeom
         execUsd
         gf
+        sdf
         tf
+        usd
+        vt
         
     PUBLIC_HEADERS
         api.h
 
     PUBLIC_CLASSES
+        computations
         controllerBuilder
-        tokens
         types
 
     PRIVATE_HEADERS
@@ -24,12 +33,12 @@ pxr_library(execIr
         utils
 
     CPPFILES
-        fkController.cpp
-        switchController.cpp
-        transformable.cpp
+        fkControllerComputations.cpp
+        switchControllerComputations.cpp
+        xformableComputations.cpp
 
-    RESOURCE_FILES
-        plugInfo.json
+    PYMODULE_FILES
+        __init__.py
 
     DOXYGEN_FILES
         README.md
@@ -114,7 +123,7 @@ pxr_register_test(testExecIrSwitchController
     EXPECTED_RETURN_CODE 0
 )
 
-pxr_build_test(testExecIrWaddlerRig
+pxr_build_test(testExecIrSwitchCompensation
     LIBRARIES
         exec
         execIr
@@ -125,10 +134,10 @@ pxr_build_test(testExecIrWaddlerRig
         ts
         usd
     CPPFILES
-        testenv/testExecIrWaddlerRig.cpp
+        testenv/testExecIrSwitchCompensation.cpp
 )
 
-pxr_register_test(testExecIrWaddlerRig
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecIrWaddlerRig"
+pxr_register_test(testExecIrSwitchCompensation
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testExecIrSwitchCompensation"
     EXPECTED_RETURN_CODE 0
 )

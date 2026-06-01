@@ -6,6 +6,7 @@
 //
 #include "pxr/pxr.h"
 
+#include "pxr/exec/execIr/computations.h"
 #include "pxr/exec/execIr/controllerBuilder.h"
 #include "pxr/exec/execIr/tokens.h"
 #include "pxr/exec/execIr/utils.h"
@@ -24,9 +25,8 @@ namespace {
 
 // Builder used to register computations for input and output attributes.
 //
-// TODO: When the OpenExec core provides builtin support for attribute
-// connection data flow and for inversion, we won't need to define any of the
-// plugin computations defined by this builder.
+// TODO: When the OpenExec core provides builtin support for inversion, we 
+// won't need to define any of the plugin computations defined by this builder.
 // 
 class _Builder : ExecIr_ControllerBuilderBase {
 public:
@@ -51,14 +51,14 @@ public:
     // Defines a computation named \p computationName that computes a
     // transformation inherited from a namespace ancestor.
     //
-    // Finds the nearest namespace ancestor that is either IrTransformable or
+    // Finds the nearest namespace ancestor that is either IrXformable or
     // Xformable:
-    // - If the ancestor is IrTransformable, yields the value of the attribute
-    //   named \p spaceAttributeName.
+    // - If the ancestor is IrXformable, yields the value of the attribute named
+    //   \p spaceAttributeName.
     // - If the ancestor is Xformable, yields the value of the ancestor's
     //   computeLocalToWorldTransform computation.
     //
-    // This is done by defining (for IrTransformable prims) and dispatching (for
+    // This is done by defining (for IrXformable prims) and dispatching (for
     // Xformable prims) a computation named \p ancestorComputationName.
     //
     void
@@ -82,50 +82,50 @@ TF_DEFINE_PRIVATE_TOKENS(
     (restTransRotOffsetXf)
 );
 
-EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrTransformable)
+EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrXformable)
 {
     _Builder builder(self);
 
-    builder.InputAttribute<double>(ExecIrTransformableTokens->avarsTx);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->avarsTy);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->avarsTz);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->avarsRx);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->avarsRy);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->avarsRz);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->avarsRspin);
+    builder.InputAttribute<double>(ExecIrTokens->avarsTx);
+    builder.InputAttribute<double>(ExecIrTokens->avarsTy);
+    builder.InputAttribute<double>(ExecIrTokens->avarsTz);
+    builder.InputAttribute<double>(ExecIrTokens->avarsRx);
+    builder.InputAttribute<double>(ExecIrTokens->avarsRy);
+    builder.InputAttribute<double>(ExecIrTokens->avarsRz);
+    builder.InputAttribute<double>(ExecIrTokens->avarsRspin);
     builder.InputAttribute<TfToken>(
-        ExecIrTransformableTokens->avarsRotationOrder);
+        ExecIrTokens->avarsRotationOrder);
     builder.InputAttribute<GfMatrix4d>(
-        ExecIrTransformableTokens->avarsDefaultSpace);
+        ExecIrTokens->avarsDefaultSpace);
 
     // avars:defaultSpace has an expression that simply returns the value of
     // default:space.
-    self.AttributeExpression(ExecIrTransformableTokens->avarsDefaultSpace)
+    self.AttributeExpression(ExecIrTokens->avarsDefaultSpace)
         .Inputs(Prim().AttributeValue<GfMatrix4d>(
-                    ExecIrTransformableTokens->defaultSpace))
+                    ExecIrTokens->defaultSpace))
         .Callback(+[](const VdfContext &ctx) -> GfMatrix4d {
             return ctx.GetInputValue<GfMatrix4d>(
-                ExecIrTransformableTokens->defaultSpace);
+                ExecIrTokens->defaultSpace);
         });
 
     builder.InputAttribute<double>(
-        ExecIrTransformableTokens->avarsUnitScaleFactor);
+        ExecIrTokens->avarsUnitScaleFactor);
 
-    builder.InputAttribute<double>(ExecIrTransformableTokens->restTx);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->restTy);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->restTz);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->restRx);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->restRy);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->restRz);
-    builder.InputAttribute<GfMatrix4d>(ExecIrTransformableTokens->restSpace);
+    builder.InputAttribute<double>(ExecIrTokens->restTx);
+    builder.InputAttribute<double>(ExecIrTokens->restTy);
+    builder.InputAttribute<double>(ExecIrTokens->restTz);
+    builder.InputAttribute<double>(ExecIrTokens->restRx);
+    builder.InputAttribute<double>(ExecIrTokens->restRy);
+    builder.InputAttribute<double>(ExecIrTokens->restRz);
+    builder.InputAttribute<GfMatrix4d>(ExecIrTokens->restSpace);
 
-    builder.InputAttribute<double>(ExecIrTransformableTokens->defaultTx);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->defaultTy);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->defaultTz);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->defaultRx);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->defaultRy);
-    builder.InputAttribute<double>(ExecIrTransformableTokens->defaultRz);
-    builder.InputAttribute<GfMatrix4d>(ExecIrTransformableTokens->defaultSpace);
+    builder.InputAttribute<double>(ExecIrTokens->defaultTx);
+    builder.InputAttribute<double>(ExecIrTokens->defaultTy);
+    builder.InputAttribute<double>(ExecIrTokens->defaultTz);
+    builder.InputAttribute<double>(ExecIrTokens->defaultRx);
+    builder.InputAttribute<double>(ExecIrTokens->defaultRy);
+    builder.InputAttribute<double>(ExecIrTokens->defaultRz);
+    builder.InputAttribute<GfMatrix4d>(ExecIrTokens->defaultSpace);
 
     // Compute default:space by taking the offsets defined by the default
     // scalars and combining them with the parent default space.
@@ -135,19 +135,19 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrTransformable)
     // default scaling for a character, to make variants, or to set a more
     // natural starting place for animation controls. Default space combines the
     // effect of that local transform with the rest space offset.
-    self.AttributeExpression(ExecIrTransformableTokens->defaultSpace)
+    self.AttributeExpression(ExecIrTokens->defaultSpace)
         .Inputs(
             Prim().Computation<GfMatrix4d>(_tokens->defaultTransRotOffsetXf),
             Prim().Computation<GfMatrix4d>(_tokens->localRestXf),
             Prim().AttributeValue<GfMatrix4d>(
-                ExecIrTransformableTokens->parentDefaultSpace))
+                ExecIrTokens->parentDefaultSpace))
         .Callback(+[](const VdfContext &ctx) -> GfMatrix4d {
             return ExecIr_ComputeDefaultSpace(
                 ctx.GetInputValue<GfMatrix4d>(_tokens->defaultTransRotOffsetXf),
                 GfMatrix4d(1), // defaultScaleXf
                 ctx.GetInputValue<GfMatrix4d>(_tokens->localRestXf),
                 ctx.GetInputValue<GfMatrix4d>(
-                    ExecIrTransformableTokens->parentDefaultSpace));
+                    ExecIrTokens->parentDefaultSpace));
         });
 
     // The defaultTransRotOffsetXf computation represents the local authored
@@ -156,22 +156,22 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrTransformable)
     // will be applied to rest space, which already incorporates handedness.
     self.PrimComputation(_tokens->defaultTransRotOffsetXf)
         .Inputs(
-            AttributeValue<double>(ExecIrTransformableTokens->defaultTx),
-            AttributeValue<double>(ExecIrTransformableTokens->defaultTy),
-            AttributeValue<double>(ExecIrTransformableTokens->defaultTz),
-            AttributeValue<double>(ExecIrTransformableTokens->defaultRx),
-            AttributeValue<double>(ExecIrTransformableTokens->defaultRy),
-            AttributeValue<double>(ExecIrTransformableTokens->defaultRz))
+            AttributeValue<double>(ExecIrTokens->defaultTx),
+            AttributeValue<double>(ExecIrTokens->defaultTy),
+            AttributeValue<double>(ExecIrTokens->defaultTz),
+            AttributeValue<double>(ExecIrTokens->defaultRx),
+            AttributeValue<double>(ExecIrTokens->defaultRy),
+            AttributeValue<double>(ExecIrTokens->defaultRz))
         .Callback(+[](const VdfContext &ctx) {
             return ExecIr_ComputeLocalXf(
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->defaultTx),
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->defaultTy),
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->defaultTz),
+                ctx.GetInputValue<double>(ExecIrTokens->defaultTx),
+                ctx.GetInputValue<double>(ExecIrTokens->defaultTy),
+                ctx.GetInputValue<double>(ExecIrTokens->defaultTz),
                 0.0, // rSpin
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->defaultRx),
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->defaultRy),
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->defaultRz),
-                ExecIrRotationOrderTokens->XYZ,
+                ctx.GetInputValue<double>(ExecIrTokens->defaultRx),
+                ctx.GetInputValue<double>(ExecIrTokens->defaultRy),
+                ctx.GetInputValue<double>(ExecIrTokens->defaultRz),
+                ExecIrTokens->XYZ,
                 ctx);
         });
 
@@ -183,7 +183,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrTransformable)
     // combines the effect of the restTx/y/z/... attributes to yield a local
     // transform. restSpace inherits from the transform parent. The connected
     // value is orthonormalized.
-    self.AttributeExpression(ExecIrTransformableTokens->restSpace)
+    self.AttributeExpression(ExecIrTokens->restSpace)
         .Inputs(
             Prim().Computation<GfMatrix4d>(_tokens->restTransRotOffsetXf),
             Prim().Computation<GfMatrix4d>(_tokens->parentRestSpace))
@@ -197,34 +197,34 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrTransformable)
     // values of the rest space scalars.
     self.PrimComputation(_tokens->restTransRotOffsetXf)
         .Inputs(
-            AttributeValue<double>(ExecIrTransformableTokens->restTx),
-            AttributeValue<double>(ExecIrTransformableTokens->restTy),
-            AttributeValue<double>(ExecIrTransformableTokens->restTz),
-            AttributeValue<double>(ExecIrTransformableTokens->restRx),
-            AttributeValue<double>(ExecIrTransformableTokens->restRy),
-            AttributeValue<double>(ExecIrTransformableTokens->restRz))
+            AttributeValue<double>(ExecIrTokens->restTx),
+            AttributeValue<double>(ExecIrTokens->restTy),
+            AttributeValue<double>(ExecIrTokens->restTz),
+            AttributeValue<double>(ExecIrTokens->restRx),
+            AttributeValue<double>(ExecIrTokens->restRy),
+            AttributeValue<double>(ExecIrTokens->restRz))
         .Callback(+[](const VdfContext &ctx) {
             return ExecIr_ComputeLocalXf(
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->restTx),
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->restTy),
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->restTz),
+                ctx.GetInputValue<double>(ExecIrTokens->restTx),
+                ctx.GetInputValue<double>(ExecIrTokens->restTy),
+                ctx.GetInputValue<double>(ExecIrTokens->restTz),
                 0.0, // rSpin
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->restRx),
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->restRy),
-                ctx.GetInputValue<double>(ExecIrTransformableTokens->restRz),
-                ExecIrRotationOrderTokens->XYZ,
+                ctx.GetInputValue<double>(ExecIrTokens->restRx),
+                ctx.GetInputValue<double>(ExecIrTokens->restRy),
+                ctx.GetInputValue<double>(ExecIrTokens->restRz),
+                ExecIrTokens->XYZ,
                 ctx);
         });
 
     // Compute local transform that defines the delta from the parent.
     self.PrimComputation(_tokens->localRestXf)
         .Inputs(
-            AttributeValue<GfMatrix4d>(ExecIrTransformableTokens->restSpace),
+            AttributeValue<GfMatrix4d>(ExecIrTokens->restSpace),
             Computation<GfMatrix4d>(_tokens->parentRestSpace))
         .Callback(+[](const VdfContext &ctx) {
             return
                 ctx.GetInputValue<GfMatrix4d>(
-                    ExecIrTransformableTokens->restSpace) *
+                    ExecIrTokens->restSpace) *
                 ctx.GetInputValue<GfMatrix4d>(
                     _tokens->parentRestSpace).GetInverse();
         });
@@ -234,17 +234,17 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrTransformable)
     builder.InheritedTransformationComputation(
         _tokens->parentRestSpace,
         _tokens->computedRestSpace,
-        ExecIrTransformableTokens->restSpace);
+        ExecIrTokens->restSpace);
 
-    builder.OutputAttribute<GfMatrix4d>(ExecIrTransformableTokens->posedSpace);
+    builder.OutputAttribute<GfMatrix4d>(ExecIrTokens->posedSpace);
     builder.OutputAttribute<GfMatrix4d>(
-        ExecIrTransformableTokens->posedDefaultSpace);
+        ExecIrTokens->posedDefaultSpace);
     
-    builder.InputAttribute<GfMatrix4d>(ExecIrTransformableTokens->parentSpace);
+    builder.InputAttribute<GfMatrix4d>(ExecIrTokens->parentSpace);
     builder.InputAttribute<GfMatrix4d>(
-        ExecIrTransformableTokens->parentDefaultSpace);
+        ExecIrTokens->parentDefaultSpace);
 
-    self.AttributeExpression(ExecIrTransformableTokens->parentDefaultSpace)
+    self.AttributeExpression(ExecIrTokens->parentDefaultSpace)
         .Inputs(Prim().Computation<GfMatrix4d>(_tokens->parentDefaultSpace))
         .Callback(+[](const VdfContext &ctx) -> GfMatrix4d {
             return ctx.GetInputValue<GfMatrix4d>(_tokens->parentDefaultSpace);
@@ -255,7 +255,7 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(ExecIrTransformable)
     builder.InheritedTransformationComputation(
         _tokens->parentDefaultSpace,
         _tokens->computedDefaultSpace,
-        ExecIrTransformableTokens->defaultSpace);
+        ExecIrTokens->defaultSpace);
 }
 
 template <typename ValueType>
@@ -269,20 +269,17 @@ _Builder::InputAttribute(const TfToken &attributeName)
     // there is exactly one desired value present. Otherwise, no value is
     // returned. An error is emitted if more than one desired value is present.
     _self.AttributeComputation(
-        attributeName, ExecIrComputationTokens->computeDesiredValue)
+        attributeName, ExecIrComputations->computeDesiredValue)
         .Callback<ValueType>(&_GetExactlyOneDesiredValue<ValueType>)
         .Inputs(
             IncomingConnections<ValueType>(
-                ExecIrComputationTokens->computeDesiredValue));
+                ExecIrComputations->computeDesiredValue));
 }
 
 template <typename ValueType>
 void
 _Builder::OutputAttribute(const TfToken &attributeName)
 {
-    // Output attributes support dataflow across connections.
-    _ConnectionDataflowExpression<ValueType>(attributeName);
-
     // Output attributes support computing desired values, for inversion.
     _DesiredValueComputations<ValueType>(attributeName);
 }
@@ -307,8 +304,8 @@ _Builder::InheritedTransformationComputation(
             ctx.SetOutput(valuePtr ? *valuePtr : GfMatrix4d(1));
         });
 
-    // Define an ancestorComputationName computation for all IrTransformable
-    // prims that returns the value of the attribute with the name given by
+    // Define an ancestorComputationName computation for all IrXformable prims
+    // that returns the value of the attribute with the name given by
     // spaceAttributeName.
     _self.PrimComputation(ancestorComputationName)
         .Inputs(AttributeValue<GfMatrix4d>(spaceAttributeName))

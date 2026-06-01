@@ -14,7 +14,7 @@ if (PXR_BUILD_EXEC)
         adapterRegistry
         debugCodes
         geomXformablePrimAdapter
-        irTransformablePrimAdapter
+        irXformablePrimAdapter
         request
         requestBuilder
         stageSceneIndex)

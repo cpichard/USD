@@ -1143,6 +1143,29 @@ pxr_register_test(testUsdImagingGLInstancing_SceneIndex_pi_ni_xform
     TESTENV testenv/testUsdImagingGLInstancing
 )
 
+pxr_register_test(testUsdImagingGLInstancing_SceneIndex_pi_outside
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -camera /main_cam -stage usd-12231/pi_outside.usda -write usd-12231/testUsdImagingGLInstancing_pi_outside.png"
+    IMAGE_DIFF_COMPARE
+        usd-12231/testUsdImagingGLInstancing_pi_outside.png
+    FAIL 0.01
+    FAIL_PERCENT 0.01
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testUsdImagingGLInstancing
+)
+
+
+# Disabled for now because of a bug in usdImaging 2.0.
+#
+#pxr_register_test(testUsdImagingGLInstancing_SceneIndex_ni_pi_outside
+#    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -camera /main_cam -stage usd-12231/ni_pi_outside.usda -write usd-12231/testUsdImagingGLInstancing_ni_pi_outside.png"
+#    IMAGE_DIFF_COMPARE
+#        usd-12231/testUsdImagingGLInstancing_ni_pi_outside.png
+#    FAIL 0.01
+#    FAIL_PERCENT 0.01
+#    EXPECTED_RETURN_CODE 0
+#    TESTENV testenv/testUsdImagingGLInstancing
+#)
+
 pxr_register_test(testUsdImagingGLPickAndHighlight
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLPickAndHighlight -offscreen -frameAll -stage instance.usda -write testUsdImagingGLPickAndHighlight.png"
     IMAGE_DIFF_COMPARE
@@ -4524,6 +4547,30 @@ pxr_register_test(testUsdImagingGLTextureResync
     FAIL_PERCENT .001
     EXPECTED_RETURN_CODE 0
     TESTENV testenv/testUsdImagingGLTextureResync)
+
+pxr_register_test(testUsdImagingGLOIT
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -camlight -frameAll -camera /Root/FrontCamera -stage scene.usda -write testUsdImagingGLOIT.png"
+    IMAGE_DIFF_COMPARE
+        testUsdImagingGLOIT.png
+    FAIL 0.008
+    FAIL_PERCENT 0.001
+    WARN 0.005
+    WARN_PERCENT 0.0005
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testUsdImagingGLOIT)
+
+pxr_register_test(testUsdImagingGLOITPacked
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -camlight -frameAll -camera /Root/FrontCamera -stage scene.usda -write testUsdImagingGLOIT.png"
+    IMAGE_DIFF_COMPARE
+        testUsdImagingGLOIT.png
+    FAIL 0.008
+    FAIL_PERCENT 0.001
+    WARN 0.004
+    WARN_PERCENT 0.0005
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testUsdImagingGLOIT
+    ENV
+        HDX_ENABLE_OIT_PACKED_DATA=1)
 
 #
 # Conditionally install and register MaterialX tests

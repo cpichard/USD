@@ -6,6 +6,7 @@
 //
 #include "pxr/pxr.h"
 
+#include "pxr/exec/execIr/computations.h"
 #include "pxr/exec/execIr/controllerBuilder.h"
 #include "pxr/exec/execIr/types.h"
 
@@ -197,14 +198,14 @@ Test_BasicInverseCompute()
 
     ExecUsdSystem execSystem(usdStage);
     const ExecUsdRequest request = execSystem.BuildRequest({
-        ExecUsdValueKey{input, ExecIrComputationTokens->computeDesiredValue}
+        ExecUsdValueKey{input, ExecIrComputations->computeDesiredValue}
     });
     TF_AXIOM(request.IsValid());
 
     // Compute the input value that produces a given desired output value.
     {
         ExecUsdValueOverrideVector overrides {
-            {{output, ExecIrComputationTokens->explicitDesiredValue},
+            {{output, ExecIrComputations->explicitDesiredValue},
              VtValue(10.0)}
         };
         ExecUsdCacheView cache = execSystem.ComputeWithOverrides(
@@ -216,7 +217,7 @@ Test_BasicInverseCompute()
     // Compute again with a different desired output value.
     {
         ExecUsdValueOverrideVector overrides {
-            {{output, ExecIrComputationTokens->explicitDesiredValue},
+            {{output, ExecIrComputations->explicitDesiredValue},
              VtValue(3.0)}
         };
         ExecUsdCacheView cache = execSystem.ComputeWithOverrides(
@@ -349,12 +350,12 @@ Test_InvertThroughMultiple()
     {
         const ExecUsdRequest desiredValueRequest = execSystem.BuildRequest({
             ExecUsdValueKey{
-                input, ExecIrComputationTokens->computeDesiredValue}
+                input, ExecIrComputations->computeDesiredValue}
         });
         TF_AXIOM(desiredValueRequest.IsValid());
 
         ExecUsdValueOverrideVector overrides {
-            {{output, ExecIrComputationTokens->explicitDesiredValue},
+            {{output, ExecIrComputations->explicitDesiredValue},
              VtValue(desiredOutputValue)}
         };
         ExecUsdCacheView cache = execSystem.ComputeWithOverrides(
@@ -443,14 +444,14 @@ Test_ConflictingGoals()
 
         const ExecUsdRequest request = execSystem.BuildRequest({
             ExecUsdValueKey{
-                input, ExecIrComputationTokens->computeDesiredValue}
+                input, ExecIrComputations->computeDesiredValue}
             });
         TF_AXIOM(request.IsValid());
 
         const double desiredOutputValue = 10.0;
 
         ExecUsdValueOverrideVector overrides {
-            {{output1, ExecIrComputationTokens->explicitDesiredValue},
+            {{output1, ExecIrComputations->explicitDesiredValue},
              VtValue(desiredOutputValue)},
         };
 
@@ -468,7 +469,7 @@ Test_ConflictingGoals()
 
         const ExecUsdRequest request = execSystem.BuildRequest({
             ExecUsdValueKey{
-                input, ExecIrComputationTokens->computeDesiredValue}
+                input, ExecIrComputations->computeDesiredValue}
             });
         TF_AXIOM(request.IsValid());
 
@@ -476,9 +477,9 @@ Test_ConflictingGoals()
         const double desiredOutputValue2 = 20.0;
 
         ExecUsdValueOverrideVector overrides {
-            {{output1, ExecIrComputationTokens->explicitDesiredValue},
+            {{output1, ExecIrComputations->explicitDesiredValue},
              VtValue(desiredOutputValue1)},
-            {{output2, ExecIrComputationTokens->explicitDesiredValue},
+            {{output2, ExecIrComputations->explicitDesiredValue},
              VtValue(desiredOutputValue2)}
         };
 
@@ -510,7 +511,7 @@ Test_ConflictingGoals()
 
         const ExecUsdRequest request = execSystem.BuildRequest({
             ExecUsdValueKey{
-                input, ExecIrComputationTokens->computeDesiredValue}
+                input, ExecIrComputations->computeDesiredValue}
             });
         TF_AXIOM(request.IsValid());
 
@@ -518,9 +519,9 @@ Test_ConflictingGoals()
         const double desiredOutputValue2 = 20.0;
 
         ExecUsdValueOverrideVector overrides {
-            {{output1, ExecIrComputationTokens->explicitDesiredValue},
+            {{output1, ExecIrComputations->explicitDesiredValue},
              VtValue(desiredOutputValue1)},
-            {{outputC1, ExecIrComputationTokens->explicitDesiredValue},
+            {{outputC1, ExecIrComputations->explicitDesiredValue},
              VtValue(desiredOutputValue2)}
         };
 
@@ -610,16 +611,16 @@ Test_DependentControllers()
     {
         const ExecUsdRequest desiredValueRequest = execSystem.BuildRequest({
             ExecUsdValueKey{
-                input1, ExecIrComputationTokens->computeDesiredValue},
+                input1, ExecIrComputations->computeDesiredValue},
             ExecUsdValueKey{
-                input2, ExecIrComputationTokens->computeDesiredValue}
+                input2, ExecIrComputations->computeDesiredValue}
         });
         TF_AXIOM(desiredValueRequest.IsValid());
 
         ExecUsdValueOverrideVector overrides {
-            {{output1, ExecIrComputationTokens->explicitDesiredValue},
+            {{output1, ExecIrComputations->explicitDesiredValue},
              VtValue(desiredOutput1Value)},
-            {{output2, ExecIrComputationTokens->explicitDesiredValue},
+            {{output2, ExecIrComputations->explicitDesiredValue},
              VtValue(desiredOutput2Value)}
         };
         ExecUsdCacheView cache = execSystem.ComputeWithOverrides(
@@ -772,9 +773,9 @@ Test_NonSpanningController()
     {
         const ExecUsdRequest desiredValueRequest = execSystem.BuildRequest({
             ExecUsdValueKey{
-                input1, ExecIrComputationTokens->computeDesiredValue},
+                input1, ExecIrComputations->computeDesiredValue},
             ExecUsdValueKey{
-                input2, ExecIrComputationTokens->computeDesiredValue}
+                input2, ExecIrComputations->computeDesiredValue}
         });
         TF_AXIOM(desiredValueRequest.IsValid());
 
@@ -783,9 +784,9 @@ Test_NonSpanningController()
         // non-spanning controller and that don't match those currently produced
         // by the authored scene.
         ExecUsdValueOverrideVector overrides {
-            {{output1, ExecIrComputationTokens->explicitDesiredValue},
+            {{output1, ExecIrComputations->explicitDesiredValue},
              VtValue(20.0)},
-            {{output2, ExecIrComputationTokens->explicitDesiredValue},
+            {{output2, ExecIrComputations->explicitDesiredValue},
              VtValue(30.0)}
         };
         ExecUsdCacheView cache = execSystem.ComputeWithOverrides(

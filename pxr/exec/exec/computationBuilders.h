@@ -1983,6 +1983,11 @@ Exec_ComputationBuilderCRTPBase<Derived>::Callback(
             const std::remove_reference_t<FuncType>, const VdfContext&>,
         "Callback function object must have const function call operator.");
 
+    static_assert(
+        !std::is_void_v<ResultType>,
+        "The ResultType template parameter cannot be void, as this indicates "
+        "the value type of the result produced by the computation.");
+
     // The callback's return type must be void because any returned value
     // will be ignored.
     static_assert(
