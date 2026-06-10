@@ -352,7 +352,11 @@ public:
 
     // Checks whether render param was successfully initialized.
     // ie. riley was created
+#if HD_API_VERSION >= 81
     bool IsValid() const override;
+#else
+    bool IsValid() const;
+#endif
 
     // Creates displays in riley based on aovBindings vector together
     // with HdPrmanFramebuffer to transfer the result between the
@@ -495,9 +499,11 @@ public:
     bool SetArbitraryValue(const TfToken& key, const VtValue& value) override;
 #endif
 
+#if PXR_VERSION >= 2308
     // Return the id map product name (ri:productType=idMap) in the provided
     // provided render settings. Returns an empty token if not found.
     static TfToken GetIdMapProductName(HdPrman_RenderSettings* renderSettings);
+#endif
 
 private:
     void _CreateStatsSession();

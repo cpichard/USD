@@ -11,12 +11,16 @@
 #include "pxr/imaging/hd/sceneIndexPrimView.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
 #include "pxr/imaging/hd/tokens.h"
-#include "pxr/base/trace/trace.h" 
+#include "pxr/base/trace/trace.h"
 #include "pxr/base/tf/stackTrace.h"
 
 #include <optional>
 
 PXR_NAMESPACE_OPEN_SCOPE
+
+TF_DEFINE_ENV_SETTING(USDIMAGING_CORRECT_PROXY_PATH_TRANSLATION, true,
+                      "Translates certain proxy paths in Usd Imaging correctly "
+                      "which is, however, expensive.");
 
 namespace UsdImaging_InstanceProxyPathTranslationSceneIndexImpl {
 
@@ -25,7 +29,7 @@ struct Data
 public:
     Data(TfTokenVector const& proxyPathDataSourceNames)
         : _proxyPathDataSourceNames(proxyPathDataSourceNames) {}
-    
+
     bool
     ShouldTranslatePathsForDataSourceName(TfToken const& name) const
     {
@@ -72,7 +76,7 @@ _GetPrototypePath(
     const HdSceneIndexPrim instancerPrim = sceneIndex->GetPrim(instancerPath);
     HdInstancerTopologySchema instancerTopologySchema =
         HdInstancerTopologySchema::GetFromParent(instancerPrim.dataSource);
-    
+
     if (HdPathArrayDataSourceHandle protoPathsDs =
             instancerTopologySchema.GetPrototypes()) {
 
@@ -85,13 +89,75 @@ _GetPrototypePath(
     return {};
 }
 
+bool
+_IsValid(const HdSceneIndexPrim &prim)
+{
+    return !prim.primType.IsEmpty() || prim.dataSource;
+}
+
+// Suffers from USD-12141, USD-12143, HYD-3681
 SdfPath
-_TranslatePath(
+_OldTranslatePath(
     SdfPath const& path,
     HdSceneIndexBaseConstRefPtr const& sceneIndex)
 {
     TRACE_FUNCTION();
 
+    // Don't translate a path to a valid scene index prim.
+    // We do this for two reasons:
+    // 1. Avoid querying the scene index at each path prefix for the general
+    //    case where the prim is not a descendant of an instance prim.
+    // 2. To not incorrectly translate an instance prim path to its
+    //    prototype path. We want to do this only for *descendant* paths of
+    //    instance prims that don't have a corresponding prim in the scene
+    //    index.
+    //
+    const HdSceneIndexPrim prim = sceneIndex->GetPrim(path);
+    if (_IsValid(prim)) {
+        return path;
+    }
+
+    // Iterate over the prefixes, adding the terminal path element of each
+    // prefix and checking if the prim at the resulting path is an instance.
+    // If it is, replace the result with the prototype path of the instance and
+    // continue iterating over the prefixes.
+    //
+    SdfPath result = SdfPath::AbsoluteRootPath();
+
+    for (SdfPath const& p: path.GetPrefixes()) {
+        result = result.AppendChild(p.GetNameToken());
+
+        const HdInstanceSchema instanceSchema =
+            HdInstanceSchema::GetFromParent(
+                sceneIndex->GetPrim(result).dataSource);
+
+        if (const std::optional<SdfPath> prototypePath =
+                _GetPrototypePath(instanceSchema, sceneIndex)) {
+            result = *prototypePath;
+        }
+    }
+
+    return result;
+}
+
+// Correct implementation, but performance problem reported in HYD-3687.
+SdfPath
+_NewTranslatePath(
+    SdfPath const& path,
+    HdSceneIndexBaseConstRefPtr const& sceneIndex)
+{
+    TRACE_FUNCTION();
+
+    // Translate paths identifying instance proxy prims to identify
+    // the corresponding descendant of the prototype:
+    //
+    // - Walk up path ancestors, stopping if we see a defined prim
+    // - For each non-defined prim ancestor, check for an HdInstanceSchema
+    //   indicating that this is an instance proxy prim
+    // - If an instance proxy is found, consult the instance schema's
+    //   prototype path, and prefix-replace the instance root with the
+    //   prototype root
+    //
     // If the provided path refers to a valid scene index prim, no
     // further translation is required:
     // - In the case where the path is not a descendant of an instance
@@ -111,17 +177,23 @@ _TranslatePath(
         for (SdfPath const& ancestorPath : result.GetAncestorsRange()) {
             if (HdSceneIndexPrim ancestor = sceneIndex->GetPrim(ancestorPath);
                 ancestor.IsDefined()) {
-                HdInstanceSchema instanceSchema = 
+                HdInstanceSchema instanceSchema =
                     HdInstanceSchema::GetFromParent(ancestor.dataSource);
                 // If the ancestor has an instanceSchema that provides a new
                 // prototype path, replace the prefix of our working path and
                 // start the loop again with this new path.
                 if (const std::optional<SdfPath> prototypePath =
                         _GetPrototypePath(instanceSchema, sceneIndex)) {
-                    result = result.ReplacePrefix(
-                        ancestorPath, *prototypePath);
-                    loopAgain = true;
-                    break;
+                    // Guard against scenarios where the prototype is
+                    // a descendant of the instance.  This scenario
+                    // has been observed when point instancers use
+                    // native-instanced prototypes; see PRES-102132.
+                    if (!prototypePath->HasPrefix(ancestorPath)) {
+                        result = result.ReplacePrefix(
+                            ancestorPath, *prototypePath);
+                        loopAgain = true;
+                        break;
+                    }
                 }
             }
         }
@@ -138,6 +210,20 @@ _TranslatePath(
     }
 
     return result;
+}
+
+SdfPath
+_TranslatePath(
+    SdfPath const& path,
+    HdSceneIndexBaseConstRefPtr const& sceneIndex)
+{
+    static const bool r =
+        TfGetEnvSetting(USDIMAGING_CORRECT_PROXY_PATH_TRANSLATION);
+    if (r) {
+        return _NewTranslatePath(path, sceneIndex);
+    } else {
+        return _OldTranslatePath(path, sceneIndex);
+    }
 }
 
 // Data source that recursively wraps data sources to apply path translation,
@@ -240,7 +326,7 @@ _TranslateDataSource(
 {
     // Translate SdfPath-valued data sources.
     if (auto pathDs = HdPathDataSource::Cast(ds)) {
-        SdfPath path = pathDs->GetTypedValue(0.0); 
+        SdfPath path = pathDs->GetTypedValue(0.0);
         return HdRetainedTypedSampledDataSource<SdfPath>
             ::New(_TranslatePath(path, si));
     }

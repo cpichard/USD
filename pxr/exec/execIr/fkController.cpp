@@ -17,7 +17,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 TF_REGISTRY_FUNCTION(TfType)
 {
     TfType::Define<ExecIrFkController,
-        TfType::Bases< ExecIrIrController > >();
+        TfType::Bases< ExecIrController > >();
     
     // Register the usd prim typename as an alias under UsdSchemaBase. This
     // enables one to call
@@ -340,7 +340,7 @@ ExecIrFkController::GetSchemaAttributeNames(bool includeInherited)
     };
     static TfTokenVector allNames =
         _ConcatenateAttributeNames(
-            ExecIrIrController::GetSchemaAttributeNames(true),
+            ExecIrController::GetSchemaAttributeNames(true),
             localNames);
 
     if (includeInherited)

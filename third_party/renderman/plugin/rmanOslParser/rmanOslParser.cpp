@@ -365,7 +365,9 @@ RmanOslParserPlugin::_getSdrContextFromSchemaBase(
     std::string schemaBase = metaIt->second;
 
     static const std::unordered_map<TfToken, TfToken, TfHash> contextMapping({
+#if PXR_VERSION >= 2308
         { TfToken("displayfilter"), SdrNodeContext->DisplayFilter },
+#endif
         { TfToken("lightfilter"), SdrNodeContext->LightFilter },
         { TfToken("samplefilter"), SdrNodeContext->SampleFilter },
         { TfToken("integrator"), TfToken("integrator")},

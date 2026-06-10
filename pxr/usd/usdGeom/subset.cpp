@@ -547,9 +547,6 @@ _GetElementCountAtTime(
                 *isCountTimeVarying = tviAttr.ValueMightBeTimeVarying();
             }
         }
-    } else {
-        TF_CODING_ERROR("Unsupported element type '%s'.",
-                        elementType.GetText());
     }
 
     return elementCount;
@@ -560,25 +557,17 @@ static bool _ValidateGeomType(const UsdGeomImageable &geom, const TfToken &eleme
     if (prim.IsA<UsdGeomMesh>()) {
         if (elementType != UsdGeomTokens->face && elementType != UsdGeomTokens->point 
             && elementType != UsdGeomTokens->edge) {
-            TF_CODING_ERROR("Unsupported element type '%s' for prim type Mesh.",
-                            elementType.GetText());
             return false;
         }
     } else if (prim.IsA<UsdGeomTetMesh>()) {
         if (elementType != UsdGeomTokens->face && elementType != UsdGeomTokens->tetrahedron) {
-            TF_CODING_ERROR("Unsupported element type '%s' for prim type TetMesh.",
-                            elementType.GetText());
             return false;
         }
     } else if (prim.IsA<UsdGeomBasisCurves>()) {
         if (elementType != UsdGeomTokens->segment) {
-            TF_CODING_ERROR("Unsupported element type '%s' for prim type BasisCurves.",
-                            elementType.GetText());
             return false;
         }
     } else {
-        TF_CODING_ERROR("Unsupported prim type '%s'.",
-                        elementType.GetText());
         return false;
     }
     return true;
@@ -615,6 +604,8 @@ UsdGeomSubset::GetUnassignedIndices(
 {
     VtIntArray result;
     if (!_ValidateGeomType(geom, elementType)) {
+        TF_CODING_ERROR("Invalid geom type for elementType %s.",
+                        elementType.GetText());
         return result;
     }
 
@@ -858,8 +849,10 @@ UsdGeomSubset::ValidateFamily(
     std::string * const reason)
 {
     if (!_ValidateGeomType(geom, elementType)) {
-        *reason += TfStringPrintf("Invalid geom type for elementType %s.",
-                elementType.GetText());
+        if (reason) {
+            *reason += TfStringPrintf("Invalid geom type for elementType %s.",
+                    elementType.GetText());
+        }
         return false;
     }
 

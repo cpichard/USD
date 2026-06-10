@@ -39,12 +39,13 @@ class SdfAssetPath;
 /// A concrete typed schema that represents the joint of an armature-based
 /// model.
 /// 
-/// The base schema IrXformable defines the behavior; this schema exists mainly
-/// so we can specialize drawing of guides, etc. In the future, other concrete
-/// schemas will also extend IrXformable.
+/// @warning
+/// The functionality provided by this schema is very limited, subject to
+/// change, and not yet ready for production use.
 /// 
-/// Note: The functionality provided by this schema is extremely limited,
-/// subject to change, and not yet ready for production use.
+/// See the base schema ExecIrXformable for the properties and behavior that
+/// this schema provides; this schema exists mainly so we can specialize drawing
+/// of guides.
 /// 
 ///
 class ExecIrJointScope : public ExecIrXformable

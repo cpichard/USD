@@ -375,10 +375,10 @@ pxr_register_test(testPcpMuseum_BasicVariantWithConnections
 
 pxr_register_test(testPcpMuseum_BasicVariantWithReference
     PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults --usd BasicVariantWithReference/root.usda" 
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults --usd --errorFile compositionErrors_BasicVariantWithReference.txt BasicVariantWithReference/root.usda" 
     TESTENV testenv/testPcpMuseum_BasicVariantWithReference.testenv
     STDOUT_REDIRECT compositionResults_BasicVariantWithReference.txt
-    DIFF_COMPARE compositionResults_BasicVariantWithReference.txt 
+    DIFF_COMPARE compositionResults_BasicVariantWithReference.txt compositionErrors_BasicVariantWithReference.txt 
 )
 
 pxr_register_test(testPcpMuseum_BasicOwner
@@ -1399,6 +1399,14 @@ pxr_register_test(testPcpMuseum_ErrorRelocateWithVariantSelection
     DIFF_COMPARE compositionResults_ErrorRelocateWithVariantSelection.txt compositionErrors_ErrorRelocateWithVariantSelection.txt
     ENV 
         SDF_SCHEMA_PROHIBIT_INVALID_VARIANT_SELECTIONS=0
+)
+
+pxr_register_test(testPcpMuseum_VariantSelectionsInVariantsOrder
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpCompositionResults --usd VariantSelectionsInVariantsOrder/root.usda" 
+    TESTENV testenv/testPcpMuseum_VariantSelectionsInVariantsOrder.testenv
+    STDOUT_REDIRECT compositionResults_VariantSelectionsInVariantsOrder.txt
+    DIFF_COMPARE compositionResults_VariantSelectionsInVariantsOrder.txt
 )
 
 pxr_register_test(testPcpMuseum_VariantSpecializesAndReferenceSurprisingBehavior

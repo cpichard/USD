@@ -267,7 +267,7 @@ struct ExecIrTokensType {
     const TfToken ZYX;
     /// \brief "IrController"
     /// 
-    /// Schema identifer and family for ExecIrIrController
+    /// Schema identifer and family for ExecIrController
     const TfToken IrController;
     /// \brief "IrFkController"
     /// 

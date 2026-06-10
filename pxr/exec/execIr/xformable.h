@@ -39,27 +39,46 @@ class SdfAssetPath;
 /// An abstract schema that provides an animation interface for an animatable
 /// coordinate space.
 /// 
-/// IrXformable defines rest, default, and posed spaces, along with a group of
-/// animation avars that can feed into controllers for posing.
+/// @warning
+/// The functionality provided by this schema is very limited, subject to
+/// change, and not yet ready for production use.
 /// 
-/// restSpace - A world space transform representing the position of the
-/// transformable object "at rest" -- generally meaning before any posing has
-/// happened. This can be thought of as a 'bind pose' for deformation.
+/// ExecIrXformable defines scalar avars that produce rest and default spaces
+/// that are meant to be fed into a controller that computes a posed space that
+/// feeds back into the IrXformable posed space attribute. In this way,
+/// ExecIrXformable%s act as the interface for a controller network, providing
+/// the input avars where animation is authored and the resulting computed
+/// outputs that can be used to drive model posing.
+/// 
+/// # Spaces
+/// 
+/// **Rest Space**: A local-to-world space transform representing the position
+/// of the transformable object "at rest," generally meaning before any posing
+/// has happened. This can be thought of as a "bind pose" for deformation.
 /// Deformations use the local difference between restSpace and posedSpace to
-/// deform the model. Note that restSpace is always orthonormalized.
+/// deform the model. Note that rest space is always orthonormalized.
 /// 
-/// defaultSpace - A world space transform that represents the "zero" position
-/// for posing. This may be different from the rest pose in order to provide
-/// default scaling for a character, to make variants, or to set a more natural
-/// starting place for animation controls. The defaultSpace is passed to
-/// controllers to be used as the 'start pose'.
+/// **Default Space**: A local-to-world space transform that represents the
+/// "zero" position for posing. This may be different from the rest pose in
+/// order to provide default scaling for a character, to make variants, or to
+/// set a more natural starting place for animation controls. The default space
+/// is passed to controllers to be used as the 'start pose'.
 /// 
-/// posedSpace - The final world space transform, after posing. This is
+/// **Posed Space**: The final world space transform, after posing. This is
 /// generally the computed result of some set of controllers that define the
 /// pose (IK, FK, etc.).
 /// 
-/// Note: The functionality here is extremely limited, subject to change, and
-/// not yet ready for production use.
+/// # Connecting to controllers
+/// 
+/// The intended use is for an ExecIrXformable to be posed by one or more
+/// ExecIrController%s that compute its posed space. One or more
+/// ExecIrController%s connect to one or more of the avars in the 'avars'
+/// namespace, compute a posed space, and then supply that to the 'posed:space'
+/// attribute. Note that without an external controller, the avars under the
+/// 'avars:' namespace don't do anything. In that case, the ExecIrXformable will
+/// fall back to following the parent's posed space (including the local rest
+/// and default offsets).
+/// 
 /// 
 ///
 /// For any described attribute \em Fallback \em Value or \em Allowed \em Values below
@@ -273,6 +292,13 @@ public:
     // RESTSPACE 
     // --------------------------------------------------------------------- //
     /// 
+    /// A local-to-world space transform representing the position of this
+    /// object before any posing has happened.
+    /// 
+    /// The value combines the effect of the scalar 'rest:' attributes to yield
+    /// a local transform. Rest space inherits from the nearest ExecIrXformable
+    /// or UsdGeomXformable namespace ancestor.
+    /// 
     ///
     /// | ||
     /// | -- | -- |
@@ -427,6 +453,14 @@ public:
     // DEFAULTSPACE 
     // --------------------------------------------------------------------- //
     /// 
+    /// A local-to-world space transform representing the "zero" position for
+    /// posing.
+    /// 
+    /// This may be different from rest space in order to provide default
+    /// scaling for a character, to make variants, or to set a more natural
+    /// starting place for animation controls. Combines the effect of the local
+    /// transform defined by the 'default:' scalars with the rest space offset.
+    /// 
     ///
     /// | ||
     /// | -- | -- |
@@ -470,6 +504,12 @@ public:
     // --------------------------------------------------------------------- //
     // POSEDDEFAULTSPACE 
     // --------------------------------------------------------------------- //
+    /// 
+    /// Default space as computed by the controller network.
+    /// 
+    /// This is almost always identical to 'default:space', except for unusual
+    /// cases where the control network wants to affect the default space (as in
+    /// re-rooting).
     /// 
     ///
     /// | ||
@@ -625,6 +665,8 @@ public:
     // AVARSRSPIN 
     // --------------------------------------------------------------------- //
     /// 
+    /// The rotation avar that gets zeroed out when solving for rotation values.
+    /// 
     ///
     /// | ||
     /// | -- | -- |
@@ -646,6 +688,12 @@ public:
     // --------------------------------------------------------------------- //
     // AVARSROTATIONORDER 
     // --------------------------------------------------------------------- //
+    /// 
+    /// The rotation order for computing the posed space from the scalar rotate
+    /// avars.
+    /// 
+    /// Note that this does not affect the rotation order for rest or default
+    /// space.
     /// 
     ///
     /// | ||
@@ -691,6 +739,11 @@ public:
     // --------------------------------------------------------------------- //
     // AVARSUNITSCALEFACTOR 
     // --------------------------------------------------------------------- //
+    /// 
+    /// Size of a canonical unit.
+    /// 
+    /// This value is used by various controllers to preserve scale independence.
+    /// For example, translating by 1.0 will move this far in world space.
     /// 
     ///
     /// | ||

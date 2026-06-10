@@ -138,7 +138,7 @@ void wrapExecIrFkController()
 {
     typedef ExecIrFkController This;
 
-    class_<This, bases<ExecIrIrController> >
+    class_<This, bases<ExecIrController> >
         cls("FkController");
 
     cls

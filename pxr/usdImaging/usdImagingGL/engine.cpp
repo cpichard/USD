@@ -1269,9 +1269,9 @@ UsdImagingGLEngine::TestIntersection(
 SdfPath
 UsdImagingGLEngine::_GetInstancerForPrim(const SdfPath &sceneIndexPath) const
 {
-    if (_GetTerminalSceneIndex()) {
+    if (HdSceneIndexBaseRefPtr terminalSceneIndex = _GetTerminalSceneIndex()) {
         const auto schema = HdInstancedBySchema::GetFromParent(
-            _GetTerminalSceneIndex()->GetPrim(sceneIndexPath).dataSource);
+            terminalSceneIndex->GetPrim(sceneIndexPath).dataSource);
         HdPathArrayDataSourceHandle const ds = schema.GetPaths();
         if (!ds) {
             return SdfPath();
@@ -1306,7 +1306,7 @@ UsdImagingGLEngine::TestIntersection(
 
     if (!_taskControllerSceneIndex) {
         TF_CODING_ERROR("No task controller scene index.");
-        return true;
+        return false;
     }
     
     TF_PY_ALLOW_THREADS_IN_SCOPE();

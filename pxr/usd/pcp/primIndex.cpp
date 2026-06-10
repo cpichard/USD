@@ -4217,6 +4217,31 @@ _ChooseBestFallbackAmongOptions(
     return std::string();
 }
 
+// Return true if the new node site could introduce variant selection opinions 
+// that would affect pending variant tasks. We check for direct variant
+// selections as well as any arc metadata (references, inherits, specializes,
+// payloads) that might transitively bring in selections through newly-added
+// nodes. Variant arcs whose sites do not bring in these composition
+// opinions will not affect pending variant tasks, so retrying variant tasks can
+// be skipped. Skipping can be a large performance gain when there a large
+// numbers of variants (and especially ancestral variants) composing a single
+// prim index.
+static bool
+_SiteMightIntroducePendingVariantSelections(
+    const PcpLayerStackSite &site)
+{   
+    for (const SdfLayerRefPtr &layer : site.layerStack->GetLayers()) {     
+        if (layer->HasField(site.path, SdfFieldKeys->VariantSelection) ||
+            layer->HasField(site.path, SdfFieldKeys->References) ||
+            layer->HasField(site.path, SdfFieldKeys->InheritPaths) ||
+            layer->HasField(site.path, SdfFieldKeys->Specializes) ||
+            layer->HasField(site.path, SdfFieldKeys->Payload)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static void
 _AddVariantArc(
     Pcp_PrimIndexer *indexer,
@@ -4228,7 +4253,9 @@ _AddVariantArc(
     // storage.  For this reason, the source site includes the
     // variant selection but the mapping function is identity.
     SdfPath varPath = node.GetSite().path.AppendVariantSelection(vset, vsel);
-    if (_AddArc(indexer, PcpArcTypeVariant,
+    const PcpLayerStackSite varSite(node.GetLayerStack(), varPath);
+    if (const PcpNodeRef varNode = _AddArc(
+                indexer, PcpArcTypeVariant,
                 /* parent = */ node,
                 /* origin = */ node,
                 PcpLayerStackSite( node.GetLayerStack(), varPath ),
@@ -4236,8 +4263,11 @@ _AddVariantArc(
                 /* arcSiblingNum = */ vsetNum)) {
         // If we expanded a variant set, it may have introduced new
         // authored variant selections, so we must retry any pending
-        // variant tasks as authored tasks.
-        indexer->RetryVariantTasks();
+        // variant tasks as authored tasks if there's a chance of new
+        // selections.
+        if (_SiteMightIntroducePendingVariantSelections(varSite)) {
+            indexer->RetryVariantTasks();
+        }
     }
 }
 
@@ -4248,8 +4278,10 @@ _AddAncestralVariantArc(
     const SdfPath &vsetPath,
     const std::string &vset, int vsetNum, const std::string &vsel)
 {
+    const SdfPath ancestralVarPath =
+        vsetPath.AppendVariantSelection(vset, vsel);
     const SdfPath varPath = node.GetPath().ReplacePrefix(
-        vsetPath, vsetPath.AppendVariantSelection(vset, vsel));
+        vsetPath, ancestralVarPath);
     const int namespaceDepth =
         PcpNode_GetNonVariantPathElementCount(vsetPath);
 
@@ -4280,18 +4312,32 @@ _AddAncestralVariantArc(
         return false;
     }();
 
-    if (_AddArc(indexer, PcpArcTypeVariant,
+    const PcpLayerStackSite varSite(node.GetLayerStack(), varPath);
+    if (const PcpNodeRef varNode = _AddArc(
+                indexer, PcpArcTypeVariant,
                 /* parent = */ node,
                 /* origin = */ node,
-                PcpLayerStackSite( node.GetLayerStack(), varPath ),
+                varSite,
                 /* mapExpression = */ PcpMapExpression::Identity(),
                 /* arcSiblingNum = */ vsetNum,
                 namespaceDepth,
                 opts)) {
         // If we expanded a variant set, it may have introduced new
         // authored variant selections, so we must retry any pending
-        // variant tasks as authored tasks.
-        indexer->RetryVariantTasks();
+        // variant tasks as authored tasks if there's a chance of new
+        // selections. 
+        // Note that we're checking for the possibility of variant 
+        // selections introduced at the ancestral variant path only as
+        // tasks for authored variant selections deeper in namespace
+        // (including the non-ancestral site varSite) will not have been
+        // processed before this task. The retry here is for the variant
+        // tasks that are at the same level of namespace as this ancestral
+        // variant set that may now have new variant selection opinions
+        // because of this ancestral variant.
+        if (_SiteMightIntroducePendingVariantSelections(
+                PcpLayerStackSite(varSite.layerStack, ancestralVarPath))) {
+            indexer->RetryVariantTasks();
+        }
     }
 }
 

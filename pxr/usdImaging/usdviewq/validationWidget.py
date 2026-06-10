@@ -347,7 +347,7 @@ class OptionsWidget(QtWidgets.QWidget):
         layout.addWidget(self.primsSetFromSelection)
         self.primsSetFromSelection.stateChanged.connect(
             lambda state: self.includeDescendantPrims.setEnabled(
-                state == QtCore.Qt.CheckState.Checked))
+                QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked))
 
         self.includeDescendantPrims = QtWidgets.QCheckBox(
             "Include descendant prims")

@@ -1221,6 +1221,7 @@ HdPrmanMeshLightResolvingSceneIndex::_PrimsDirtied(
         }
     }
 
+#if PXR_VERSION < 2505
     for (const auto& entry : entries) {
         if (_meshLights.count(entry.primPath)) {
             // Propogate dirtiness to the meshLight light if applicable.
@@ -1253,6 +1254,7 @@ HdPrmanMeshLightResolvingSceneIndex::_PrimsDirtied(
             }
         }
     }
+#endif
 
     _SendPrimsAdded(added);
     _SendPrimsRemoved(removed);

@@ -607,6 +607,8 @@ static Ts_TypedSplineData<double> _ExtrapLoopRepeatDualValuedBoundary()
     knot3.time = 110.0;
     knot3.nextInterp = TsInterpHeld;
     knot3.value = 15.0;
+    knot3.preValue = 25.0;
+    knot3.dualValued = true;
 
     Ts_TypedSplineData<double> data{};
     data.SetKnot(&knot1, VtDictionary());

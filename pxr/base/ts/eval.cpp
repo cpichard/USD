@@ -1456,7 +1456,9 @@ _EvalMain(
             // Pre-value after held segment = previous knot value.
             if (location == Ts_EvalPre) {
                 if (atFirst) {
-                    if (data->preExtrapolation.mode == TsExtrapValueBlock) {
+                    if (data->preExtrapolation.mode == TsExtrapValueBlock ||
+                        loopRes.HasInvalidPreExtrapLoop())
+                    {
                         return std::nullopt;
                     }
                 } else {
@@ -1470,7 +1472,9 @@ _EvalMain(
                 }
             } else {
                 if (atLast) {
-                    if (data->postExtrapolation.mode == TsExtrapValueBlock) {
+                    if (data->postExtrapolation.mode == TsExtrapValueBlock ||
+                        loopRes.HasInvalidPostExtrapLoop())
+                    {
                         return std::nullopt;
                     }
                 } else {
@@ -1737,8 +1741,8 @@ _BreakdownBezier(
         {prevData.time + prevData.postTanWidth, 
          prevData.value + prevData.GetPostTanHeight()},
         {nextData.time - nextData.preTanWidth,
-         nextData.value + nextData.GetPreTanHeight()},
-        {nextData.time, nextData.value}};
+         nextData.GetPreValue() + nextData.GetPreTanHeight()},
+        {nextData.time, nextData.GetPreValue()}};
 
     // Run one De Casteljau interpolation
     GfVec2d cp01   = GfLerp(u, cp[0], cp[1]);
@@ -2186,7 +2190,11 @@ _BreakdownMain(
           case TsExtrapSloped:
             knotData.nextInterp = TsInterpLinear;
             knotData.preTanSlope = knotData.postTanSlope = *slope;
-            prevData.nextInterp = TsInterpLinear;
+            if (prevData.nextInterp != TsInterpLinear) {
+                prevData.nextInterp = TsInterpLinear;
+                idx = data->SetKnotFromDouble(&prevData, VtDictionary());
+                data->UpdateKnotTangentsAtIndex(idx);
+            }
             break;
 
           default:

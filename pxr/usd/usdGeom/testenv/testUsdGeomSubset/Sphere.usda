@@ -79,6 +79,13 @@ def Xform "Sphere" (
             }
         }
 
+        def GeomSubset "face_invalidElementType"
+        {
+            uniform token elementType = "face"
+            uniform token familyName = "face_invalidElementType"
+            int[] indices = [0]
+        }
+
         def GeomSubset "segment_invalidIndices" 
         # Indices (0, 4), (5, 0) at default time and (-1, 12) at frame 3 are invalid.
         # Frame 2 has an odd number of indices
@@ -447,6 +454,12 @@ def Xform "Sphere" (
             }
         }
 
+        def GeomSubset "segment_invalidElementType"
+        {
+            uniform token elementType = "segment"
+            uniform token familyName = "segment_invalidElementType"
+            int[] indices = [0]
+        }
 
         def GeomSubset "tetrahedron_invalidIndices" 
         # Indices 16 at frame 2 and -1 at frame 3 are invalid.
@@ -1121,6 +1134,14 @@ def Xform "Sphere" (
                 2: [4, 5, 6, 7],
                 3: [12, 13, 14, 15]
             }
+        }
+
+
+        def GeomSubset "tetrahedron_invalidElementType"
+        {
+            uniform token elementType = "tetrahedron"
+            uniform token familyName = "tetrahedron_invalidElementType"
+            int[] indices = [0]
         }
 
 

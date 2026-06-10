@@ -26,6 +26,13 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+namespace {
+
+// Constants for constructing GfInterval objects
+constexpr bool OPEN = false;
+constexpr bool CLOSED = true;
+
+} // annonymous namespace
 
 TF_REGISTRY_FUNCTION(TfType)
 {
@@ -59,6 +66,12 @@ TsSpline::TsSpline(const TsSpline &other)
     : _data(other._data)
 {
 }
+
+TsSpline::TsSpline(Ts_SplineData* data)
+    : _data(data)
+{
+}
+
 
 TsSpline& TsSpline::operator=(const TsSpline &other)
 {
@@ -561,6 +574,29 @@ TF_PP_SEQ_FOR_EACH(_INSTANTIATE_SAMPLE_METHOD,
 
 #undef _INSTANTIATE_SAMPLE_METHOD
 
+////////////////////////////////////////////////////////////////////////////////
+// Transformation
+
+TsSpline
+TsSpline::GetTruncated(
+    const GfInterval& interval,
+    TsExtrapolation preFallback,
+    TsExtrapolation postFallback) const
+{
+    if (interval.IsEmpty() || _data == nullptr || _data->times.empty()) {
+        return TsSpline();
+    }
+
+    Ts_SplineData* truncatedData = Ts_Truncate(_GetData(), interval,
+                                               preFallback, postFallback);
+
+    if (truncatedData) {
+        return TsSpline(truncatedData);
+    }
+
+    // Ts_Truncate issued a coding error already if truncatedData is null.
+    return TsSpline();
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Comparison

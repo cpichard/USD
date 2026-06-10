@@ -11,7 +11,7 @@
 
 #include "pxr/pxr.h"
 #include "pxr/exec/execIr/api.h"
-#include "pxr/exec/execIr/irController.h"
+#include "pxr/exec/execIr/controller.h"
 #include "pxr/usd/usd/prim.h"
 #include "pxr/usd/usd/stage.h"
 #include "pxr/exec/execIr/tokens.h"
@@ -36,15 +36,27 @@ class SdfAssetPath;
 /// \class ExecIrFkController
 ///
 /// 
-/// A simple invertible FK controller.
+/// A simple invertible controller that computes a forward kinematic transform.
 /// 
-/// The forward computation takes inputs from scalar translate and rotate
-/// FK attributes, and a parent space, and produces a posed space. The inverse
-/// computation takes a desired posed space and the parent space as input and
-/// produces the FK attribute values that produce the desired space.
+/// @warning
+/// The functionality provided by this schema is very limited, subject to
+/// change, and not yet ready for production use.
 /// 
-/// Note: The functionality provided by this schema is extremely limited,
-/// subject to change, and not yet ready for production use.
+/// An FK controller takes as inputs scalar translate and rotate attributes and
+/// parent and default spaces, and computes a posed space that can be used to
+/// drive model posing. The parent space input allows one ExecIrFkController to
+/// be the child of another, linking them in a chain. A chain of FK controllers
+/// functions like a transform hierarchy, with the child inheriting the
+/// transformation of the parent. The resulting chain of controllers can be used
+/// collectively to pose a model or some part of a model, such as an arm.
+/// 
+/// An FK controller also defines an inverse computation that takes as inputs a
+/// desired posed space and the parent and default spaces, and computes the FK
+/// attribute values that produce the desired pose. This capability enables
+/// authoring operations that need to compute inverses. E.g., a model can be
+/// posed by multiple rigs, and inversion can be used to compute the
+/// compensating input values needed to switch from one rig to another, while
+/// maintaining the same pose.
 /// 
 ///
 /// For any described attribute \em Fallback \em Value or \em Allowed \em Values below
@@ -52,7 +64,7 @@ class SdfAssetPath;
 /// So to set an attribute to the value "rightHanded", use ExecIrTokens->rightHanded
 /// as the value.
 ///
-class ExecIrFkController : public ExecIrIrController
+class ExecIrFkController : public ExecIrController
 {
 public:
     /// Compile time constant representing what kind of schema this class is.
@@ -65,7 +77,7 @@ public:
     /// for a \em valid \p prim, but will not immediately throw an error for
     /// an invalid \p prim
     explicit ExecIrFkController(const UsdPrim& prim=UsdPrim())
-        : ExecIrIrController(prim)
+        : ExecIrController(prim)
     {
     }
 
@@ -73,7 +85,7 @@ public:
     /// Should be preferred over ExecIrFkController(schemaObj.GetPrim()),
     /// as it preserves SchemaBase state.
     explicit ExecIrFkController(const UsdSchemaBase& schemaObj)
-        : ExecIrIrController(schemaObj)
+        : ExecIrController(schemaObj)
     {
     }
 
@@ -151,6 +163,9 @@ public:
     // PARENTINSPACE 
     // --------------------------------------------------------------------- //
     /// 
+    /// If the FK controller has a parent controller, this attribute takes the
+    /// parent's posed space as input.
+    /// 
     ///
     /// | ||
     /// | -- | -- |
@@ -172,6 +187,9 @@ public:
     // --------------------------------------------------------------------- //
     // PARENTINDEFAULTSPACE 
     // --------------------------------------------------------------------- //
+    /// 
+    /// If the FK controller has a parent controller, this attribute takes the
+    /// parent's default space as input.
     /// 
     ///
     /// | ||
@@ -195,6 +213,9 @@ public:
     // OUTSPACE 
     // --------------------------------------------------------------------- //
     /// 
+    /// A 4x4 matrix that represents the computed output space produced by the
+    /// controller.
+    /// 
     ///
     /// | ||
     /// | -- | -- |
@@ -217,6 +238,8 @@ public:
     // OUTDEFAULTSPACE 
     // --------------------------------------------------------------------- //
     /// 
+    /// Passes through the value of the 'in:defaultSpace' attribute.
+    /// 
     ///
     /// | ||
     /// | -- | -- |
@@ -238,6 +261,9 @@ public:
     // --------------------------------------------------------------------- //
     // INDEFAULTSPACE 
     // --------------------------------------------------------------------- //
+    /// 
+    /// A local-to-world space transform representing the "zero" position for
+    /// posing.
     /// 
     ///
     /// | ||
@@ -392,6 +418,9 @@ public:
     // --------------------------------------------------------------------- //
     // INRSPIN 
     // --------------------------------------------------------------------- //
+    /// 
+    /// The rotation attribute that gets zeroed out when solving for rotation
+    /// values.
     /// 
     ///
     /// | ||

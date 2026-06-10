@@ -3948,6 +3948,8 @@ HdPrman_RenderParam::CreateFramebufferAndRenderViewFromAovs(
 #if PXR_VERSION >= 2308
     static bool useRenderSettingsProductsForInteractiveRenderView =
         TfGetEnvSetting(HD_PRMAN_INTERACTIVE_RENDER_WITH_RENDER_SETTINGS);
+#else
+    static bool useRenderSettingsProductsForInteractiveRenderView = false;
 #endif
 
     const bool dirtyProductsOnRenderSettingsPrim =
@@ -5076,6 +5078,7 @@ HdPrman_RenderParam::_UpdateShutterInterval(const RtParamList& composedParams)
         _shutterInterval[0], _shutterInterval[1]);
 }
 
+#if PXR_VERSION >= 2308
 TfToken
 HdPrman_RenderParam::GetIdMapProductName(HdPrman_RenderSettings* renderSettings)
 {
@@ -5093,5 +5096,6 @@ HdPrman_RenderParam::GetIdMapProductName(HdPrman_RenderSettings* renderSettings)
 
     return TfToken();
 }
+#endif
 
 PXR_NAMESPACE_CLOSE_SCOPE

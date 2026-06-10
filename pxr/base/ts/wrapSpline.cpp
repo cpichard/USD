@@ -271,6 +271,10 @@ void wrapSpline()
         .def("IsSupportedValueType",
             &This::IsSupportedValueType)
         .staticmethod("IsSupportedValueType")
+
+        .def("GetTruncated",
+             &This::GetTruncated)
+        .staticmethod("GetTruncated")
         ;
 
     _CanBreakdownResult::Wrap<_CanBreakdownResult>("_CanBreakdownResult",

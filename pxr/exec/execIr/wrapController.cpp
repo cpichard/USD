@@ -4,7 +4,7 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#include "pxr/exec/execIr/irController.h"
+#include "pxr/exec/execIr/controller.h"
 #include "pxr/usd/usd/schemaBase.h"
 
 #include "pxr/usd/sdf/primSpec.h"
@@ -33,22 +33,22 @@ WRAP_CUSTOM;
 
 
 static std::string
-_Repr(const ExecIrIrController &self)
+_Repr(const ExecIrController &self)
 {
     std::string primRepr = TfPyRepr(self.GetPrim());
     return TfStringPrintf(
-        "ExecIr.IrController(%s)",
+        "ExecIr.Controller(%s)",
         primRepr.c_str());
 }
 
 } // anonymous namespace
 
-void wrapExecIrIrController()
+void wrapExecIrController()
 {
-    typedef ExecIrIrController This;
+    typedef ExecIrController This;
 
     class_<This, bases<UsdTyped> >
-        cls("IrController");
+        cls("Controller");
 
     cls
         .def(init<UsdPrim>(arg("prim")))

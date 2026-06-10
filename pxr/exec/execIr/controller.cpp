@@ -4,7 +4,7 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#include "pxr/exec/execIr/irController.h"
+#include "pxr/exec/execIr/controller.h"
 #include "pxr/usd/usd/schemaRegistry.h"
 #include "pxr/usd/usd/typed.h"
 
@@ -16,45 +16,45 @@ PXR_NAMESPACE_OPEN_SCOPE
 // Register the schema with the TfType system.
 TF_REGISTRY_FUNCTION(TfType)
 {
-    TfType::Define<ExecIrIrController,
+    TfType::Define<ExecIrController,
         TfType::Bases< UsdTyped > >();
     
 }
 
 /* virtual */
-ExecIrIrController::~ExecIrIrController()
+ExecIrController::~ExecIrController()
 {
 }
 
 /* static */
-ExecIrIrController
-ExecIrIrController::Get(const UsdStagePtr &stage, const SdfPath &path)
+ExecIrController
+ExecIrController::Get(const UsdStagePtr &stage, const SdfPath &path)
 {
     if (!stage) {
         TF_CODING_ERROR("Invalid stage");
-        return ExecIrIrController();
+        return ExecIrController();
     }
-    return ExecIrIrController(stage->GetPrimAtPath(path));
+    return ExecIrController(stage->GetPrimAtPath(path));
 }
 
 
 /* virtual */
-UsdSchemaKind ExecIrIrController::_GetSchemaKind() const
+UsdSchemaKind ExecIrController::_GetSchemaKind() const
 {
-    return ExecIrIrController::schemaKind;
+    return ExecIrController::schemaKind;
 }
 
 /* static */
 const TfType &
-ExecIrIrController::_GetStaticTfType()
+ExecIrController::_GetStaticTfType()
 {
-    static TfType tfType = TfType::Find<ExecIrIrController>();
+    static TfType tfType = TfType::Find<ExecIrController>();
     return tfType;
 }
 
 /* static */
 bool 
-ExecIrIrController::_IsTypedSchema()
+ExecIrController::_IsTypedSchema()
 {
     static bool isTyped = _GetStaticTfType().IsA<UsdTyped>();
     return isTyped;
@@ -62,14 +62,14 @@ ExecIrIrController::_IsTypedSchema()
 
 /* virtual */
 const TfType &
-ExecIrIrController::_GetTfType() const
+ExecIrController::_GetTfType() const
 {
     return _GetStaticTfType();
 }
 
 /*static*/
 const TfTokenVector&
-ExecIrIrController::GetSchemaAttributeNames(bool includeInherited)
+ExecIrController::GetSchemaAttributeNames(bool includeInherited)
 {
     static TfTokenVector localNames;
     static TfTokenVector allNames =

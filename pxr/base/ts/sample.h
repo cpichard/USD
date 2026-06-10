@@ -222,6 +222,16 @@ Ts_Bake(const Ts_SplineData* const data,
         const GfInterval& timeInterval,
         const bool includeExtrapLoops);
 
+// Truncate the given data to the given interval. See Spline::GetTruncated
+// for expected behavior of this function. Proper deallocation of the
+// return value is the caller's respondibility.
+TS_API
+Ts_SplineData*
+Ts_Truncate(const Ts_SplineData* const data,
+            const GfInterval& interval,
+            TsExtrapolation preFallback,
+            TsExtrapolation postFallback);
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
 #endif

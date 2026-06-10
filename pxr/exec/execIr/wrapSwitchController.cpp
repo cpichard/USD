@@ -68,7 +68,7 @@ void wrapExecIrSwitchController()
 {
     typedef ExecIrSwitchController This;
 
-    class_<This, bases<ExecIrIrController> >
+    class_<This, bases<ExecIrController> >
         cls("SwitchController");
 
     cls

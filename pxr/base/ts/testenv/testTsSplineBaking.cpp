@@ -22,6 +22,9 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+// Constants for constructing GfInterval objects
+constexpr bool OPEN = false;
+
 std::string FormatKnotMap(const TsKnotMap& knots)
 {
     std::ostringstream str;
@@ -34,6 +37,22 @@ std::string FormatKnotMap(const TsKnotMap& knots)
 
     return str.str();
 }
+
+// Set the max side of the interval to open if the spline's post extrapolation
+// resolves to value-block. Baked-out knots do not convey interpolations of
+// value block resulting from extrapolation.
+GfInterval
+NormalizeInterval(const TsSpline& spline, const GfInterval& interval)
+{
+    GfInterval normInterval = interval;
+    if (spline.GetPostExtrapolation().mode == TsExtrapValueBlock ||
+        !spline.IsPostExtrapolationValid())
+    {
+        normInterval.SetMax(interval.GetMax(), OPEN);
+    }
+    return normInterval;
+}
+
 
 // Simplify access to the Museum
 class SplineSrc
@@ -114,6 +133,8 @@ public:
     }
 
     // Verify that the splines evaluate equivalently across interval.
+    // This should be kept semantically in sync with
+    // testTsSplineTransforms.cpp's VerifySplineEquivalence.
     bool VerifySplineEquivalence(const std::string& testId,
                                  const std::string& splineId,
                                  const TsSpline& spline1,
@@ -135,8 +156,13 @@ public:
             bool valid1, valid2;
             double v1, v2;
 
-            valid1 = spline1.Eval(t, &v1);
-            valid2 = spline2.Eval(t, &v2);
+            if (i == 100 && interval.IsMaxOpen()) {
+                valid1 = spline1.EvalPreValue(t, &v1);
+                valid2 = spline2.EvalPreValue(t, &v2);
+            } else {
+                valid1 = spline1.Eval(t, &v1);
+                valid2 = spline2.Eval(t, &v2);
+            }
 
             if (!valid1 && !valid2) {
                 // No value from both splines.
@@ -240,7 +266,9 @@ public:
                                             knots2.GetTimeSpan();
                 if (!VerifySplineEquivalence(testId, splineId,
                                              spline1, spline2,
-                                             verifyInterval,
+                                             NormalizeInterval(
+                                                spline1,
+                                                verifyInterval),
                                              epsilons[valueType]))
                 {
                     // Error message has already been reported.
@@ -313,7 +341,9 @@ public:
                                             bakedKnots.GetTimeSpan();
                 if (!VerifySplineEquivalence(testId, splineId,
                                              spline1, spline3,
-                                             verifyInterval,
+                                             NormalizeInterval(
+                                                spline1,
+                                                verifyInterval),
                                              epsilons[valueType]))
                 {
                     // Error message has already been reported.
@@ -378,15 +408,21 @@ public:
 
                 if (!VerifySplineEquivalence(testId, splineId,
                                              spline1, shortSpline,
-                                             shortInterval,
+                                             NormalizeInterval(
+                                                spline1,
+                                                shortInterval),
                                              epsilons[valueType])
                     || !VerifySplineEquivalence(testId, splineId,
                                                 spline1, mediumSpline,
-                                                interval,
+                                                NormalizeInterval(
+                                                    spline1,
+                                                    interval),
                                                 epsilons[valueType])
                     || !VerifySplineEquivalence(testId, splineId,
                                                 spline1, longSpline,
-                                                longInterval,
+                                                NormalizeInterval(
+                                                    spline1,
+                                                    longInterval),
                                                 epsilons[valueType]))
                 {
                     // Error message has already been reported.

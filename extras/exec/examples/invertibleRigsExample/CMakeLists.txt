@@ -25,6 +25,10 @@ pxr_plugin(${PXR_PACKAGE}
 
     PYMODULE_FILES
         __init__.py
+
+    DOXYGEN_FILES
+        README.md
+        docs/images/waddlerRig.drawio.svg
 )
 
 pxr_test_scripts(

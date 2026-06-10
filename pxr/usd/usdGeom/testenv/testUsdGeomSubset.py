@@ -134,6 +134,10 @@ class testUsdGeomSubset(unittest.TestCase):
         self._TestSubsetRetrieval(geom, UsdGeom.Tokens.edge, "physicsAttachment")
         self._TestSubsetValidity(geom, varyingGeom, nullGeom, UsdGeom.Tokens.edge)
 
+        # Test an invalid case where the elementType is not valid for the geom
+        self._ValidateFamily(geom, "tetrahedron", "tetrahedron_invalidElementType", 
+                             False, ["Invalid geom type for elementType"])
+
         sphere = stage.GetPrimAtPath("/Sphere/TetMesh")
         geom = UsdGeom.Imageable(sphere)
         self.assertTrue(geom)
@@ -152,6 +156,10 @@ class testUsdGeomSubset(unittest.TestCase):
         self._TestSubsetRetrieval(geom, UsdGeom.Tokens.face, "materialBind")
         self._TestSubsetValidity(geom, varyingGeom, nullGeom, UsdGeom.Tokens.face)
 
+        # Test an invalid case where the elementType is not valid for the geom
+        self._ValidateFamily(geom, "segment", "segment_invalidElementType", 
+                             False, ["Invalid geom type for elementType"])
+
         sphere = stage.GetPrimAtPath("/Sphere/BasisCurves")
         geom = UsdGeom.Imageable(sphere)
         self.assertTrue(geom)
@@ -166,6 +174,10 @@ class testUsdGeomSubset(unittest.TestCase):
 
         self._TestSubsetRetrieval(geom, UsdGeom.Tokens.segment, "physicsAttachment")
         self._TestSubsetValidity(geom, varyingGeom, nullGeom, UsdGeom.Tokens.segment)
+
+        # Test an invalid case where the elementType is not valid for the geom
+        self._ValidateFamily(geom, "face", "face_invalidElementType", 
+                             False, ["Invalid geom type for elementType"])
 
 
     def test_GetUnassignedIndicesForEdges(self):
@@ -351,7 +363,7 @@ class testUsdGeomSubset(unittest.TestCase):
         # Check total count.
         allGeomSubsets = UsdGeom.Subset.GetAllGeomSubsets(
                 UsdGeom.Imageable(sphere))
-        self.assertEqual(len(allGeomSubsets), 68)
+        self.assertEqual(len(allGeomSubsets), 69)
 
         # Check that invalid negative indices are ignored when getting 
         # unassigned indices.

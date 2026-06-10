@@ -297,6 +297,24 @@ struct VtIsKnownValueType_Workaround
     static const bool value = VtIsKnownValueType<T>();
 };
 
+// Generally, we want to allow clients to register value-type transforms for
+// their own user-defined types.  Registering transforms for built-in (float,
+// double, string) or low-level (GfVec, GfMatrix) types can lead to ODR
+// violations (due to trait differences in different TUs) and added performance
+// costs.  So we allow registering transforms for all the types not known to Vt.
+// However there are a couple of low-level types known to Vt that are explicitly
+// allowed to support registered transforms.  This private function captures
+// this set of types.
+template <class T>
+constexpr bool
+Vt_IsTypeAllowedToRegisterTransforms()
+{
+    return !VtIsKnownValueType<T>()
+        // || std::is_same_v<T, GfTimeCode>
+        // || std::is_same_v<T, GfDuration>
+        ; 
+}
+
 // None of the VT_VALUE_TYPES are value proxies.  We want to specialize these
 // templates here, since otherwise the VtIsTypedValueProxy will require a
 // complete type to check if it derives VtTypedValueProxyBase.

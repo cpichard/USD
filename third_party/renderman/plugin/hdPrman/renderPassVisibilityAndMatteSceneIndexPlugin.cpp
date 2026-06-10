@@ -30,6 +30,8 @@
 #include "pxr/imaging/hdsi/utils.h"
 #include "pxr/base/trace/trace.h"
 
+#include <optional>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -477,6 +479,7 @@ _RenderPassVisibilityAndMatteSceneIndex::_UpdateActiveRenderPassState(
         // Avoid further work if no render pass was or is active.
         return;
     }
+#if PXR_VERSION >= 2508
     if (!state.renderPassPath.IsEmpty()) {
         const HdSceneIndexPrim passPrim =
             inputSceneIndex->GetPrim(state.renderPassPath);
@@ -497,6 +500,7 @@ _RenderPassVisibilityAndMatteSceneIndex::_UpdateActiveRenderPassState(
                                        &state.cameraVisEval);
         }
     }
+#endif
 
     // Short-circuit the analysis below based on which patterns changed.
     const bool visOrMatteExprDidChange =

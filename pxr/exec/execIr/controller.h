@@ -4,10 +4,10 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef EXECIR_GENERATED_IRCONTROLLER_H
-#define EXECIR_GENERATED_IRCONTROLLER_H
+#ifndef EXECIR_GENERATED_CONTROLLER_H
+#define EXECIR_GENERATED_CONTROLLER_H
 
-/// \file execIr/irController.h
+/// \file execIr/controller.h
 
 #include "pxr/pxr.h"
 #include "pxr/exec/execIr/api.h"
@@ -32,16 +32,22 @@ class SdfAssetPath;
 // IRCONTROLLER                                                               //
 // -------------------------------------------------------------------------- //
 
-/// \class ExecIrIrController
+/// \class ExecIrController
 ///
 /// 
 /// An abstract schema that represents an invertible controller.
 /// 
-/// Note: The functionality provided by this schema is extremely limited,
-/// subject to change, and not yet ready for production use.
+/// @warning
+/// The functionality provided by this schema is very limited, subject to
+/// change, and not yet ready for production use.
+/// 
+/// Controllers have explicit input and output attributes, a forward computation
+/// that produces output values from input values and an inverse computation
+/// that computes the input values that satisfy a given set of desired output
+/// values.
 /// 
 ///
-class ExecIrIrController : public UsdTyped
+class ExecIrController : public UsdTyped
 {
 public:
     /// Compile time constant representing what kind of schema this class is.
@@ -49,26 +55,26 @@ public:
     /// \sa UsdSchemaKind
     static const UsdSchemaKind schemaKind = UsdSchemaKind::AbstractTyped;
 
-    /// Construct a ExecIrIrController on UsdPrim \p prim .
-    /// Equivalent to ExecIrIrController::Get(prim.GetStage(), prim.GetPath())
+    /// Construct a ExecIrController on UsdPrim \p prim .
+    /// Equivalent to ExecIrController::Get(prim.GetStage(), prim.GetPath())
     /// for a \em valid \p prim, but will not immediately throw an error for
     /// an invalid \p prim
-    explicit ExecIrIrController(const UsdPrim& prim=UsdPrim())
+    explicit ExecIrController(const UsdPrim& prim=UsdPrim())
         : UsdTyped(prim)
     {
     }
 
-    /// Construct a ExecIrIrController on the prim held by \p schemaObj .
-    /// Should be preferred over ExecIrIrController(schemaObj.GetPrim()),
+    /// Construct a ExecIrController on the prim held by \p schemaObj .
+    /// Should be preferred over ExecIrController(schemaObj.GetPrim()),
     /// as it preserves SchemaBase state.
-    explicit ExecIrIrController(const UsdSchemaBase& schemaObj)
+    explicit ExecIrController(const UsdSchemaBase& schemaObj)
         : UsdTyped(schemaObj)
     {
     }
 
     /// Destructor.
     EXECIR_API
-    virtual ~ExecIrIrController();
+    virtual ~ExecIrController();
 
     /// Return a vector of names of all pre-declared attributes for this schema
     /// class and all its ancestor classes.  Does not include attributes that
@@ -77,17 +83,17 @@ public:
     static const TfTokenVector &
     GetSchemaAttributeNames(bool includeInherited=true);
 
-    /// Return a ExecIrIrController holding the prim adhering to this
+    /// Return a ExecIrController holding the prim adhering to this
     /// schema at \p path on \p stage.  If no prim exists at \p path on
     /// \p stage, or if the prim at that path does not adhere to this schema,
     /// return an invalid schema object.  This is shorthand for the following:
     ///
     /// \code
-    /// ExecIrIrController(stage->GetPrimAtPath(path));
+    /// ExecIrController(stage->GetPrimAtPath(path));
     /// \endcode
     ///
     EXECIR_API
-    static ExecIrIrController
+    static ExecIrController
     Get(const UsdStagePtr &stage, const SdfPath &path);
 
 

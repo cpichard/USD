@@ -184,12 +184,13 @@ My_TestGLDrawing::Pick(const UsdTimeCode frame)
 
     const GfFrustum frustum = _pickCamera.GetCamera(frame).GetFrustum();
 
+    UsdImagingGLEngine::PickParams pickParams;
+    pickParams.resolveMode = HdxPickResolveModeTokens->resolveDeep;
+    
     UsdImagingGLEngine::IntersectionResultVector hits;
 
     if (_engine->TestIntersection(
-            UsdImagingGLEngine::PickParams{
-                .resolveMode = HdxPickResolveModeTokens->resolveDeep
-            },
+            pickParams,
             frustum.ComputeViewMatrix(),
             frustum.ComputeProjectionMatrix(),
             _stage->GetPseudoRoot(),

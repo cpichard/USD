@@ -34,7 +34,8 @@ constexpr double inf = std::numeric_limits<double>::infinity();
 constexpr bool OPEN = false;
 constexpr bool CLOSED = true;
 
-// Writes the pre values of the given output data.
+// Writes the pre values of the given output data. To finalize the data,
+// call _FinalizeKnotData.
 void _SetKnotDataPreValues(
     const Ts_Segment& segment,
     Ts_DoubleKnotData& data
@@ -51,13 +52,14 @@ void _SetKnotDataPreValues(
     data.preValue = segment.p1[1];
 }
 
-// This function requires that the pre-values on the given knot data have
-// already been correctly set. If they have not yet been set, this
-// function will write values with potentially incorrect semantics.
+// Writes the post values of the given output data. To finalize the data,
+// call _FinalizeKnotData.
 void _SetKnotDataValues(
     const Ts_Segment& segment,
     Ts_DoubleKnotData& data
 ) {
+    data.time = segment.p0[0];
+
     data.postTanAlgorithm = TsTangentAlgorithmNone;
     data.postTanWidth = segment.t0[0] - segment.p0[0];
     data.postTanSlope =
@@ -85,6 +87,9 @@ void _SetKnotDataValues(
     }
 
     data.value = segment.p0[1];
+}
+
+void _FinalizeKnotData(Ts_DoubleKnotData& data) {
     if (data.value == data.preValue) {
         data.dualValued = false;
         data.preValue = 0;
@@ -248,6 +253,286 @@ _SampleBezier(GfVec2d cp[4],
         }
     }
 }
+
+// Get simplification of a looping extrapolation. If not looping, return
+// original extrapolation.
+TsExtrapolation
+_SimplifyOuterLooping(
+    const Ts_SplineData* data,
+    const double boundaryAdjacentTime,
+    const TsExtrapolation& extrap)
+{
+    if (!extrap.IsLooping()) {
+        return extrap;
+    }
+
+    const auto& times = data->times;
+    if (times.empty()) {
+        return TsExtrapolation(TsExtrapValueBlock);
+    }
+
+    const bool hasBoundary = extrap.loopBoundaryTime.has_value();
+    if (hasBoundary) {
+        const double boundary = extrap.loopBoundaryTime.value();
+        const bool found = std::binary_search(times.begin(), times.end(),
+                                              boundary);
+        if (found && boundary == boundaryAdjacentTime) {
+            return TsExtrapolation(TsExtrapHeld);
+        } else if (!found) {
+            return TsExtrapolation(TsExtrapValueBlock);
+        }
+    } else if (data->times.size() == 1 && !data->HasInnerLoops()) {
+        return TsExtrapolation(TsExtrapHeld);
+    }
+
+    return extrap;
+}
+
+// Returns a shifted loop boundary time after baking enough knots to cover
+// numSegments into the given resultData for pre extrapolation looping.
+double
+_BakeAndShiftPreExtrapLoop(
+    const Ts_SplineData* const data,
+    const GfInterval& interval,
+    const size_t numSegments,
+    Ts_SplineData* resultData)
+{
+    const double finiteTime = interval.GetMax();
+    const GfInterval startPoint(finiteTime, finiteTime, CLOSED, CLOSED);
+
+    Ts_SegmentIterator it(data, startPoint);
+    Ts_TypedKnotData<double> d;
+    Ts_Segment segment = *it;
+    const double shiftedBoundary = segment.p0[0];
+
+    // Scenario A: First segment starts exactly at the open interval max.
+    // Scenario B: First segment starts exactly at the closed interval max.
+    // Scenario C: The interval max lies somewhere in (last knot time, +inf)
+    // Scenario D: The interval max lies between two knots.
+    const bool scenarioA = segment.p0[0] == interval.GetMax()
+                           && interval.IsMaxOpen();
+    const bool scenarioB = segment.p0[0] == interval.GetMax()
+                           && interval.IsMaxClosed();
+    const bool scenarioC = segment.p1[0] == +inf;
+    const bool scenarioD = !scenarioA && !scenarioB && !scenarioC;
+
+    // Add a pre-values-only knot if the finite max is between two knots,
+    // so that we can breakdown a knot at the max later in Ts_Truncate.
+    if (scenarioD) {
+        _SetKnotDataPreValues(segment, d);
+        d.value = d.preValue;
+        _FinalizeKnotData(d);
+        resultData->SetKnotFromDouble(&d, VtDictionary());
+        d = Ts_TypedKnotData<double>();
+    }
+
+    // Set the values of the ending knot unless we want to truncate
+    // away the values side of the knot at the open interval max.
+    if (!scenarioA) {
+        _SetKnotDataValues(segment, d);
+    }
+
+    for (size_t i = 0; i < numSegments; ++i) {
+        const bool success = it.StepBackward();
+        TF_VERIFY(success,
+                  "Ts_SegmentIterator should be able to StepBackward "
+                  "infinitely into looped extrap regions");
+
+        segment = *it;
+        _SetKnotDataPreValues(segment, d);
+
+        // If we truncated away the values side of the knot earlier, set the
+        // knot's value from the recorded pre-value so that any held
+        // extrapolation behaves as expected.
+        if (scenarioA && i == 0) {
+            d.value = d.preValue;
+        }
+
+        _FinalizeKnotData(d);
+        resultData->SetKnotFromDouble(&d, VtDictionary());
+        d = Ts_TypedKnotData<double>();
+
+        _SetKnotDataValues(segment, d);
+    }
+
+    // We never need the pre-values of the first knot, so don't call
+    // _FinalizeKnotData.
+    resultData->SetKnotFromDouble(&d, VtDictionary());
+
+    return shiftedBoundary;
+}
+
+// Returns a shifted loop boundary time after baking enough knots to cover
+// numSegments into the given resultData for post extrapolation looping.
+double
+_BakeAndShiftPostExtrapLoop(
+    const Ts_SplineData* const data,
+    const GfInterval& interval,
+    const size_t numSegments,
+    Ts_SplineData* resultData)
+{
+    const double finiteTime = interval.GetMin();
+    const GfInterval startPoint(finiteTime, finiteTime, CLOSED, CLOSED);
+
+    Ts_SegmentIterator it(data, startPoint);
+    Ts_TypedKnotData<double> d;
+    Ts_Segment segment = *it;
+
+    // Scenario A: First segment starts exactly at the interval min.
+    // Scenario B: The interval min lies somewhere in (-inf, first knot time)
+    // Scenario C: The interval min lies between two knots.
+    const bool scenarioA = segment.p0[0] == interval.GetMin();
+    const bool scenarioB = segment.p0[0] == -inf;
+    const bool scenarioC = !scenarioA && !scenarioB;
+
+    // Add a post-values-only knot if the finite min is between two knots,
+    // so that we can breakdown a knot at the min later in Ts_Truncate.
+    if (scenarioC) {
+        _SetKnotDataValues(segment, d);
+        resultData->SetKnotFromDouble(&d, VtDictionary());
+        d = Ts_TypedKnotData<double>();
+    }
+
+    // Set pre values of the next knot only if the interval contains
+    // those pre values.
+    if (scenarioB || scenarioC) {
+        _SetKnotDataPreValues(segment, d);
+    }
+
+    const double shiftedBoundary = scenarioA ? segment.p0[0]
+                                             : segment.p1[0];
+
+    for (size_t i = 0; i < numSegments; ++i) {
+        // When the iterator's first segment starts exactly at the interval
+        // min, we don't need to step the iterator forward to access the
+        // first full segment.
+        const bool scenarioAStart = scenarioA && i == 0;
+        if (!scenarioAStart) {
+            const bool success = it.StepForward();
+            TF_VERIFY(success,
+                      "Ts_SegmentIterator should be able to StepForward "
+                      "infinitely into looped extrap regions");
+            segment = *it;
+        }
+
+        _SetKnotDataValues(segment, d);
+
+        // We should only finalize knots that have both pre and post data
+        // written to them. Scenario A's first knot only has post values.
+        if (!scenarioAStart) {
+            _FinalizeKnotData(d);
+        }
+
+        resultData->SetKnotFromDouble(&d, VtDictionary());
+        d = Ts_TypedKnotData<double>();
+
+        _SetKnotDataPreValues(segment, d);
+    }
+
+    // Complete the last knot
+    bool success = it.StepForward();
+    TF_VERIFY(success,
+              "Ts_SegmentIterator should be able to step forward infinitely"
+              "into looping extrap");
+    segment = *it;
+    _SetKnotDataValues(segment, d);
+    _FinalizeKnotData(d);
+    resultData->SetKnotFromDouble(&d, VtDictionary());
+
+    return shiftedBoundary;
+}
+
+// Requires that extrap was distilled from _SimplifyOuterLooping. Updates
+// extrap parameter and creates a Ts_SplineData, which the caller is
+// responsible for deallocating.
+Ts_SplineData*
+_BakeAndShiftExtrapLoopBoundary(
+    const Ts_SplineData* const data,
+    const double boundaryOppositeTime,
+    const GfInterval& interval,
+    const bool isPre,
+    TsExtrapolation* extrap)
+{
+    if (!extrap->IsLooping()) {
+        TF_CODING_ERROR("_BakeAndShiftExtrapLoopBoundary must be called with "
+                        "looping extrap, returning 0");
+        return nullptr;
+    }
+    const auto& times = data->times;
+
+    // Get the num segments that are looped over.
+    size_t numSegments = 0;
+    double loopBoundaryTime = isPre ? times.back() : times.front();
+    if (data->HasInnerLoops()) {
+        // Inner looping being present indicates that looping extrap doesn't
+        // specifiy loopBoundaryTime. We need to count the number of segments.
+        Ts_SegmentKnotIterator it(data, GfInterval::GetFullInterval());
+        while (!it.AtEnd()) {
+            numSegments++;
+            ++it;
+        }
+        TF_VERIFY(numSegments > 0,
+                  "The number of segments in correctly looping "
+                  "extrapolation should be positive. Ensure that "
+                  "_SimplifyOuterLooping was run.");
+    } else {
+        // Because we ran _SimplifyOuterLooping earlier, the
+        // loopBoundaryTime is guaranteed to exist in the times vec.
+        if (extrap->loopBoundaryTime.has_value()) {
+            loopBoundaryTime = extrap->loopBoundaryTime.value();
+        }
+        const auto& it = std::lower_bound(times.begin(),
+                                          times.end(),
+                                          loopBoundaryTime);
+        TF_VERIFY(it != times.end() && *it == loopBoundaryTime,
+                  "The value of loopBoundaryTime must correspond to a knot "
+                  "time. Ensure that _SimplifyOuterLooping was run.");
+
+        // In the post-extrapolation case, subtract one to get the number
+        // of segments, because times.end() is one step beyond the actual
+        // looping range covered.
+        std::ptrdiff_t dist = isPre ? std::distance(times.begin(), it)
+                                    : std::distance(it, times.end()) - 1;
+        TF_VERIFY(dist >= 1,
+                  "The number of segments in correctly looping "
+                  "extrapolation should be positive. Ensure that "
+                  "_SimplifyOuterLooping was run.");
+
+        numSegments = (size_t) dist;
+    }
+
+    // When we are handling infinitely looping pre extrapolation, the max
+    // side of the interval is finite. Vice versa for post extrapolation.
+    const bool shiftBoundary = isPre ? loopBoundaryTime > interval.GetMax()
+                                     : loopBoundaryTime < interval.GetMin();
+    
+    Ts_SplineData* resultData = nullptr;
+    if (shiftBoundary) {
+
+        if (extrap->mode == TsExtrapLoopOscillate) {
+            numSegments *= 2;
+            extrap->mode = TsExtrapLoopReset;
+        }
+
+        resultData = Ts_SplineData::Create(data->GetValueType(), data);
+        if (resultData == nullptr) {
+            return resultData;
+        }
+
+        extrap->loopBoundaryTime =
+            isPre ? _BakeAndShiftPreExtrapLoop(data, interval, numSegments,
+                                               resultData)
+                  : _BakeAndShiftPostExtrapLoop(data, interval, numSegments,
+                                                resultData);
+    } else {
+        resultData = Ts_Bake(data, GfInterval::GetFullInterval(),
+                             /* includeExtrapLooops */ false);
+    }
+
+    return resultData;
+}
+
+// _ReparameterizeExtrapLoop()
 
 } // anonymous namespace
 
@@ -457,6 +742,7 @@ Ts_SplineData* Ts_Bake(
         segment = *it;
         _SetKnotDataValues(segment, d);
 
+        _FinalizeKnotData(d);
         bakedData->SetKnotFromDouble(&d, VtDictionary());
         d = Ts_TypedKnotData<double>();
 
@@ -465,13 +751,23 @@ Ts_SplineData* Ts_Bake(
     }
 
     // Step the iterator forward if possible to get information about the
-    // post-side of the last knot.
-    if (segment.p1[0] != +inf) {
-        bool success = it.StepForward();
-        TF_VERIFY(success,
-                  "Ts_SegmentIterator should be able to step forward "
-                  "when the current segment's end time is not +inf");
-        _SetKnotDataValues(segment, d);
+    // post-side of the last knot. Note that we don't need to add another
+    // knot if the previously added knot's time is >= the interval
+    // max.
+    const bool prevKnotDone = !bakedData->times.empty() &&
+        bakedData->times.back() >= inputInterval.GetMax();
+    if (segment.p1[0] != +inf && !prevKnotDone) {
+        if (d.time == inputInterval.GetMax() && inputInterval.IsMaxOpen()) {
+            d.value = d.preValue;
+        } else {
+            bool success = it.StepForward();
+            TF_VERIFY(success,
+                    "Ts_SegmentIterator should be able to step forward "
+                    "when the current segment's end time is not +inf");
+            segment = *it;
+            _SetKnotDataValues(segment, d);
+        }
+        _FinalizeKnotData(d);
         bakedData->SetKnotFromDouble(&d, VtDictionary());
     }
 
@@ -481,5 +777,168 @@ Ts_SplineData* Ts_Bake(
     return bakedData;
 }
 
+Ts_SplineData*
+Ts_Truncate(
+    const Ts_SplineData* const data,
+    const GfInterval& interval,
+    TsExtrapolation preFallback,
+    TsExtrapolation postFallback)
+{
+    if (interval.IsEmpty()) {
+        TF_CODING_ERROR("Cannot truncate spline to an empty interval");
+        return nullptr;
+    }
+
+    if (data->times.empty()) {
+        TF_CODING_ERROR("Cannot truncate empty spline");
+        return nullptr;
+    }
+
+    double firstTime = data->times.front();
+    double lastTime = data->times.back();
+    if (data->HasInnerLoops()) {
+        const GfInterval lpInterval = data->loopParams.GetLoopedInterval();
+        firstTime = std::min(firstTime, lpInterval.GetMin());
+        lastTime = std::max(lastTime, lpInterval.GetMax());
+    }
+    const bool minFinite = interval.IsMinFinite();
+    const bool maxFinite = interval.IsMaxFinite();
+
+    // Collapse any degenerate looping extrapolation modes to simpler modes.
+    TsExtrapolation preExtrap = data->preExtrapolation;
+    preExtrap = _SimplifyOuterLooping(data, firstTime, preExtrap);
+    TsExtrapolation postExtrap = data->postExtrapolation;
+    postExtrap = _SimplifyOuterLooping(data, lastTime, postExtrap);
+
+    // If both ends are infinite, clone the spline data and return
+    if (!minFinite && !maxFinite) {
+        Ts_SplineData* resultData = data->Clone();
+        if (resultData == nullptr) {
+            TF_VERIFY(false,
+                      "Ts_Truncate failed to clone input spline data");
+            return nullptr;
+        }
+        resultData->preExtrapolation = preExtrap;
+        resultData->postExtrapolation = postExtrap;
+        return resultData;
+    }
+
+    Ts_SplineData* resultData = nullptr;
+    if (minFinite && !maxFinite && postExtrap.IsLooping()) {
+        resultData = _BakeAndShiftExtrapLoopBoundary(data, firstTime, interval,
+                                                     /* isPre */ false,
+                                                     &postExtrap);
+    } else if (!minFinite && maxFinite && preExtrap.IsLooping()) {
+        resultData = _BakeAndShiftExtrapLoopBoundary(data, lastTime, interval,
+                                                     /* isPre */ true,
+                                                     &preExtrap);
+    } else {
+        // We need to clone the data to set simplified extrap if it has
+        // degenerate looping into infinite regions, so that baking succeeds.
+        // The alternative is to modify baking to allow looping
+        // in infinite regions if the looping is degenerate.
+        const bool postInfLooping =
+            !maxFinite && data->postExtrapolation.IsLooping();
+        const bool preInfLooping =
+            !minFinite && data->preExtrapolation.IsLooping();
+
+        if (firstTime == lastTime) {
+            resultData = data->Clone();
+        } else if (postInfLooping || preInfLooping) {
+            Ts_SplineData* bakeInput = data->Clone();
+            if (postInfLooping) {
+                bakeInput->postExtrapolation = postExtrap;
+            }
+            if (preInfLooping) {
+                bakeInput->preExtrapolation = preExtrap;
+            }
+
+            resultData = Ts_Bake(bakeInput, interval,
+                                 /* includeExtrapLoops */ true);
+            delete bakeInput;
+        } else {
+            resultData = Ts_Bake(data, interval,
+                                 /* includeExtrapLoops */ true);
+        }
+    }
+
+    if (resultData == nullptr) {
+        TF_VERIFY(false, "Ts_Truncate failed bake of input spline data");
+        return nullptr;
+    }
+    resultData->loopParams = TsLoopParams();
+
+    // Write back simplified extrapolation. This ensures we don't
+    // breakdown in a looped section that actually behaves like held
+    // or value block.
+    resultData->preExtrapolation = preExtrap;
+    resultData->postExtrapolation = postExtrap;
+
+    // Perform any relevant breakdowns and reduction of knot vectors.
+    // 
+    // There are three cases:
+    // 1. First time is at the interval min exactly. Do nothing.
+    // 2. Interval min is bracketed by first time and second time.
+    //    Breakdown at min and remove the first knot.
+    // 3. Interval min is before the first time. Breakdown at min.
+    if (minFinite && resultData->times.front() != interval.GetMin()) {
+        const bool removeFirstKnot =
+            resultData->times.front() < interval.GetMin();
+
+        GfInterval localAffectedInterval;
+        std::string reason;
+        const bool success = Ts_Breakdown(resultData,
+                                          interval.GetMin(),
+                                          /* testOnly */ false,
+                                          &localAffectedInterval,
+                                          &reason);
+        TF_VERIFY(success,
+                  "We should be able to breakdown, otherwise something "
+                  "has gone wrong earlier in Ts_Truncate; breakdown "
+                  "failed due to %s", reason.c_str());
+
+        if (removeFirstKnot) {
+            while (resultData->times.front() < interval.GetMin()) {
+                resultData->RemoveKnotAtTime(resultData->times.front());
+            }
+        }
+
+        TF_VERIFY(resultData->times.front() == interval.GetMin(),
+                  "Min side is not correctly truncated to the interval min.");
+    }
+
+    // Max post-processing is symmetric to min post-processing.
+    if (maxFinite && resultData->times.back() != interval.GetMax() &&
+        interval.GetMax() != interval.GetMin())
+    {
+        const bool removeLastKnot =
+            resultData->times.back() > interval.GetMax();
+
+        GfInterval localAffectedInterval;
+        std::string reason;
+        const bool success = Ts_Breakdown(resultData,
+                                          interval.GetMax(),
+                                          /* testOnly */ false,
+                                          &localAffectedInterval,
+                                          &reason);
+        TF_VERIFY(success,
+                  "We should be able to breakdown, otherwise something "
+                  "has gone wrong earlier in Ts_Truncate; breakdown "
+                  "failed due to %s", reason.c_str());
+
+        if (removeLastKnot) {
+            while (resultData->times.back() > interval.GetMax()) {
+                resultData->RemoveKnotAtTime(resultData->times.back());
+            }
+        }
+
+        TF_VERIFY(resultData->times.back() == interval.GetMax(),
+                  "Max side is not correctly truncated to the interval max.");
+    }
+    resultData->preExtrapolation = minFinite ? preFallback : preExtrap;
+    resultData->postExtrapolation = maxFinite ? postFallback : postExtrap;
+
+    return resultData;
+}
 
 PXR_NAMESPACE_CLOSE_SCOPE

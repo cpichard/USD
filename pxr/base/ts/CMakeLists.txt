@@ -211,6 +211,16 @@ pxr_build_test(
 )
 
 pxr_build_test(
+    testTsSplineTransforms
+    CPPFILES
+        testenv/testTsSplineTransforms.cpp
+    LIBRARIES
+        ts
+        vt
+        tf
+)
+
+pxr_build_test(
     testTsTangentConversion
     CPPFILES
         testenv/testTsTangentConversion.cpp
@@ -313,6 +323,11 @@ pxr_register_test(
 pxr_register_test(
     testTsSplineEval
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTsSplineEval"
+)
+
+pxr_register_test(
+    testTsSplineTransforms
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTsSplineTransforms"
 )
 
 pxr_register_test(

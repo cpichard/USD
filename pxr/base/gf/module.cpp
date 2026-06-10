@@ -80,6 +80,7 @@ TF_WRAP_MODULE
     // Note that Transform must be wrapped after Rotation and Vec3d so that it
     // can create python objects for them as keyword args.
     TF_WRAP( Transform );
+    TF_WRAP( Traits );
 
 
     TF_WRAP( Camera );

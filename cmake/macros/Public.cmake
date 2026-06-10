@@ -229,6 +229,7 @@ function(pxr_library NAME)
         PYTHON_PRIVATE_HEADERS
         PYTHON_CPPFILES
         PYMODULE_CPPFILES
+        PYMODULE_DIRS
         PYMODULE_FILES
         PYSIDE_UI_FILES
     )
@@ -427,12 +428,15 @@ function(pxr_library NAME)
         LIB_INSTALL_PREFIX_RESULT libInstallPrefix
     )
 
-    if(PXR_ENABLE_PYTHON_SUPPORT AND (args_PYMODULE_CPPFILES OR args_PYMODULE_FILES OR args_PYSIDE_UI_FILES))
+    if(PXR_ENABLE_PYTHON_SUPPORT AND
+       (args_PYMODULE_CPPFILES OR args_PYMODULE_DIRS OR
+        args_PYMODULE_FILES OR args_PYSIDE_UI_FILES))
         list(APPEND pythonModuleIncludeDirs ${PYTHON_INCLUDE_DIRS})
 
         _pxr_python_module(
             ${NAME}
             WRAPPED_LIB_INSTALL_PREFIX "${libInstallPrefix}"
+            PYTHON_DIRS ${args_PYMODULE_DIRS}
             PYTHON_FILES ${args_PYMODULE_FILES}
             PYSIDE_UI_FILES ${args_PYSIDE_UI_FILES}
             CPPFILES ${args_PYMODULE_CPPFILES}

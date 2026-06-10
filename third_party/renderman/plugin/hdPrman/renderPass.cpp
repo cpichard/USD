@@ -566,6 +566,7 @@ HdPrman_RenderPass::_Execute(
                 _MarkBindingsAsConverged(aovBindings, GetRenderIndex());
             }
 
+#if PXR_VERSION >= 2308
             // Write the id info for batch renders if the render pass contains 
             // an idMap product.
             TfToken idMapProductName =
@@ -574,6 +575,7 @@ HdPrman_RenderPass::_Execute(
                 _renderParam->GetIdMap()->WriteIdMap(
                         idMapProductName.GetString());
             }
+#endif
             _converged = true;
 
             return;
