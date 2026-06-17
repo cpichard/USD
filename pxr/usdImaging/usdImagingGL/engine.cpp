@@ -463,6 +463,7 @@ UsdImagingGLEngine::_DestroyHydraObjects()
         _terminalSceneIndex = nullptr;
         _cachingSceneIndex = nullptr;
         _appSceneIndices = nullptr;
+        _mergingSceneIndex = nullptr;
     }
 
     {

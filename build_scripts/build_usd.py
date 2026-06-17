@@ -311,14 +311,23 @@ def Run(cmd, logCommandOutput = True, env = None):
             p = subprocess.Popen(shlex.split(cmd), env=env)
             p.wait()
 
+        logfile.write("\n")
+        logfile.write(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+        logfile.write("\n")
+        logfile.write("{cmd} exited with returncode {returncode}"
+                      .format(cmd=cmd, returncode=p.returncode))
+        logfile.write("\n\n")
+            
     if p.returncode != 0:
         # If verbosity >= 3, we'll have already been printing out command output
         # so no reason to print the log file again.
         if verbosity < 3:
             with open("log.txt", "r") as logfile:
                 Print(logfile.read())
-        raise RuntimeError("Failed to run '{cmd}' in {path}.\nSee {log} for more details."
-                           .format(cmd=cmd, path=os.getcwd(), log=os.path.abspath("log.txt")))
+        raise RuntimeError(
+            f"Failed to run '{cmd}' in {os.getcwd()} "
+            f"(exited with returncode {p.returncode}).\n\n"
+            f"See {os.path.abspath('log.txt')} for more details.")
 
 @contextlib.contextmanager
 def CurrentWorkingDirectory(dir):
@@ -390,8 +399,21 @@ def AppendCXX11ABIArg(buildFlag, context, buildArgs):
     buildArgs.append('{flag}="{flags}"'.format(
         flag=buildFlag, flags=" ".join(cxxFlags)))
 
+def GetCMakeCacheValue(buildDir, variable):
+    """Return the value of a CMake cache variable by querying the build
+    directory with 'cmake -N -LA <buildDir>', or None on failure."""
+    output = GetCommandOutput(
+        "cmake -N -LA {}".format(shlex.quote(buildDir)))
+    if output is None:
+        return None
+    for line in output.splitlines():
+        m = re.match(r"{}(?::[A-Z]+)?=(.*)".format(re.escape(variable)), line)
+        if m:
+            return m.group(1).strip()
+    return None
+
 def RunCMake(context, force, extraArgs = None, installDir = None):
-    """Invoke CMake to configure, build, and install a library whose 
+    """Invoke CMake to configure, build, and install a library whose
     source code is located in the current working directory."""
     # Create a directory for out-of-source builds in the build directory
     # using the name of the current working directory.
@@ -1748,6 +1770,10 @@ def InstallUSD(context, force, buildArgs):
         if context.buildPython:
             extraArgs.append('-DPXR_ENABLE_PYTHON_SUPPORT=ON')
 
+            if context.pythonInstallDir is not None:
+                extraArgs.append('-DPXR_PYTHON_INSTALL_DIR={}'
+                                 .format(context.pythonInstallDir))
+
             # Many people on Windows may not have Python libraries with debug
             # symbols (denoted by a '_d') installed. This is the common
             # case when a user installs Python from the official download
@@ -2203,6 +2229,12 @@ subgroup.add_argument("--no-debug-python", dest="debug_python",
                       "Don't define Boost Python Debug if your Python "
                       "library comes with Debugging symbols.")
 
+group.add_argument("--python-install-dir", type=str,
+                   dest="python_install_dir", default=None,
+                   help=("Directory to install USD Python bindings, relative "
+                         "to the install prefix or absolute. Defaults to the "
+                         "Python site-packages directory."))
+
 (NO_IMAGING, IMAGING, USD_IMAGING) = (0, 1, 2)
 
 group = parser.add_argument_group(title="Imaging and USD Imaging Options")
@@ -2427,9 +2459,11 @@ class InstallContext:
 
         # Optional components
         self.buildTests = (args.build_tests and not embedded)
-        self.buildPython = (args.build_python and 
-                            not embedded and 
+        self.buildPython = (args.build_python and
+                            not embedded and
                             not self.targetWasm)
+
+        self.pythonInstallDir = args.python_install_dir
         self.buildExamples = (args.build_examples and 
                               not embedded)
         self.buildTutorials = (args.build_tutorials and 
@@ -2942,8 +2976,13 @@ except Exception as e:
     sys.exit(1)
 
 # Done. Print out a final status message.
+usdCMakeBuildDir = os.path.join(context.buildDir,
+                                os.path.basename(context.usdSrcDir))
+pythonInstallDir = GetCMakeCacheValue(usdCMakeBuildDir, "PXR_PYTHON_INSTALL_DIR")
 requiredInPythonPath = set([
-    os.path.join(context.usdInstDir, "lib", "python")
+    os.path.join(context.usdInstDir, pythonInstallDir)
+    if pythonInstallDir is not None else
+    "<unknown: could not read PXR_PYTHON_INSTALL_DIR from CMake cache>"
 ])
 requiredInPythonPath.update(extraPythonPaths)
 
