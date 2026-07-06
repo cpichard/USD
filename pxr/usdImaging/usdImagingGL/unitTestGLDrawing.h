@@ -104,10 +104,6 @@ protected:
     bool _ShouldFrameAll() const { return _shouldFrameAll; }
     TfToken _GetRenderer() const { return _renderer; }
 
-    HdRenderIndex *_GetRenderIndex(UsdImagingGLEngine *engine) {
-        return engine->_GetRenderIndex();
-    }
-    
     void _Render(UsdImagingGLEngine *engine, 
                  const UsdImagingGLRenderParams &params) {
         SdfPathVector roots(1, SdfPath::AbsoluteRootPath());

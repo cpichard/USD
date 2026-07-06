@@ -704,16 +704,36 @@ void InitTestCases()
         ex.loopBoundaryTime = 2.0;
         extrapRepeatDualValuedLoopBoundary.spline.SetPostExtrapolation(ex);
     }
-    // Set the knot at time 2.0 to be dual valued
-    TsKnot knot;
-    extrapRepeatDualValuedLoopBoundary.spline.GetKnot(2.0, &knot);
-    knot.SetPreValue(1.5);
-    extrapRepeatDualValuedLoopBoundary.spline.SetKnot(knot);
-    extrapRepeatDualValuedLoopBoundary.segments[2].t1[1] = 1.5;
-    extrapRepeatDualValuedLoopBoundary.segments[2].p1[1] = 1.5;
 
-    extrapRepeatDualValuedLoopBoundary.preExtrapValueOffset = 2.5;
-    extrapRepeatDualValuedLoopBoundary.postExtrapValueOffset = 2.5;
+    {
+        // Set the knot at time 0.0 to be dual valued
+        TsKnot knot0;
+        extrapRepeatDualValuedLoopBoundary.spline.GetKnot(0.0, &knot0);
+        knot0.SetPreValue(-0.5);
+        extrapRepeatDualValuedLoopBoundary.spline.SetKnot(knot0);
+        extrapRepeatDualValuedLoopBoundary.segments[0].t1[1] = -0.5;
+        extrapRepeatDualValuedLoopBoundary.segments[0].p1[1] = -0.5;
+
+        // Set the knot at time 2.0 to be dual valued
+        TsKnot knot2;
+        extrapRepeatDualValuedLoopBoundary.spline.GetKnot(2.0, &knot2);
+        knot2.SetPreValue(1.5);
+        extrapRepeatDualValuedLoopBoundary.spline.SetKnot(knot2);
+        extrapRepeatDualValuedLoopBoundary.segments[2].t1[1] = 1.5;
+        extrapRepeatDualValuedLoopBoundary.segments[2].p1[1] = 1.5;
+
+        // Set the knot at time 4.0 to be dual valued
+        TsKnot knot4;
+        extrapRepeatDualValuedLoopBoundary.spline.GetKnot(4.0, &knot4);
+        knot4.SetPreValue(4.0);
+        knot4.SetValue(6.0);
+        extrapRepeatDualValuedLoopBoundary.spline.SetKnot(knot4);
+        extrapRepeatDualValuedLoopBoundary.segments[5].t0[1] = 6.0;
+        extrapRepeatDualValuedLoopBoundary.segments[5].p0[1] = 6.0;
+    }
+
+    extrapRepeatDualValuedLoopBoundary.preExtrapValueOffset = 2.0;
+    extrapRepeatDualValuedLoopBoundary.postExtrapValueOffset = 3.5;
     testSplineNames.insert(extrapRepeatDualValuedLoopBoundary.name);
 
     // ================ ExtrapOscillateLoopBoundary ================

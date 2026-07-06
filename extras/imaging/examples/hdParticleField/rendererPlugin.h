@@ -14,7 +14,8 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-class HdParticleFieldRendererPlugin final : public HdRendererPlugin {
+class HdParticleFieldRendererPlugin final : public HdRendererPlugin
+{
   public:
     HdParticleFieldRendererPlugin()           = default;
     ~HdParticleFieldRendererPlugin() override = default;
@@ -30,20 +31,18 @@ class HdParticleFieldRendererPlugin final : public HdRendererPlugin {
     void DeleteRenderDelegate(HdRenderDelegate* renderDelegate) override;
 
     /// Is this plugin supported?
-#if HD_API_VERSION >= 83
     bool IsSupported(
-        HdRendererCreateArgs const &rendererCreateArgs,
-        std::string *reasonWhyNot = nullptr) const override;
-#else
-    bool IsSupported(bool gpuEnabled = true) const override;
-#endif
-
-#if HD_API_VERSION >= 98
-    bool IsSupported(
+#if HD_API_VERSION >= 103
         const HdRendererCreateArgsSchema &rendererCreateArgs,
-        std::string *reasonWhyNot = nullptr) const override;
+        std::string *reasonWhyNot = nullptr
+#elif HD_API_VERSION >= 83
+        HdRendererCreateArgs const &rendererCreateArgs,
+        std::string *reasonWhyNot = nullptr
+#else
+        bool gpuEnabled = true
 #endif
-
+        ) const override;
+    
   private:
     /// Cannot copy.
     HdParticleFieldRendererPlugin(

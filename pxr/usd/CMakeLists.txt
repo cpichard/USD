@@ -9,6 +9,7 @@ set(DIRS
     usdVol
     usdMedia
     usdShade
+    usdLod
     usdLux
     usdProc
     usdProfiles

@@ -23,18 +23,18 @@ supported Python versions see `3rd Party Library and Application Versions
 <https://github.com/PixarAnimationStudios/OpenUSD/blob/release/VERSIONS.md>`_).
 These tutorials assume the interpreter is named "python". 
 
-+---------------------+------------+---------------------------------------------------------------------------------------------+
-|Variable             |Meaning     |Value                                                                                        |
-+=====================+============+=============================================================================================+
-|:envvar:`PYTHONPATH` |Python      |See `docs<https://github.com/PixarAnimationStudios/OpenUSD/blob/release/BUILDING.md#python>` |
-|                     |module      |                                                                                             |
-|                     |search path |                                                                                             |
-+---------------------+------------+---------------------------------------------------------------------------------------------+
-|:envvar:`PATH`       |Program     |:filename:`USD_INSTALL_ROOT/bin`                                                             |
-|                     |search path |                                                                                             |
-|                     |            |On Windows also add                                                                          |
-|                     |            |:filename:`USD_INSTALL_ROOT/lib`                                                             |
-+---------------------+------------+---------------------------------------------------------------------------------------------+
++---------------------+------------+------------------------------------------------------------------------------------------------+
+|Variable             |Meaning     |Value                                                                                           |
++=====================+============+================================================================================================+
+|:envvar:`PYTHONPATH` |Python      |See `docs <https://github.com/PixarAnimationStudios/OpenUSD/blob/release/BUILDING.md#python>`__ |
+|                     |module      |                                                                                                |
+|                     |search path |                                                                                                |
++---------------------+------------+------------------------------------------------------------------------------------------------+
+|:envvar:`PATH`       |Program     |:filename:`USD_INSTALL_ROOT/bin`                                                                |
+|                     |search path |                                                                                                |
+|                     |            |On Windows also add                                                                             |
+|                     |            |:filename:`USD_INSTALL_ROOT/lib`                                                                |
++---------------------+------------+------------------------------------------------------------------------------------------------+
 
 For more information see `Advanced Build Configuration
 <https://github.com/PixarAnimationStudios/OpenUSD/blob/release/BUILDING.md>`_.

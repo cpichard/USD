@@ -75,7 +75,7 @@ HdEmbreeRendererPlugin::DeleteRenderDelegate(HdRenderDelegate *renderDelegate)
 
 bool 
 HdEmbreeRendererPlugin::IsSupported(
-    HdRendererCreateArgs const & /* rendererCreateArgs */,
+    const HdRendererCreateArgsSchema & /* rendererCreateArgs */,
     std::string * /* reasonWhyNot */) const
 {
     // Nothing more to check for now, we assume if the plugin loads correctly

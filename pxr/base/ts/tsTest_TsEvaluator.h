@@ -31,7 +31,6 @@ public:
     // EVALUATION
 
     // Evaluate at specified times.
-    TS_API
     TsTest_SampleVec Eval(
         const TsSpline& spline,
         const TsTest_SampleTimes &sampleTimes) const;
@@ -53,7 +52,6 @@ public:
     // Produce a copy of spline with inner loops, if any, baked out into
     // ordinary knots.
     /*
-    TS_API
     TsSpline BakeInnerLoops(
         const TsSpline &spline) const;
     */

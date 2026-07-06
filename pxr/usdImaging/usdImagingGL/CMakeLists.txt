@@ -2268,6 +2268,18 @@ pxr_register_test(testUsdImagingGLCards_SceneIndex_basic
     TESTENV testenv/testUsdImagingGLCards
 )
 
+pxr_register_test(testUsdImagingGLCards_SceneIndex_visibility
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -frameAll -stage testCardsVisibility.usda -camera /MainCamera -write testCardsVisibility.png"
+    IMAGE_DIFF_COMPARE
+        testCardsVisibility.png
+    FAIL 0.1
+    FAIL_PERCENT 0.1
+    WARN 0.2
+    WARN_PERCENT 0.05
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testUsdImagingGLCards
+)
+
 pxr_register_test(testUsdImagingGLMeshQuadrangulation
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -shading wireOnSurface -frameAll -stage meshQuadrangulation.usda -write testUsdImagingGLMeshQuadrangulation_default.png"
     IMAGE_DIFF_COMPARE
@@ -4559,29 +4571,31 @@ pxr_register_test(testUsdImagingGLDomeLightTaskController
     TESTENV testenv/testUsdImagingGLDomeLightTaskController
 )
 
-pxr_register_test(testUsdImagingGLVelocityMotion
+pxr_register_test(testUsdImagingGLVelocityMotion_24
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -camlight -shading wireOnSurface -camera /World/main_cam -stage scene.usda -times 1 2.5 4 -write testUsdImagingGLVelocityMotion.png"
     IMAGE_DIFF_COMPARE
         testUsdImagingGLVelocityMotion_001.png
         testUsdImagingGLVelocityMotion_2.5.png
         testUsdImagingGLVelocityMotion_004.png
-    FAIL 1
-    FAIL_PERCENT 1
-    PERCEPTUAL
-    EXPECTED_RETURN_CODE 0
-    TESTENV testenv/testUsdImagingGLVelocityMotion)
+    FAIL_PERCENT 0.0004
+    FAIL 0.008
+    TESTENV testenv/testUsdImagingGLVelocityMotion
+    ENV
+        TF_DEBUG=HDSI_VELOCITY_MOTION
+)
 
-pxr_register_test(testUsdImagingGLVelocityMotion_SceneIndex
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -camlight -shading wireOnSurface -camera /World/main_cam -stage scene.usda -times 1 2.5 4 -write testUsdImagingGLVelocityMotion.png"
+pxr_register_test(testUsdImagingGLVelocityMotion_48
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -camlight -shading wireOnSurface -camera /World/main_cam -stage scene48.usda -times 1 2.5 4 -write testUsdImagingGLVelocityMotion48.png"
     IMAGE_DIFF_COMPARE
-        testUsdImagingGLVelocityMotion_001.png
-        testUsdImagingGLVelocityMotion_2.5.png
-        testUsdImagingGLVelocityMotion_004.png
-    FAIL 1
-    FAIL_PERCENT 1
-    PERCEPTUAL
-    EXPECTED_RETURN_CODE 0
-    TESTENV testenv/testUsdImagingGLVelocityMotion)
+        testUsdImagingGLVelocityMotion48_001.png
+        testUsdImagingGLVelocityMotion48_2.5.png
+        testUsdImagingGLVelocityMotion48_004.png
+    FAIL_PERCENT 0.0004
+    FAIL 0.008
+    TESTENV testenv/testUsdImagingGLVelocityMotion
+    ENV
+        TF_DEBUG=HDSI_VELOCITY_MOTION
+)
 
 pxr_register_test(testUsdImagingGLMaterialPrimvars
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -camlight -camera /main_cam -stage materialPrimvars.usda -write testUsdImagingGLMaterialPrimvars.png"
@@ -4636,6 +4650,50 @@ pxr_register_test(testUsdImagingGLUsdRenderPass_visibility
     COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --renderPassPrimPath /Render/Passes/onlyspheres input.usda onlyspheres.exr"
     IMAGE_DIFF_COMPARE
         onlyspheres.exr
+    FAIL 1
+    FAIL_PERCENT 1
+    PERCEPTUAL
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testUsdImagingGLUsdRenderPass)
+
+pxr_register_test(testUsdImagingGLUsdRenderPassWithInstances_default
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --renderPassPrimPath /Render/Passes/default renderPassWithInstances.usda renderPassWithInstances_default.exr"
+    IMAGE_DIFF_COMPARE
+        renderPassWithInstances_default.exr
+    FAIL 1
+    FAIL_PERCENT 1
+    PERCEPTUAL
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testUsdImagingGLUsdRenderPass)
+
+pxr_register_test(testUsdImagingGLUsdRenderPassWithInstances_prune_test
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --renderPassPrimPath /Render/Passes/prune_test renderPassWithInstances.usda renderPassWithInstances_prune_test.exr"
+    IMAGE_DIFF_COMPARE
+        renderPassWithInstances_prune_test.exr
+    FAIL 1
+    FAIL_PERCENT 1
+    PERCEPTUAL
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testUsdImagingGLUsdRenderPass)
+
+pxr_register_test(testUsdImagingGLUsdRenderPassWithInstances_renderVisibility_test
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --renderPassPrimPath /Render/Passes/renderVisibility_test renderPassWithInstances.usda renderPassWithInstances_renderVisibility_test.exr"
+    IMAGE_DIFF_COMPARE
+        renderPassWithInstances_renderVisibility_test.exr
+    FAIL 1
+    FAIL_PERCENT 1
+    PERCEPTUAL
+    EXPECTED_RETURN_CODE 0
+    TESTENV testenv/testUsdImagingGLUsdRenderPass)
+
+pxr_register_test(testUsdImagingGLUsdRenderPassWithInstances_renderVisibility_test2
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdrecord --renderer HdStormRendererPlugin --renderPassPrimPath /Render/Passes/renderVisibility_test2 renderPassWithInstances.usda renderPassWithInstances_renderVisibility_test2.exr"
+    IMAGE_DIFF_COMPARE
+        renderPassWithInstances_renderVisibility_test2.exr
     FAIL 1
     FAIL_PERCENT 1
     PERCEPTUAL

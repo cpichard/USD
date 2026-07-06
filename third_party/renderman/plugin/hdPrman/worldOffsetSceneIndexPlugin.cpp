@@ -632,6 +632,9 @@ public:
                 1, &HdXformSchemaTokens->xform, &xformDataSource
             );
             HdContainerDataSourceHandle handles[2] = { xformContainerDataSource, prim.dataSource };
+#if PXR_VERSION <= 2305 && defined(ARCH_OS_WINDOWS)
+            return prim;
+#else
             return {
                 prim.primType,
                 _WorldOffsetPrimDataSource::New(
@@ -639,6 +642,7 @@ public:
                     _worldOffset + _cameraOffset
                 )
             };
+#endif
         }
 
         // Add the transform to all other prims.

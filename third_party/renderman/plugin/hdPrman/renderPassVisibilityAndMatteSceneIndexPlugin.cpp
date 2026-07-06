@@ -14,6 +14,7 @@
 
 #include "pxr/imaging/hd/collectionExpressionEvaluator.h"
 #include "pxr/imaging/hd/collectionsSchema.h"
+#include "pxr/imaging/hd/instancedBySchema.h"
 #include "pxr/imaging/hd/instancerTopologySchema.h"
 #include "pxr/imaging/hd/containerDataSourceEditor.h"
 #include "pxr/imaging/hd/dataSourceLocator.h"
@@ -79,6 +80,7 @@ _IsGeometryType(const TfToken &primType)
         HdPrimTypeTokens->cylinder,
         HdPrimTypeTokens->sphere,
         HdPrmanTokens->meshLightSourceMesh,
+        HdPrmanTokens->meshLightSourcePoints,
         HdPrmanTokens->meshLightSourceVolume
     };
     return HdPrimTypeIsGprim(primType) ||
@@ -92,6 +94,16 @@ _ShouldApplyPassVisibility(const TfToken &primType)
 {
     return _IsGeometryType(primType) || HdPrimTypeIsLight(primType) ||
         primType == HdPrimTypeTokens->lightFilter;
+}
+
+// Returns true if the matte rules apply to this prim type.
+bool
+_ShouldApplyPassMatte(const TfToken &primType)
+{
+    // We need to also include instancers, so that matte'ing can apply
+    // to point-instancers.
+    return _IsGeometryType(primType) ||
+        primType == HdPrimTypeTokens->instancer;
 }
 
 bool
@@ -203,7 +215,7 @@ struct _RenderPassVisibilityAndMatteState {
         HdSceneIndexPrim const& prim) const
     {
         return matteEval
-            && _IsGeometryType(prim.primType)
+            && _ShouldApplyPassMatte(prim.primType)
             && matteEval->Match(primPath);
     }
 
@@ -592,13 +604,41 @@ _RenderPassVisibilityAndMatteDataSource::Get(const TfToken &name)
 // Render Pass Visibility And Matte Scene Index (cont.) //
 //////////////////////////////////////////////////////////
 
+static bool
+_IsPrototype(HdSceneIndexPrim const& prim)
+{
+    if (HdInstancedBySchema instancedBySchema =
+        HdInstancedBySchema::GetFromParent(prim.dataSource)) {
+        // XXX The docs for the InstancedBy schema say it is
+        // "A schema marking a prim as instanced by another prim"
+        //
+        // However, experimentally we observe prims from Presto Mf
+        // have this schema regardless of being instanced.  So we
+        // must pull apart the schema to check for instance paths.
+        //
+        // It seems like it would be better to only emit the
+        // instancedBy schema for prims that are instanced.
+        if (HdPathArrayDataSourceHandle pathsDs =
+            instancedBySchema.GetPaths()) {
+            VtArray<SdfPath> paths = pathsDs->GetTypedValue(0.0);
+            return !paths.empty();
+        }
+    }
+    return false;
+}
+
 HdSceneIndexPrim 
 _RenderPassVisibilityAndMatteSceneIndex::GetPrim(
     const SdfPath &primPath) const
 {
     HdSceneIndexPrim prim = _GetInputSceneIndex()->GetPrim(primPath);
 
-    if (prim.dataSource) {
+    // Do not modify prototype prims (those with instancedBy schema).
+    // Prototypes are an internal detail of the system, not something
+    // meant to be user-facing, so there must be no way to point
+    // user-defined operations (such as render pass collections)
+    // at prototypes.
+    if (prim.dataSource && !_IsPrototype(prim)) {
         // Overrides happen in the prim-level data source.
         prim.dataSource = _RenderPassVisibilityAndMatteDataSource::New(
             TfCreateWeakPtr(this), primPath, prim);

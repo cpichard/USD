@@ -66,7 +66,7 @@ TsTest_TsEvaluator::Sample(
 }
 
 // Explicit templated method instantiation.
-template TS_API bool
+template bool
 TsTest_TsEvaluator::Sample(
     const TsSpline& spline,
     const GfInterval& timeInterval,
@@ -75,7 +75,7 @@ TsTest_TsEvaluator::Sample(
     const double tolerance,
     TsSplineSamples<GfVec2d>* splineSamples) const;
 
-template TS_API bool
+template bool
 TsTest_TsEvaluator::Sample(
     const TsSpline& spline,
     const GfInterval& timeInterval,

@@ -897,11 +897,12 @@ INPUT                  = docs/doxygen/externalOverview.dox \
                          docs/doxygen/architecture-guides \
                          docs/doxygen/developer-guidelines \
                          docs/include/pxr/extras/imaging \
+                         docs/include/pxr/extras/exec \
                          docs/include/pxr/base \
                          docs/include/pxr/usd \
                          docs/include/pxr/imaging \
                          docs/include/pxr/usdImaging \
-                         docs/include
+                         docs/include 
 
 # This tag can be used to specify the character encoding of the source files
 # that doxygen parses. Internally doxygen uses the UTF-8 encoding. Doxygen uses

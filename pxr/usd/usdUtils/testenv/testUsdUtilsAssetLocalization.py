@@ -4,7 +4,7 @@
 #
 # Licensed under the terms set forth in the LICENSE.txt file available at
 # https://openusd.org/license.
-from pxr import Tf, Ar, Sdf, UsdUtils, Plug
+from pxr import Tf, Ar, Sdf, UsdUtils, Plug, Usd
 import os, shutil
 import unittest
 
@@ -270,6 +270,51 @@ class TestUsdUtilsAssetLocalization(unittest.TestCase):
                 self.assertTrue(
                     "Skipping export of dependency @/unresolvable.usda@" 
                     in trap.GetWarnings()[1].commentary)
+
+    def test_LocalizeExpressionVariables(self):
+        assetPath = "variableExpressions/root.usda"
+        archivePath = "variableExpressions.usdz"
+        context = Ar.GetResolver().CreateDefaultContextForAsset(assetPath)
+
+        with Ar.ResolverContextBinder(context):
+            self.assertTrue(UsdUtils.CreateNewUsdzPackage(
+                assetPath, archivePath, editLayersInPlace=True))
+            
+        zf = Sdf.ZipFile.Open(archivePath)
+        expectedAssets = [
+            "root.usda", 
+            "0/attr.usda",
+            "0/attr_arr.usda",
+            "0/meta.usda",
+            "0/meta_arr.usda",
+            "0/pay.usda",
+            "0/ref.usda",
+            "0/sub.usda",
+        ]
+
+        self.assertEqual(expectedAssets, zf.GetFileNames())
+
+        # ensure that the expression variable paths have been remapped and
+        # saved in the asset's layers correctly.
+        stage = Usd.Stage.Open(archivePath)
+        self.assertIsNotNone(stage)
+
+        # Assert that the the expression variables themselves have not been
+        # altered.  This is important for preserving possible variant
+        # selections.
+        expectedExpressionVariables = {
+            "ATTR": "attr.usda",
+            "ATTR_ARR": "attr_arr.usda",
+            "FILTER": True,
+            "META": "meta.usda", 
+            "META_ARR": "meta_arr.usda",
+            "PAY": "pay.usda",
+            "REF": "ref.usda",
+            "SUBLAYER": "sub.usda"
+        }
+        self.assertEqual(
+            expectedExpressionVariables, 
+            stage.GetRootLayer().expressionVariables)
 
 if __name__=="__main__":
     unittest.main()

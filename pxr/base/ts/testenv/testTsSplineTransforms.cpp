@@ -325,14 +325,323 @@ TestTruncateMuseumCases()
 }
 
 bool
+TestTruncateSpecificCases()
+{
+    std::string testId = "TestTruncateSpecificCases";
+
+    TsSpline splineOsc;
+    splineOsc.SetPostExtrapolation(TsExtrapLoopOscillate);
+    {
+        TsKnot k1, k2;
+        k1.SetTime(5);
+        k1.SetValue(10.0);
+        k1.SetNextInterpolation(TsInterpCurve);
+        k2.SetTime(10);
+        k2.SetValue(5.0);
+        splineOsc.SetKnots({k1, k2});
+    }
+    const GfInterval oscInterval(10, 12.5, CLOSED, OPEN);
+    const TsSpline truncOsc = splineOsc.GetTruncated(oscInterval);
+    if (!VerifySplineEquivalence(testId, "splineOsc", splineOsc, truncOsc,
+                                 oscInterval, oscInterval, 1e-10)) {
+        return false;
+    }
+    return true;
+}
+
+bool
 TestTruncate()
 {
     return TestTruncateBaseCases()
-        && TestTruncateMuseumCases();
+        && TestTruncateMuseumCases()
+        && TestTruncateSpecificCases();
+}
+
+template <typename T>
+TsSpline GetTestSpline() {
+    const TfType valueType = Ts_GetType<T>();
+    TsSpline spline(valueType);
+
+    // Set extrapolations
+    {
+        TsExtrapolation preExtrap(TsExtrapSloped);
+        preExtrap.slope = -0.5;
+        spline.SetPreExtrapolation(preExtrap);
+
+        TsExtrapolation postExtrap(TsExtrapLoopOscillate);
+        postExtrap.loopBoundaryTime = 2.0;
+        spline.SetPostExtrapolation(postExtrap);
+    }
+
+    // Set knots
+    {
+        TsKnot k1(valueType);
+        TsKnot k2(valueType);
+        TsKnot k3(valueType);
+
+        k1.SetTime(0.0);
+        k1.SetValue(T(2.0));
+        k1.SetPostTanWidth(0.25);
+        k1.SetPostTanSlope(T(0.5));
+        k1.SetNextInterpolation(TsInterpCurve);
+
+        k2.SetTime(2.0);
+        k2.SetPreValue(T(3.0));
+        k2.SetValue(T(4.0));
+        k2.SetPreTanWidth(0.5);
+        k2.SetPreTanSlope(T(-0.5));
+        k2.SetNextInterpolation(TsInterpLinear);
+
+        k3.SetTime(4.0);
+        k3.SetValue(T(2.0));
+
+        spline.SetKnots({k1, k2, k3});
+    }
+
+    return spline;
+}
+
+bool TestGetTimeScaled()
+{
+    const double scaleFactor = 3.0;
+    const double scaleOffset = 5.0;
+
+    const TsSpline dSpline = GetTestSpline<double>();
+    const TsExtrapolation dPreExtrap = dSpline.GetPreExtrapolation();
+    const TsExtrapolation dPostExtrap = dSpline.GetPostExtrapolation();
+
+    // Check positive scale and offset of double spline
+    const TsSpline dScaled = dSpline.GetTimeScaled(scaleFactor,
+                                                   scaleOffset);
+    {
+        // Check scaled extrapolation
+        const TsExtrapolation pre = dScaled.GetPreExtrapolation();
+        const TsExtrapolation post = dScaled.GetPostExtrapolation();
+        TF_AXIOM(pre.mode == dPreExtrap.mode);
+        TF_AXIOM(pre.slope == dPreExtrap.slope / scaleFactor);
+        TF_AXIOM(post.mode == dPostExtrap.mode);
+        TF_AXIOM(post.loopBoundaryTime.value() ==
+                 dPostExtrap.loopBoundaryTime.value()
+                 * scaleFactor + scaleOffset);
+    }
+    {
+        // Check knots
+        TsKnotMap expectedKnots;
+        for (const TsKnot& dKnot : dSpline.GetKnots()) {
+            TsKnot expected = dKnot;
+            expected.SetTime(dKnot.GetTime() * scaleFactor + scaleOffset);
+            expected.SetPreTanWidth(dKnot.GetPreTanWidth() * scaleFactor);
+            expected.SetPostTanWidth(dKnot.GetPostTanWidth() * scaleFactor);
+
+            double value;
+            TF_AXIOM(dKnot.GetPreTanSlope(&value));
+            expected.SetPreTanSlope(value / scaleFactor);
+            TF_AXIOM(dKnot.GetPostTanSlope(&value));
+            expected.SetPostTanSlope(value / scaleFactor);
+
+            expectedKnots.insert(expected);
+        }
+        TF_AXIOM(expectedKnots == dScaled.GetKnots());
+    }
+
+    // Check negative scale and offset of double spline
+    const TsSpline dNegScaled = dSpline.GetTimeScaled(-scaleFactor,
+                                                      scaleOffset);
+    {
+        // Check negative scaled extrapolation
+        const TsExtrapolation pre = dNegScaled.GetPreExtrapolation();
+        const TsExtrapolation post = dNegScaled.GetPostExtrapolation();
+        TF_AXIOM(pre.mode == dPostExtrap.mode);
+        TF_AXIOM(pre.loopBoundaryTime.value() ==
+                 dPostExtrap.loopBoundaryTime.value()
+                 * (-scaleFactor) + scaleOffset);
+        TF_AXIOM(post.mode == dPreExtrap.mode);
+        TF_AXIOM(post.slope == -dPreExtrap.slope / scaleFactor);
+    }
+    {
+        // Build expected knots and check them
+        TsKnot k1, k2, k3;
+
+        k3.SetTime(4.0 * (-scaleFactor) + scaleOffset);
+        k3.SetValue(2.0);
+        k3.SetNextInterpolation(TsInterpLinear);
+
+        k2.SetTime(2.0 * (-scaleFactor) + scaleOffset);
+        k2.SetValue(3.0);
+        k2.SetPreValue(4.0);
+        k2.SetPostTanWidth(0.5 * scaleFactor);
+        k2.SetPostTanSlope(0.5 / scaleFactor);
+        k2.SetNextInterpolation(TsInterpCurve);
+
+        k1.SetTime(scaleOffset);
+        k1.SetValue(2.0);
+        k1.SetPreTanWidth(0.25 * scaleFactor);
+        k1.SetPreTanSlope(-0.5 / scaleFactor);
+
+        TF_AXIOM(TsKnotMap({k3, k2, k1}) == dNegScaled.GetKnots());
+    }
+
+    const TsSpline tSpline = GetTestSpline<GfTimeCode>();
+    const TsExtrapolation tPreExtrap = tSpline.GetPreExtrapolation();
+    const TsExtrapolation tPostExtrap = tSpline.GetPostExtrapolation();
+
+    // Check positive scale and offset of GfTimeCode spline
+    const TsSpline tScaled = tSpline.GetTimeScaled(scaleFactor,
+                                                   scaleOffset);
+    {
+        // Check scaled extrapolation
+        const TsExtrapolation pre = tScaled.GetPreExtrapolation();
+        const TsExtrapolation post = tScaled.GetPostExtrapolation();
+        TF_AXIOM(pre == tPreExtrap);
+        TF_AXIOM(post.mode == tPostExtrap.mode);
+        TF_AXIOM(post.loopBoundaryTime.value() ==
+                 tPostExtrap.loopBoundaryTime.value()
+                 * scaleFactor + scaleOffset);
+    }
+    {
+        // Check knots
+        TsKnotMap expectedKnots;
+        for (const TsKnot& tKnot : tSpline.GetKnots()) {
+            TsKnot expected = tKnot;
+            expected.SetTime(tKnot.GetTime() * scaleFactor + scaleOffset);
+            expected.SetPreTanWidth(tKnot.GetPreTanWidth() * scaleFactor);
+            expected.SetPostTanWidth(tKnot.GetPostTanWidth() * scaleFactor);
+
+            GfTimeCode value;
+            TF_AXIOM(tKnot.GetValue(&value));
+            expected.SetValue(value * scaleFactor + scaleOffset);
+            if (tKnot.IsDualValued()) {
+                TF_AXIOM(tKnot.GetPreValue(&value));
+                expected.SetPreValue(value * scaleFactor + scaleOffset);
+            }
+
+            expectedKnots.insert(expected);
+        }
+        TF_AXIOM(expectedKnots == tScaled.GetKnots());
+    }
+
+    // Check negative scale and offset of GfTimeCode spline
+    const TsSpline tNegScaled = tSpline.GetTimeScaled(-scaleFactor,
+                                                      scaleOffset);
+    {
+        // Check negative scaled extrapolation
+        const TsExtrapolation pre = tNegScaled.GetPreExtrapolation();
+        const TsExtrapolation post = tNegScaled.GetPostExtrapolation();
+        TF_AXIOM(pre.mode == tPostExtrap.mode);
+        TF_AXIOM(pre.loopBoundaryTime.value() ==
+                 tPostExtrap.loopBoundaryTime.value()
+                 * (-scaleFactor) + scaleOffset);
+        TF_AXIOM(post == tPreExtrap);
+    }
+    {
+        // Build expected knots and check them
+        const TfType t = Ts_GetType<GfTimeCode>();
+        TsKnot k1(t);
+        TsKnot k2(t);
+        TsKnot k3(t);
+
+        k3.SetTime(4.0 * (-scaleFactor) + scaleOffset);
+        k3.SetValue(GfTimeCode(2.0 * (-scaleFactor) + scaleOffset));
+        k3.SetNextInterpolation(TsInterpLinear);
+
+        k2.SetTime(2.0 * (-scaleFactor) + scaleOffset);
+        k2.SetValue(GfTimeCode(3.0 * (-scaleFactor) + scaleOffset));
+        k2.SetPreValue(GfTimeCode(4.0 * (-scaleFactor) + scaleOffset));
+        k2.SetPostTanWidth(0.5 * scaleFactor);
+        k2.SetPostTanSlope(GfTimeCode(-0.5));
+        k2.SetNextInterpolation(TsInterpCurve);
+
+        k1.SetTime(scaleOffset);
+        k1.SetValue(GfTimeCode(2.0 * (-scaleFactor) + scaleOffset));
+        k1.SetPreTanWidth(0.25 * scaleFactor);
+        k1.SetPreTanSlope(GfTimeCode(+0.5));
+
+        TF_AXIOM(TsKnotMap({k3, k2, k1}) == tNegScaled.GetKnots());
+    }
+    return true;
+}
+
+bool TestConcatenate()
+{
+    // Concatenation of a single spline should yield a copy of the original.
+    const TfType doubleType = Ts_GetType<double>();
+    TsSpline spline(doubleType);
+    TsKnot knot(doubleType);
+    knot.SetTime(5.0);
+    knot.SetValue(15.0);
+    spline.SetKnot(knot);
+    TF_AXIOM(TsSpline::Concatenate({spline}) == spline);
+
+    // Check that all knots, both directly preserved and the result of
+    // combining boundary knots, appear in the result spline.
+    std::vector<TsSpline> splines;
+    TsSpline s1(doubleType);
+    TsSpline s2(doubleType);
+    TsSpline s3(doubleType);
+    s1.SetPreExtrapolation(TsExtrapLoopOscillate);
+    s3.SetPreExtrapolation(TsExtrapLoopRepeat);
+    s3.SetPostExtrapolation(TsExtrapLinear);
+
+    TsKnot k1, k2, k3, k4, k5, k6;
+    k1.SetTime(1.0);
+    k1.SetValue(5.0);
+    k1.SetPostTanWidth(0.5);
+    k1.SetNextInterpolation(TsInterpCurve);
+
+    k2.SetTime(3.0);
+    k2.SetValue(4.0);
+    k2.SetNextInterpolation(TsInterpValueBlock);
+    k2.SetPreTanWidth(0.25);
+
+    k3.SetTime(3.0);
+    k3.SetValue(3.0);
+    k3.SetNextInterpolation(TsInterpHeld);
+
+    k4.SetTime(3.0);
+    k4.SetValue(2.0);
+    k4.SetPreValue(6.0);
+    k4.SetPostTanSlope(0.2);
+    k4.SetNextInterpolation(TsInterpLinear);
+
+    k5.SetTime(5.0);
+    k5.SetNextInterpolation(TsInterpCurve);
+    k5.SetValue(0.0);
+    k5.SetPostTanWidth(1.0);
+
+    k6.SetTime(10.0);
+    k6.SetValue(10.0);
+    k6.SetPreTanWidth(1.0);
+
+    s1.SetKnots({k1, k2});
+    s2.SetKnots({k3}); // knot 3 will get overwritten entirely
+    s3.SetKnots({k4, k5, k6});
+
+    const TsSpline result = TsSpline::Concatenate({s1, s2, s3});
+    TF_AXIOM(result.GetPreExtrapolation().mode == TsExtrapLoopOscillate);
+    TF_AXIOM(result.GetPostExtrapolation().mode == TsExtrapLinear);
+
+    // Check that we got the expected knots
+    const TsKnotMap resultKnots = result.GetKnots();
+
+    TF_AXIOM(resultKnots.size() == 4);
+    TsKnot kBoundary = k4;
+    kBoundary.SetPreValue(4.0);     // value of k2
+    kBoundary.SetPreTanWidth(0.25); // pre tan width of k2
+    kBoundary.SetPreTanSlope(0.0);  // pre tan slope of k2
+    const std::vector<TsKnot> expectedKnots = {k1, kBoundary, k5, k6};
+    size_t i = 0;
+    auto it = resultKnots.begin();
+    while (i < expectedKnots.size()) {
+        TF_AXIOM(*it == expectedKnots[i]);
+        i++;
+        it++;
+    }
+
+    return true;
 }
 
 int main(int argc, const char **argv)
 {
-    bool success = TestTruncate();
+    bool success = TestTruncate() && TestGetTimeScaled() && TestConcatenate();
     return success ? 0 : 1;
 }

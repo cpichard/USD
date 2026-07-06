@@ -1051,6 +1051,257 @@ testDictionaryIterators()
 
 }
 
+namespace {
+struct _MoveCounter {
+    int copies = 0;
+    int moves = 0;
+    int value = 0;
+
+    _MoveCounter() = default;
+    explicit _MoveCounter(int v) : value(v) {}
+    _MoveCounter(const _MoveCounter &o)
+        : copies(o.copies + 1), moves(o.moves), value(o.value) {}
+    _MoveCounter(_MoveCounter &&o) noexcept
+        : copies(o.copies), moves(o.moves + 1), value(o.value) {}
+    _MoveCounter &operator=(const _MoveCounter &o) {
+        copies = o.copies + 1; moves = o.moves; value = o.value;
+        return *this;
+    }
+    _MoveCounter &operator=(_MoveCounter &&o) noexcept {
+        copies = o.copies; moves = o.moves + 1; value = o.value;
+        return *this;
+    }
+    bool operator==(const _MoveCounter &o) const { return value == o.value; }
+};
+}
+
+static void
+testDictionaryInsertion()
+{
+    // Exercise VtDictionary::insert, try_emplace, and insert_or_assign.
+    VtDictionary dict;
+
+    // Insert a key-value
+    {
+        auto [it, didInsert] = dict.insert({"key1", VtValue(1)});
+        TF_AXIOM(didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key1");
+        TF_AXIOM(it->second.IsHolding<int>());
+        TF_AXIOM(it->second.UncheckedGet<int>() == 1);
+        TF_AXIOM(it == dict.find("key1"));
+        TF_AXIOM(dict.size() == 1);
+    }
+
+    // Insert a second key-value.
+    {
+        auto [it, didInsert] = dict.insert({"key2", VtValue(2)});
+        TF_AXIOM(didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key2");
+        TF_AXIOM(it->second.IsHolding<int>());
+        TF_AXIOM(it->second.UncheckedGet<int>() == 2);
+        TF_AXIOM(it == dict.find("key2"));
+        TF_AXIOM(dict.size() == 2);
+    }
+
+    // Try inserting a duplicate key.
+    {
+        auto [it, didInsert] = dict.insert({"key1", VtValue(5)});
+        TF_AXIOM(!didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key1");
+        TF_AXIOM(it->second.IsHolding<int>());
+        TF_AXIOM(it->second.UncheckedGet<int>() == 1);
+        TF_AXIOM(it == dict.find("key1"));
+        TF_AXIOM(dict.size() == 2);
+    }
+    
+    // try_emplace a new key with an lvalue
+    {
+        _MoveCounter value(5);
+        auto [it, didInsert] = dict.try_emplace("key3", value);
+        TF_AXIOM(didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key3");
+        TF_AXIOM(it->second.IsHolding<_MoveCounter>());
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().value == 5);
+        TF_AXIOM(it == dict.find("key3"));
+        TF_AXIOM(dict.size() == 3);
+
+        // value should be copied, not moved.
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().moves == 0);
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().copies == 1);
+    }
+
+    // try_emplace a new key with an rvalue
+    {
+        _MoveCounter value(6);
+        auto [it, didInsert] = dict.try_emplace("key4", std::move(value));
+        TF_AXIOM(didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key4");
+        TF_AXIOM(it->second.IsHolding<_MoveCounter>());
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().value == 6);
+        TF_AXIOM(it == dict.find("key4"));
+        TF_AXIOM(dict.size() == 4);
+
+        // value should be moved, not copied
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().moves == 1);
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().copies == 0);
+    }
+
+    // try_emplace an rvalue but the key already exists
+    {
+        _MoveCounter value(7);
+        auto [it, didInsert] = dict.try_emplace("key4", value);
+        TF_AXIOM(!didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key4");
+        TF_AXIOM(it->second.IsHolding<_MoveCounter>());
+
+        // The existing value from the previous try_emplace should be unchanged
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().value == 6);
+        TF_AXIOM(it == dict.find("key4"));
+        TF_AXIOM(dict.size() == 4);
+
+        // The moves/copies on this value should be the same as the previous
+        // block.
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().moves == 1);
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().copies == 0);
+    }
+
+    // try_emplace a new rvalue ref key with an rvalue
+    {
+        _MoveCounter value(8);
+        std::string key = "key to move";
+        auto [it, didInsert] =
+            dict.try_emplace(std::move(key), std::move(value));
+        TF_AXIOM(didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key to move");
+        TF_AXIOM(it->second.IsHolding<_MoveCounter>());
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().value == 8);
+        TF_AXIOM(it == dict.find("key to move"));
+        TF_AXIOM(dict.size() == 5);
+
+        // value should be moved, not copied
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().moves == 1);
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().copies == 0);
+    }
+
+    // try_emplace an rvalue with a rvalue ref key but the key already exists
+    {
+        _MoveCounter value(9);
+        std::string key = "key to move";
+        auto [it, didInsert] =
+            dict.try_emplace(std::move(key), std::move(value));
+        TF_AXIOM(!didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key to move");
+        TF_AXIOM(it->second.IsHolding<_MoveCounter>());
+
+        // The existing value from the previous try_emplace should be unchanged
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().value == 8);
+        TF_AXIOM(it == dict.find("key to move"));
+        TF_AXIOM(dict.size() == 5);
+
+        // The moves/copies on this value should be the same as the previous
+        // block.
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().moves == 1);
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().copies == 0);
+    }
+
+    // insert_or_assign a new key with an lvalue
+    {
+        _MoveCounter value(10);
+        auto [it, didInsert] = dict.insert_or_assign("key5", value);
+        TF_AXIOM(didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key5");
+        TF_AXIOM(it->second.IsHolding<_MoveCounter>());
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().value == 10);
+        TF_AXIOM(it == dict.find("key5"));
+        TF_AXIOM(dict.size() == 6);
+
+        // value should be copied, not moved
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().moves == 0);
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().copies == 1);
+    }
+
+    // insert_or_assign a new key with an rvalue
+    {
+        _MoveCounter value(11);
+        auto [it, didInsert] = dict.insert_or_assign("key6", std::move(value));
+        TF_AXIOM(didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key6");
+        TF_AXIOM(it->second.IsHolding<_MoveCounter>());
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().value == 11);
+        TF_AXIOM(it == dict.find("key6"));
+        TF_AXIOM(dict.size() == 7);
+
+        // value should be moved, not copied
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().moves == 1);
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().copies == 0);
+    }
+
+    // insert_or_assign an lvalue but the key already exists
+    {
+        _MoveCounter value(12);
+        auto [it, didInsert] = dict.insert_or_assign("key6", value);
+        TF_AXIOM(!didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key6");
+        TF_AXIOM(it->second.IsHolding<_MoveCounter>());
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().value == 12);
+        TF_AXIOM(it == dict.find("key6"));
+        TF_AXIOM(dict.size() == 7);
+
+        // value should be copied, not moved
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().moves == 0);
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().copies == 1);
+    }
+
+    // insert_or_assign move a value that doesn't exist and move its key.
+    {
+        _MoveCounter value(13);
+        std::string key = "key to move 2";
+        auto [it, didInsert] = dict.insert_or_assign(
+            std::move(key), std::move(value));
+        TF_AXIOM(didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key to move 2");
+        TF_AXIOM(it->second.IsHolding<_MoveCounter>());
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().value == 13);
+        TF_AXIOM(it == dict.find("key to move 2"));
+        TF_AXIOM(dict.size() == 8);
+
+        // value should be moved, not copied
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().moves == 1);
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().copies == 0);
+    }
+
+    // insert_or_assign move a value that does exist and using key rvalue ref.
+    {
+        _MoveCounter value(14);
+        std::string key = "key to move 2";
+        auto [it, didInsert] = dict.insert_or_assign(
+            std::move(key), std::move(value));
+        TF_AXIOM(!didInsert);
+        TF_AXIOM(it != dict.end());
+        TF_AXIOM(it->first == "key to move 2");
+        TF_AXIOM(it->second.IsHolding<_MoveCounter>());
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().value == 14);
+        TF_AXIOM(it == dict.find("key to move 2"));
+        TF_AXIOM(dict.size() == 8);
+
+        // value should be moved, not copied
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().moves == 1);
+        TF_AXIOM(it->second.UncheckedGet<_MoveCounter>().copies == 0);
+    }
+}
+
 static void
 testDictionaryInitializerList()
 {
@@ -2278,28 +2529,6 @@ static void testVtCheapToCopy() {
     static_assert(!VtValueTypeHasCheapCopy<VtArray<TfToken>>::value, "");
 }
 
-struct _MoveCounter {
-    int copies = 0;
-    int moves = 0;
-    int value = 0;
-
-    _MoveCounter() = default;
-    explicit _MoveCounter(int v) : value(v) {}
-    _MoveCounter(const _MoveCounter &o)
-        : copies(o.copies + 1), moves(o.moves), value(o.value) {}
-    _MoveCounter(_MoveCounter &&o) noexcept
-        : copies(o.copies), moves(o.moves + 1), value(o.value) {}
-    _MoveCounter &operator=(const _MoveCounter &o) {
-        copies = o.copies + 1; moves = o.moves; value = o.value;
-        return *this;
-    }
-    _MoveCounter &operator=(_MoveCounter &&o) noexcept {
-        copies = o.copies; moves = o.moves + 1; value = o.value;
-        return *this;
-    }
-    bool operator==(const _MoveCounter &o) const { return value == o.value; }
-};
-
 static void testVtValueForwarding()
 {
     // _MoveCounter is larger than a pointer (remote storage) and tracks copies
@@ -3073,6 +3302,7 @@ int main(int argc, char *argv[])
     testDictionaryOverRecursive();
     testDictionaryIterators();
     testDictionaryInitializerList();
+    testDictionaryInsertion();
 
     testValue();
     testValueHash();

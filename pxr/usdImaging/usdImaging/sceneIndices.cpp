@@ -17,6 +17,7 @@
 #include "pxr/usdImaging/usdImaging/selectionSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/stageSceneIndex.h"
 #include "pxr/usdImaging/usdImaging/unloadedDrawModeSceneIndex.h"
+#include "pxr/usdImaging/usdImaging/usdUpAxisSchema.h"
 #include "pxr/usdImaging/usdImaging/sceneIndexCreateArgsSchema.h"
 
 #include "pxr/usdImaging/usdImaging/geomModelSchema.h"
@@ -151,7 +152,8 @@ _InstanceDataSourceNames()
         // assetInfo, which may be used in material networks for texture
         // asset resolution.  See HdDataSourceMaterialNetworkInterface::
         // GetModelAssetName().
-        UsdImagingModelSchema::GetSchemaToken()
+        UsdImagingModelSchema::GetSchemaToken(),
+        UsdImagingUsdUpAxisSchema::GetSchemaToken()
     };
 
     for (const UsdImagingSceneIndexPluginUniquePtr &plugin :

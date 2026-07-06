@@ -1560,7 +1560,6 @@ TsTest_Museum::_SplineDataToSpline(
     spline.SetPreExtrapolation(data.preExtrapolation);
     spline.SetPostExtrapolation(data.postExtrapolation);
     spline.SetInnerLoopParams(data.loopParams);
-    spline.SetTimeValued(data.timeValued);
 
     // Don't de-regress.  If the SplineData is regressive, the Spline should be
     // too.

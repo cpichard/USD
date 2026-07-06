@@ -31,4 +31,7 @@ categories:
   - \c tsTest_CompareBaseline (py): test helper that creates baseline files,
     compares results against baselines, and graphs differences.
 
+The TsTest framework is available in the Ts Python module when Ts is built
+with tests enabled. See BUILDING.md for more details.
+
 */

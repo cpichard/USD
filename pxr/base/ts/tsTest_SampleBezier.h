@@ -25,7 +25,6 @@ PXR_NAMESPACE_OPEN_SCOPE
 //
 // Only Bezier segments are supported.  No extrapolation is performed.
 //
-TS_API
 TsTest_SampleVec
 TsTest_SampleBezier(
     const TsSpline& spline,

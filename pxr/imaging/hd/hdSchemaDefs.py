@@ -943,6 +943,7 @@
      # instanceProxy
     dict(
         SCHEMA_NAME = 'InstanceProxy',
+        SCHEMA_INCLUDES = ['{{LIBRARY_PATH}}/schemaTypeDefs'],
         DOC = '''A schema for marking a prim as an instance proxy. An instance
                  proxy prim represents a descendant prim beneath an instance
                  prim, even though no such prim actually exists in the scene.
@@ -956,10 +957,14 @@
         SCHEMA_TOKEN = 'instanceProxy',
         ADD_DEFAULT_LOCATOR = True,
         MEMBERS = [
-            ('prototypePath', T_PATH,
-             dict(DOC = '''The path to the propagated prototype prim that this
-                  instance proxy prim represents.''')),
-             # XXX Add the instancing context.
+            ('pathToPrimInPrototype', T_PATH,
+             dict(DOC = '''The path to the prim in the propagated prototype 
+                hierarchy that this instance proxy prim corresponds to.
+                This is modeled after the UsdPrim::GetPrimInPrototype() API. ''')),
+            ('instancingContext', 'HdInstanceVectorSchema',
+             dict(DOC = '''Starting from the outer most, lists the instancer, 
+                  prototype index and instance index for each level of instancing
+                  leading to this instance proxy prim.''')),
         ],
     ),
 
@@ -1499,6 +1504,7 @@
 
     #--------------------------------------------------------------------------
     # instanceIndices
+    # XXX WBN to rename this schema.
     dict(
         SCHEMA_NAME = 'InstanceIndices',
         MEMBERS = [

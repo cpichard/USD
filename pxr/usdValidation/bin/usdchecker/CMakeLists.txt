@@ -183,3 +183,10 @@ pxr_register_test(testUsdChecker23
     TESTENV testenv/testUsdChecker
     EXPECTED_RETURN_CODE 1
 )
+
+# ensures that validation of paths with variable expressions correctly resolve
+pxr_register_test(testUsdChecker24
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/usdchecker clean/clean_variable_expression.usda"
+    TESTENV testenv/testUsdChecker
+    EXPECTED_RETURN_CODE 0
+)

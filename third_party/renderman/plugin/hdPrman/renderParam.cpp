@@ -2057,8 +2057,8 @@ HdPrman_RenderParam::_CreateStatsSession(void)
         editor.Finish()}});
 
     // Create and register listener for progress metric
-    _statsListener = new HdPrmanStatsListener("HdPrman Stats Listenr",
-                                              IsInteractive());
+    _statsListener = new HdPrmanStatsListener("HdPrman Stats Listener",
+                                              this);
     if (_statsListener) {
         _statsSession->AttachListener(_statsListener);
     } else {

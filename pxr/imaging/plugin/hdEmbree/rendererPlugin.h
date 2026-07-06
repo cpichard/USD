@@ -52,7 +52,7 @@ public:
     /// Checks to see if the embree plugin is supported on the running system
     ///
     bool IsSupported(
-        HdRendererCreateArgs const &rendererCreateArgs,
+        const HdRendererCreateArgsSchema &rendererCreateArgs,
         std::string *reasonWhyNot = nullptr) const override;
 
 private:

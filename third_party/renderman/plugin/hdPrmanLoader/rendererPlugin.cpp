@@ -26,6 +26,9 @@
 #endif
 #endif
 
+#include <filesystem>
+#include <iostream>
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PUBLIC_TOKENS(HdPrmanLoaderTokens, HDPRMAN_LOADER_TOKENS);
@@ -108,26 +111,44 @@ HdPrmanLoaderRendererPlugin::HdPrmanLoaderRendererPlugin()
         return;
     }
 
-// Preload some usd libs if defines indicate that we should
-// Usually the host app will have preloaded most usd libs, but sometimes
-// not all the ones we require, so this only loads those extra ones.
-#if defined(PXR_DCC_LOCATION_ENV_VAR) && defined(PXR_PRELOAD_USD_LIB_LIST) && defined(PXR_USD_DIR)
-    const std::string dccLocationEnvVar(PXR_DCC_LOCATION_ENV_VAR);
-    const std::string dccLocation = TfGetenv(dccLocationEnvVar);
-    if(!dccLocation.empty()) {
-        const std::string usdlibdir = dccLocation + "/" + std::string(PXR_USD_DIR);
-        const std::string usdlibliststr(PXR_PRELOAD_USD_LIB_LIST);
-        const std::vector<std::string> usdliblist =
-            TfStringSplit(usdlibliststr, ",");
-        for(const auto usdlib : usdliblist) {
-            const std::string libpath(usdlibdir+"/"+usdlib+ARCH_LIBRARY_SUFFIX);
-            if(!ArchLibraryOpen(libpath, ARCH_LIBRARY_NOW | ARCH_LIBRARY_GLOBAL))
-            {
-                TF_WARN("Could not load %s", libpath.c_str());
+    // Lookup USD plugins from the PlugRegistry and preload 
+    // them incase they are not in our LD_LIBRARY_PATH.
+    // Also save the usdLibPath so we can also find MaterialX libs.
+    static const char* preloadUsdPlugins[] = { 
+        "hio", "hdMtlx", "hdsi", "usdVolImaging", "usdMtlx" 
+    };
+    std::string usdLibPath;
+    for (const char* preloadUsdPlugin : preloadUsdPlugins) {
+        PlugPluginPtr plugin = 
+            PlugRegistry::GetInstance().GetPluginWithName(preloadUsdPlugin);
+        if (plugin && !plugin->GetPath().empty()) {
+            usdLibPath = TfGetPathName(plugin->GetPath());
+            if (!plugin->IsLoaded()) {
+                ArchLibraryOpen(
+                    plugin->GetPath(), 
+                    ARCH_LIBRARY_NOW | ARCH_LIBRARY_GLOBAL
+                );
             }
         }
     }
-#endif
+
+    // Preload the MaterialX and hdMtlx libs incase they are 
+    // not in our LD_LIBRARY_PATH.
+    if (!usdLibPath.empty()) {
+        for (const auto& entry 
+            : std::filesystem::directory_iterator(usdLibPath)) {
+            const std::string filename = entry.path().filename().string();
+            if ((TfStringStartsWith(filename, "libMaterialX") 
+            || filename.find("hdMtlx") != std::string::npos
+            || filename.find("hdsi") != std::string::npos)
+                && TfStringEndsWith(filename, ARCH_LIBRARY_SUFFIX)) {
+                ArchLibraryOpen(
+                    entry.path().string(), 
+                    ARCH_LIBRARY_NOW | ARCH_LIBRARY_GLOBAL
+                );
+            }
+        }
+    }
 
 #if defined(ARCH_OS_LINUX) || defined(ARCH_OS_DARWIN)
     // Open $RMANTREE/lib/libprman.so into the global namespace
@@ -187,9 +208,7 @@ HdPrmanLoaderRendererPlugin::HdPrmanLoaderRendererPlugin()
     _hdPrman.valid = true;
 }
 
-HdPrmanLoaderRendererPlugin::~HdPrmanLoaderRendererPlugin()
-{
-}
+HdPrmanLoaderRendererPlugin::~HdPrmanLoaderRendererPlugin() = default;
 
 #if HD_API_VERSION >= 90
 
@@ -360,31 +379,42 @@ HdPrmanLoaderRendererPlugin::DeleteRenderDelegate(
     }
 }
 
+static
 bool
-#if PXR_VERSION < 2305
-HdPrmanLoaderRendererPlugin::IsSupported() const
-#elif HD_API_VERSION < 83
-HdPrmanLoaderRendererPlugin::IsSupported(bool /* gpuEnabled */) const
-#else
-HdPrmanLoaderRendererPlugin::IsSupported(
-    HdRendererCreateArgs const & /* rendererCreateArgs */,
-    std::string *reasonWhyNot) const
-#endif
+_IsSupported(std::string * const reasonWhyNot = nullptr)
 {
     // TODO: Should we disable XPU gpus with gpuEnabled off?
     if (!_hdPrman.valid) {
         TF_DEBUG(HD_RENDERER_PLUGIN).Msg(
             "hdPrman renderer plugin unsupported: %s\n",
             _hdPrman.errorMsg.c_str());
-#if HD_API_VERSION >= 83
         if (reasonWhyNot) {
             *reasonWhyNot = "hdPrman renderer plugin unsupported: " +
                 _hdPrman.errorMsg;
         }
-#endif
     }
 
     return _hdPrman.valid;
+}
+
+bool
+HdPrmanLoaderRendererPlugin::IsSupported(
+#if HD_API_VERSION >= 103
+    const HdRendererCreateArgsSchema &rendererCreateArgs,
+    std::string * reasonWhyNot
+#elif HD_API_VERSION >= 83
+    HdRendererCreateArgs const &rendererCreateArgs,
+    std::string * reasonWhyNot
+#elif PXR_VERSION < 2305
+    bool gpuEnabled = true
+#endif
+    ) const
+{
+    return _IsSupported(
+#if HD_API_VERSION >= 83
+        reasonWhyNot
+#endif
+        );
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -249,6 +249,7 @@ const TfTokenVector HdPrmanRenderDelegate::SUPPORTED_RPRIM_TYPES =
 
     // New type, specific to mesh light source geom.
     HdPrmanTokens->meshLightSourceMesh,
+    HdPrmanTokens->meshLightSourcePoints,
     HdPrmanTokens->meshLightSourceVolume
 };
 
@@ -559,6 +560,8 @@ HdPrmanRenderDelegate::CreateRprim(TfToken const& typeId,
     }
     if (typeId == HdPrmanTokens->meshLightSourceMesh) {
         return new HdPrman_Mesh(rprimId, true /* isMeshLight */);
+    } else if (typeId == HdPrmanTokens->meshLightSourcePoints) {
+        return new HdPrman_Points(rprimId, true /* isMeshLight */);
     } else if (typeId == HdPrmanTokens->meshLightSourceVolume) {
         return new HdPrman_Volume(rprimId, true /* isMeshLight */);
     } else if (typeId == HdPrimTypeTokens->mesh) {

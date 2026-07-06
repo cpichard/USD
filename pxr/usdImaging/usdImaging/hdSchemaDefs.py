@@ -86,6 +86,7 @@
             ('applyDrawMode', T_BOOL, {}),
             ('drawModeColor', T_VEC3F, {}),
             ('cardGeometry', T_TOKEN, {}),
+            ('cardVisibility', T_TOKEN, {}),
             ('cardTextureXPos', T_ASSETPATH, {}),
             ('cardTextureYPos', T_ASSETPATH, {}),
             ('cardTextureZPos', T_ASSETPATH, {}),
@@ -104,6 +105,10 @@
                 'cross',
                 'box',
                 'fromTexture']),
+            ('cardVisibility', [
+                'inherited',
+                'simple',
+                'full']),
         ],
     ),
 
@@ -270,6 +275,19 @@
 
             # note: namespacedSettings isn't in the USD schema.
             ('namespacedSettings', T_CONTAINER, dict(ADD_LOCATOR=True)),
+        ],
+    ),
+
+    #--------------------------------------------------------------------------
+    # usdImaging/usdUpAxis
+    dict(
+        SCHEMA_NAME = 'UsdUpAxis',
+        SCHEMA_TOKEN = '__usdUpAxis',
+        ADD_DEFAULT_LOCATOR = True,
+        MEMBERS = [
+            ('ALL_MEMBERS', '', dict(ADD_LOCATOR=True)),
+
+            ('upAxis', T_TOKEN, {}),
         ],
     ),
 ] 

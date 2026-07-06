@@ -86,13 +86,16 @@ int main(int argc, char **argv)
         std::ofstream output(outputFilePrefix + "_sceneIndexTraversal.txt");
 
         HdSceneIndexPrimView view(
-            sceneIndices.finalSceneIndex, SdfPath::AbsoluteRootPath());
+            sceneIndices.finalSceneIndex, SdfPath::AbsoluteRootPath()); 
 
         for (const SdfPath &primPath : view) {
             const auto prim = sceneIndices.finalSceneIndex->GetPrim(primPath);
             output
                 << primPath
-                << " type=" << _GetPrimTypeToLog(prim.primType);
+                // Needed for Windows only bug where paths above 128 characters
+                // get linesplit in fc.exe
+                << (primPath.GetString().length() > 100 ? "\n\t" : " ")
+                << "type=" << _GetPrimTypeToLog(prim.primType);
             output << "\n";
         }
     }
@@ -114,7 +117,10 @@ int main(int argc, char **argv)
             const auto prim = proxyViewSi->GetPrim(primPath);
             output
                 << primPath
-                << " type=" << _GetPrimTypeToLog(prim.primType)
+                // Needed for Windows only bug where paths above 128 characters
+                // get linesplit in fc.exe
+                << (primPath.GetString().length() > 100 ? "\n\t" : " ")
+                << "type=" << _GetPrimTypeToLog(prim.primType)
                 << (proxyViewSi->IsInstanceProxy(primPath)
                     ? " (instance proxy)" : "");
             output << "\n";

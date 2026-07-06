@@ -211,19 +211,41 @@ class TestPcpMapFunction(unittest.TestCase):
     def test_ImpliedClass(self):
         # Test ImpliedClass operation with the same mappings from the
         # test_InheritRelocateChain test case.
-        transfer = Pcp.MapFunction( {'/M':'/M_1'} )
-        relocation = Pcp.MapFunction( {'/M/Rig/Inst/Scope': '/M/Anim/Scope'} )
-        classArc = Pcp.MapFunction( {'/M/Rig/Class': '/M/Rig/Inst'} )
+        transfer = Pcp.MapFunction( {'/':'/', '/M':'/M_1'} )
+        relocation = Pcp.MapFunction( {'/':'/', '/M/Rig/Inst/Scope': '/M/Anim/Scope'} )
+        classArc = Pcp.MapFunction( {'/':'/', '/M/Rig/Class': '/M/Rig/Inst'} )
 
         for (transfer, relocation, classArc) in \
             itertools.product([transfer, DeferredComposition(transfer)],
                               [relocation, DeferredComposition(relocation)],
                               [classArc, DeferredComposition(classArc)]):
             self.assertEqual(
-                Pcp.MapFunction({'/':'/', '/M_1/Rig/Class/Scope': '/M_1/Anim/Scope'}), 
+                Pcp.MapFunction({'/':'/', 
+                                 '/M_1/Rig/Class': '/M_1/Rig/Inst',
+                                 '/M_1/Rig/Class/Scope': '/M_1/Anim/Scope'}),
                 Pcp.MapFunction.ImpliedClass(
                     transfer, relocation.Compose(classArc)),
                 f"Unexpected result:\n{transfer=}\n{relocation=}\n{classArc=}")
+
+    def test_ImpliedClassEdgeCaseLocalAndGlobalClassCombination(self):
+        # Test ImpliedClass operation with the same mappings from the
+        # testPcpMuseum_EdgeCaseLocalAndGlobalClassCombination test case. This
+        # was the only test that had a map function change after the switch to
+        # using _ComposeImpliedClassPathPairs in the implementation of
+        # ImpliedClass. This output is more correct than the output before that
+        # change which would also have incorrectly included a mapping from 
+        # /GlobalParent -> /OtherModel.
+        transfer = Pcp.MapFunction( {'/':'/', '/GlobalParent': '/OtherModel'} )
+        classArc = Pcp.MapFunction( {'/':'/', '/GlobalParent': '/Model'} )
+
+        for (transfer, classArc) in \
+            itertools.product([transfer, DeferredComposition(transfer)],
+                              [classArc, DeferredComposition(classArc)]):
+            self.assertEqual(
+                Pcp.MapFunction({'/':'/',
+                                 '/OtherModel':'/Model'}),
+                Pcp.MapFunction.ImpliedClass(transfer, classArc),
+                f"Unexpected result:\n{transfer=}\n{classArc=}")
 
     def test_LayerOffsets(self):
         # Test layer offsets

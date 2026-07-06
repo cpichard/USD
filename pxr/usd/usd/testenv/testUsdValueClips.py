@@ -8,6 +8,7 @@
 import contextlib
 import os
 import shutil
+import sys
 import unittest
 from pxr import Sdf, Tf, Usd, Vt, Gf
 
@@ -220,6 +221,21 @@ class TestUsdValueClips(unittest.TestCase):
         self.assertTrue(Sdf.Layer.Find('basic/clip.usda'))
         self.assertTrue(Sdf.Layer.Find('basic/manifest.usda'))
 
+        # Check we get the same values from the first clip for edge conditions.
+        minDouble = -sys.float_info.max
+        self.CheckValue(localAttr, time=minDouble, expected=5.0)
+        self.CheckValue(refAttr, time=minDouble, expected=-5.0)
+        self.CheckValue(clsAttr, time=minDouble, expected=-5.0)
+        self.CheckValue(payloadAttr, time=minDouble, expected=-5.0)
+        self.CheckValue(varAttr, time=minDouble, expected=-5.0)
+        
+        negInf = float('-inf')
+        self.CheckValue(localAttr, time=negInf, expected=5.0)
+        self.CheckValue(refAttr, time=negInf, expected=-5.0)
+        self.CheckValue(clsAttr, time=negInf, expected=-5.0)
+        self.CheckValue(payloadAttr, time=negInf, expected=-5.0)
+        self.CheckValue(varAttr, time=negInf, expected=-5.0)
+
         # Starting at time 10, clips should be consulted for values.
         #
         # The strength order using during time sample resolution is
@@ -234,6 +250,22 @@ class TestUsdValueClips(unittest.TestCase):
         self.CheckValue(clsAttr, time=10, expected=-10.0)
         self.CheckValue(payloadAttr, time=10, expected=-10.0)
         self.CheckValue(varAttr, time=10, expected=-10.0)
+
+        # The last active clip is considered active to +inf. Test edge
+        # conditions.
+        maxDouble = sys.float_info.max
+        self.CheckValue(localAttr, time=maxDouble, expected=20.0)
+        self.CheckValue(refAttr, time=maxDouble, expected=-20.0)
+        self.CheckValue(clsAttr, time=maxDouble, expected=-20.0)
+        self.CheckValue(payloadAttr, time=maxDouble, expected=-20.0)
+        self.CheckValue(varAttr, time=maxDouble, expected=-20.0)
+
+        posInf = float('inf')
+        self.CheckValue(localAttr, time=posInf, expected=20.0)
+        self.CheckValue(refAttr, time=posInf, expected=-20.0)
+        self.CheckValue(clsAttr, time=posInf, expected=-20.0)
+        self.CheckValue(payloadAttr, time=posInf, expected=-20.0)
+        self.CheckValue(varAttr, time=posInf, expected=-20.0)
 
         # Attributes in prims that are descended from where the clip
         # metadata was authored should pick up opinions from the clip
