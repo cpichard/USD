@@ -1165,7 +1165,15 @@ def InstallTBB_MacOS(context, force, buildArgs):
             env = os.environ.copy()
             if MacOSTargetEmbedded(context):
                 env["SDKROOT"] = apple_utils.GetSDKRoot(context)
-                buildArgs.append(f' compiler=clang arch=arm64 extra_inc=big_iron.inc target={context.buildTarget.lower()}')
+                buildArgs.extend([
+                    'compiler=clang',
+                    'arch=arm64',
+                    'extra_inc=big_iron.inc',
+                    f'target={context.buildTarget.lower()}',
+                ])
+            elif context.buildAppleFramework:
+                # Force build of static libs as well
+                buildArgs.append('extra_inc=big_iron.inc')
             makeTBBCmd = 'make -j{procs} arch={arch} {buildArgs}'.format(
                 arch=arch, procs=context.numJobs,
                 buildArgs=" ".join(buildArgs))
@@ -1506,6 +1514,11 @@ def InstallOpenImageIO(context, force, buildArgs):
         # we reset it back to its old value.
         extraArgs.append('-DCMAKE_DEBUG_POSTFIX=""')
 
+        # Homebrew-installed dependencies of OpenImageIO can cause build
+        # and link issues when building for USD, so avoid using them.
+        if MacOS():
+            extraArgs.append('-DIGNORE_HOMEBREWED_DEPS=ON')
+
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
 
@@ -1590,6 +1603,8 @@ def InstallOpenSubdiv(context, force, buildArgs):
                 '-DNO_OPENGL=ON',
                 '-DOSD_PATCH_SHADER_SOURCE_MSL=ON',
             ])
+            if context.buildAppleFramework:
+                extraArgs.append("-DBUILD_SHARED_LIBS=OFF")
 
         # Add on any user-specified extra arguments.
         extraArgs += buildArgs
@@ -1685,13 +1700,11 @@ DRACO = Dependency("Draco", InstallDraco, "include/draco/compression/decode.h")
 ############################################################
 # MaterialX
 
-MATERIALX_URL = "https://github.com/AcademySoftwareFoundation/MaterialX/archive/v1.39.4.zip"
+MATERIALX_URL = "https://github.com/AcademySoftwareFoundation/MaterialX/archive/v1.39.5.zip"
 
 def InstallMaterialX(context, force, buildArgs):
     with CurrentWorkingDirectory(DownloadURL(MATERIALX_URL, context, force)):
-        cmakeOptions = ['-DMATERIALX_BUILD_SHARED_LIBS=ON',
-                        '-DMATERIALX_BUILD_TESTS=OFF'
-        ]
+        cmakeOptions = ['-DMATERIALX_BUILD_TESTS=OFF']
 
         if MacOSTargetEmbedded(context):
             # The materialXShaderGen in hdSt assumes the GLSL shadergen is
@@ -1711,6 +1724,10 @@ def InstallMaterialX(context, force, buildArgs):
                         '        add_subdirectory(source/MaterialXRenderGlsl)\n' +
                         '    endif()')
                        ], multiLineMatches=True)
+        if MacOS() and context.buildAppleFramework:
+            cmakeOptions.extend(["-DMATERIALX_BUILD_SHARED_LIBS=OFF"])
+        else:
+            cmakeOptions.extend(["-DMATERIALX_BUILD_SHARED_LIBS=ON"])
 
         cmakeOptions += buildArgs
         RunCMake(context, force, cmakeOptions)
@@ -1938,6 +1955,15 @@ def InstallUSD(context, force, buildArgs):
             # Increase the precompiled header buffer limit.
             extraArgs.append('-DCMAKE_CXX_FLAGS="/Zm150"')
 
+        if MacOS():
+            if context.buildAppleFramework:
+                extraArgs.append('-DPXR_BUILD_APPLE_FRAMEWORK=ON')
+                # link to static libs for TBB and OSD when building a framework
+                extraArgs.append('-DTBB_USE_STATIC_LIBS=ON')
+                extraArgs.append('-DOPENSUBDIV_USE_STATIC_LIBS=ON')
+            else:
+                extraArgs.append('-DPXR_BUILD_APPLE_FRAMEWORK=OFF')
+
         # Make sure to use boost installed by the build script and not any
         # system installed boost
         extraArgs.append('-DBoost_NO_SYSTEM_PATHS=ON')
@@ -2096,6 +2122,19 @@ group.add_argument("--build-target",
                             GetBuildTargetDefault())))
 
 if MacOS():
+    subgroup = group.add_mutually_exclusive_group()
+    subgroup.add_argument(
+        "--build-apple-framework",
+        dest="build_apple_framework",
+        action="store_true",
+        help=("Build USD as an Apple Framework "
+              "(Default if using embedded platforms)"))
+    subgroup.add_argument(
+        "--no-build-apple-framework",
+        dest="build_apple_framework",
+        action="store_false",
+        help="Do not build USD as an Apple Framework (Default if macOS)")
+
     if apple_utils.IsHostArm():
         # Intel Homebrew stores packages in /usr/local which unfortunately can
         # be where a lot of other things are too. So we only add this flag on arm macs.
@@ -2443,8 +2482,16 @@ class InstallContext:
                                       apple_utils.GetCodeSignID())
             if apple_utils.IsHostArm() and args.ignore_homebrew:
                 self.ignorePaths.append("/opt/homebrew")
+
+            self.buildAppleFramework = (args.build_apple_framework or
+                                        MacOSTargetEmbedded(self))
+
+            if self.buildAppleFramework:
+                self.buildShared = False
+                self.buildMonolithic = True
         else:
             self.buildTarget = ""
+            self.buildAppleFramework = False
 
         self.useCXX11ABI = \
             (args.use_cxx11_abi if hasattr(args, "use_cxx11_abi") else None)
@@ -2455,7 +2502,7 @@ class InstallContext:
         self.forceBuild = [dep.lower() for dep in args.force_build]
 
         # Some components are disabled for embedded build targets
-        embedded = MacOSTargetEmbedded(self)
+        embedded = MacOSTargetEmbedded(self) or self.buildAppleFramework
 
         # Optional components
         self.buildTests = (args.build_tests and not embedded)
@@ -2732,8 +2779,8 @@ if which("cmake"):
         # visionOS support was added in CMake 3.28
         cmake_required_version = (3, 28)
     else:
-        # OpenUSD requires CMake 3.26+
-        cmake_required_version = (3, 26)
+        # OpenUSD requires CMake 3.27+
+        cmake_required_version = (3, 27)
 
     cmake_version = GetCMakeVersion()
     if not cmake_version:
@@ -2826,6 +2873,11 @@ if context.useCXX11ABI is not None:
     Use C++11 ABI               {useCXX11ABI}
 """
 
+if MacOS():
+    summaryMsg += """\
+    Framework Build             {buildAppleFramework}
+"""
+
 summaryMsg += """\
     Variant                     {buildVariant}
     Target                      {buildTarget}
@@ -2909,6 +2961,7 @@ summaryMsg = summaryMsg.format(
                   else "Release w/ Debug Info" if context.buildRelWithDebug
                   else ""),
     buildTarget=(context.buildTarget),
+    buildAppleFramework=("On" if context.buildAppleFramework else "Off"),
     buildImaging=("On" if context.buildImaging else "Off"),
     enablePtex=("On" if context.enablePtex else "Off"),
     enableOpenVDB=("On" if context.enableOpenVDB else "Off"),
@@ -3021,7 +3074,10 @@ if context.buildPython or context.buildTools:
     The following in your PATH environment variable:
     {requiredInPath}""".format(
         requiredInPath="\n    ".join(sorted(requiredInPath))))
-    
+
 if context.buildPrman:
     Print("See documentation at http://openusd.org/docs/RenderMan-USD-Imaging-Plugin.html "
           "for setting up the RenderMan plugin.\n")
+
+if context.buildAppleFramework:
+        Print("\nSee documentation in README.md for using the framework in XCode.")

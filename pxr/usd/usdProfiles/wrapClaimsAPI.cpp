@@ -126,7 +126,7 @@ namespace {
 static object
 _IsCompatibleWith(const UsdProfilesClaimsAPI& self, const TfToken& profile)
 {
-    std::vector<UsdProfileRegistry::CapabilityResult> results;
+    std::set<UsdProfileRegistry::CapabilityResult> results;
     UsdProfileRegistry::QueryStatus status =
         self.IsCompatibleWith(profile, &results);
     list pyResults;
@@ -168,6 +168,9 @@ WRAP_CUSTOM {
 
         .def("IsCompatibleWith", &_IsCompatibleWith,
              arg("profile"))
+
+        .def("PopulateCapabilityUsages",
+             &UsdProfilesClaimsAPI::PopulateCapabilityUsages)
     ;
 }
 

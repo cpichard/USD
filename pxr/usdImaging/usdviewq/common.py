@@ -319,7 +319,7 @@ def GetPropertyTextFont(prop, frame):
     if bracketing and (len(bracketing) == 2) and (bracketing[0] != frameVal):
         return UIFonts.ITALIC
 
-    if prop.GetResolveInfo(frame).GetSource() == Usd.ResolveInfoSourceSpline:
+    if prop.HasSpline():
         spline = prop.GetSpline()
         if frameVal not in spline.GetKnots().keys():
             return UIFonts.ITALIC

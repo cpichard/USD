@@ -154,7 +154,7 @@ class TestEmptyGraph(unittest.TestCase):
         self.assertEqual(errors, [])
 
     def test_Empty(self):
-        self.assertEqual(PR.GetAllCapabilities(), [])
+        self.assertEqual(PR.GetAllCapabilities(), set())
         self.assertFalse(PR.HasCapability("anything"))
         self.assertEqual(len(PR.GetCapabilityStyles()), 0)
 
@@ -164,9 +164,9 @@ class TestClear(unittest.TestCase):
         PR._TestClear()
         ok, _ = _load("testBasicDAG.json")
         self.assertTrue(ok)
-        self.assertNotEqual(PR.GetAllCapabilities(), [])
+        self.assertNotEqual(PR.GetAllCapabilities(), set())
         PR._TestClear()
-        self.assertEqual(PR.GetAllCapabilities(), [])
+        self.assertEqual(PR.GetAllCapabilities(), set())
         self.assertFalse(PR.HasCapability("usd"))
         self.assertEqual(len(PR.GetCapabilityStyles()), 0)
 

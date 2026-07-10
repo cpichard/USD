@@ -1319,6 +1319,11 @@ function(pxr_toplevel_epilogue)
     # Setup the plugins in the top epilogue to ensure that everybody has had a
     # chance to update PXR_EXTRA_PLUGINS with their plugin paths.
     pxr_setup_plugins()
+
+    if (PXR_BUILD_APPLE_FRAMEWORK)
+        pxr_create_apple_framework()
+    endif ()
+
 endfunction() # pxr_toplevel_epilogue
 
 function(pxr_core_prologue)

@@ -1209,6 +1209,7 @@
         SCHEMA_NAME = 'Camera',
         SCHEMA_TOKEN = 'camera',
         SCHEMA_INCLUDES = [
+            '{{LIBRARY_PATH}}/backPlateSchema',
             '{{LIBRARY_PATH}}/schemaTypeDefs',
             '{{LIBRARY_PATH}}/splitDiopterSchema',
             '{{LIBRARY_PATH}}/lensDistortionSchema'],
@@ -1237,9 +1238,41 @@
             ('splitDiopter', 'HdSplitDiopterSchema', {}),
             ('lensDistortion', 'HdLensDistortionSchema', {}),
             ('namespacedProperties', 'HdSampledDataSourceContainerContainerSchema', dict(ADD_LOCATOR = True)),
+            ('backPlate', 'HdBackPlateContainerSchema', dict(ADD_LOCATOR = True)),
         ],
         STATIC_TOKEN_DATASOURCE_BUILDERS = [ # optional for shared token ds's
             ('projection', ['perspective', 'orthographic']),
+        ],
+    ),
+
+    #--------------------------------------------------------------------------
+    # backPlate
+    dict(
+        SCHEMA_NAME = 'BackPlate',
+        SCHEMA_TOKEN = 'backPlate',
+        DOC = '''The {{ SCHEMA_CLASS_NAME }} specifies a container that will 
+                 hold "back plate" data.  This data is parallel to the 
+                 properties defined in UsdGeomBackPlateAPI and more details can 
+                 be found at usdGeom/backPlateAPI.h''',
+        SCHEMA_INCLUDES = [
+            '{{LIBRARY_PATH}}/schemaTypeDefs'],
+        MEMBERS = [
+            ('scaleTweak', T_VEC2F, {}),
+            ('rotateXYZTweak', T_VEC3F, {}),
+            ('translateTweak', T_VEC3F, {}),
+            ('image', T_ASSETPATH, {}),
+            ('alphaImage', T_ASSETPATH, {}),
+            ('depthImage', T_ASSETPATH, {}),
+            ('depthMinOffset', T_FLOAT, {}),
+            ('depthNormalizingFactor', T_FLOAT, {}),
+            ('depthCameraSpaceOffset', T_FLOAT, {}),
+            ('lumaGain', T_VEC3F, {}),
+            ('lumaGamma', T_VEC3F, {}),
+            ('lumaLift', T_VEC3F, {}),
+            ('plateVisibility', T_TOKEN, {}),
+        ],
+        STATIC_TOKEN_DATASOURCE_BUILDERS = [ # optional for shared token ds's
+            ('plateVisibility', ['all', 'solo', 'none']),
         ],
     ),
 

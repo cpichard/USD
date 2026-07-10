@@ -31,7 +31,7 @@ using CR = UsdProfileRegistry::CapabilityResult;
 using QS = UsdProfileRegistry::QueryStatus;
 
 static bool
-_ResultContains(const std::vector<CR>& v, const TfToken& t)
+_ResultContains(const std::set<CR>& v, const TfToken& t)
 {
     for (const auto& r : v) {
         if (r.capability == t) return true;
@@ -40,7 +40,7 @@ _ResultContains(const std::vector<CR>& v, const TfToken& t)
 }
 
 static QS
-_ResultStatus(const std::vector<CR>& v, const TfToken& t)
+_ResultStatus(const std::set<CR>& v, const TfToken& t)
 {
     for (const auto& r : v) {
         if (r.capability == t) return r.status;
@@ -108,47 +108,43 @@ TestCoversCapabilities()
 
     // All required caps reachable via valid paths
     {
-        std::vector<TfToken> required = {
+        std::set<TfToken> required = {
             TfToken("usd.geom.mesh"), TfToken("usd"),
         };
-        std::vector<CR> results;
+        std::set<CR> results;
         QS status = UsdProfileRegistry::CoversCapabilities(
             TfToken("profile.25.11"), required, {}, &results);
         TF_AXIOM(status == QS::ValidPath);
         TF_AXIOM(results.size() == 2);
-        TF_AXIOM(results[0].capability == TfToken("usd.geom.mesh"));
-        TF_AXIOM(results[0].status == QS::ValidPath);
-        TF_AXIOM(results[1].capability == TfToken("usd"));
-        TF_AXIOM(results[1].status == QS::ValidPath);
+        TF_AXIOM(_ResultStatus(results, TfToken("usd.geom.mesh")) == QS::ValidPath);
+        TF_AXIOM(_ResultStatus(results, TfToken("usd")) == QS::ValidPath);
     }
 
     // Mixed: valid + deprecated → DeprecationConflict aggregate
     {
-        std::vector<TfToken> required = {
+        std::set<TfToken> required = {
             TfToken("usd.geom.nurbs"), TfToken("usd.geom.mesh"),
         };
-        std::vector<CR> results;
+        std::set<CR> results;
         QS status = UsdProfileRegistry::CoversCapabilities(
             TfToken("profile.26.08"), required, {}, &results);
         TF_AXIOM(status == QS::DeprecationConflict);
-        TF_AXIOM(results[0].capability == TfToken("usd.geom.nurbs"));
-        TF_AXIOM(results[0].status == QS::ValidPath);
-        TF_AXIOM(results[1].capability == TfToken("usd.geom.mesh"));
-        TF_AXIOM(results[1].status == QS::DeprecationConflict);
+        TF_AXIOM(_ResultStatus(results, TfToken("usd.geom.nurbs")) == QS::ValidPath);
+        TF_AXIOM(_ResultStatus(results, TfToken("usd.geom.mesh")) == QS::DeprecationConflict);
     }
 
     // One cap unreachable → NoPath aggregate, results still fully populated
     {
-        std::vector<TfToken> required = {
+        std::set<TfToken> required = {
             TfToken("usd.geom.mesh"), TfToken("no.such.cap"),
         };
-        std::vector<CR> results;
+        std::set<CR> results;
         QS status = UsdProfileRegistry::CoversCapabilities(
             TfToken("profile.25.11"), required, {}, &results);
         TF_AXIOM(status == QS::NoPath);
         TF_AXIOM(results.size() == 2);
-        TF_AXIOM(results[0].status == QS::ValidPath);
-        TF_AXIOM(results[1].status == QS::NoPath);
+        TF_AXIOM(_ResultStatus(results, TfToken("usd.geom.mesh")) == QS::ValidPath);
+        TF_AXIOM(_ResultStatus(results, TfToken("no.such.cap")) == QS::NoPath);
     }
 
     // Empty required → NoPath
@@ -167,34 +163,32 @@ TestCoversCapabilities()
 
     // Deprecated path only → Deprecated aggregate
     {
-        std::vector<TfToken> required = {TfToken("profile.25.11")};
-        std::vector<CR> results;
+        std::set<TfToken> required = {TfToken("profile.25.11")};
+        std::set<CR> results;
         QS status = UsdProfileRegistry::CoversCapabilities(
             TfToken("profile.26.08"), required, {}, &results);
         TF_AXIOM(status == QS::Deprecated);
-        TF_AXIOM(results[0].status == QS::Deprecated);
+        TF_AXIOM(_ResultStatus(results, TfToken("profile.25.11")) == QS::Deprecated);
     }
 
     // Excepted cap: per-result → Excepted, aggregate → NoPath
     {
-        std::vector<TfToken> required = {
+        std::set<TfToken> required = {
             TfToken("usd.geom.mesh"), TfToken("usd"),
         };
-        std::vector<TfToken> ex = {TfToken("usd.geom.mesh")};
-        std::vector<CR> results;
+        std::set<TfToken> ex = {TfToken("usd.geom.mesh")};
+        std::set<CR> results;
         QS status = UsdProfileRegistry::CoversCapabilities(
             TfToken("profile.25.11"), required, ex, &results);
         TF_AXIOM(status == QS::NoPath);
-        TF_AXIOM(results[0].capability == TfToken("usd.geom.mesh"));
-        TF_AXIOM(results[0].status == QS::Excepted);
-        TF_AXIOM(results[1].capability == TfToken("usd"));
-        TF_AXIOM(results[1].status == QS::ValidPath);
+        TF_AXIOM(_ResultStatus(results, TfToken("usd.geom.mesh")) == QS::Excepted);
+        TF_AXIOM(_ResultStatus(results, TfToken("usd")) == QS::ValidPath);
     }
 
     // Excepted cap not in required → no effect
     {
-        std::vector<TfToken> required = {TfToken("usd.geom.mesh")};
-        std::vector<TfToken> ex = {TfToken("usd.geom.nurbs")};
+        std::set<TfToken> required = {TfToken("usd.geom.mesh")};
+        std::set<TfToken> ex = {TfToken("usd.geom.nurbs")};
         QS status = UsdProfileRegistry::CoversCapabilities(
             TfToken("profile.25.11"), required, ex);
         TF_AXIOM(status == QS::ValidPath);
@@ -266,7 +260,7 @@ TestIsCompatibleWith()
     // Declare fully compatible; profile.25.11 covers both caps validly
     api.SetProfileCompatible(TfToken("profile.25.11"));
     {
-        std::vector<CR> results;
+        std::set<CR> results;
         QS status = api.IsCompatibleWith(TfToken("profile.25.11"), &results);
         TF_AXIOM(status == QS::ValidPath);
         TF_AXIOM(results.size() == 2);
@@ -282,7 +276,7 @@ TestIsCompatibleWith()
     api.SetProfileCompatibleWithExceptions(
         TfToken("profile.26.08"), VtArray<TfToken>{TfToken("usd.geom.mesh")});
     {
-        std::vector<CR> results;
+        std::set<CR> results;
         QS status = api.IsCompatibleWith(TfToken("profile.26.08"), &results);
         TF_AXIOM(status == QS::NoPath);
         TF_AXIOM(_ResultStatus(results, TfToken("usd.geom.mesh")) == QS::Excepted);

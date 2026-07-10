@@ -472,6 +472,8 @@ public:
     // Instancer by id
     HdPrmanInstancer* GetInstancer(const SdfPath& id);
 
+    void FinalizeMeshLightSprim(const SdfPath& sourceGeomPath);
+
     // Cache riley options coming from the scene index observer observing
     // the riley:globals prim.
     void SetRileySceneIndexObserverOptions(RtParamList const &params);

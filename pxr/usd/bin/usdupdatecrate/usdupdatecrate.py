@@ -45,6 +45,10 @@ from typing import Callable, Iterable, List, Optional, Tuple
 os.environ['TF_ENV_SETTING_ALERTS_ENABLED'] = '0'
 os.environ['PXR_USDC_EMIT_DEPRECATION_WARNINGS'] = '0'
 
+# Ar gives us the canonical package-relative path syntax operators.
+# Heavier USD modules (Sdf, UsdUtils) are imported lazily inside workers.
+from pxr import Ar
+
 ########################################################################
 # Version helpers
 
@@ -86,20 +90,89 @@ def ReadCrateVersion(path: str) -> Optional[Version]:
 
     return tuple(header[CRATE_MAGIC_LEN:])
 
+def _ReadCrateVersionFromView(view) -> Optional[Version]:
+    """Same as ReadCrateVersion but reads from a memoryview / bytes-like
+    object (e.g. a UsdzScanIterator slice of an mmap)."""
+    if (len(view) < CRATE_HEADER_LEN or
+        bytes(view[:CRATE_MAGIC_LEN]) != CRATE_MAGIC):
+        return None
+    
+    return tuple(view[CRATE_MAGIC_LEN:CRATE_HEADER_LEN])
+
+########################################################################
+# Package-relative path helpers
+#
+# Inner crate files inside a .usdz package are identified using the
+# USD/Ar package-relative bracket form, e.g.
+#     "path/to/outer.usdz[inner.usdc]"
+# or, for nested packages,
+#     "path/to/outer.usdz[mid.usdz[deep.usdc]]"
+# The bracket syntax is owned by Ar; we use its helpers directly
+# (Ar.SplitPackageRelativePathOuter, Ar.JoinPackageRelativePath,
+# Ar.IsPackageRelativePath).  Ar's split returns ('', '') or
+# (path, '') for non-package inputs, so callers check the inner with
+# truthiness rather than `is not None`.
+
+_USDZ_BOUNDARY_RE = re.compile(r'\.usdz/', re.IGNORECASE)
+
+def _ArcnameToBracket(arcname: str) -> str:
+    """Convert UsdzScanIterator's slash-joined nested-package arcname
+    to Ar's bracket form.  The '.usdz' boundary is matched case-
+    insensitively (ZIP arcnames preserve whatever case the packager
+    wrote); the original case is preserved in the emitted parts.
+
+    Examples:
+        'bar.usdc'                  -> 'bar.usdc'
+        'mid.usdz/deep.usdc'        -> 'mid.usdz[deep.usdc]'
+        'a.usdz/b.usdz/c.usdc'      -> 'a.usdz[b.usdz[c.usdc]]'
+        'Mid.USDZ/deep.usdc'        -> 'Mid.USDZ[deep.usdc]'
+    """
+    parts = []
+    rest = arcname
+    while True:
+        m = _USDZ_BOUNDARY_RE.search(rest)
+        if m is None:
+            parts.append(rest)
+            break
+        idx = m.start()
+        parts.append(rest[:idx + 5])   # include '.usdz' (original case)
+        rest = rest[idx + 6:]          # skip past '.usdz/'
+    if len(parts) == 1:
+        return parts[0]
+    return Ar.JoinPackageRelativePath(parts)
 
 ########################################################################
 # Stale temp file recognition
 #
-# An update writes its temp file as
-#     {original}.usdupdatecrate.{pid}.tmp{ext}
-# (see _UpdateWorker).  A crashed or killed worker can leave these behind.
-# We recognize them by name during the walk and either remove them
-# (--update with cleanup, or --cleanup) or report them.
+# A loose-file update writes its temp as
+#     {original}.usdupdatecrate.{pid}.tmp{ext}     (ext in .usd/.usdc)
+#
+# A package (.usdz) rewrite writes its temp as
+#     {original}.usdupdatecrate.{pid}.tmp.usdz
+# (per usdzUtils.UsdzUpdateIterator with tag='usdupdatecrate').
+#
+# A crashed or killed worker can leave either form behind, plus an extract dir
+#     .usdzExtract.usdupdatecrate.{pid}.{random}/
+#
+# We recognize all three during the walk and either remove them (--update with
+# cleanup, or --cleanup) or report them.  The 'tag' component lets us
+# distinguish our debris from any other tool that happens to use
+# usdzUtils.UsdzUpdateIterator with a different tag.
 
-_STALE_TEMP_RE = re.compile(r'\.usdupdatecrate\.\d+\.tmp\.(usd|usdc)$')
+_STALE_TEMP_RE = re.compile(
+    r'\.usdupdatecrate\.\d+\.tmp\.(usd|usdc|usdz)$',
+    re.IGNORECASE,
+)
+
+_STALE_EXTRACT_DIR_RE = re.compile(
+    r'^\.usdzExtract\.usdupdatecrate\.\d+\.'
+)
 
 def _IsStaleTempName(fname: str) -> bool:
     return _STALE_TEMP_RE.search(fname) is not None
+
+def _IsStaleExtractDirName(dname: str) -> bool:
+    return _STALE_EXTRACT_DIR_RE.match(dname) is not None
 
 
 ########################################################################
@@ -134,15 +207,67 @@ def _SearchWorker(
     olderThan: Version,
 ) -> List[FileResult]:
     """Worker function: given a list of candidate (displayPath, realPath,
-    relPath) triples and the threshold version, return a FileResult(FOUND)
-    for each file whose crate version is older than the threshold.
+    relPath) triples and the threshold version, return FileResult records
+    for each file (or in-package inner file) whose crate version is older
+    than the threshold.
+
+    Routing per triple:
+      - composite (bracketed) realPath: open the outer package, locate the
+        named inner, version-check it.
+      - .usdz realPath: open the package, recursively enumerate inner
+        crate entries, emit one FOUND per stale inner.
+      - otherwise: loose .usd/.usdc file, version-checked directly.
+
+    Unreadable packages produce one ERROR_OPEN attributed to the outer.
 
     Exclude-pattern filtering has already been applied by _WalkCandidates
     before these triples were produced.
     """
+    try:
+        from pxr import UsdUtils
+        _scanIter = UsdUtils.UsdzScanIterator
+    except ImportError as e:
+        # If UsdUtils isn't importable, .usdz routing can't work.  Fall
+        # back to loose-only handling and attribute one ERROR_OPEN to any
+        # .usdz / composite triple in this chunk.
+        _scanIter = None
+        _importErr = f"pxr.UsdUtils import failed: {e}"
+
     results = []
 
-    for displayPath, realPath, relPath in triples:
+    for displayPath, realPath, _relPath in triples:
+        outer, inner = Ar.SplitPackageRelativePathOuter(realPath)
+
+        if inner:
+            # Composite path (typically from a worklist entry).  Open
+            # outer, find named inner, version-check.
+            if _scanIter is None:
+                results.append(FileResult(
+                    kind         = ResultKind.ERROR_OPEN,
+                    displayPath  = displayPath,
+                    realPath     = realPath,
+                    errorMessage = _importErr,
+                ))
+                continue
+            results.extend(_SearchOneInner(
+                _scanIter, displayPath, outer, inner, olderThan))
+            continue
+
+        ext = os.path.splitext(realPath)[1].lower()
+        if ext == '.usdz':
+            if _scanIter is None:
+                results.append(FileResult(
+                    kind         = ResultKind.ERROR_OPEN,
+                    displayPath  = displayPath,
+                    realPath     = realPath,
+                    errorMessage = _importErr,
+                ))
+                continue
+            results.extend(_SearchPackage(
+                _scanIter, displayPath, realPath, olderThan))
+            continue
+
+        # Loose .usd / .usdc
         version = ReadCrateVersion(realPath)
         if version is not None and version < olderThan:
             results.append(FileResult(
@@ -154,6 +279,89 @@ def _SearchWorker(
 
     return results
 
+
+_INNER_CRATE_EXTS = ('.usd', '.usdc')
+
+def _SearchPackage(
+    scanIterCls,
+    outerDisplay: str,
+    outerReal: str,
+    olderThan: Version,
+) -> List[FileResult]:
+    """Open outerReal as a .usdz package and emit FOUND for each inner crate
+    entry whose version is older than olderThan.
+    """
+    results: List[FileResult] = []
+    try:
+        with scanIterCls(outerReal, recurse=True) as it:
+            for arcname, view in it:
+                ext = os.path.splitext(arcname)[1].lower()
+                if ext not in _INNER_CRATE_EXTS:
+                    continue
+                version = _ReadCrateVersionFromView(view)
+                if version is None or not (version < olderThan):
+                    continue
+                bracketed = _ArcnameToBracket(arcname)
+                results.append(FileResult(
+                    kind          = ResultKind.FOUND,
+                    displayPath   = Ar.JoinPackageRelativePath(
+                                        outerDisplay, bracketed),
+                    realPath      = Ar.JoinPackageRelativePath(
+                                        outerReal, bracketed),
+                    versionBefore = version,
+                ))
+    except Exception as e:
+        results.append(FileResult(
+            kind         = ResultKind.ERROR_OPEN,
+            displayPath  = outerDisplay,
+            realPath     = outerReal,
+            errorMessage = f"could not scan .usdz: {e}",
+        ))
+    return results
+
+
+def _SearchOneInner(
+    scanIterCls,
+    composedDisplay: str,
+    outerReal: str,
+    innerBracket: str,
+    olderThan: Version,
+) -> List[FileResult]:
+    """Open outerReal, locate the inner whose arcname (in bracket form)
+    matches innerBracket, version-check it.  Emits one FOUND, one
+    NOT_NEEDED, or one ERROR_OPEN (if the inner can't be located or the
+    package can't be scanned).  A version-current inner is silently
+    dropped (matches loose-file behavior in search).
+    """
+    composedReal = Ar.JoinPackageRelativePath(outerReal, innerBracket)
+    try:
+        with scanIterCls(outerReal, recurse=True) as it:
+            for arcname, view in it:
+                if _ArcnameToBracket(arcname) != innerBracket:
+                    continue
+                version = _ReadCrateVersionFromView(view)
+                if version is None or not (version < olderThan):
+                    return []
+                return [FileResult(
+                    kind          = ResultKind.FOUND,
+                    displayPath   = composedDisplay,
+                    realPath      = composedReal,
+                    versionBefore = version,
+                )]
+    except Exception as e:
+        return [FileResult(
+            kind         = ResultKind.ERROR_OPEN,
+            displayPath  = composedDisplay,
+            realPath     = composedReal,
+            errorMessage = f"could not scan .usdz: {e}",
+        )]
+    return [FileResult(
+        kind         = ResultKind.ERROR_OPEN,
+        displayPath  = composedDisplay,
+        realPath     = composedReal,
+        errorMessage = f"inner {innerBracket!r} not found in package",
+    )]
+
 ########################################################################
 # Update worker
 
@@ -163,6 +371,234 @@ def _TryUnlink(p: str) -> None:
     except OSError:
         pass
 
+def _UpdateSingle(
+    displayPath:    str,
+    targetPath:     str,
+    olderThan:      Version,
+    preserveAttrs:  bool,
+) -> FileResult:
+    """Core per-file update.  Exports the layer at targetPath via
+    Sdf.Layer.FindOrOpen + Export to a sibling temp, optionally matches the
+    original's mode and ownership, verifies the new crate version, and
+    atomically renames the temp into place.  The original is left untouched on
+    any failure.
+
+    Returns a FileResult whose realPath is targetPath; callers that need a
+    composite (bracketed) realPath in the result should override it after this
+    returns.
+    """
+    from pxr import Sdf
+    ext     = os.path.splitext(targetPath)[1]
+    tmpPath = f"{targetPath}.usdupdatecrate.{os.getpid()}.tmp{ext}"
+
+    # Re-read the version now: authoritative against TOCTOU and against
+    # work-list entries lacking a versionBefore hint.
+    versionNow = ReadCrateVersion(targetPath)
+    if versionNow is not None and not (versionNow < olderThan):
+        return FileResult(
+            kind          = ResultKind.NOT_NEEDED,
+            displayPath   = displayPath,
+            realPath      = targetPath,
+            versionBefore = versionNow,
+        )
+
+    versionBefore = versionNow
+
+    def _err(errKind, msg):
+        return FileResult(
+            kind          = errKind,
+            displayPath   = displayPath,
+            realPath      = targetPath,
+            versionBefore = versionBefore,
+            errorMessage  = msg,
+        )
+
+    layer = None
+    try:
+        layer = Sdf.Layer.FindOrOpen(targetPath)
+    except Exception as e:
+        return _err(ResultKind.ERROR_OPEN, f"FindOrOpen raised: {e}")
+    if layer is None:
+        return _err(ResultKind.ERROR_OPEN,
+                    "Sdf.Layer.FindOrOpen returned None")
+
+    origStat = None
+    if preserveAttrs:
+        try:
+            origStat = os.stat(targetPath)
+        except OSError as e:
+            return _err(ResultKind.ERROR_EXPORT, f"stat original failed: {e}")
+
+    try:
+        exportOk = layer.Export(tmpPath)
+    except Exception as e:
+        _TryUnlink(tmpPath)
+        return _err(ResultKind.ERROR_EXPORT, f"Export raised: {e}")
+    if not exportOk:
+        _TryUnlink(tmpPath)
+        return _err(ResultKind.ERROR_EXPORT, "layer.Export returned False")
+
+    del layer
+
+    if preserveAttrs:
+        try:
+            os.chmod(tmpPath, origStat.st_mode & 0o7777)
+            os.chown(tmpPath, origStat.st_uid, origStat.st_gid)
+        except OSError as e:
+            _TryUnlink(tmpPath)
+            return _err(ResultKind.ERROR_EXPORT,
+                        f"could not preserve original attrs: {e}")
+
+    versionAfter = ReadCrateVersion(tmpPath)
+    if versionAfter is None or versionAfter < olderThan:
+        _TryUnlink(tmpPath)
+        return FileResult(
+            kind          = ResultKind.NOT_UPDATED,
+            displayPath   = displayPath,
+            realPath      = targetPath,
+            versionBefore = versionBefore,
+            versionAfter  = versionAfter,
+        )
+
+    try:
+        os.replace(tmpPath, targetPath)
+    except OSError as e:
+        _TryUnlink(tmpPath)
+        return _err(ResultKind.ERROR_EXPORT,
+                    f"rename into place failed: {e}")
+
+    return FileResult(
+        kind          = ResultKind.UPDATED,
+        displayPath   = displayPath,
+        realPath      = targetPath,
+        versionBefore = versionBefore,
+        versionAfter  = versionAfter,
+    )
+
+
+def _UpdateLoose(
+    fr: FileResult,
+    olderThan: Version,
+    preserveAttrs: bool,
+) -> FileResult:
+    """Update a loose .usd/.usdc file in place."""
+    return _UpdateSingle(fr.displayPath, fr.realPath, olderThan, preserveAttrs)
+
+
+def _UpdateInner(
+    fr: FileResult,
+    innerAbsPath: str,
+    olderThan: Version,
+) -> FileResult:
+    """Update an inner crate file inside an extract dir.  Preserves the original
+    composite (bracketed) display/real paths in the result.
+
+    preserveAttrs is forced False: the file's mode/uid/gid will be discarded by
+    the surrounding package repack, and the outer's attrs are what
+    UsdzUpdateIterator preserves at the package boundary.
+    """
+    res = _UpdateSingle(fr.displayPath, innerAbsPath, olderThan,
+                        preserveAttrs=False)
+    res.realPath = fr.realPath
+    return res
+
+
+def _NotFoundInPackage(fr: FileResult, what: str) -> FileResult:
+    return FileResult(
+        kind          = ResultKind.ERROR_OPEN,
+        displayPath   = fr.displayPath,
+        realPath      = fr.realPath,
+        versionBefore = fr.versionBefore,
+        errorMessage  = what,
+    )
+
+
+def _DowngradeIfUpdated(r: FileResult, err: Exception) -> FileResult:
+    """If r.kind is UPDATED, return a copy with kind=ERROR_EXPORT and the
+    repack error attached.  Otherwise return r unchanged."""
+    if r.kind != ResultKind.UPDATED:
+        return r
+    return FileResult(
+        kind          = ResultKind.ERROR_EXPORT,
+        displayPath   = r.displayPath,
+        realPath      = r.realPath,
+        versionBefore = r.versionBefore,
+        versionAfter  = r.versionAfter,
+        errorMessage  = f"package repack failed: {err}",
+    )
+
+
+def _UpdatePackage(
+    packagePath:    str,
+    items:          List[Tuple[FileResult, str]],
+    olderThan:      Version,
+    preserveAttrs:  bool,
+) -> List[FileResult]:
+    """Update one or more inner crate files inside packagePath.
+
+    items: list of (FileResult, innerArc) where innerArc is the archive name
+    within *this* package, possibly with further brackets for nested packages.
+
+    Semantics: partial-commit.  Every inner update that can succeed does; any
+    that fail are reported as ERROR_EXPORT.  The package is repacked in one
+    atomic os.replace; if that repack itself raises, no changes land and every
+    in-flight UPDATED result is downgraded to ERROR_EXPORT.
+
+    Recurses on entries with further bracket nesting: opens the next-level outer
+    with its own UsdzUpdateIterator (whose __exit__ repacks the inner package in
+    place inside this extract dir before our own __exit__ repacks).
+    """
+    from pxr import UsdUtils
+
+    # Partition: direct (flat arcname) vs nested (further brackets).
+    direct: List[Tuple[FileResult, str]] = []
+    nested: dict                         = {}   # nextOuter -> [(fr, deeper)]
+
+    for fr, innerArc in items:
+        nextOuter, deeper = Ar.SplitPackageRelativePathOuter(innerArc)
+        if not deeper:
+            direct.append((fr, innerArc))
+        else:
+            nested.setdefault(nextOuter, []).append((fr, deeper))
+
+    results:      List[FileResult]    = []
+    repackError:  Optional[Exception] = None
+
+    try:
+        with UsdUtils.UsdzUpdateIterator(
+                packagePath,
+                preserveAttrs = preserveAttrs,
+                tag           = 'usdupdatecrate') as upd:
+            arcToAbs = dict((arc, abs) for abs, arc in upd.Entries())
+
+            for fr, flatArc in direct:
+                innerAbs = arcToAbs.get(flatArc)
+                if innerAbs is None:
+                    results.append(_NotFoundInPackage(
+                        fr, f"entry {flatArc!r} not found in package"))
+                    continue
+                results.append(_UpdateInner(fr, innerAbs, olderThan))
+
+            for nestedArc, nestedItems in nested.items():
+                nestedAbs = arcToAbs.get(nestedArc)
+                if nestedAbs is None:
+                    for fr, _ in nestedItems:
+                        results.append(_NotFoundInPackage(
+                            fr,
+                            f"nested package {nestedArc!r} not found"))
+                    continue
+                results.extend(_UpdatePackage(
+                    nestedAbs, nestedItems, olderThan,
+                    preserveAttrs=False))
+    except Exception as e:
+        repackError = e
+
+    if repackError is not None:
+        results = [_DowngradeIfUpdated(r, repackError) for r in results]
+
+    return results
+
+
 def _UpdateWorker(
     foundResults: List[FileResult],
     olderThan: Version,
@@ -170,25 +606,19 @@ def _UpdateWorker(
 ) -> List[FileResult]:
     """Worker function: given a pre-chunked list of FileResult(FOUND) records,
     the threshold version, and a preserveAttrs flag, attempt to update each
-    file via Sdf.Layer.FindOrOpen and Export.
+    file (loose or in-package).
 
-    Return a list of FileResult records reflecting the outcome of each update
-    attempt.
-
-    Each file is updated by exporting to a sibling temp path, optionally
-    matching the original's mode and ownership, verifying the new file's
-    crate version, and then atomically renaming it over the original.  The
-    original is left untouched on any failure along the way.
+    Inner-file entries (composite realPath) are grouped by their outermost .usdz
+    container and dispatched to _UpdatePackage so each package is extracted and
+    repacked exactly once per worker.
 
     USD is imported here (inside the worker) so that the import and runtime
     initialization happen once per worker process, not in the main process.
     """
     try:
-        from pxr import Sdf
+        from pxr import Sdf, UsdUtils
     except ImportError as e:
-        # If USD is not importable in the worker, fail every item with a clear
-        # message rather than crashing the whole pool.
-        err = f"Failed to import pxr.Sdf: {e}"
+        err = f"Failed to import pxr modules: {e}"
         return [
             FileResult(
                 kind          = ResultKind.ERROR_OPEN,
@@ -200,118 +630,23 @@ def _UpdateWorker(
             for r in foundResults
         ]
 
-    outcomes = []
+    looseEntries:   List[FileResult] = []
+    packageGroups:  dict             = {}
+    # packageGroups: outerRealPath -> [(FileResult, innerArc)]
 
     for fr in foundResults:
-        path = fr.realPath
-        ext  = os.path.splitext(path)[1]
-        tmpPath = f"{path}.usdupdatecrate.{os.getpid()}.tmp{ext}"
+        outer, inner = Ar.SplitPackageRelativePathOuter(fr.realPath)
+        if not inner:
+            looseEntries.append(fr)
+        else:
+            packageGroups.setdefault(outer, []).append((fr, inner))
 
-        # Re-read the version now.  This is authoritative: it covers the
-        # work-list flow (where versionBefore is unknown) and protects the
-        # walk flow against TOCTOU between the search phase and now.  If
-        # the file is already at or above the threshold, skip cleanly.
-        versionNow = ReadCrateVersion(path)
-        if versionNow is not None and not (versionNow < olderThan):
-            outcomes.append(FileResult(
-                kind          = ResultKind.NOT_NEEDED,
-                displayPath   = fr.displayPath,
-                realPath      = path,
-                versionBefore = versionNow,
-            ))
-            continue
-
-        # Use freshly-read version (may be None for non-crate / unreadable;
-        # FindOrOpen will fail in that case and produce ERROR_OPEN).
-        versionBefore = versionNow
-
-        error = lambda errorKind, message: outcomes.append(
-            FileResult(
-                kind          = errorKind,
-                displayPath   = fr.displayPath,
-                realPath      = path,
-                versionBefore = versionBefore,
-                errorMessage  = message,
-            ))
-
-        # FindOrOpen can return None or raise; handle both.
-        layer = None
-        try:
-            layer = Sdf.Layer.FindOrOpen(path)
-        except Exception as e:
-            error(ResultKind.ERROR_OPEN, f"FindOrOpen raised: {e}")
-            continue
-
-        if layer is None:
-            error(ResultKind.ERROR_OPEN, "Sdf.Layer.FindOrOpen returned None")
-            continue
-
-        # Capture original attrs before touching anything, if requested.
-        origStat = None
-        if preserveAttrs:
-            try:
-                origStat = os.stat(path)
-            except OSError as e:
-                error(ResultKind.ERROR_EXPORT, f"stat original failed: {e}")
-                continue
-
-        # Export to sibling temp.  Export can return False or raise; handle
-        # both.
-        try:
-            exportOk = layer.Export(tmpPath)
-        except Exception as e:
-            _TryUnlink(tmpPath)
-            error(ResultKind.ERROR_EXPORT, f"Export raised: {e}")
-            continue
-
-        if not exportOk:
-            _TryUnlink(tmpPath)
-            error(ResultKind.ERROR_EXPORT, "layer.Export returned False")
-            continue
-
-        # Drop the layer.
-        del layer
-
-        # Optionally match original mode and ownership on the new file.
-        # Strict policy: any failure here means we do not finalize.
-        if preserveAttrs:
-            try:
-                os.chmod(tmpPath, origStat.st_mode & 0o7777)
-                os.chown(tmpPath, origStat.st_uid, origStat.st_gid)
-            except OSError as e:
-                _TryUnlink(tmpPath)
-                error(ResultKind.ERROR_EXPORT,
-                      f"could not preserve original attrs: {e}")
-                continue
-
-        # Verify the new file before clobbering the original.
-        versionAfter = ReadCrateVersion(tmpPath)
-        if versionAfter is None or versionAfter < olderThan:
-            _TryUnlink(tmpPath)
-            outcomes.append(FileResult(
-                kind          = ResultKind.NOT_UPDATED,
-                displayPath   = fr.displayPath,
-                realPath      = path,
-                versionBefore = versionBefore,
-                versionAfter  = versionAfter,
-            ))
-            continue
-
-        # Atomic finalize.
-        try:
-            os.replace(tmpPath, path)
-        except OSError as e:
-            _TryUnlink(tmpPath)
-            error(ResultKind.ERROR_EXPORT, f"rename into place failed: {e}")
-            continue
-
-        outcomes.append(FileResult(
-            kind          = ResultKind.UPDATED,
-            displayPath   = fr.displayPath,
-            realPath      = path,
-            versionBefore = versionBefore,
-            versionAfter  = versionAfter,
-        ))
+    outcomes: List[FileResult] = []
+    for fr in looseEntries:
+        outcomes.append(_UpdateLoose(fr, olderThan, preserveAttrs))
+    for outerPath, items in packageGroups.items():
+        outcomes.extend(_UpdatePackage(
+            outerPath, items, olderThan, preserveAttrs))
 
     return outcomes
 
@@ -338,15 +673,17 @@ def _UpdateWorkerSendResult(conn, foundResults, olderThan, preserveAttrs):
     finally:
         conn.close()
 
-def _RunOneFileSubprocess(fr, olderThan, preserveAttrs, ctx, perFileTimeout):
-    """Spawn a fresh subprocess to update one file.  Returns
+def _RunIsolatedSubprocess(
+        frList, olderThan, preserveAttrs, ctx, perFileTimeout):
+    """Spawn a fresh subprocess to update the given group of FileResults
+    (one loose file or all inner entries of one .usdz package).  Returns
     ('ok', [FileResult]) | ('exc', message) | ('crash', message).
-    Handles non-zero exits, hangs (terminate then kill), and clean
-    exits that didn't send a result.
+    Handles non-zero exits, hangs (terminate then kill), and clean exits
+    that didn't send a result.
     """
     parent, child = ctx.Pipe(duplex=False)
     p = ctx.Process(target=_UpdateWorkerSendResult,
-                    args=(child, [fr], olderThan, preserveAttrs))
+                    args=(child, frList, olderThan, preserveAttrs))
     p.start()
     child.close()
     p.join(timeout=perFileTimeout)
@@ -374,15 +711,30 @@ def _RunOneFileSubprocess(fr, olderThan, preserveAttrs, ctx, perFileTimeout):
 
 def _RecoverPendingFiles(pending, olderThan, preserveAttrs, nWorkers,
                          perFileTimeout, ctx):
-    """Run each pending file in its own subprocess, paralleled across
-    nWorkers threads.  pending = [(chunkIdx, FileResult), ...].  Returns
-    a list of (chunkIdx, [FileResult]) items; files that crash even when
-    run alone are recorded as ERROR_CRASH.
+    """Run each pending group (loose file, or one package's stale inners) in its
+    own subprocess, paralleled across nWorkers threads.  pending = [(chunkIdx,
+    FileResult), ...].  Group by outer so package inner entries stay together
+    (we cannot split them across processes without racing on the outer .usdz).
+    Returns a list of (chunkIdx, [FileResult]) items; files that crash even when
+    run in isolation are recorded as ERROR_CRASH.
     """
-    def doOne(item):
-        chunkIdx, fr = item
-        outcome, data = _RunOneFileSubprocess(
-            fr, olderThan, preserveAttrs, ctx, perFileTimeout)
+    # Group by (chunkIdx, outerKey) so inner entries from one package
+    # in one chunk are recovered together.
+    groups: dict      = {}    # (chunkIdx, outerKey) -> [FileResult]
+    order:  List      = []
+    for chunkIdx, fr in pending:
+        outer, inner = Ar.SplitPackageRelativePathOuter(fr.realPath)
+        key = (chunkIdx, outer if inner else fr.realPath)
+        if key not in groups:
+            order.append(key)
+            groups[key] = []
+        groups[key].append(fr)
+
+    def doOne(key):
+        chunkIdx = key[0]
+        items    = groups[key]
+        outcome, data = _RunIsolatedSubprocess(
+            items, olderThan, preserveAttrs, ctx, perFileTimeout)
         if outcome == 'ok':
             return chunkIdx, data
         return chunkIdx, [FileResult(
@@ -391,11 +743,11 @@ def _RecoverPendingFiles(pending, olderThan, preserveAttrs, nWorkers,
             realPath      = fr.realPath,
             versionBefore = fr.versionBefore,
             errorMessage  = str(data),
-        )]
+        ) for fr in items]
 
     with concurrent.futures.ThreadPoolExecutor(
             max_workers=nWorkers) as tpool:
-        return list(tpool.map(doOne, pending))
+        return list(tpool.map(doOne, order))
 
 def _DispatchUpdate(chunks, olderThan, preserveAttrs, nWorkers,
                     quiescenceTimeout, perFileTimeout):
@@ -498,6 +850,56 @@ def _ChunkBy(items: list, batchSize: int) -> List[list]:
     if batchSize <= 0:
         return [items] if items else []
     return [items[i:i+batchSize] for i in range(0, len(items), batchSize)]
+
+
+def _GroupByOuter(
+    results: List[FileResult],
+) -> List[Tuple[List[FileResult], int]]:
+    """Group FileResults by their outermost container.  Each group is one unit
+    of update work: either a single loose file or one .usdz package with N stale
+    inner entries.
+
+    Returns a list of (payload, cost) pairs where payload is the list of
+    FileResults belonging to the group and cost is len(payload).  Order is
+    preserved from `results` (first-seen wins for grouping).
+    """
+    order:    List[str] = []
+    grouped:  dict      = {}    # key -> [FileResult]
+    for fr in results:
+        outer, inner = Ar.SplitPackageRelativePathOuter(fr.realPath)
+        key = outer if inner else fr.realPath
+        if key not in grouped:
+            order.append(key)
+            grouped[key] = []
+        grouped[key].append(fr)
+    return [(grouped[k], len(grouped[k])) for k in order]
+
+
+def _ChunkByCost(
+    groups: List[Tuple[List[FileResult], int]],
+    batchSize: int,
+) -> List[List[FileResult]]:
+    """Greedy-pack groups so each chunk's cumulative cost is <= batchSize.  A
+    single oversized group (cost > batchSize) goes alone in its own chunk; it
+    must stay together because a package's inner updates must happen inside one
+    UsdzUpdateIterator context.
+    """
+    if batchSize <= 0:
+        flat = [fr for payload, _ in groups for fr in payload]
+        return [flat] if flat else []
+    chunks: List[List[FileResult]] = []
+    current: List[FileResult]      = []
+    currCost                       = 0
+    for payload, cost in groups:
+        if current and currCost + cost > batchSize:
+            chunks.append(current)
+            current  = []
+            currCost = 0
+        current.extend(payload)
+        currCost += cost
+    if current:
+        chunks.append(current)
+    return chunks
 
 ########################################################################
 # Filesystem walk
@@ -611,41 +1013,51 @@ def _WalkDir(
             break
         yield from item
 
-USD_EXTENSIONS = {'.usd', '.usdc'}
+USD_EXTENSIONS = {'.usd', '.usdc', '.usdz'}
 
 def _WalkCandidates(
         root: str,
         excludePatterns: List[str],
         numThreads: int = 1,
-) -> Tuple[List[Tuple[str, str, str]], List[str]]:
-    """Walk root and return (candidates, staleTemps).
+) -> Tuple[List[Tuple[str, str, str]], List[str], List[str]]:
+    """Walk root and return (candidates, staleTemps, staleExtractDirs).
 
-    candidates is a list of (displayPath, realPath, relPath) triples for
-    every non-temp file whose extension is in USD_EXTENSIONS.  staleTemps
-    is a list of absolute paths to files matching the worker temp-file
-    pattern (see _IsStaleTempName), suitable for cleanup.
+    candidates is a list of (displayPath, realPath, relPath) triples for every
+    non-temp file whose extension is in USD_EXTENSIONS.  staleTemps is a list of
+    absolute paths to files matching the worker temp-file pattern (see
+    _IsStaleTempName), suitable for cleanup.  staleExtractDirs is a list of
+    absolute paths to directories matching the package extract-dir pattern (see
+    _IsStaleExtractDirName), also cleanup targets.
 
     displayPath  - path as discovered (may contain symlink components)
     realPath     - os.path.realpath(displayPath)
     relPath      - path relative to root, used for exclude-pattern matching
 
     Exclude patterns are checked against relPath before realpath() is called, so
-    excluded files pay no realpath() cost.  Subdirectories whose relPath
-    matches any exclude pattern are pruned before descent in both the
-    single- and multi-threaded paths, avoiding walking into excluded trees.
+    excluded files pay no realpath() cost.  Subdirectories whose relPath matches
+    any exclude pattern are pruned before descent in both the single- and
+    multi-threaded paths, avoiding walking into excluded trees.  Stale extract
+    dirs are likewise pruned (not descended into), but their paths are recorded
+    so cleanup can rmtree them.
     """
     root = os.path.normpath(root)
 
     def _IsExcluded(relPath: str) -> bool:
         return any(fnmatch.fnmatch(relPath, pat) for pat in excludePatterns)
 
-    def _IsExcludedDir(absPath: str) -> bool:
-        return _IsExcluded(os.path.relpath(absPath, root))
+    candidates:       List[Tuple[str, str, str]] = []
+    staleTemps:       List[str]                  = []
+    staleExtractDirs: List[str]                  = []
 
-    candidates: List[Tuple[str, str, str]] = []
-    staleTemps: List[str] = []
-
-    isExcludedDir = _IsExcludedDir if excludePatterns else None
+    def _ClassifyDir(absPath: str) -> bool:
+        # Exclude patterns win: user can opt out of cleanup of extract dirs
+        # by adding them to --exclude.  Otherwise, recognize and collect.
+        if excludePatterns and _IsExcluded(os.path.relpath(absPath, root)):
+            return True
+        if _IsStaleExtractDirName(os.path.basename(absPath)):
+            staleExtractDirs.append(absPath)
+            return True
+        return False
 
     def _Process(displayPath: str) -> None:
         fname = os.path.basename(displayPath)
@@ -668,10 +1080,10 @@ def _WalkCandidates(
             root,
             followlinks   = False,
             numThreads    = numThreads,
-            isExcludedDir = isExcludedDir):
+            isExcludedDir = _ClassifyDir):
         _Process(displayPath)
 
-    return candidates, staleTemps
+    return candidates, staleTemps, staleExtractDirs
 
 ########################################################################
 # Deduplication
@@ -821,17 +1233,40 @@ def _ReportResults(
 
     # Summary to stderr
     nTotal = len(results)
+
+    # Count inner (package-relative) results and the distinct packages they live
+    # in, so the summary can distinguish loose vs packaged work.
+    allPackages = set()
+    nInner      = 0
+    for r in results:
+        outer, inner = Ar.SplitPackageRelativePathOuter(r.realPath)
+        if inner:
+            nInner += 1
+            allPackages.add(outer)
+    nLoose    = nTotal - nInner
+    nPackages = len(allPackages)
+
+    def _carriedDetail():
+        if nInner == 0:
+            return ""
+        return (f"\n  {nLoose} loose; "
+                f"{nInner} within {nPackages} package(s).")
+
     if updateMode:
         nOk      = sum(1 for r in results if r.kind == ResultKind.UPDATED)
         nSkipped = sum(1 for r in results if r.kind == ResultKind.NOT_NEEDED)
         nErr     = len(errors)
         print(
             f"\nSummary: {nTotal} file(s) processed, "
-            f"{nOk} updated, {nSkipped} skipped, {nErr} error(s).",
+            f"{nOk} updated, {nSkipped} skipped, {nErr} error(s)."
+            f"{_carriedDetail()}",
             file=sys.stderr,
         )
     else:
-        print(f"\nSummary: {nTotal} file(s) identified.", file=sys.stderr)
+        print(
+            f"\nSummary: {nTotal} file(s) identified.{_carriedDetail()}",
+            file=sys.stderr,
+        )
 
     return 1 if errors else 0
 
@@ -1037,6 +1472,24 @@ def _RemoveStaleTemps(staleTemps: List[str]) -> Tuple[int, int]:
     return nRemoved, nFailed
 
 
+def _RemoveStaleExtractDirs(dirs: List[str]) -> Tuple[int, int]:
+    """Best-effort rmtree of each path in dirs.  Logs failures to stderr.
+    Returns (nRemoved, nFailed).
+    """
+    import shutil
+    nRemoved = 0
+    nFailed  = 0
+    for d in dirs:
+        try:
+            shutil.rmtree(d)
+            nRemoved += 1
+        except OSError as e:
+            print(f"WARNING: could not remove stale extract dir {d!r}: {e}",
+                  file=sys.stderr)
+            nFailed += 1
+    return nRemoved, nFailed
+
+
 def main() -> int:
     parser = _BuildParser()
     args = parser.parse_args()
@@ -1086,25 +1539,33 @@ def main() -> int:
             return 2
 
         print(f"Scanning {root!r} for stale temp files ...", file=sys.stderr)
-        _candidates, staleTemps = _WalkCandidates(
+        _candidates, staleTemps, staleExtractDirs = _WalkCandidates(
             root, args.exclude, args.walkThreads)
-        print(f"  {len(staleTemps)} stale temp file(s) found.",
-              file=sys.stderr)
-        if not staleTemps:
+        print(
+            f"  {len(staleTemps)} stale temp file(s), "
+            f"{len(staleExtractDirs)} stale extract dir(s) found.",
+            file=sys.stderr,
+        )
+        if not staleTemps and not staleExtractDirs:
             return 0
         for p in staleTemps:
             print(p)
-        nRemoved, nFailed = _RemoveStaleTemps(staleTemps)
+        for d in staleExtractDirs:
+            print(d)
+        nFRemoved, nFFailed = _RemoveStaleTemps(staleTemps)
+        nDRemoved, nDFailed = _RemoveStaleExtractDirs(staleExtractDirs)
         print(
-            f"\nSummary: {nRemoved} removed, {nFailed} failed.",
+            f"\nSummary: {nFRemoved} file(s) removed, {nDRemoved} dir(s) "
+            f"removed, {nFFailed + nDFailed} failed.",
             file=sys.stderr,
         )
-        return 1 if nFailed else 0
+        return 1 if (nFFailed or nDFailed) else 0
 
     ########################################################################
     # Phase 1: Source candidates - either a saved work list or a fresh walk.
 
-    staleTemps: List[str] = []
+    staleTemps:       List[str] = []
+    staleExtractDirs: List[str] = []
 
     if args.fromWorkList:
         # Notice if any walk-related flags were explicitly set.
@@ -1130,7 +1591,7 @@ def main() -> int:
             return 2
 
         print(f"Scanning {root!r} ...", file=sys.stderr)
-        candidates, staleTemps = _WalkCandidates(
+        candidates, staleTemps, staleExtractDirs = _WalkCandidates(
             root, args.exclude, args.walkThreads)
         print(f"  {len(candidates)} USD-extension file(s) found.",
               file=sys.stderr)
@@ -1140,16 +1601,26 @@ def main() -> int:
                 f"(from prior crashed runs).",
                 file=sys.stderr,
             )
+        if staleExtractDirs:
+            print(
+                f"  {len(staleExtractDirs)} stale extract dir(s) found "
+                f"(from prior crashed runs).",
+                file=sys.stderr,
+            )
 
-    # Implicit cleanup of stale temps when running --update (unless
-    # --noCleanup).  In report-only mode we only mention them.
-    if staleTemps and args.update and not args.noCleanup:
-        print("  Removing stale temp files ...", file=sys.stderr)
-        nRemoved, nFailed = _RemoveStaleTemps(staleTemps)
-        print(
-            f"    {nRemoved} removed, {nFailed} failed.",
-            file=sys.stderr,
-        )
+    # Implicit cleanup of stale temps and extract dirs when running --update
+    # (unless --noCleanup).  In report-only mode we only mention them.
+    if (staleTemps or staleExtractDirs) and args.update and not args.noCleanup:
+        if staleTemps:
+            print("  Removing stale temp files ...", file=sys.stderr)
+            nRemoved, nFailed = _RemoveStaleTemps(staleTemps)
+            print(f"    {nRemoved} removed, {nFailed} failed.",
+                  file=sys.stderr)
+        if staleExtractDirs:
+            print("  Removing stale extract dirs ...", file=sys.stderr)
+            nRemoved, nFailed = _RemoveStaleExtractDirs(staleExtractDirs)
+            print(f"    {nRemoved} removed, {nFailed} failed.",
+                  file=sys.stderr)
 
     if not candidates:
         print("Nothing to do.", file=sys.stderr)
@@ -1238,13 +1709,19 @@ def main() -> int:
             file=sys.stderr,
         )
 
+    # Cost-based chunking: keep each .usdz's stale inner entries together in one
+    # chunk (a single worker must extract+repack the package once).  A loose
+    # file is a cost-1 group; a package with N stale inners is a cost-N group.
+    # Greedy-pack until batchSize.
+    updateGroups = _GroupByOuter(kept)
+    updateChunks = _ChunkByCost(updateGroups, args.batchSize)
+
     nUpdateWorkers = (
         args.workers
         if args.workers is not None
-        else _ComputeWorkerCount(len(kept), args.batchSize, maxWorkers)
+        else min(maxWorkers, len(updateChunks))
     )
 
-    updateChunks = _ChunkBy(kept, args.batchSize)
     updateWorker = functools.partial(_UpdateWorker,
                                      olderThan     = args.olderThan,
                                      preserveAttrs = args.preserveAttrs)

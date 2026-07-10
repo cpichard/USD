@@ -8,6 +8,7 @@
     dict(
         SCHEMA_NAME = 'ALL_SCHEMAS',
         LIBRARY_PATH = 'pxr/usdImaging/usdImaging',
+        HD_LIBRARY_PATH = 'pxr/imaging/hd',
     ),        
 
     #--------------------------------------------------------------------------
@@ -42,6 +43,7 @@
     dict(
         SCHEMA_NAME = 'UsdPrimInfo',
         SCHEMA_TOKEN = '__usdPrimInfo',
+        SCHEMA_INCLUDES = ['{{HD_LIBRARY_PATH}}/schemaTypeDefs'],
         ADD_DEFAULT_LOCATOR = True,
         MEMBERS = [
             ('specifier', T_TOKEN, {}),
@@ -50,8 +52,7 @@
             # Skipping isModel and isGroup, which can be inferred from 'kind'.
             ('apiSchemas', T_TOKENARRAY, {}),
             ('kind', T_TOKEN, {}),
-            # XXX Add variantSets. Is it a token array, or a container of token
-            #     to token array?
+            ('variantSelections', 'HdTokenDataSourceContainerSchema', {}),
             ('niPrototypePath', T_PATH, dict(ADD_LOCATOR=True)),
             ('isNiPrototype', T_BOOL, {}),
             ('piPropagatedPrototypes', T_CONTAINER, {}),

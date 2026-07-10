@@ -19,6 +19,7 @@ pxr_library(hd
 
     PUBLIC_CLASSES
         aov
+        backPlateSchema
         basisCurves
         basisCurvesSchema
         basisCurvesTopology

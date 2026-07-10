@@ -68,6 +68,10 @@ if(APPLE)
             set(PXR_ENABLE_OPENVDB_SUPPORT OFF)
         endif()
     endif ()
+
+    option(PXR_BUILD_APPLE_FRAMEWORK "Builds an Apple Framework." ${PXR_APPLE_EMBEDDED})
+    set(PXR_APPLE_FRAMEWORK_NAME "OpenUSD" CACHE STRING "Name to provide Apple Framework build")
+    set(PXR_APPLE_IDENTIFIER_DOMAIN "org.openusd" CACHE STRING "Name to provide Apple Framework build")
 endif()
 
 
@@ -172,6 +176,23 @@ set(PXR_EXTRA_PLUGINS ""
     INTERNAL
     "Aggregation of extra plugin directories containing a plugInfo.json.")
 
+if (PXR_BUILD_APPLE_FRAMEWORK)
+    MESSAGE(STATUS "Framework build requires monolithic builds.")
+    set(PXR_BUILD_MONOLITHIC ON)
+    set(BUILD_SHARED_LIBS ON)
+
+    set(PXR_APPLE_FRAMEWORK_RELATIVE_RESOURCES ""
+        CACHE
+        STRING
+        "Relative path to search for resources within an Apple framework.")
+    mark_as_advanced(PXR_APPLE_FRAMEWORK_RELATIVE_RESOURCES)
+
+    if(PXR_APPLE_EMBEDDED)
+        set(PXR_APPLE_FRAMEWORK_RELATIVE_RESOURCES "Assets")
+    else()
+        set(PXR_APPLE_FRAMEWORK_RELATIVE_RESOURCES "Resources")
+    endif()
+endif ()
 # Resolve options that depend on one another so that subsequent .cmake scripts
 # all have the final value for these options.
 if (${PXR_BUILD_USD_IMAGING} AND NOT ${PXR_BUILD_IMAGING})
@@ -270,6 +291,17 @@ if (EMSCRIPTEN)
             "supported when targeting wasm")
         set(BUILD_SHARED_LIBS "OFF")
     endif()
+endif()
+
+if (PXR_BUILD_APPLE_FRAMEWORK)
+    if(PXR_BUILD_USD_TOOLS)
+        MESSAGE(STATUS "Setting PXR_BUILD_USD_TOOLS=OFF because PXR_BUILD_APPLE_FRAMEWORK is enabled.")
+    endif()
+    set(PXR_BUILD_USD_TOOLS OFF)
+    if(PXR_ENABLE_PYTHON_SUPPORT)
+        MESSAGE(STATUS "Setting PXR_ENABLE_PYTHON_SUPPORT=OFF because PXR_BUILD_APPLE_FRAMEWORK is enabled.")
+    endif ()
+    set(PXR_ENABLE_PYTHON_SUPPORT OFF)
 endif()
 
 # Configure the use of compiler caches for faster compilation

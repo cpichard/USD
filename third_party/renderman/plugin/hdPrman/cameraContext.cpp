@@ -411,6 +411,8 @@ HdPrman_CameraContext::_ComputeCameraParams(
             shutterCurve.shutteropening->size());
     }
 
+    result.SetFloat(RixStr.k_dofaspect,
+                    hdPrmanCamera->GetDofAspect());
     result.SetFloat(RixStr.k_apertureAngle,
                     hdPrmanCamera->GetApertureAngle());
     result.SetFloat(RixStr.k_apertureDensity,
@@ -419,7 +421,6 @@ HdPrman_CameraContext::_ComputeCameraParams(
                       hdPrmanCamera->GetApertureNSides());
     result.SetFloat(RixStr.k_apertureRoundness,
                     hdPrmanCamera->GetApertureRoundness());
-                    
 
     const GfVec4f s = _ToVec4f(screenWindow);
     result.SetFloatArray(RixStr.k_Ri_ScreenWindow, s.data(), 4);

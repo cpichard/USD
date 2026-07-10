@@ -10,6 +10,17 @@ over "GLOBAL" (
     customData = {
         string libraryName      = "UsdProfiles"
         string libraryPath      = "pxr/usd/usdProfiles"
+        dictionary libraryTokens = {
+            dictionary enhancement = {
+                string doc = """Degradation class: capability improves quality but absence is allowable."""
+            }
+            dictionary hard = {
+                string doc = """Degradation class: capability is load-bearing; absence produces incorrect results."""
+            }
+            dictionary soft = {
+                string doc = """Degradation class: capability degrades gracefully if absent."""
+            }
+        }
     }
 )
 {

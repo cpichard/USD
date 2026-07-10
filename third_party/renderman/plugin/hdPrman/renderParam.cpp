@@ -3348,7 +3348,9 @@ HdPrman_RenderParam::SetRileyOptions()
 
         RtParamList composedParams = HdPrman_Utils::Compose(
             _envOptions,
+#if PXR_VERSION > 2505
             _rileySceneIndexObserverOptions,
+#endif
 #if PXR_VERSION >= 2311 // causes issues for houdini 20, eg. bad shutter interval
             _renderSettingsPrimOptions,
 #endif
@@ -3380,6 +3382,14 @@ HdPrman_RenderParam::SetRileyOptions()
         );
         prunedOptions.SetFloatArray(RixStr.k_trace_worldoffset, worldOffset.GetArray(), 3);
         prunedOptions.SetString(RixStr.k_trace_worldorigin, RixStr.k_worldoffset);
+#endif
+
+#if PXR_VERSION < 2407
+        uint32_t paramId;
+        if (!prunedOptions.GetParamId(RixStr.k_Ri_Frame, paramId))
+        {
+            prunedOptions.SetInteger(RixStr.k_Ri_Frame, frame);
+        }
 #endif
 
         for(const auto& cb: *_rileyOptionsCallbacks) {
@@ -4214,7 +4224,9 @@ HdPrman_RenderParam::CreateRenderViewFromLegacyProducts(
             } else if (TfStringStartsWith(settingName.GetText(),
                                           "driver:parameters:") ||
                        TfStringStartsWith(settingName.GetText(),
-                                          "ri:driver:parameters:")) {
+                                          "ri:driver:parameters:") ||
+                       TfStringStartsWith(settingName.GetText(),
+                                          "ri:displayDriver:")) {
                 driverParameters.push_back(settingName);
             }
         }
@@ -5013,6 +5025,25 @@ HdPrman_RenderParam::GetInstancer(const SdfPath& id)
         return static_cast<HdPrmanInstancer*>(index->GetInstancer(id));
     }
     return nullptr;
+}
+
+void
+HdPrman_RenderParam::FinalizeMeshLightSprim(const SdfPath& sourceGeomPath)
+{
+    static const TfToken k_meshLightLightName("__meshLight_light");
+    const SdfPath lightPath = sourceGeomPath.GetParentPath().AppendChild(k_meshLightLightName);
+
+    if (HdRenderIndex* index = _renderDelegate->GetRenderIndex()) {
+        if (HdSprim* sprim = index->GetSprim(
+#if PXR_VERSION <= 2305
+            HdPrmanTokens->meshLight,
+#else
+            HdPrimTypeTokens->meshLight,
+#endif
+            lightPath)) {
+            sprim->Finalize(this);
+        }
+    }
 }
 
 bool

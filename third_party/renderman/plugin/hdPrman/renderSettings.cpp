@@ -270,6 +270,11 @@ _UpdateFrame(
     const HdSceneIndexBaseRefPtr &terminalSi,
     RtParamList *options)
 {
+    uint32_t paramId;
+    if (options->GetParamId(RixStr.k_Ri_Frame, paramId)) {
+        return;
+    }
+
     // Get the Frame from the Terminal Scene Index
     double frame;
     if (!HdUtils::GetCurrentFrame(terminalSi, &frame)) {
@@ -623,6 +628,11 @@ void HdPrman_RenderSettings::_Sync(
 #if PXR_VERSION >= 2407
     if (*dirtyBits & HdRenderSettings::DirtyFrameNumber ||
         *dirtyBits & HdRenderSettings::DirtyNamespacedSettings) {
+        // Remove Ri:Frame from _settingsOptions unless ri:Ri:Frame is authored,
+        // otherwise _UpdateFrame exits early before the scene globals can update Ri:Frame.
+        if (namespacedSettings.find("ri:Ri:Frame") == namespacedSettings.end()) {
+            _settingsOptions.Remove(RixStr.k_Ri_Frame);
+        }
         _UpdateFrame(terminalSi, &_settingsOptions);
     }
 #else
@@ -752,10 +762,12 @@ HdPrman_RenderSettings::_ProcessRenderTerminals(
                 _renderTerminalTokens->outputsRiIntegrator.GetString(),
                 VtDefault = SdfPathVector());
 
+#if PXR_VERSION >= 2505
             if (!paths.empty() && rsSchemaHasRelationships && terminalsWarn) {
                 TF_WARN("outputs:ri:integrator on RenderSettings is "
                         "deprecated in favor of ri:integrator.");
             }
+#endif
         }
 
         param->SetRenderSettingsIntegratorPath(sceneDelegate,
@@ -780,10 +792,12 @@ HdPrman_RenderSettings::_ProcessRenderTerminals(
                 _renderTerminalTokens->outputsRiSampleFilters.GetString(),
                 VtDefault = SdfPathVector());
 
+#if PXR_VERSION >= 2505
             if (!paths.empty() && rsSchemaHasRelationships && terminalsWarn) {
                 TF_WARN("outputs:ri:sampleFilters on RenderSettings is "
                         "deprecated in favor of ri:sampleFilters.");
             }
+#endif
         }
 
         param->SetSampleFilterPaths(sceneDelegate, paths);
@@ -807,10 +821,12 @@ HdPrman_RenderSettings::_ProcessRenderTerminals(
                 _renderTerminalTokens->outputsRiDisplayFilters.GetString(),
                 VtDefault = SdfPathVector());
 
+#if PXR_VERSION >= 2505
             if (!paths.empty() && rsSchemaHasRelationships && terminalsWarn) {
                 TF_WARN("outputs:ri:displayFilters on RenderSettings is "
                         "deprecated in favor of ri:displayFilters.");
             }
+#endif
         }
 
         param->SetDisplayFilterPaths(sceneDelegate, paths);

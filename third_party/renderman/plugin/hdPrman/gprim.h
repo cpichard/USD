@@ -62,10 +62,16 @@ public:
         }
         _instanceIds.clear();
 
-        // delete instances owned by the instancer.
+        // Delete instances owned by the instancer.
         if (HdPrmanInstancer* instancer = param->GetInstancer(
             BASE::GetInstancerId())) {
             instancer->Depopulate(renderParam, id);
+        }
+
+        // For mesh lights, finalize the light (and therefore its instances)
+        // before the geometry prototype is deleted below.
+        if (_PrototypeOnly()) {
+            param->FinalizeMeshLightSprim(id);
         }
 
         for (const auto &protoId: _prototypeIds) {

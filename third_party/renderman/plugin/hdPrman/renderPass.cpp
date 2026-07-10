@@ -375,6 +375,34 @@ _GetSceneStateId(const HdRenderIndex * const renderIndex)
 }
 #endif
 
+#if PXR_VERSION <= 2308
+CameraUtilConformWindowPolicy
+_ToConformWindowPolicy(const TfToken &token)
+{
+    if (token == HdAspectRatioConformPolicyTokens->adjustApertureWidth) {
+        return CameraUtilMatchVertically;
+    }
+    if (token == HdAspectRatioConformPolicyTokens->adjustApertureHeight) {
+        return CameraUtilMatchHorizontally;
+    }
+    if (token == HdAspectRatioConformPolicyTokens->expandAperture) {
+        return CameraUtilFit;
+    }
+    if (token == HdAspectRatioConformPolicyTokens->cropAperture) {
+        return CameraUtilCrop;
+    }
+    if (token == HdAspectRatioConformPolicyTokens->adjustPixelAspectRatio) {
+        return CameraUtilDontConform;
+    }
+
+    TF_WARN(
+        "Invalid aspectRatioConformPolicy value '%s', "
+        "falling back to expandAperture.", token.GetText());
+
+    return CameraUtilFit;
+}
+#endif
+
 } // end anonymous namespace
 
 
@@ -433,14 +461,31 @@ HdPrman_RenderPass::_UpdateCameraFramingAndWindowPolicy(
                         // but the camera framing is y-Down, so converting here.
                         GfVec2i(vp[0], resolution[1] - (vp[1] + vp[3])),
                         vp[2], vp[3])));
+
+            // Get the aspect ratio conform policy from render settings (Solaris)
+            // otherwise get it from render pass state (studio's hdprman)
+            std::string aspectRatioConformPolicy = renderDelegate->GetRenderSetting<std::string>(
+                HdPrmanRenderSettingsTokens->aspectRatioConformPolicy,
+                std::string());
+            if (!aspectRatioConformPolicy.empty()) {
+                cameraContext->SetWindowPolicy(
+#if PXR_VERSION <= 2308
+                    _ToConformWindowPolicy(TfToken(aspectRatioConformPolicy)));
+#else
+                    HdUtils::ToConformWindowPolicy(TfToken(aspectRatioConformPolicy)));
+#endif
+            }
+            else {
+                cameraContext->SetWindowPolicy(renderPassState->GetWindowPolicy());    
+            }
         } else {
             // If no camera framing was provided,
             // try to get the framing from the render settings.
             _ComputeCameraFramingFromSettings(
                 renderPassState, renderDelegate, renderProducts, resolution);
             cameraContext->SetFraming(renderPassState->GetFraming());
+            cameraContext->SetWindowPolicy(renderPassState->GetWindowPolicy());
         }
-        cameraContext->SetWindowPolicy(renderPassState->GetWindowPolicy());
     }
 
     return cameraContext->GetFraming().dataWindow != prevDataWindow;

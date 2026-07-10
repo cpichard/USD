@@ -36,6 +36,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     ((shutterOpenTime,    "ri:shutterOpenTime"))
     ((shutterCloseTime,   "ri:shutterCloseTime"))
     ((shutteropening,     "ri:shutteropening"))
+    ((dofAspect,          "ri:dofaspect"))
     ((apertureAngle,      "ri:apertureAngle"))
     ((apertureDensity,    "ri:apertureDensity"))
     ((apertureNSides,     "ri:apertureNSides"))
@@ -151,6 +152,7 @@ HdPrmanCamera::HdPrmanCamera(SdfPath const& id)
   , _lensDistortionAsym(0.0f)
   , _lensDistortionScale(1.0f)
 #endif
+  , _dofAspect(1.0f)
   , _apertureAngle(0.0f)
   , _apertureDensity(0.0f)
   , _apertureNSides(0)
@@ -272,6 +274,9 @@ HdPrmanCamera::Sync(HdSceneDelegate *sceneDelegate,
             sceneDelegate->GetCameraParamValue(id, _tokens->shutteropening);
         _shutterCurve.shutteropening = _ToOptionalFloat8(vShutteropening);
 
+        _dofAspect =
+            sceneDelegate->GetCameraParamValue(id, _tokens->dofAspect)
+                         .GetWithDefault<float>(1.0f);
         _apertureAngle =
             sceneDelegate->GetCameraParamValue(id, _tokens->apertureAngle)
                          .GetWithDefault<float>(0.0f);

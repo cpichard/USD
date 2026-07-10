@@ -8,6 +8,7 @@
 #include "pxr/usd/usd/interpolators.h"
 
 #include "pxr/usd/usd/attribute.h"
+#include "pxr/usd/usd/clipSet.h"
 #include "pxr/usd/usd/interpolation.h"
 #include "pxr/usd/usd/stage.h"
 

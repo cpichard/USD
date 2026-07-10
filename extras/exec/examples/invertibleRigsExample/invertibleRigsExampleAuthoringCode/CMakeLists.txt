@@ -40,3 +40,11 @@ pxr_register_test(testSwitchCompensation
     TESTENV testenv/testSwitchCompensation
     EXPECTED_RETURN_CODE 0
 )
+
+# TODO: Fix underlying issue in doxygen build that requires the 
+# following explicit inclusion of files we want to build and publish
+pxr_docs_only_dir(invertibleRigsExampleAuthoringCode_doxygenHeaders
+  DOXYGEN_FILES                                                                     
+      authoring.h                                                                   
+      query.h                                                                       
+)

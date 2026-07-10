@@ -12,8 +12,8 @@
 #include "pxr/base/js/types.h"
 #include "pxr/base/js/value.h"
 
-#include <algorithm>
 #include <cstdio>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -30,18 +30,12 @@ PXR_NAMESPACE_USING_DIRECTIVE
 // Helpers
 //----------------------------------------------------------------------------
 
-static bool
-_VectorContains(const std::vector<TfToken>& v, const TfToken& t)
-{
-    return std::find(v.begin(), v.end(), t) != v.end();
-}
-
 using CR = UsdProfileRegistry::CapabilityResult;
 using QS = UsdProfileRegistry::QueryStatus;
 
 // Return true if any CapabilityResult in v has the given capability token.
 static bool
-_ResultContains(const std::vector<CR>& v, const TfToken& t)
+_ResultContains(const std::set<CR>& v, const TfToken& t)
 {
     for (const auto& r : v) {
         if (r.capability == t) return true;
@@ -49,10 +43,10 @@ _ResultContains(const std::vector<CR>& v, const TfToken& t)
     return false;
 }
 
-// Return the QueryStatus for a given token in a CapabilityResult vector.
+// Return the QueryStatus for a given token in a CapabilityResult set.
 // Asserts if not found.
 static QS
-_ResultStatus(const std::vector<CR>& v, const TfToken& t)
+_ResultStatus(const std::set<CR>& v, const TfToken& t)
 {
     for (const auto& r : v) {
         if (r.capability == t) return r.status;
@@ -61,9 +55,9 @@ _ResultStatus(const std::vector<CR>& v, const TfToken& t)
     return QS::NoPath;
 }
 
-// Return all tokens with a given status from a CapabilityResult vector.
+// Return all tokens with a given status from a CapabilityResult set.
 static std::vector<TfToken>
-_ResultTokensWithStatus(const std::vector<CR>& v, QS status)
+_ResultTokensWithStatus(const std::set<CR>& v, QS status)
 {
     std::vector<TfToken> result;
     for (const auto& r : v) {
@@ -103,23 +97,22 @@ TestBasicDAG()
     TF_AXIOM(!UsdProfileRegistry::HasCapability(TfToken("nonexistent")));
 
     // GetAllCapabilities
-    std::vector<TfToken> all = UsdProfileRegistry::GetAllCapabilities();
+    std::set<TfToken> all = UsdProfileRegistry::GetAllCapabilities();
     TF_AXIOM(all.size() == 6);
-    TF_AXIOM(_VectorContains(all, TfToken("usd")));
-    TF_AXIOM(_VectorContains(all, TfToken("merge.point")));
+    TF_AXIOM(all.count(TfToken("usd")));
+    TF_AXIOM(all.count(TfToken("merge.point")));
 
     // GetPredecessors
-    std::vector<CR> rootPreds =
+    std::set<CR>rootPreds =
         UsdProfileRegistry::GetPredecessors(TfToken("usd"));
     TF_AXIOM(rootPreds.empty());
 
-    std::vector<CR> chainAPreds =
+    std::set<CR>chainAPreds =
         UsdProfileRegistry::GetPredecessors(TfToken("chain.a"));
     TF_AXIOM(chainAPreds.size() == 1);
-    TF_AXIOM(chainAPreds[0].capability == TfToken("usd"));
-    TF_AXIOM(chainAPreds[0].status == QS::ValidPath);
+    TF_AXIOM(_ResultStatus(chainAPreds, TfToken("usd")) == QS::ValidPath);
 
-    std::vector<CR> mergePreds =
+    std::set<CR>mergePreds =
         UsdProfileRegistry::GetPredecessors(TfToken("merge.point"));
     TF_AXIOM(mergePreds.size() == 3);
     TF_AXIOM(_ResultContains(mergePreds, TfToken("chain.b")));
@@ -189,7 +182,7 @@ TestDeprecation()
     // Case 1: Hydra v1/v2 migration
     //   hydra.v2 has hydra.v1 as deprecated predecessor, hydra.base as valid
     {
-        std::vector<CR> preds =
+        std::set<CR>preds =
             UsdProfileRegistry::GetPredecessors(TfToken("hydra.v2"));
         TF_AXIOM(preds.size() == 2);
         TF_AXIOM(_ResultContains(preds, TfToken("hydra.base")));
@@ -201,7 +194,7 @@ TestDeprecation()
     // Case 2: Look/Material sunset
     //   shade.material has shade.look as deprecated predecessor
     {
-        std::vector<CR> preds =
+        std::set<CR>preds =
             UsdProfileRegistry::GetPredecessors(TfToken("shade.material"));
         TF_AXIOM(_ResultStatus(preds, TfToken("shade.look")) == QS::Deprecated);
         TF_AXIOM(_ResultStatus(preds, TfToken("shade.base")) == QS::ValidPath);
@@ -210,7 +203,7 @@ TestDeprecation()
     // Case 3: Pipeline multi-deprecated
     //   pipeline.v3 has both v1 and v2 as deprecated predecessors
     {
-        std::vector<CR> preds =
+        std::set<CR>preds =
             UsdProfileRegistry::GetPredecessors(TfToken("pipeline.v3"));
         TF_AXIOM(preds.size() == 3);
         TF_AXIOM(_ResultStatus(preds, TfToken("hydra.base")) == QS::ValidPath);
@@ -223,7 +216,7 @@ TestDeprecation()
 
     // Case 4: Clean leaf has no deprecated direct predecessors
     {
-        std::vector<CR> preds =
+        std::set<CR>preds =
             UsdProfileRegistry::GetPredecessors(TfToken("clean.leaf"));
         TF_AXIOM(_ResultTokensWithStatus(preds, QS::Deprecated).empty());
     }
@@ -278,7 +271,7 @@ TestEmptyGraph()
     TF_AXIOM(ok);
     TF_AXIOM(errors.empty());
 
-    std::vector<TfToken> all = UsdProfileRegistry::GetAllCapabilities();
+    std::set<TfToken> all = UsdProfileRegistry::GetAllCapabilities();
     TF_AXIOM(all.empty());
 
     TF_AXIOM(!UsdProfileRegistry::HasCapability(TfToken("anything")));
@@ -301,14 +294,13 @@ TestMultiPluginMerge()
     TF_AXIOM(errors.empty());
 
     // Cross-plugin edge: vendor.geom depends on core.module
-    std::vector<CR> geomPreds =
+    std::set<CR>geomPreds =
         UsdProfileRegistry::GetPredecessors(TfToken("vendor.geom"));
     TF_AXIOM(geomPreds.size() == 1);
-    TF_AXIOM(geomPreds[0].capability == TfToken("core.module"));
-    TF_AXIOM(geomPreds[0].status == QS::ValidPath);
+    TF_AXIOM(_ResultStatus(geomPreds, TfToken("core.module")) == QS::ValidPath);
 
     // vendor.render depends on both core.module and vendor.geom
-    std::vector<CR> renderPreds =
+    std::set<CR>renderPreds =
         UsdProfileRegistry::GetPredecessors(TfToken("vendor.render"));
     TF_AXIOM(renderPreds.size() == 2);
     TF_AXIOM(_ResultContains(renderPreds, TfToken("core.module")));
@@ -362,19 +354,19 @@ TestTransitivePredecessors()
     TF_AXIOM(ok);
 
     // usd has no predecessors at all
-    std::vector<CR> rootTrans =
+    std::set<CR>rootTrans =
         UsdProfileRegistry::GetTransitivePredecessors(TfToken("usd"));
     TF_AXIOM(rootTrans.empty());
 
     // chain.a -> usd (one level, valid)
-    std::vector<CR> chainATrans =
+    std::set<CR>chainATrans =
         UsdProfileRegistry::GetTransitivePredecessors(TfToken("chain.a"));
     TF_AXIOM(chainATrans.size() == 1);
     TF_AXIOM(_ResultContains(chainATrans, TfToken("usd")));
     TF_AXIOM(_ResultStatus(chainATrans, TfToken("usd")) == QS::ValidPath);
 
     // chain.b -> chain.a -> usd (two levels, all valid)
-    std::vector<CR> chainBTrans =
+    std::set<CR>chainBTrans =
         UsdProfileRegistry::GetTransitivePredecessors(TfToken("chain.b"));
     TF_AXIOM(chainBTrans.size() == 2);
     TF_AXIOM(_ResultStatus(chainBTrans, TfToken("chain.a")) == QS::ValidPath);
@@ -382,7 +374,7 @@ TestTransitivePredecessors()
 
     // merge.point -> chain.b, branch.left, branch.right -> chain.a, usd
     // Full closure: chain.b, branch.left, branch.right, chain.a, usd (all valid)
-    std::vector<CR> mergeTrans =
+    std::set<CR>mergeTrans =
         UsdProfileRegistry::GetTransitivePredecessors(TfToken("merge.point"));
     TF_AXIOM(mergeTrans.size() == 5);
     TF_AXIOM(_ResultContains(mergeTrans, TfToken("chain.b")));
@@ -393,7 +385,7 @@ TestTransitivePredecessors()
     TF_AXIOM(_ResultTokensWithStatus(mergeTrans, QS::Deprecated).empty());
 
     // Unknown capability returns empty
-    std::vector<CR> unknownTrans =
+    std::set<CR>unknownTrans =
         UsdProfileRegistry::GetTransitivePredecessors(TfToken("nonexistent"));
     TF_AXIOM(unknownTrans.empty());
 
@@ -706,11 +698,11 @@ TestVersioningQueries()
     // --- CoversCapabilities with unversioned required tokens ---
     {
         // profile.sim covers usd.geom and usd.physics (resolves to _v2)
-        std::vector<TfToken> required = {
+        std::set<TfToken> required = {
             TfToken("usd.geom"),
             TfToken("usd.physics"),  // resolves to usd.physics_v2
         };
-        std::vector<CR> results;
+        std::set<CR>results;
         QS status = UsdProfileRegistry::CoversCapabilities(
             TfToken("profile.sim"), required, {}, &results);
         // usd.geom: reachable via valid path (profile.sim→usd.physics_v2→usd.geom)
@@ -719,18 +711,16 @@ TestVersioningQueries()
         // Aggregate: DeprecationConflict
         TF_AXIOM(status == QS::DeprecationConflict);
         TF_AXIOM(results.size() == 2);
-        TF_AXIOM(results[0].capability == TfToken("usd.geom"));
-        TF_AXIOM(results[0].status == QS::DeprecationConflict);
+        TF_AXIOM(_ResultStatus(results, TfToken("usd.geom")) == QS::DeprecationConflict);
         // Result reports the resolved token
-        TF_AXIOM(results[1].capability == TfToken("usd.physics_v2"));
-        TF_AXIOM(results[1].status == QS::ValidPath);
+        TF_AXIOM(_ResultStatus(results, TfToken("usd.physics_v2")) == QS::ValidPath);
     }
 
     // --- Unversioned perspective also resolves ---
     {
         // "usd.physics" resolves to usd.physics_v2.
         // usd.geom is reachable via valid and deprecated paths → DeprecationConflict
-        std::vector<TfToken> required = {TfToken("usd.geom")};
+        std::set<TfToken> required = {TfToken("usd.geom")};
         QS status = UsdProfileRegistry::CoversCapabilities(
             TfToken("usd.physics"), required);
         TF_AXIOM(status == QS::DeprecationConflict);

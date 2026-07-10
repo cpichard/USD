@@ -54,11 +54,11 @@ class TestGetAllProfiles(unittest.TestCase):
         PR._TestClear()
         ok, errors = _load("testEmpty.json")
         self.assertTrue(ok)
-        self.assertEqual(PR.GetAllProfiles(), [])
+        self.assertEqual(PR.GetAllProfiles(), set())
 
     def test_SubsetOfAllCapabilities(self):
-        profiles = set(PR.GetAllProfiles())
-        all_caps = set(PR.GetAllCapabilities())
+        profiles = PR.GetAllProfiles()
+        all_caps = PR.GetAllCapabilities()
         self.assertTrue(profiles.issubset(all_caps))
         self.assertLess(len(profiles), len(all_caps))
 
@@ -105,27 +105,23 @@ class TestCoversCapabilities(unittest.TestCase):
         status, results = PR.CoversCapabilities("profile.25.11", required)
         self.assertEqual(status, QS.ValidPath)
         self.assertEqual(len(results), 2)
-        self.assertEqual(results[0].capability, "usd.geom.mesh")
-        self.assertEqual(results[0].status, QS.ValidPath)
-        self.assertEqual(results[1].capability, "usd")
-        self.assertEqual(results[1].status, QS.ValidPath)
+        self.assertEqual(_resultStatus(results, "usd.geom.mesh"), QS.ValidPath)
+        self.assertEqual(_resultStatus(results, "usd"), QS.ValidPath)
 
     def test_MixedDeprecation(self):
         required = ["usd.geom.nurbs", "usd.geom.mesh"]
         status, results = PR.CoversCapabilities("profile.26.08", required)
         self.assertEqual(status, QS.DeprecationConflict)
-        self.assertEqual(results[0].capability, "usd.geom.nurbs")
-        self.assertEqual(results[0].status, QS.ValidPath)
-        self.assertEqual(results[1].capability, "usd.geom.mesh")
-        self.assertEqual(results[1].status, QS.DeprecationConflict)
+        self.assertEqual(_resultStatus(results, "usd.geom.nurbs"), QS.ValidPath)
+        self.assertEqual(_resultStatus(results, "usd.geom.mesh"), QS.DeprecationConflict)
 
     def test_Unreachable(self):
         required = ["usd.geom.mesh", "no.such.cap"]
         status, results = PR.CoversCapabilities("profile.25.11", required)
         self.assertEqual(status, QS.NoPath)
         self.assertEqual(len(results), 2)
-        self.assertEqual(results[0].status, QS.ValidPath)
-        self.assertEqual(results[1].status, QS.NoPath)
+        self.assertEqual(_resultStatus(results, "usd.geom.mesh"), QS.ValidPath)
+        self.assertEqual(_resultStatus(results, "no.such.cap"), QS.NoPath)
 
     def test_EmptyRequired(self):
         status, _ = PR.CoversCapabilities("profile.25.11", [])
@@ -146,10 +142,8 @@ class TestCoversCapabilities(unittest.TestCase):
         excepted = ["usd.geom.mesh"]
         status, results = PR.CoversCapabilities("profile.25.11", required, excepted)
         self.assertEqual(status, QS.NoPath)
-        self.assertEqual(results[0].capability, "usd.geom.mesh")
-        self.assertEqual(results[0].status, QS.Excepted)
-        self.assertEqual(results[1].capability, "usd")
-        self.assertEqual(results[1].status, QS.ValidPath)
+        self.assertEqual(_resultStatus(results, "usd.geom.mesh"), QS.Excepted)
+        self.assertEqual(_resultStatus(results, "usd"), QS.ValidPath)
 
     def test_ExceptedNotInRequired(self):
         required = ["usd.geom.mesh"]

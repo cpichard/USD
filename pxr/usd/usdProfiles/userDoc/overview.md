@@ -112,6 +112,181 @@ form of an unversioned name, so callers can pass `"usd.physics"` and
 transparently receive results for `"usd.physics_v2"`. `CoversCapabilities()`
 and `HasPredecessor()` both resolve tokens before querying the graph.
 
+(usdProfiles_schema_implied_capabilities)=
+## Schema-Implied Capabilities
+
+It is not a requirement that a DCC provides explicit capabilities during usd
+export processes, unless there is a reasonable possibility that the schema 
+involved might not exist at a second client, and that is considered important
+to flag the lack of that schema. USD already guarantees that authored data is
+retained even if it is not interpreted by the runtime, so capability
+declarations are informative. As such, tools should enforce whatever contract 
+they have with users about whether or not capabilities should be provided
+during the usd export process.
+
+Rather than requiring DCC tools to hard-code which capabilities each applied
+schema implies, API schemas can declare their implications directly in their
+`schema.usda` definition via `customData.extraPlugInfo.impliesCapabilities`.
+The codegen tool (`usdGenSchema`) propagates this declaration verbatim into the
+per-type block of the library's `plugInfo.json`, making it available to the
+runtime without any additional registration step.
+
+### Declaring Implications in a Schema
+
+```{code-block} usda
+class "ColorSpaceAPI"
+(
+    inherits = </APISchemaBase>
+    customData = {
+        string apiSchemaType = "singleApply"
+        dictionary extraPlugInfo = {
+            string[] impliesCapabilities = ["usd.core.colorspace"]
+        }
+    }
+)
+{ ... }
+```
+
+`impliesCapabilities` is a plain string array of capability names, like
+`predecessors`. It carries only the capability identity. **The strength of
+that capability (`hard`, `soft`, or `enhancement`) is not a property of the
+schema, it is a property of how a particular application consumes the
+capability**, and is therefore recorded on the consumer's
+`UsdProfilesClaimsAPI` rather than at the implication site (see
+[Recording Capability Usages](#usdProfiles_using_claimsapi)).
+
+A schema may list any number of capabilities, and the same capability can be
+listed by multiple schemas. The runtime can use the union to understand the 
+capabilities required to work with the layer. When different claim strengths
+are made on the same capability at different points in a layer, the strongest
+claim applies.
+
+### Inheritance Through the Schema Hierarchy
+
+Schema authors do **not** re-declare `impliesCapabilities` on derived schemas.
+`GetSchemaImpliedCapabilities()` walks the full ancestor chain via
+`TfType::GetAllAncestorTypes` and unions declarations from every level. A
+schema that inherits from `ColorSpaceAPI` therefore implies
+`usd.core.colorspace` automatically.
+
+```{code-block} python
+from pxr import Usd, UsdProfiles
+
+t = Usd.SchemaRegistry.GetTypeFromName(Usd.Tokens.ColorSpaceAPI)
+caps = UsdProfiles.ProfileRegistry.GetSchemaImpliedCapabilities(t)
+# caps == ["usd.core.colorspace"]
+```
+
+Results are cached on first call per `TfType`, so the walk and plugin
+metadata reads happen only once regardless of how many prims apply the schema.
+
+### Production Capability Seeds
+
+For implied capabilities to be useful, the referenced capabilities must
+actually exist in the registry. The `pxr/usd/usd` library seeds the part of
+the DAG it owns by including a `Profiles.Capabilities` block alongside the
+`Types` block in its `plugInfo.json`:
+
+```{code-block} json
+"Profiles": {
+    "Capabilities": {
+        "usd": {
+            "name": "USD",
+            "docstring": "Root capability for the USD taxonomy.",
+            "style": "core",
+            "subgraph": "Foundation"
+        },
+        "usd.core": {
+            "predecessors": ["usd"],
+            "name": "usd core library",
+            "docstring": "Capabilities introduced by the pxr/usd/usd library.",
+            "style": "core",
+            "subgraph": "Foundation"
+        },
+        "usd.core.colorspace": {
+            "predecessors": ["usd.core"],
+            "name": "Color Space",
+            "docstring": "Color space authoring via UsdColorSpaceAPI / UsdColorSpaceDefinitionAPI.",
+            "style": "core",
+            "subgraph": "Foundation"
+        }
+    }
+}
+```
+
+Downstream libraries follow the same pattern: each library that introduces new
+capabilities owns its own `Profiles.Capabilities` block in its `plugInfo.json`.
+
+(usdProfiles_file_format_implied_capabilities)=
+### File Format Plugin Implications
+
+File format plugins (`SdfFileFormat`-derived types) can also declare implied
+capabilities using the same `impliesCapabilities` key directly in their
+`plugInfo.json` type entry. This is the appropriate mechanism for format
+plugins that are not USD API schemas and therefore have no `schema.usda` to
+annotate.
+
+For example, `usdMtlx` declares that referencing a `.mtlx` layer requires the
+`usd.mtlx.fileformat` capability:
+
+```{code-block} json
+"UsdMtlxFileFormat": {
+    "bases": ["SdfFileFormat"],
+    "extensions": ["mtlx"],
+    "formatId": "mtlx",
+    "impliesCapabilities": ["usd.mtlx.fileformat"],
+    ...
+}
+```
+
+The corresponding `Profiles.Capabilities` block (in the same `plugInfo.json`)
+seeds the part of the DAG that `usdMtlx` owns:
+
+```{code-block} json
+"Profiles": {
+    "Capabilities": {
+        "usd.mtlx": {
+            "predecessors": ["usd.core"],
+            "name": "usdMtlx library",
+            "docstring": "Capabilities introduced by the pxr/usd/usdMtlx library.",
+            "style": "core",
+            "subgraph": "Foundation"
+        },
+        "usd.mtlx.fileformat": {
+            "predecessors": ["usd.mtlx"],
+            "name": "MaterialX File Format",
+            "docstring": "Support for referencing .mtlx files as USD layers via UsdMtlxFileFormat.",
+            "style": "core",
+            "subgraph": "Foundation"
+        }
+    }
+}
+```
+
+To query file format implications directly:
+
+```{code-block} python
+from pxr import Tf, UsdProfiles, UsdMtlx
+
+t = Tf.Type.FindByName("UsdMtlxFileFormat")
+caps = UsdProfiles.ProfileRegistry.GetFileFormatImpliedCapabilities(t)
+# caps == ["usd.mtlx.fileformat"]
+```
+
+`PopulateCapabilityUsages()` incorporates file format implications
+automatically: after traversing the prim namespace for schema-implied
+capabilities, it iterates `stage.GetUsedLayers()`, identifies each layer's
+file format type, and unions any declared `impliesCapabilities` with the
+schema-derived set. Each implied capability that the user has not already
+declared a strength for is written to the prim's `capabilityUsages` metadata
+at the default strength `"hard"`. Authored entries are preserved verbatim,
+so callers can override the strength of any implied capability by calling
+`SetCapabilityUsage()` before `PopulateCapabilityUsages()`.
+
+Note that `UsdMtlx` must be imported to guarantee that `FindByName` can find 
+the `UsdMtlxFileFormat` type; if the `UsdMtlx` plugin has not been loaded, the
+`Type` will not be resolved and consequently neither will the capability.
+
 (usdProfiles_using_claimsapi)=
 ## Using ClaimsAPI
 
@@ -138,6 +313,59 @@ api.SetCapabilityUsage("usd.geom.hairAndFur", "soft")
 | `soft` | The prim degrades gracefully if the capability is absent. |
 | `enhancement` | Improves quality but its absence is acceptable. |
 
+### Auto-populating Capability Usages from Schema Implications
+
+Schemas may author implications where it is desirable to have capabilities
+automatically aggregated. This allows the introduction of some automation -
+instead of manually calling `SetCapabilityUsage` for every capability, one can
+let `PopulateCapabilityUsages()` do the work automatically. It
+traverses the entire namespace rooted at the `ClaimsAPI` prim, inspects every
+applied API schema on every descendant (including the root itself), and merges
+their implied capabilities into a single dictionary, writing each capability at
+the default "hard" strength unless it has already been authored on the prim.The
+result is written to the prim's `capabilityUsages` metadata, preserving any 
+authored strength and filling in undeclared implied capabilities at the default
+`"hard"` strength.
+
+Note that there's no need to imply anything that does not need reporting. 
+e.g. `UsdCollections` are always available. There is nothing to imply or report.
+Right now colorspace information is allowably optional from an implementation 
+that is e.g. only concerned with physics. A layer may or may not care about 
+reporting that colorspace information is present.
+
+It is important to recognize that Capabilities are not a ground truth 
+"algebraic" solve of composition, they are the means by which users may express 
+what they intend on behalf of layers they publish.
+
+```{code-block} python
+from pxr import Usd, UsdProfiles
+
+stage  = Usd.Stage.Open("shot.usda")
+root   = stage.GetPrimAtPath("/Shot")
+claims = UsdProfiles.ClaimsAPI.Apply(root)
+
+merged = claims.PopulateCapabilityUsages()
+# merged == {"usd.core.colorspace": "hard"}  (if any descendant has ColorSpaceAPI)
+```
+
+This is the recommended approach for pipeline post-processes and DCC save
+hooks: apply `ClaimsAPI` to the namespace root (typically the shot or asset
+prim), then call `PopulateCapabilityUsages()` once after all
+other schemas have been applied. The method handles multi-apply schema
+instance deduplication automatically — `ColorSpaceDefinitionAPI:foo` and
+`ColorSpaceDefinitionAPI:bar` on the same prim each resolve to the same
+`TfType` and therefore contribute the capability only once.
+
+```{admonition} Preserves authored usages
+:class: note
+
+`PopulateCapabilityUsages()` merges into the existing `capabilityUsages`
+dictionary rather than replacing it. Authored entries survive verbatim; only
+capabilities that have no authored strength are added, at the default `"hard"`.
+Call `SetCapabilityUsage` *before* `PopulateCapabilityUsages` to lock in a
+non-default strength for any implied capability.
+```
+
 ### Declaring Profile Compatibility
 
 A pipeline conformance step declares which profiles the prim satisfies. A
@@ -147,8 +375,10 @@ fully compatible declaration (no exceptions) is an unqualified assertion:
 api.SetProfileCompatible("studio.vfx.26.08")
 ```
 
-If certain capabilities are present but known to fail audit, list them as
-exceptions — a signed degradation declaration:
+It may be that certain capabilities are present but known to fail a strict
+validation check (using the pending UsdValidation extensions for Capabilities
+and Profiles), These capabilities may be listed as exceptions via a
+deprecation declaration:
 
 ```{code-block} python
 api.SetProfileCompatibleWithExceptions(

@@ -30,6 +30,7 @@ pxr_library(usdImaging
         adapterRegistry
         collectionCache
         collectionMaterialBindingSchema
+        collectionPredicateLibrary
         directMaterialBindingSchema
         dataSourceAttribute
         dataSourceAttributeColorSpace
@@ -74,6 +75,7 @@ pxr_library(usdImaging
         selectionSceneIndex
         tokens
         apiSchemaAdapter
+        backPlateAPIAdapter
         basisCurvesAdapter
         capsuleAdapter
         cameraAdapter
@@ -312,6 +314,17 @@ pxr_build_test(testUsdImagingInstanceProxyTraversal
     CPPFILES
         testenv/testUsdImagingInstanceProxyTraversal.cpp
 )
+pxr_build_test(testUsdImagingCollectionPredicateLibrary
+    LIBRARIES
+        usdImaging
+        hd
+        usd
+        kind
+        tf
+        sdf
+    CPPFILES
+        testenv/testUsdImagingCollectionPredicateLibrary.cpp
+)
 
 # Register tests to be run
 pxr_register_test(testUsdImagingDataSourceAttribute
@@ -401,6 +414,10 @@ pxr_register_test(testUsdImagingInstanceProxyTraversal_2
         2_ni-2-levels_sceneIndexInstanceProxyTraversal.txt
     ENV
         USD_ASSIGN_PROTOTYPES_DETERMINISTICALLY=1
+)
+pxr_register_test(testUsdImagingCollectionPredicateLibrary
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingCollectionPredicateLibrary"
+    EXPECTED_RETURN_CODE 0
 )
 
 # This test requires MaterialX support and is not currently supported on static 

@@ -759,6 +759,14 @@ HdStMaterialXShaderGen<Base>::_EmitConstantsUniformsAndTypeDefs(
             std::to_string(int(
                 mxContext.getOptions().hwDirectionalAlbedoMethod)),
             mxStage, false);
+
+#if MTLX_COMBINED_VERSION >= 13905
+    // Define Airy Fresnel iterations
+    emitLine("#define AIRY_FRESNEL_ITERATIONS " + 
+        std::to_string(mxContext.getOptions().hwAiryFresnelIterations), 
+        mxStage, false);
+#endif
+
     Base::emitLineBreak(mxStage);
 
     // Add all constants and ensure that values are initialized

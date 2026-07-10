@@ -58,6 +58,7 @@ pxr_library(hdSt
         ${optionalIncludeDirs}
 
     PUBLIC_CLASSES
+        backPlateSceneIndexPlugin
         basisCurves
         binding
         bufferArrayRange
