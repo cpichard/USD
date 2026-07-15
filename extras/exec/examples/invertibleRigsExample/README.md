@@ -88,3 +88,83 @@ InvertibleRigsExample_Authoring::BreakdownInputAvars().
   be used to programmatically produce continuous animation.
 - When the test runs, it produces `result.usda`, which contains the resulting
   animation.
+
+## Building and Running the Example Plugin
+
+> [!Note]
+> Note that we use bash shell syntax here; other shells may require different 
+> syntax.
+
+First, make sure you have properly [built and installed OpenUSD](https://github.com/PixarAnimationStudios/OpenUSD#getting-and-building-the-code) 
+with usdview and examples.
+
+1. Build OpenUSD with the `--examples` option.
+    ```
+    python /path/to/OpenUSD/build_scripts/build_usd.py --examples [other options ...] /path/to/my_usd_install_dir
+    ```
+
+   Upon completion, you should receive a message similar to the following:
+    ```
+    Success! To use USD, please ensure that you have:
+
+       The following in your PYTHONPATH environment variable:
+       /path/to/my_usd_install_dir/lib/python3.9/site-packages
+
+       The following in your PATH environment variable:
+       /path/to/my_usd_install_dir/bin
+    ```
+      
+2. Update your environment with these paths accordingly.
+    ```
+    export PYTHONPATH=$PYTHONPATH:/path/to/my_usd_install_dir/lib/python3.9/site-packages
+    export PATH=$PATH:/path/to/my_usd_install_dir/bin
+    ```
+
+Now, set up the environment to enable loading of the usdview plugin for the 
+Invertible Rigs example.
+
+1. In order for usdview to find plugins not located in the default search 
+   path, the location of the plugin must be added to the 
+   [PXR_PLUGINPATH_NAME](https://openusd.org/release/tut_usdview_plugin.html) 
+   environment variable. This example's plugin is located in the 
+   invertibleRigsExampleUsdviewPlugin directory within the OpenUSD *source* 
+   tree:
+    ```
+    export PXR_PLUGINPATH_NAME=$PXR_PLUGINPATH_NAME:/path/to/OpenUSD/extras/exec/examples/invertibleRigsExample/invertibleRigsExampleUsdviewPlugin
+    ```
+   
+2. This example relies on the visualization of schemas with registered 
+   computations. To this end, a new, experimental "stage" scene index was 
+   implemented in order for Hydra to consume values from OpenExec's execution 
+   network and properly update them. To activate this scene index, set 
+   the environment variable `USDIMAGINGGL_ENGINE_ENABLE_EXEC_SCENE_INDEX` to 1. 
+    ```
+    export USDIMAGINGGL_ENGINE_ENABLE_EXEC_SCENE_INDEX=1
+    ```
+   
+3. Finally, the plugin is gated by the environment variable
+   `USDVIEW_ENABLE_OPENEXEC_DEMO_PLUGIN`, so this must be set to 1. 
+    ```
+    export USDVIEW_ENABLE_OPENEXEC_DEMO_PLUGIN=1
+    ```
+
+We can at last launch usdview using the `shot.usda` file in the example's 
+`assets` directory.
+```
+usdview /path/to/OpenUSD/extras/exec/examples/invertibleRigsExample/assets/shot.usda
+```
+
+If everything has been set up correctly, usdview should now have an 'OpenExec' 
+menu with an 'Invertible Rig Demo' item. Clicking on this item will bring up the 
+'OpenExec: Invertible Rig Demo' dialog.
+
+### Troubleshooting
+
+- Make sure to use absolute paths when setting your environment variables.
+- Make sure you are running the proper usdview binary, especially if you have 
+  multiple OpenUSD installations present. The `which` command on Linux/macOS and 
+  the `where` command on Windows can help identify the true path to the binary.
+- An incorrect `PYTHONPATH` may cause usdview not to find the required Python 
+  modules, resulting in a `ModuleNotFoundError`. Double check that this 
+  directory exists underneath the install directory, and that it contains the
+  `pxr` subdirectory.
