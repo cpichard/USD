@@ -4,8 +4,8 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_EXTRAS_EXEC_EXAMPLES_INVERTIBLE_RIGS_EXAMPLE_AUTHORING_H
-#define PXR_EXTRAS_EXEC_EXAMPLES_INVERTIBLE_RIGS_EXAMPLE_AUTHORING_H
+#ifndef PXR_EXTRAS_EXEC_EXAMPLES_IR_EXAMPLE_AUTHORING_H
+#define PXR_EXTRAS_EXEC_EXAMPLES_IR_EXAMPLE_AUTHORING_H
 
 #include "pxr/pxr.h"
 
@@ -24,7 +24,7 @@ class VtValue;
 ///
 class InvertibleRigsExample_Authoring {
 public:
-    EXEC_INVERTIBLERIGSEXAMPLE_API
+    EXEC_IREXAMPLE_API
     InvertibleRigsExample_Authoring(const UsdStageRefPtr &stage);
 
     /// For each input avar, authors a knot or a time sample at the given time,
@@ -42,7 +42,7 @@ public:
     /// would find the input avars by analysis, based on the switch attribute,
     /// but that requires additional core support for invertible rigs.
     /// 
-    EXEC_INVERTIBLERIGSEXAMPLE_API
+    EXEC_IREXAMPLE_API
     void
     BreakdownInputAvars(
         const UsdAttribute &switchAttribute,
@@ -68,7 +68,7 @@ public:
     /// would find the input avars by analysis, based on the switch attribute,
     /// but that requires additional core support for invertible rigs.
     ///
-    EXEC_INVERTIBLERIGSEXAMPLE_API
+    EXEC_IREXAMPLE_API
     void
     CompensateSwitch(
         const UsdAttribute &switchAttribute,

@@ -5,7 +5,7 @@
 # Licensed under the terms set forth in the LICENSE.txt file available at
 # https://openusd.org/license.
 
-from pxr import ExecIr, Gf, Sdf, Ts, Usd, InvertibleRigsExampleAuthoringCode
+from pxr import ExecIr, Gf, Sdf, Ts, Usd, IrExampleAuthoringCode
 import unittest
 
 def _SetSplineKnot(attr, time, value):
@@ -89,7 +89,7 @@ class TestSwitchCompensation(unittest.TestCase):
                       for prim in (joint1, joint2)
                       for name in inputAvarNames]
 
-        authoring = InvertibleRigsExampleAuthoringCode.Authoring(stage)
+        authoring = IrExampleAuthoringCode.Authoring(stage)
 
         # Start at time 0 by breaking down default values into splines for all
         # input avars.
@@ -182,7 +182,7 @@ class TestSwitchCompensation(unittest.TestCase):
                       for name in inputAvarNames]
         inputAvars.append(switch)
 
-        authoring = InvertibleRigsExampleAuthoringCode.Authoring(stage)
+        authoring = IrExampleAuthoringCode.Authoring(stage)
 
         # Author a default to one of the input avars.
         inputAvars[0].Set(10.0)

@@ -4,7 +4,7 @@
 # Licensed under the terms set forth in the LICENSE.txt file available at
 # https://openusd.org/license.
 #
-from pxr import Usd, Sdf, Tf, Ts, InvertibleRigsExampleAuthoringCode
+from pxr import Usd, Sdf, Tf, Ts, IrExampleAuthoringCode
 from pxr.Usdviewq.qt import QtCore, QtGui, QtWidgets
 
 def SetAtTime(attr, value, time):
@@ -369,7 +369,7 @@ class AttributeValueSelectWidgetWithCompensation(AttributeValueSelectWidget):
         super(AttributeValueSelectWidgetWithCompensation, self) \
             .__init__(switchAttribute, usdviewApi, parent)
 
-        self._authoring = InvertibleRigsExampleAuthoringCode.Authoring(
+        self._authoring = IrExampleAuthoringCode.Authoring(
             self._usdviewApi.dataModel.stage)
         self._switchAttribute = switchAttribute
 
@@ -523,7 +523,7 @@ class AuthoringWindow(QtWidgets.QWidget):
         self._switchAttribute = None
 
         stage = self._usdviewApi.dataModel.stage
-        query = InvertibleRigsExampleAuthoringCode.Query(stage)
+        query = IrExampleAuthoringCode.Query(stage)
         sources = query.FindSwitchAvars("switch")
         foundSwitchAvar = len(sources) == 1
         
@@ -560,7 +560,7 @@ class AuthoringWindow(QtWidgets.QWidget):
         For all avars that contribute to the pose, author spline knots or time 
         samples at the current time, with the current value of the avar.
         """
-        authoring = InvertibleRigsExampleAuthoringCode.Authoring(
+        authoring = IrExampleAuthoringCode.Authoring(
             self._usdviewApi.dataModel.stage)
         
         try:

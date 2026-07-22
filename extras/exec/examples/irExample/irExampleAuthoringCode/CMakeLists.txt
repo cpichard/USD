@@ -1,4 +1,4 @@
-set(PXR_PACKAGE invertibleRigsExampleAuthoringCode)
+set(PXR_PACKAGE irExampleAuthoringCode)
 
 pxr_plugin(${PXR_PACKAGE}
     LIBRARIES
@@ -43,7 +43,7 @@ pxr_register_test(testSwitchCompensation
 
 # TODO: Fix underlying issue in doxygen build that requires the 
 # following explicit inclusion of files we want to build and publish
-pxr_docs_only_dir(invertibleRigsExampleAuthoringCode_doxygenHeaders
+pxr_docs_only_dir(irExampleAuthoringCode_doxygenHeaders
   DOXYGEN_FILES                                                                     
       authoring.h                                                                   
       query.h                                                                       

@@ -83,7 +83,7 @@ InvertibleRigsExample_Authoring::BreakdownInputAvars().
 - The file `assets/waddlerRig.usda` contains the example rig discussed above.
 - The file `assets/shot.usda` references the waddler rig into a small scene.
 - The test code in
-  `invertibleRigsExampleAuthoringCode/testenv/testSwitchCompensation.py` (which
+  `irExampleAuthoringCode/testenv/testSwitchCompensation.py` (which
   contains copies of these same assets) illustrates how switch compensation can
   be used to programmatically produce continuous animation.
 - When the test runs, it produces `result.usda`, which contains the resulting
@@ -95,8 +95,9 @@ InvertibleRigsExample_Authoring::BreakdownInputAvars().
 > Note that we use bash shell syntax here; other shells may require different 
 > syntax.
 
-First, make sure you have properly [built and installed OpenUSD](https://github.com/PixarAnimationStudios/OpenUSD#getting-and-building-the-code) 
-with usdview and examples.
+First, make sure you have properly built and installed OpenUSD with usdview and 
+examples by following the instructions 
+[here](https://github.com/PixarAnimationStudios/OpenUSD#getting-and-building-the-code).
 
 1. Build OpenUSD with the `--examples` option.
     ```
@@ -127,10 +128,10 @@ Invertible Rigs example.
    path, the location of the plugin must be added to the 
    [PXR_PLUGINPATH_NAME](https://openusd.org/release/tut_usdview_plugin.html) 
    environment variable. This example's plugin is located in the 
-   invertibleRigsExampleUsdviewPlugin directory within the OpenUSD *source* 
+   irExampleUsdviewPlugin directory within the OpenUSD *source* 
    tree:
     ```
-    export PXR_PLUGINPATH_NAME=$PXR_PLUGINPATH_NAME:/path/to/OpenUSD/extras/exec/examples/invertibleRigsExample/invertibleRigsExampleUsdviewPlugin
+    export PXR_PLUGINPATH_NAME=$PXR_PLUGINPATH_NAME:/path/to/OpenUSD/extras/exec/examples/irExample/irExampleUsdviewPlugin
     ```
    
 2. This example relies on the visualization of schemas with registered 
@@ -151,7 +152,7 @@ Invertible Rigs example.
 We can at last launch usdview using the `shot.usda` file in the example's 
 `assets` directory.
 ```
-usdview /path/to/OpenUSD/extras/exec/examples/invertibleRigsExample/assets/shot.usda
+usdview /path/to/OpenUSD/extras/exec/examples/irExample/assets/shot.usda
 ```
 
 If everything has been set up correctly, usdview should now have an 'OpenExec' 

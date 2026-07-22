@@ -4,8 +4,8 @@
 // Licensed under the terms set forth in the LICENSE.txt file available at
 // https://openusd.org/license.
 //
-#ifndef PXR_EXTRAS_EXEC_EXAMPLES_INVERTIBLE_RIGS_EXAMPLE_QUERY_H
-#define PXR_EXTRAS_EXEC_EXAMPLES_INVERTIBLE_RIGS_EXAMPLE_QUERY_H
+#ifndef PXR_EXTRAS_EXEC_EXAMPLES_IR_EXAMPLE_QUERY_H
+#define PXR_EXTRAS_EXEC_EXAMPLES_IR_EXAMPLE_QUERY_H
 
 #include "pxr/pxr.h"
 
@@ -20,7 +20,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///
 class InvertibleRigsExample_Query {
 public:
-    EXEC_INVERTIBLERIGSEXAMPLE_API
+    EXEC_IREXAMPLE_API
     InvertibleRigsExample_Query(const UsdStageRefPtr &stage);
 
     /// Finds all switch avars that are sources for switch attributes named
@@ -31,7 +31,7 @@ public:
     /// attributes, traverses connections to find the unique set of switch avars
     /// that are dataflow sources for the found attributes.
     ///
-    EXEC_INVERTIBLERIGSEXAMPLE_API
+    EXEC_IREXAMPLE_API
     UsdAttributeVector
     FindSwitchAvars(const TfToken &attributeName) const;
 

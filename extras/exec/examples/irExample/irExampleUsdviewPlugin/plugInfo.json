@@ -2,10 +2,10 @@
     "Plugins": [
         {
             "Type": "python",
-            "Name": "pxr.InvertibleRigsExampleUsdviewPlugin",
+            "Name": "pxr.IrExampleUsdviewPlugin",
             "Info": {
                 "Types": {
-                    "pxr.InvertibleRigsExampleUsdviewPlugin.OpenExecContainer": {
+                    "pxr.IrExampleUsdviewPlugin.OpenExecContainer": {
                         "bases": ["pxr.Usdviewq.plugin.PluginContainer"],
                         "displayName": "Usdview Plugin Container for Invertible Rigs Example"
                     }

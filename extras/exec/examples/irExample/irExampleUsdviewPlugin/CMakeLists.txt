@@ -1,4 +1,4 @@
-set(PXR_PACKAGE invertibleRigsExampleUsdviewPlugin)
+set(PXR_PACKAGE irExampleUsdviewPlugin)
 
 pxr_plugin(${PXR_PACKAGE}
     PYMODULE_FILES

@@ -113,8 +113,9 @@ set(PXR_PYTHON_INSTALL_DIR ""
     CACHE
     STRING
     "Directory for installing Python bindings (relative to \
-    CMAKE_INSTALL_PREFIX or absolute). Defaults to the Python \
-    site-packages directory."
+    CMAKE_INSTALL_PREFIX or absolute). If unspecified, defaults to \
+    'lib/pythonX.Y/site-packages' on Linux and MacOS and 'Lib\\site-packages' \
+    on Windows."
 )
 
 set(PXR_OVERRIDE_PLUGINPATH_NAME ""
