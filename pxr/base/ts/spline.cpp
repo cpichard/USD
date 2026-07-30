@@ -109,21 +109,9 @@ TfType TsSpline::GetValueType() const
     return _GetData()->GetValueType();
 }
 
-void TsSpline::SetTimeValued(const bool timeValued)
-{
-    if (GetValueType() == Ts_GetType<GfTimeCode>()) {
-        TF_CODING_ERROR("SetTimeValued is deprecated and cannot be invoked "
-                        "when this spline's value type is GfTimeCode.");
-        return;
-    }
-    _PrepareForWrite();
-    _data->timeValued = timeValued;
-}
-
 bool TsSpline::IsTimeValued() const
 {
-    return _GetData()->valueType == Ts_GetType<GfTimeCode>() ||
-           _GetData()->timeValued;
+    return _GetData()->valueType == Ts_GetType<GfTimeCode>();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -653,11 +641,9 @@ TsSpline::Concatenate(const std::vector<TsSpline>& splines)
     }
 
     TfType valueType;
-    TsExtrapolation preExtrapolation;
     for (const TsSpline& spline : splines) {
         if (!spline.IsEmpty()) {
             valueType = spline.GetValueType();
-            preExtrapolation = spline.GetPreExtrapolation();
             break;
         }
     }
@@ -667,7 +653,7 @@ TsSpline::Concatenate(const std::vector<TsSpline>& splines)
 
     TsSpline resultSpline(valueType);
     TsKnot prevKnot(valueType);
-    TsExtrapolation postExtrapolation;
+    bool foundPreExtrapolation = false;
     for (size_t i = 0; i < splines.size(); ++i) {
         const TsSpline& spline = splines[i];
         if (spline.IsEmpty()) {
@@ -686,7 +672,6 @@ TsSpline::Concatenate(const std::vector<TsSpline>& splines)
             return TsSpline();
         }
 
-        postExtrapolation = spline.GetPostExtrapolation();
         TsKnotMap knots = spline.GetKnots();
         TsKnot& startKnot = *knots.begin();
 
@@ -724,10 +709,27 @@ TsSpline::Concatenate(const std::vector<TsSpline>& splines)
 
         // Store the boundary knot's pre values.
         prevKnot = *knots.rbegin();
+
+        // Set extrapolations as necessary
+        if (!foundPreExtrapolation) {
+            TsExtrapolation preExtrapolation = spline.GetPreExtrapolation();
+            if (preExtrapolation.IsLooping()
+                && !preExtrapolation.loopBoundaryTime.has_value())
+            {
+                preExtrapolation.loopBoundaryTime = prevKnot.GetTime();
+            }
+            resultSpline.SetPreExtrapolation(preExtrapolation);
+            foundPreExtrapolation = true;
+        }
+        TsExtrapolation postExtrapolation = spline.GetPostExtrapolation();
+        if (postExtrapolation.IsLooping()
+            && !postExtrapolation.loopBoundaryTime.has_value())
+        {
+            postExtrapolation.loopBoundaryTime = startKnot.GetTime();
+        }
+        resultSpline.SetPostExtrapolation(postExtrapolation);
     }
 
-    resultSpline.SetPreExtrapolation(preExtrapolation);
-    resultSpline.SetPostExtrapolation(postExtrapolation);
     return resultSpline;
 }
 
@@ -798,6 +800,11 @@ static std::string _ExtrapDesc(const TsExtrapolation &extrap)
     if (extrap.mode == TsExtrapSloped)
     {
         ss << " " << TfStringify(extrap.slope);
+    }
+
+    if (extrap.IsLooping() && extrap.loopBoundaryTime.has_value())
+    {
+        ss << " " << TfStringify(extrap.loopBoundaryTime.value());
     }
 
     return ss.str();

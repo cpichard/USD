@@ -237,7 +237,7 @@ class TestUsdSplines(unittest.TestCase):
         spline.SetInnerLoopParams(lp)
         self._DoSerializationTest("Loops.Invalid", spline)
 
-    def _DoLayerOffsetTest(self, case, attrType, timeValued, scale):
+    def _DoLayerOffsetTest(self, case, attrType, scale):
         """
         Test writing and reading splines across layer offsets.
         """
@@ -251,8 +251,7 @@ class TestUsdSplines(unittest.TestCase):
 
         stage.SetEditTarget(stage.GetEditTargetForLocalLayer(deepLayer))
 
-        spline = self._GetTestSpline(Sdf.ValueTypeNames.Double)
-        spline.SetTimeValued(timeValued)
+        spline = self._GetTestSpline(attrType)
         print(f"Original spline, {case}:")
         print(spline)
 
@@ -303,6 +302,7 @@ class TestUsdSplines(unittest.TestCase):
         splineKnots = spline.GetKnots()
         sdfSplineKnots = sdfSpline.GetKnots()
         self.assertEqual(len(splineKnots), len(sdfSplineKnots))
+        timeValued = attrType == Sdf.ValueTypeNames.TimeCode
         for k1, k2 in zip(splineKnots.values(), sdfSplineKnots.values()):
             assertFn = self.assertEqual if timeValued and scale != 1 \
                   else self.assertNotEqual
@@ -318,7 +318,7 @@ class TestUsdSplines(unittest.TestCase):
         """
         self._DoLayerOffsetTest(
             "test_LayerOffsets",
-            attrType = Sdf.ValueTypeNames.Double, timeValued = False,
+            attrType = Sdf.ValueTypeNames.Double,
             scale = 2.0)
 
     def test_LayerOffsets_TimeCode(self):
@@ -327,7 +327,7 @@ class TestUsdSplines(unittest.TestCase):
         """
         self._DoLayerOffsetTest(
             "test_LayerOffsets_TimeCode",
-            attrType = Sdf.ValueTypeNames.TimeCode, timeValued = True,
+            attrType = Sdf.ValueTypeNames.TimeCode,
             scale = 2.0)
 
     def test_InvalidType(self):

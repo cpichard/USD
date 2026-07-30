@@ -74,6 +74,9 @@
             ('assetName', T_STRING, {}),
             ('assetVersion', T_STRING, {}),
         ],
+        EXTRA_TOKENS = [
+            '(modelPathPrimvarName, "model:modelPath")',
+        ],
     ),
 
     #--------------------------------------------------------------------------

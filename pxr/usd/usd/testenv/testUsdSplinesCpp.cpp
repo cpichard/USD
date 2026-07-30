@@ -9,6 +9,7 @@
 
 #include "pxr/usd/sdf/layer.h"
 #include "pxr/usd/sdf/path.h"
+#include "pxr/usd/sdf/schema.h"
 
 #include "pxr/usd/usd/attribute.h"
 #include "pxr/usd/usd/attributeQuery.h"
@@ -23,62 +24,26 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+template <typename T>
 static
 void
 _TestSplineAndAttr(
     const TsSpline& spline, const UsdAttribute& attr)
 {
-    // Our spline in this test is all double valued, hence the following will be
-    // to retrieve double values for both the raw spline and the attribute.
-    double splineDouble = 0.0;
-    bool splineSuccess = spline.Eval(1.0, &splineDouble);
-    std::cout << "splineDouble: " << splineDouble << "\n";
+    T splineValue;
+    bool splineSuccess = spline.Eval(1.0, &splineValue);
+    std::cout << "spline value: " << splineValue << "\n";
     // different default value to make sure if Eval or Get fail, the test
     // doesn't result in a false positive.
-    double attrDouble = 1.0;;
-    bool attrSuccess = attr.Get<double>(&attrDouble, 1.0);
-    std::cout << "attrDouble: " << attrDouble << "\n";
-    if (!attrSuccess || !splineSuccess) {
-        // If either fails, both should fail to eval / get the value.
-        // This is the case when spline is empty.
-        TF_AXIOM(attrSuccess == splineSuccess);
-    } else {
-        TF_AXIOM(splineDouble == attrDouble);
-    }
-
-    // Now lets try to get a float value from this double values spline via
-    // TsSpline and UsdAttr both. As it is now, UsdAttribute will fail to
-    // retrieve the value because of type mismatch, but TsSpline will be able to
-    // which might also be addressed with USD-10630.
-    float splineFloat = 0.0;
-    splineSuccess = spline.Eval(1.0, &splineFloat);
-    float attrFloat = 1.0;
-    attrSuccess = attr.Get<float>(&attrFloat, 1.0);
-    TF_AXIOM(splineSuccess && !attrSuccess);
-
-    VtValue splineValue;
-    splineSuccess = spline.Eval(1.0, &splineValue);
-    VtValue attrValue;
-    attrSuccess = attr.Get(&attrValue, 1.0);
+    T attrValue = 1.0;
+    bool attrSuccess = attr.Get<T>(&attrValue, 1.0);
+    std::cout << "attr value: " << attrValue << "\n";
     if (!attrSuccess || !splineSuccess) {
         // If either fails, both should fail to eval / get the value.
         // This is the case when spline is empty.
         TF_AXIOM(attrSuccess == splineSuccess);
     } else {
         TF_AXIOM(splineValue == attrValue);
-    }
-
-    // Do a pre value test.
-    splineDouble = 0.0;
-    splineSuccess = spline.EvalPreValue(0.0, &splineDouble);
-    attrDouble = 1.0;
-    attrSuccess = attr.Get<double>(&attrDouble, UsdTimeCode::PreTime(1.0));
-    if (!attrSuccess || !splineSuccess) {
-        // If either fails, both should fail to eval / get the value.
-        // This is the case when spline is empty.
-        TF_AXIOM(attrSuccess == splineSuccess);
-    } else {
-        TF_AXIOM(splineDouble == attrDouble);
     }
     // Lets also try UsdAttributeQuery matching the spline value and the attr
     // value.
@@ -93,31 +58,43 @@ _TestSplineAndAttr(
     } else {
         TF_AXIOM(queryValue == splineValue);
     }
+
+    // Do a pre value test.
+    splineValue = 0.0;
+    splineSuccess = spline.EvalPreValue(0.0, &splineValue);
+    attrValue = 1.0;
+    attrSuccess = attr.Get<T>(&attrValue, UsdTimeCode::PreTime(1.0));
+    if (!attrSuccess || !splineSuccess) {
+        // If either fails, both should fail to eval / get the value.
+        // This is the case when spline is empty.
+        TF_AXIOM(attrSuccess == splineSuccess);
+    } else {
+        TF_AXIOM(splineValue == attrValue);
+    }
 }
 
+template <typename T>
 static
 TsSpline
-_GetTestSpline(
-    const SdfValueTypeName& attrType = SdfValueTypeNames->Double)
-{
+_GetTestSpline() {
     TsSpline spline;
-    TsKnot knot1(attrType.GetType());
+    TsKnot knot1(Ts_GetType<T>());
     knot1.SetTime(1);
-    knot1.SetValue(8.0);
-    knot1.SetPreValue(6.0);
+    knot1.SetValue(T(8.0));
+    knot1.SetPreValue(T(6.0));
     knot1.SetNextInterpolation(TsInterpCurve);
     knot1.SetPostTanWidth(1.3);
-    knot1.SetPostTanSlope(0.125);
+    knot1.SetPostTanSlope(T(0.125));
     spline.SetKnot(knot1);
-    TsKnot knot2(attrType.GetType());
+    TsKnot knot2(Ts_GetType<T>());
     knot2.SetTime(6);
-    knot2.SetValue(20.0);
-    knot2.SetPreValue(10.0);
+    knot2.SetValue(T(20.0));
+    knot2.SetPreValue(T(10.0));
     knot2.SetNextInterpolation(TsInterpCurve);
     knot2.SetPreTanWidth(1.3);
-    knot2.SetPreTanSlope(-0.2);
+    knot2.SetPreTanSlope(T(-0.2));
     knot2.SetPostTanWidth(2);
-    knot2.SetPostTanSlope(0.3);
+    knot2.SetPostTanSlope(T(0.3));
     spline.SetKnot(knot2);
     return spline;
 }
@@ -161,16 +138,18 @@ _DoSerializationTest(
     }
 }
 
+template <typename T>
 static
 void
 _DoLayerOffsetTest(
     const std::string& desc,
-    const SdfValueTypeName& attrType,
-    bool timeValued,
     double scale)
 {
+    const TfType attrType = Ts_GetType<T>();
+    const SdfValueTypeName sdfType =
+        SdfSchema::GetInstance().FindType(attrType);
     std::cout << "Doing layer offset test for " << desc << "with type as "
-        << attrType.GetAsToken().GetString() << "\n";
+        << attrType.GetTypeName() << "\n";
     UsdStageRefPtr stage = UsdStage::CreateInMemory();
     SdfLayerRefPtr rootLayer = stage->GetRootLayer();
     const SdfLayerRefPtr deepLayer = SdfLayer::CreateAnonymous();
@@ -180,18 +159,17 @@ _DoLayerOffsetTest(
 
     stage->SetEditTarget(stage->GetEditTargetForLocalLayer(deepLayer));
 
-    TsSpline spline = _GetTestSpline();
-    spline.SetTimeValued(timeValued);
+    TsSpline spline = _GetTestSpline<T>();
 
     const UsdPrim prim = stage->DefinePrim(SdfPath("/MyPrim"));
-    UsdAttribute attr = prim.CreateAttribute(TfToken("myAttr"), attrType);
+    UsdAttribute attr = prim.CreateAttribute(TfToken("myAttr"), sdfType);
     TF_AXIOM(!attr.HasSpline());
     TF_AXIOM(!attr.ValueMightBeTimeVarying());
     attr.SetSpline(spline);
     TF_AXIOM(attr.HasSpline());
     TF_AXIOM(attr.ValueMightBeTimeVarying());
 
-    _TestSplineAndAttr(spline, attr);
+    _TestSplineAndAttr<T>(spline, attr);
 
     const SdfAttributeSpecHandle sdfAttr = deepLayer->GetAttributeAtPath(
         SdfPath("/MyPrim.myAttr"));
@@ -203,7 +181,7 @@ _DoLayerOffsetTest(
         stage->GetAttributeAtPath(SdfPath("/MyPrim.myAttr"));
     const TsSpline spline2 = attr2.GetSpline();
     TF_AXIOM(spline2 == spline);
-    _TestSplineAndAttr(spline2, attr2);
+    _TestSplineAndAttr<T>(spline2, attr2);
 
     attr2.GetMetadata(SdfFieldKeys->Spline, &value);
     TF_AXIOM(value.IsHolding<TsSpline>());
@@ -335,7 +313,7 @@ TestSerializationComplex()
 
     // Bezier
     {
-        TsSpline spline = _GetTestSpline();
+        TsSpline spline = _GetTestSpline<double>();
         TsKnot knot1;
         knot1.SetTime(40);
         knot1.SetValue(-44.0);
@@ -377,20 +355,17 @@ TestSerializationValueTypes()
     // Test serialization of splines with different value types.
     //
     {
-        const TsSpline spline = _GetTestSpline(SdfValueTypeNames->Float);
+        const TsSpline spline = _GetTestSpline<float>();
         _DoSerializationTest("ValueTypes.Float", spline, 
                              SdfValueTypeNames->Float);
     }
     {
-        const TsSpline spline = _GetTestSpline(SdfValueTypeNames->Half);
+        const TsSpline spline = _GetTestSpline<GfHalf>();
         _DoSerializationTest("ValueTypes.Half", spline, 
                              SdfValueTypeNames->Half);
     }
     {
-        // Note that TimeCode spline have Double attrType and is marked as
-        // TimeValues
-        TsSpline spline = _GetTestSpline(SdfValueTypeNames->Double);
-        spline.SetTimeValued(true);
+        TsSpline spline = _GetTestSpline<GfTimeCode>();
         _DoSerializationTest("ValueTypes.TimeCode", spline, 
                              SdfValueTypeNames->TimeCode);
     }
@@ -431,16 +406,16 @@ static
 void
 TestLayerOffsets()
 {
-    _DoLayerOffsetTest(
-        "test_LayerOffsets", SdfValueTypeNames->Double, false, 2.0);
+    _DoLayerOffsetTest<double>(
+        "test_LayerOffsets", 2.0);
 }
 
 static
 void
 TestLayerOffsetsTimeCode()
 {
-    _DoLayerOffsetTest(
-        "test_LayerOffsets_TimeCode", SdfValueTypeNames->TimeCode, true, 2.0);
+    _DoLayerOffsetTest<GfTimeCode>(
+        "test_LayerOffsets_TimeCode", 2.0);
 }
 
 static
@@ -451,7 +426,7 @@ TestInvalidType()
     const UsdPrim prim = stage->DefinePrim(SdfPath("/MyPrim"));
     UsdAttribute attr = prim.CreateAttribute(
         TfToken("myAttr"), SdfValueTypeNames->String);
-    const TsSpline spline = _GetTestSpline();
+    const TsSpline spline = _GetTestSpline<double>();
 
     TfErrorMark m;
     TF_AXIOM(!attr.HasSpline());
@@ -472,7 +447,7 @@ TestClobbered()
     const UsdPrim prim = stage->DefinePrim(SdfPath("/MyPrim"));
     UsdAttribute attr = prim.CreateAttribute(
         TfToken("myAttr"), SdfValueTypeNames->Double);
-    const TsSpline spline = _GetTestSpline(SdfValueTypeNames->Double);
+    const TsSpline spline = _GetTestSpline<double>();
 
     attr.SetSpline(spline);
     TF_AXIOM(attr.HasSpline());
@@ -504,7 +479,7 @@ TestWeakerSplineOpinion()
     const UsdPrim prim = stage->DefinePrim(SdfPath("/MyPrim"));
     UsdAttribute attr = prim.CreateAttribute(TfToken("myAttr"),
                                              SdfValueTypeNames->Double);
-    TsSpline spline = _GetTestSpline();
+    TsSpline spline = _GetTestSpline<double>();
     attr.SetSpline(spline);
     TF_AXIOM(attr.HasSpline());
     TF_AXIOM(attr.GetSpline() == spline);

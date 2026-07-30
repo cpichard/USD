@@ -48,7 +48,7 @@ public:
 #elif HD_API_VERSION >= 83
         HdRendererCreateArgs const &rendererCreateArgs,
         std::string * reasonWhyNot = nullptr
-#elif PXR_VERSION < 2305
+#elif PXR_VERSION >= 2305
         bool gpuEnabled = true
 #endif
         ) const override;
@@ -66,7 +66,7 @@ public:
 protected:
 
     HDPRMANLOADER_API
-    virtual TfToken _GetRenderVariant() { return TfToken(); }
+    virtual TfToken _GetRenderVariant();
 
     HDPRMANLOADER_API
     virtual int _GetCpuConfig(HdRenderSettingsMap const& settingsMap);

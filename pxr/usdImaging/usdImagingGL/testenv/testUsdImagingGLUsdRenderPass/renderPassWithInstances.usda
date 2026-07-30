@@ -360,7 +360,7 @@ def Scope "Render"
         )
         {
             uniform bool collection:prune:includeRoot = 0
-            uniform pathExpression collection:prune:membershipExpression = "/World/Geom/NativeInstances/SphereInstance_2 /World/Geom/NestedNativeInstances/NestedSpheres_2 /World/Geom/NestedNativeInstances/NestedSpheres_3/SphereInstance_2 /World/Geom/NativeInstancesWithMultiplePrims/NestedSpheres_2 /World/Geom/GroundPlane"
+            uniform pathExpression collection:prune:membershipExpression = "/World/Geom/NativeInstances/SphereInstance_2 /World/Geom/NestedNativeInstances/NestedSpheres_2 /World/Geom/NestedNativeInstances/NestedSpheres_3/SphereInstance_2 /World/Geom/NativeInstancesWithMultiplePrims/NestedSpheres_2 /World/Geom/GroundPlane /World/Geom/PointInstancer"
             uniform token passType = "render"
             # Can use visualizer here
             rel renderSource = </Render/Settings/Visualizer>
@@ -369,7 +369,7 @@ def Scope "Render"
         def RenderPass "matte_test"
         {
             uniform bool collection:matte:includeRoot = 0
-            uniform pathExpression collection:matte:membershipExpression = "/World/Geom/NativeInstances/SphereInstance_2 /World/Geom/NestedNativeInstances/NestedSpheres_2 /World/Geom/NestedNativeInstances/NestedSpheres_3/SphereInstance_2 /World/Geom/NativeInstancesWithMultiplePrims/NestedSpheres_2 /World/Geom/Cube// /World/Geom/Cone// /World/Geom/LargeCone//"
+            uniform pathExpression collection:matte:membershipExpression = "/World/Geom/NativeInstances/SphereInstance_2 /World/Geom/NestedNativeInstances/NestedSpheres_2 /World/Geom/NestedNativeInstances/NestedSpheres_3/SphereInstance_2 /World/Geom/NativeInstancesWithMultiplePrims/NestedSpheres_2 /World/Geom/Cube// /World/Geom/Cone// /World/Geom/LargeCone// /World/Geom/PointInstancer//"
             uniform token passType = "render"
             # Visualizer does not support matte
             rel renderSource = </Render/Settings/Default>
@@ -378,7 +378,7 @@ def Scope "Render"
         def RenderPass "renderVisibility_test"
         {
             uniform bool collection:renderVisibility:includeRoot = 0
-            uniform pathExpression collection:renderVisibility:membershipExpression = "~(/World/Geom/NativeInstances/SphereInstance_2// /World/Geom/NestedNativeInstances/NestedSpheres_2// /World/Geom/NestedNativeInstances/NestedSpheres_3/SphereInstance_2// /World/Geom/NativeInstancesWithMultiplePrims/NestedSpheres_2// /World/Geom/Cube// /World/Geom/Cone// /World/Geom/LargeCone//)"
+            uniform pathExpression collection:renderVisibility:membershipExpression = "~(/World/Geom/NativeInstances/SphereInstance_2// /World/Geom/NestedNativeInstances/NestedSpheres_2// /World/Geom/NestedNativeInstances/NestedSpheres_3/SphereInstance_2// /World/Geom/NativeInstancesWithMultiplePrims/NestedSpheres_2// /World/Geom/Cube// /World/Geom/Cone// /World/Geom/LargeCone// /World/Geom/PointInstancer//)"
             uniform token passType = "render"
             # Can use visualizer here
             rel renderSource = </Render/Settings/Visualizer>
@@ -396,10 +396,9 @@ def Scope "Render"
         def RenderPass "cameraVisibility_test"
         {
             uniform bool collection:cameraVisibility:includeRoot = 0
-            uniform pathExpression collection:cameraVisibility:membershipExpression = "~(/World/Geom/NativeInstances/SphereInstance_2// /World/Geom/NestedNativeInstances/NestedSpheres_2// /World/Geom/NestedNativeInstances/NestedSpheres_3/SphereInstance_2// /World/Geom/NativeInstancesWithMultiplePrims/NestedSpheres_2// /World/Geom/Cube// /World/Geom/Cone// /World/Geom/LargeCone//)"
+            uniform pathExpression collection:cameraVisibility:membershipExpression = "~(/World/Geom/NativeInstances/SphereInstance_2// /World/Geom/NestedNativeInstances/NestedSpheres_2// /World/Geom/NestedNativeInstances/NestedSpheres_3/SphereInstance_2// /World/Geom/NativeInstancesWithMultiplePrims/NestedSpheres_2// /World/Geom/Cube// /World/Geom/Cone// /World/Geom/LargeCone// /World/Geom/PointInstancer//)"
             uniform token passType = "render"
-            # Need lighting to confirm that shadowing from camera-invised
-            # geomtry
+            # Need lighting to confirm shadowing from camera-invised geom
             rel renderSource = </Render/Settings/Default>
         }
     }

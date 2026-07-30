@@ -99,6 +99,79 @@ class TestUsdAttributeQuery(unittest.TestCase):
             }
             '''.strip(), 5.0)
 
+    def mightBeTimeVaryingTest(
+        self, layerContent,
+        expectedValueMightVary, expectedValueSourceMightVary):
+        """
+        Test that we get the expected results from MightBeTimeVarying queries.
+        """
+
+        layer = Sdf.Layer.CreateAnonymous("source.usda")
+        layer.ImportFromString(layerContent)
+        stage = Usd.Stage.Open(layer)
+
+        query = Usd.AttributeQuery(stage.GetAttributeAtPath("/Prim.attr"))
+        self.assertTrue(query)
+        self.assertEqual(
+            query.ValueMightBeTimeVarying(), expectedValueMightVary)
+        self.assertEqual(
+            query.ValueSourceMightBeTimeVarying(), expectedValueSourceMightVary)
+
+    def test_MightBeTimeVaryingDefaultOnly(self):
+        self.mightBeTimeVaryingTest('''
+            #usda 1.0
+                    
+            def "Prim"
+            {
+                double attr = 1.0
+            }
+            '''.strip(), False, False)
+
+    def test_MightBeTimeVarying1TimeSample(self):
+        """
+        Note that this is a case where ValueMightBeTimeVarying and
+        ValueSourceMightBeTimeVarying produce different results.
+        """
+        self.mightBeTimeVaryingTest('''
+            #usda 1.0
+                    
+            def "Prim"
+            {
+                double attr = 1.0
+                double attr.timeSamples = {
+                    0.0: 2.0
+                }
+            }
+            '''.strip(), False, True)
+
+    def test_MightBeTimeVarying2TimeSamples(self):
+        self.mightBeTimeVaryingTest('''
+            #usda 1.0
+                    
+            def "Prim"
+            {
+                double attr = 1.0
+                double attr.timeSamples = {
+                    0.0: 2.0,
+                    10.0: 3.0
+                }
+            }
+            '''.strip(), True, True)
+
+    def test_MightBeTimeVaryingSpline(self):
+        self.mightBeTimeVaryingTest('''
+            #usda 1.0
+
+            def "Prim"
+            {
+                double attr = 1.0
+                double attr.spline = {
+                    loop: (1, 10, 0, 1, 0),
+                    1: 5; pre (1, 1); post curve (1, 1),
+                }
+            }
+            '''.strip(), True, True)
+
 if __name__ == "__main__":
     unittest.main()
 

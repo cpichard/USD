@@ -229,33 +229,24 @@ namespace Vt_KnownValueTypeDetail
 {
 
 // Implement compile-time value type indexes.
-// Base case -- unknown types get index -1.
-template <typename T>
+template <typename T, typename... Ts, size_t... Is>
 constexpr int
-GetIndexImpl(TfMetaList<>) {
-    return -1;
-}
-
-template <typename T, typename Typelist>
-constexpr int
-GetIndexImpl(Typelist) {
-    if (std::is_same_v<T, TfMetaApply<TfMetaHead, Typelist>>) {
-        return 0;
-    }
-    else if (const int indexOfTail =
-             GetIndexImpl<T>(TfMetaApply<TfMetaTail, Typelist>{});
-             indexOfTail >= 0) {
-        return 1 + indexOfTail;
-    }
-    else {
-        return -1;
-    }
+GetIndexImpl(TfMetaList<Ts...>, std::index_sequence<Is...>)
+{
+    int index = -1;
+    TF_UNUSED(((std::is_same_v<T, Ts> ? (index = Is, false) : true) && ...));
+    return index;
 }
 
 template <typename T>
 constexpr int
 GetIndex() {
-    return GetIndexImpl<T>(Vt_ValueTypeList{});
+    return GetIndexImpl<T>(
+        Vt_ValueTypeList{}, 
+        std::make_index_sequence<
+            TfMetaApply<TfMetaLength, Vt_ValueTypeList>::value
+        >()
+    );
 }
 
 } // Vt_KnownValueTypeDetail

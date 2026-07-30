@@ -173,26 +173,23 @@ _GetBracketingTimeSegment(
         return false;
     }
 
-    if (externalTime.IsPreTime()) {
-        // A pre time was requested, adjust the segment accordingly.
-        if (*m1 > 0 && times[*m1].isJumpDiscontinuity)
+    if (times[*m2].externalTime == externalTime.GetValue()) {
+        if (externalTime.IsPreTime()
+            && *m1 > 0 && times[*m1].isJumpDiscontinuity)
         {
+            // Adjust segment out of the jump discontinuity region
             (*m1)--;
             (*m2)--;
-        }
-    } else {
-        // We must adjust the segment for a regular time query in certain
-        // scenarios. For example:
-        // `times` is [(0, 0), (5, -5), (10, 10)]. 
-        // _GetBracketingTimeSegment with a Usd_Clip::ExternalTime query of 5
-        // will give us the segment from (0, 0) to (5, -5). A caller that is
-        // trying to determine whether a segment is flipped will see that the
-        // section is flipped. However, that determination is only correct
-        // if computed from the intended segment from (5, -5) to (10, 10) for
-        // regular time queries.
-        if (times[*m2].externalTime == externalTime.GetValue() &&
-            *m2 < times.size() - 1)
-        {
+        } else if (*m2 < times.size() - 1) {
+            // We must adjust the segment for a regular time query in certain
+            // scenarios. For example: `times` is [(0, 0), (5, -5), (10, 10)].
+            //
+            // _GetBracketingTimeSegment with a Usd_Clip::ExternalTime query of
+            // 5 will give us the segment from (0, 0) to (5, -5). A caller that
+            // is trying to determine whether a segment is flipped will see
+            // that the section is flipped. However, that determination is only
+            // correct if computed from the intended segment from (5, -5) to
+            // (10, 10) for regular time queries.
             (*m1)++;
             (*m2)++;
         }
@@ -283,7 +280,7 @@ Usd_Clip::_GetBracketingTimeSamplesForPathFromClipLayer(
     ExternalTime* tLower, ExternalTime* tUpper) const
 {
     const SdfLayerRefPtr& clip = _GetLayerForClip();
-    const SdfPath clipPath = _TranslatePathToClip(path);
+    const SdfPath clipPath = TranslatePathToClip(path);
     const InternalTime timeInClip = _TranslateTimeToInternal(time);
     InternalTime lowerInClip, upperInClip;
 
@@ -498,7 +495,7 @@ Usd_Clip::_ListTimeSamplesForPathFromClipLayer(
     std::set<ExternalTime>* timeSamples) const
 {
     std::set<InternalTime> timeSamplesInClip = 
-        _GetLayerForClip()->ListTimeSamplesForPath(_TranslatePathToClip(path));
+        _GetLayerForClip()->ListTimeSamplesForPath(TranslatePathToClip(path));
     if (times->empty()) {
         *timeSamples = std::move(timeSamplesInClip);
 
@@ -588,53 +585,25 @@ Usd_Clip::ListTimeSamplesForPath(const SdfPath& path) const
 bool 
 Usd_Clip::HasField(const SdfPath& path, const TfToken& field) const
 {
-    return _GetLayerForClip()->HasField(_TranslatePathToClip(path), field);
+    return _GetLayerForClip()->HasField(TranslatePathToClip(path), field);
 }
 
 bool
 Usd_Clip::HasAuthoredTimeSamples(const SdfPath& path) const
 {
     return _GetLayerForClip()->GetNumTimeSamplesForPath(
-        _TranslatePathToClip(path)) > 0;    
+        TranslatePathToClip(path)) > 0;    
 }
 
 bool
 Usd_Clip::HasAuthoredSpline(const SdfPath& path) const
 {
-    return _GetLayerForClip()->HasField(_TranslatePathToClip(path),
+    return _GetLayerForClip()->HasField(TranslatePathToClip(path),
                                         SdfFieldKeys->Spline);
 }
 
-bool
-Usd_Clip::IsBlocked(const SdfPath& path, ExternalTime time) const
-{
-    const SdfPath clipPath = _TranslatePathToClip(path);
-    bool hasTimeSamples =
-        _GetLayerForClip()->HasField(clipPath, SdfFieldKeys->TimeSamples);
-
-    TsSpline spline;
-    const bool hasSpline =
-        _GetLayerForClip()->HasField(clipPath, SdfFieldKeys->Spline, &spline);
-
-    if (hasTimeSamples) {
-        SdfAbstractDataTypedValue<SdfValueBlock> blockValue(nullptr);
-        if (_GetLayerForClip()->QueryTimeSample(
-                clipPath, _TranslateTimeToInternal(time), 
-                (SdfAbstractDataValue*)&blockValue)
-            && blockValue.isValueBlock) {
-            return true;
-        }
-    } else if (hasSpline) {
-        const TsKnotMap knots = spline.GetKnots();
-        if (knots.find(_TranslateTimeToInternal(time)) != knots.end()) {
-            return true;
-        }
-    }
-    return false;
-}
-
 SdfPath
-Usd_Clip::_TranslatePathToClip(const SdfPath& path) const
+Usd_Clip::TranslatePathToClip(const SdfPath& path) const
 {
     return path.ReplacePrefix(sourcePrimPath, primPath);
 }
@@ -784,10 +753,47 @@ Usd_Clip::_TranslateTimeToExternal(
     return _TranslateTimeToExternalHelper(intTime, m1, m2);
 }
 
+UsdTimeCode
+Usd_Clip::_TranslateTimeToInternalDualValued(UsdTimeCode extTime) const
+{
+    bool localPreTime = extTime.IsPreTime();
+
+    // If we're in a reversed clip times section, flip the desired time query
+    // from pre time to regular time or vice versa. When negative time scaling
+    // affects a dual valued item like a spline's knot, pre and post values of
+    // that item are flipped.
+    size_t m1, m2;
+    if (_GetBracketingTimeSegment(*times, extTime, &m1, &m2) &&
+        (*times)[m1].internalTime > (*times)[m2].internalTime)
+    {
+        localPreTime = !localPreTime;
+    }
+
+    // Clamp the external time to the clip times range if it exists;
+    // past the times range the active clip's attribute's value is held
+    // at the clip time associated with the clip times range boundary.
+    // Note that this clip time is always a regular time code, not a
+    // pre time code.
+    if (times && !times->empty()) {
+        if (times->front().externalTime > extTime) {
+            extTime = times->front().externalTime;
+            localPreTime = false;
+        } else if (times->back().externalTime < extTime) {
+            extTime = times->back().externalTime;
+            localPreTime = false;
+        }
+    }
+    const InternalTime clipTime = _TranslateTimeToInternal(extTime);
+
+    return localPreTime ? UsdTimeCode::PreTime(clipTime)
+                        : UsdTimeCode(clipTime);
+}
+
+
 SdfPropertySpecHandle
 Usd_Clip::GetPropertyAtPath(const SdfPath &path) const
 {
-    return _GetLayerForClip()->GetPropertyAtPath(_TranslatePathToClip(path));
+    return _GetLayerForClip()->GetPropertyAtPath(TranslatePathToClip(path));
 }
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -1039,7 +1045,7 @@ _MakeHeldSpline(
 const std::type_info &
 Usd_Clip::QueryTimeSampleTypeid(const SdfPath &path, UsdTimeCode time) const
 {
-    const SdfPath clipPath = _TranslatePathToClip(path);
+    const SdfPath clipPath = TranslatePathToClip(path);
     const InternalTime clipTime = _TranslateTimeToInternal(time);
     const SdfLayerRefPtr& clip = _GetLayerForClip();
 
@@ -1052,7 +1058,7 @@ Usd_Clip::QueryTimeSample(
     const SdfPath& path, UsdTimeCode time, 
     Usd_Interpolator const & interpolator, T* value) const
 {
-    const SdfPath clipPath = _TranslatePathToClip(path);
+    const SdfPath clipPath = TranslatePathToClip(path);
     const InternalTime clipTime = _TranslateTimeToInternal(time);
     const SdfLayerRefPtr& clip = _GetLayerForClip();
 
@@ -1091,6 +1097,14 @@ template bool Usd_Clip::QueryTimeSample(
     Usd_Interpolator const &,
     VtValue*) const;
 
+bool
+Usd_Clip::GetSplineForClip(const SdfPath& path, TsSpline* result) const
+{
+    const SdfPath clipPath = TranslatePathToClip(path);
+    const SdfLayerRefPtr& clip = _GetLayerForClip();
+    return clip->HasField(clipPath, SdfFieldKeys->Spline, result);
+}
+
 template <class T>
 bool
 Usd_Clip::QuerySpline(
@@ -1098,50 +1112,16 @@ Usd_Clip::QuerySpline(
     UsdTimeCode time,
     T* value) const
 {
-    if (!HasAuthoredSpline(path)) {
+    TsSpline spline;
+    if (!GetSplineForClip(path, &spline)) {
         return false;
     }
 
-    TsSpline spline;
-    const SdfPath clipPath = _TranslatePathToClip(path);
-    const SdfLayerRefPtr& clip = _GetLayerForClip();
-    clip->HasField(clipPath, SdfFieldKeys->Spline, &spline);
-
-    bool localPreTime = time.IsPreTime();
-
-    // If we're in a reversed clip times section, flip the desired time query
-    // from pre time to regular time or vice versa. When negative time scaling
-    // a knot, pre and post values of the knot are flipped.
-    size_t m1, m2;
-    if (_GetBracketingTimeSegment(*times, time, &m1, &m2) &&
-        (*times)[m1].internalTime > (*times)[m2].internalTime)
-    {
-        localPreTime = !localPreTime;
-    }
-
-    // Clamp the external time to the clip times range if it exists;
-    // past the times range the active clip's spline value is held
-    // at the clip time associated with the clip times range boundary.
-    // Note that this clip time is always a regular time code, not a
-    // pre time code.
-    if (times && !times->empty()) {
-        if (times->front().externalTime > time) {
-            time = times->front().externalTime;
-            localPreTime = false;
-        } else if (times->back().externalTime < time) {
-            time = times->back().externalTime;
-            localPreTime = false;
-        }
-    }
-    const InternalTime clipTime = _TranslateTimeToInternal(time);
-
-    const UsdTimeCode localTimeCode =
-        localPreTime ? UsdTimeCode::PreTime(clipTime)
-                     : UsdTimeCode(clipTime);
+    const UsdTimeCode clipTime = _TranslateTimeToInternalDualValued(time);
 
     // Note that we don't need to apply a layer offset, since it's baked
     // into clip times upon clipset construction.
-    bool ok = Usd_QuerySpline(spline, localTimeCode, SdfLayerOffset(),
+    bool ok = Usd_QuerySpline(spline, clipTime, SdfLayerOffset(),
                               value);
     if (!ok) {
         return false;
@@ -1151,7 +1131,7 @@ Usd_Clip::QuerySpline(
     // Conversion of the evaluation vs. evaluation of a converted
     // spline may result in slightly different numbers because of differences
     // in floating point operator rounding accumulation.
-    _ConvertValueForTime(time.GetValue(), clipTime, value);
+    _ConvertValueForTime(time.GetValue(), clipTime.GetValue(), value);
     return true;
 }
 
@@ -1174,7 +1154,7 @@ bool
 Usd_Clip::BuildSpline(const SdfPath& path, TsSpline* result) const
 {
     TsSpline clipSpline;
-    const SdfPath clipPath = _TranslatePathToClip(path);
+    const SdfPath clipPath = TranslatePathToClip(path);
     const SdfLayerRefPtr& clip = _GetLayerForClip();
     if (!clip->HasField(clipPath, SdfFieldKeys->Spline, &clipSpline)) {
         return false;

@@ -13,6 +13,11 @@
 #include "pxr/imaging/hd/sceneIndexPluginRegistry.h"
 #include "pxr/imaging/hdsi/renderPassPruneSceneIndex.h"
 
+#include "pxr/usdImaging/usdImaging/version.h"
+#if USD_IMAGING_API_VERSION >= 26
+#define HDPRMAN_DISABLE_RENDERPASS_PRUNE_PLUGIN
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 TF_DEFINE_PRIVATE_TOKENS(
@@ -51,6 +56,19 @@ HdPrman_RenderPassPruneSceneIndexPlugin::_AppendSceneIndex(
     const HdContainerDataSourceHandle &inputArgs)
 {
     return HdsiRenderPassPruneSceneIndex::New(inputScene);
+}
+
+bool
+HdPrman_RenderPassPruneSceneIndexPlugin::_IsEnabled(
+    const HdContainerDataSourceHandle &inputArgs) const
+{
+    // If the UsdImaging_RenderPassPruneSceneIndexPlugin is available, use
+    // that instead.
+#if defined(HDPRMAN_DISABLE_RENDERPASS_PRUNE_PLUGIN)
+    return false;
+#else
+    return true;
+#endif
 }
 
 PXR_NAMESPACE_CLOSE_SCOPE

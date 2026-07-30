@@ -1378,6 +1378,69 @@ UsdImagingGLEngine::DecodeIntersection(
     return true;
 }
 
+// Convert a PickId to an HdxPickHit
+static HdxPickHit
+_PickHitFromPickId(
+    const UsdImagingGLEngine::PickId& pickId,
+    HdLegacyRenderControlInterface * const renderControl)
+{
+    HdxPickHit hit;
+    hit.objectId = renderControl->GetRprimPathFromPrimId(pickId.primId);
+    hit.instanceIndex = pickId.instanceId;
+    return hit;
+}
+
+UsdImagingGLEngine::DecodeResultVector
+UsdImagingGLEngine::DecodeIntersections(const PickIdVector& pickIds)
+{
+    DecodeResultVector results;
+    results.resize(pickIds.size());
+
+    HdLegacyRenderControlInterface * const renderControl =
+        _GetLegacyRenderControl();
+    if (!renderControl) {
+        return results;
+    }
+
+    if (_sceneDelegate) {
+        // Legacy scene delegate path: resolve each rprimPath individually
+        for (size_t i = 0; i < pickIds.size(); ++i) {
+            const auto [primIdx, instanceIdx] = pickIds[i];
+
+            const SdfPath sceneIndexPath =
+                renderControl->GetRprimPathFromPrimId(primIdx);
+            if (sceneIndexPath.IsEmpty()) {
+                continue;
+            }
+
+            DecodeResult& res = results[i];
+            res.primPath = _sceneDelegate->GetScenePrimPath(
+                sceneIndexPath, instanceIdx, &res.instancerContext);
+        }
+    } else {
+        // Scene index path: use HdxPrimOriginInfo::FromPickHits which amortizes
+        // instancer topology computation.
+        std::vector<HdxPickHit> hits;
+        hits.resize(pickIds.size());
+
+        for (size_t i = 0; i < pickIds.size(); ++i) {
+            hits[i] = _PickHitFromPickId(pickIds[i], renderControl);
+        }
+
+        const std::vector<HdxPrimOriginInfo> infos =
+            HdxPrimOriginInfo::FromPickHits(
+                _GetTerminalSceneIndex(), hits);
+
+        for (size_t i = 0; i < infos.size(); ++i) {
+            DecodeResult& res = results[i];
+            res.primPath = infos[i].GetFullPath();
+            res.instancerContext = infos[i].ComputeInstancerContext();
+        }
+    }
+
+    return results;
+}
+
 //----------------------------------------------------------------------------
 // Renderer Plugin Management
 //----------------------------------------------------------------------------

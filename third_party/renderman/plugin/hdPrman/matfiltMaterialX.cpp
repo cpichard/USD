@@ -101,6 +101,12 @@ TF_DEFINE_PRIVATE_TOKENS(
     (ND_add_bsdf)
     (MaterialXAdd)
 
+    // Houdini's visualize VOP for mtlx
+    (ND_surface_unlit)
+    (PxrConstant)
+    (emission_color)
+    (emitColor)
+
     // MaterialX - OSL Adapter Node names
     ((SS_Adapter, "StandardSurfaceParameters"))
     ((USD_Adapter, "UsdPreviewSurfaceParameters"))
@@ -756,6 +762,17 @@ _TransformTerminalNode(
                     break;
                 }
                 break;
+            }
+        }
+        // Houdini's visualize VOP for mtlx:
+        // ND_surface_unlit -> PxrConstant
+        // emission_color -> emitColor
+        else if (nodeType == _tokens->ND_surface_unlit) {
+            netInterface->SetNodeType(terminalNodeName, _tokens->PxrConstant);
+            auto conns = netInterface->GetNodeInputConnection(terminalNodeName, _tokens->emission_color);
+            if (!conns.empty()) {
+                netInterface->DeleteNodeInputConnection(terminalNodeName, _tokens->emission_color);
+                netInterface->SetNodeInputConnection(terminalNodeName, _tokens->emitColor, conns);
             }
         }
         return;

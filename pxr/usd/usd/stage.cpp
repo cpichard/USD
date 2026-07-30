@@ -7595,20 +7595,7 @@ UsdStage::_GetAssetPathContext(UsdTimeCode time, const UsdAttribute &attr) const
     }
     else if (resolveInfo._source == UsdResolveInfoSourceValueClips) {
         const Usd_ClipSetRefPtr& clipSet = extraResolveInfo.clipSet;
-
-        // Get the active clip assuming no jump discontinuity or time not at any
-        // clip boundary.
-        Usd_ClipRefPtr activeClip = clipSet->GetActiveClip(time, false);
-
-        // If we are querying for a pre-time, and the active clip we
-        // retrieved has its start time same as the time, that
-        // means we are on a clip boundary, and we should use the previous
-        // clip as the active clip. This will automatically also cover jump 
-        // discontinuity scenarios.
-        if (time.IsPreTime() && 
-                activeClip->startTime == time.GetValue()) {
-            activeClip = clipSet->GetPreviousClip(activeClip);
-        }
+        const Usd_ClipRefPtr& activeClip = clipSet->GetActiveClip(time);
 
         resultSpecPath =
             resolveInfo._primPathInLayerStack.AppendProperty(attr.GetName());
@@ -7728,19 +7715,8 @@ _GetClipLayer(Usd_ClipSetRefPtr const &clipSet,
               const double *lowerSample = nullptr,
               const double *upperSample = nullptr)
 {
-    // Get the active clip assuming no jump discontinuity or time not at any
-    // clip boundary.
-    Usd_ClipRefPtr activeClip = clipSet->GetActiveClip(time, false);
+    const Usd_ClipRefPtr& activeClip = clipSet->GetActiveClip(time);
 
-    // If we are querying for a pre-time, and the active clip we
-    // retrieved has its start time same as the time, that means
-    // we are on a clip boundary, and we should use the previous clip as the
-    // active clip. This will automatically also cover jump discontinuity
-    // scenarios.
-    if (time.IsPreTime() &&
-        activeClip->startTime == time.GetValue()) {
-        activeClip = clipSet->GetPreviousClip(activeClip);
-    }
     // If the active clip has authored time samples, the value will come from it
     // (or at least be interpolated from it) so use that clip's layer. Otherwise
     // the value will come from the manifest.
@@ -8150,19 +8126,7 @@ struct UsdStage::_PropertyStackResolver {
                  const UsdTimeCode* time) 
     {
         if (clipSet->ContainsValueForAttribute(specPath)) {
-            // Get the active clip assuming no jump discontinuity or time not at
-            // any clip boundary.
-            Usd_ClipRefPtr activeClip = clipSet->GetActiveClip(*time, false);
-
-            // If we are querying for a pre-time, and the active clip we
-            // retrieved has its start time same as the time,
-            // that means we are on a clip boundary, and we should use the
-            // previous clip as the active clip. This will automatically also
-            // cover jump discontinuity scenarios.
-            if (time->IsPreTime() &&
-                    activeClip->startTime == time->GetValue()) {
-                activeClip = clipSet->GetPreviousClip(activeClip);
-            }
+            const Usd_ClipRefPtr& activeClip = clipSet->GetActiveClip(*time);
 
             // If the active clip has relevant authored attrs, the value will
             // come from it (or at least be interpolated from it) so use the

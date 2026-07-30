@@ -346,6 +346,37 @@ TestTruncateSpecificCases()
                                  oscInterval, oscInterval, 1e-10)) {
         return false;
     }
+
+    TsSpline splineReset;
+    splineReset.SetPreExtrapolation(TsExtrapLoopReset);
+    splineReset.SetPostExtrapolation(TsExtrapLoopReset);
+    {
+        TsKnot k1, k2, k3;
+        k1.SetTime(0);
+        k1.SetValue(0.0);
+        k1.SetPreTanWidth(2.0);
+        k1.SetPostTanWidth(2.0);
+        k1.SetNextInterpolation(TsInterpCurve);
+        k2.SetTime(5);
+        k2.SetValue(3.0);
+        k2.SetPreTanWidth(2.0);
+        k2.SetPostTanWidth(2.0);
+        k2.SetNextInterpolation(TsInterpCurve);
+        k3.SetTime(10);
+        k3.SetValue(0.0);
+        k3.SetPreTanWidth(2.0);
+        k3.SetPostTanWidth(2.0);
+        k3.SetNextInterpolation(TsInterpCurve);
+        splineReset.SetKnots({k1, k2, k3});
+    }
+    const GfInterval resetInterval(-inf, 11, OPEN, OPEN);
+    const TsSpline truncReset = splineReset.GetTruncated(resetInterval);
+    const GfInterval checkInterval(-100, 11, OPEN, OPEN);
+    if (!VerifySplineEquivalence(testId, "splineReset", splineReset,
+                                 truncReset, resetInterval, checkInterval,
+                                 1e-10)) {
+        return false;
+    }
     return true;
 }
 
@@ -636,6 +667,22 @@ bool TestConcatenate()
         i++;
         it++;
     }
+
+    // Check that loopBoundaryTime is set for looping extrapolation so that
+    // concatenating additional knots doesn't change the originally looped
+    // region.
+    TsSpline s1Looped = s1;
+    s1Looped.SetPreExtrapolation(TsExtrapLoopReset);
+    TsSpline s3Looped = s3;
+    s3Looped.SetPostExtrapolation(TsExtrapLoopReset);
+
+    const TsSpline resultLooped = TsSpline::Concatenate({s1Looped, s3Looped});
+    TF_AXIOM(resultLooped.GetPreExtrapolation().mode == TsExtrapLoopReset);
+    TF_AXIOM(resultLooped.GetPreExtrapolation().loopBoundaryTime.value()
+             == 3.0);
+    TF_AXIOM(resultLooped.GetPostExtrapolation().mode == TsExtrapLoopReset);
+    TF_AXIOM(resultLooped.GetPostExtrapolation().loopBoundaryTime.value()
+             == 3.0);
 
     return true;
 }

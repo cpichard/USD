@@ -151,11 +151,6 @@ public:
     // we have been presumptively created as TypedSplineData<double>.
     bool isTyped : 1;
 
-    // Deprecated in favor of valueType for full type specification. This bit
-    // currently exists solely to ensure double values and not GfTimeCode
-    // values are extracted when the legacy TsSpline::SetTimeValued is invoked.
-    bool timeValued : 1;
-
     // Overall spline parameters.
     TsCurveType curveType : 2;
     TfType valueType;
@@ -293,9 +288,6 @@ bool Ts_TypedSplineData<T>::operator==(
 {
     // Compare non-templated data.
     if (isTyped != other.isTyped
-        || ((timeValued || valueType == Ts_GetType<GfTimeCode>())
-            != (other.timeValued ||
-                other.valueType == Ts_GetType<GfTimeCode>()))
         || curveType != other.curveType
         || preExtrapolation != other.preExtrapolation
         || postExtrapolation != other.postExtrapolation
@@ -723,7 +715,7 @@ void Ts_TypedSplineData<T>::ApplyOffsetAndScale(
     // Scale and offset knot fields.  Duplicate the logic that is applied
     // unconditionally, so that we can rip through the entire vector just
     // once, and we don't have to do the if-check on each iteration.
-    if (timeValued || valueType == Ts_GetType<GfTimeCode>())
+    if (valueType == Ts_GetType<GfTimeCode>())
     {
         for (Ts_TypedKnotData<T> &knotData : knots)
         {

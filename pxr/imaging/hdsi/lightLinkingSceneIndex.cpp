@@ -7,6 +7,7 @@
 
 #include "pxr/imaging/hdsi/lightLinkingSceneIndex.h"
 
+#include "lightLinkingSceneIndex.h"
 #include "pxr/imaging/hd/collectionExpressionEvaluator.h"
 #include "pxr/imaging/hd/collectionPredicateLibrary.h"
 #include "pxr/imaging/hd/overlayContainerDataSource.h"
@@ -115,7 +116,8 @@ public:
     void ProcessCollection(
         const SdfPath &primPath,
         const TfToken &collectionName,
-        const SdfPathExpression &expr)
+        const SdfPathExpression &expr,
+        const HdsiLightLinkingSceneIndex * const lightLinkingSi)
     {
         TRACE_FUNCTION();
 
@@ -181,7 +183,7 @@ public:
                  _ToStr(collectionId).c_str(), expr.GetText().c_str());
 
             // ... create evaluator.
-            eval = _MakePathExpressionEvaluator(expr);
+            eval = lightLinkingSi->MakeEvaluator(expr);
 
         } else {
             TF_DEBUG(HDSI_LIGHT_LINK_COLLECTION_CACHE).Msg(
@@ -263,7 +265,8 @@ public:
     void
     InvalidatePrimsAndClearDirtyState(
         HdSceneIndexObserver::DirtiedPrimEntries *dirtiedEntries,
-        bool populating)
+        bool populating,
+        const HdsiLightLinkingSceneIndex * const lightLinkingSi)
     {
         if (!dirtiedEntries) {
             TF_CODING_ERROR("Null dirty notice vector provided\n");
@@ -330,7 +333,7 @@ public:
                 "Combined expression from %zu dirty expressions: %s\n",
                 exprs.size(), combinedExpr.GetText().c_str());
 
-        const auto eval = _MakePathExpressionEvaluator(combinedExpr);
+        const auto eval = lightLinkingSi->MakeEvaluator(combinedExpr);
         SdfPathVector targets = _ComputeAllMatches(eval);
         _InvalidateCategoriesOnTargets(targets, dirtiedEntries);
         _InvalidateLights(collectionIds, dirtiedEntries);
@@ -505,19 +508,6 @@ private:
             SdfPath::AbsoluteRootPath(), matchKind, &resultVec);
         
         return resultVec;
-    }
-
-    HdCollectionExpressionEvaluator
-    _MakePathExpressionEvaluator(
-        const SdfPathExpression &expr) const
-    {
-        // XXX For now, use the base set of predicates that Hydra ships with.
-        //     If this needs to be configured for an application, then the
-        //     light linking scene index would need to be registered using the
-        //     callback registration mechanism rather than the plugin registry.
-        //
-        return HdCollectionExpressionEvaluator(
-            _si, expr, HdGetCollectionPredicateLibrary());
     }
 
 private:
@@ -1105,20 +1095,36 @@ static const VtArray<TfToken> LIGHT_FILTER_PRIM_TYPES = {
 HdSceneIndexBaseRefPtr
 HdsiLightLinkingSceneIndex::New(
     const HdSceneIndexBaseRefPtr &inputSceneIndex,
-    const HdContainerDataSourceHandle &inputArgs)
+    const HdContainerDataSourceHandle &inputArgs,
+    const HdCollectionPredicateLibrary &predicateLibrary)
 {
     HdSceneIndexBaseRefPtr sceneIndex = 
         TfCreateRefPtr(
-            new HdsiLightLinkingSceneIndex(inputSceneIndex, inputArgs));
+            new HdsiLightLinkingSceneIndex(
+                inputSceneIndex, inputArgs, predicateLibrary));
 
     sceneIndex->SetDisplayName("Light Linking Scene Index");
     
     return sceneIndex;
 }
 
-HdsiLightLinkingSceneIndex::HdsiLightLinkingSceneIndex(
+HdSceneIndexBaseRefPtr
+HdsiLightLinkingSceneIndex::New(
     const HdSceneIndexBaseRefPtr &inputSceneIndex,
     const HdContainerDataSourceHandle &inputArgs)
+{
+    // XXX Ideally, we'd want to use
+    // UsdImagingGetCollectionPredicateLibrary() here, but that would create a 
+    // dependency on the usdImaging library, which we want to avoid in hdsi.
+    //
+    HdCollectionPredicateLibrary emptyPredicateLibrary;
+    return New(inputSceneIndex, inputArgs, emptyPredicateLibrary);
+}
+
+HdsiLightLinkingSceneIndex::HdsiLightLinkingSceneIndex(
+    const HdSceneIndexBaseRefPtr &inputSceneIndex,
+    const HdContainerDataSourceHandle &inputArgs,
+    const HdCollectionPredicateLibrary &predicateLibrary)
   : HdSingleInputFilteringSceneIndexBase(inputSceneIndex)
   , _cache(std::make_shared<_Cache>(inputSceneIndex))
   , _lightPrimTypes(_GetPrimTypes(
@@ -1133,6 +1139,7 @@ HdsiLightLinkingSceneIndex::HdsiLightLinkingSceneIndex(
         inputArgs,
         HdsiLightLinkingSceneIndexTokens->geometryPrimTypes,
         GEOMETRY_PRIM_TYPES))
+  , _predicateLibrary(predicateLibrary)
 {
 }
 
@@ -1171,6 +1178,13 @@ HdsiLightLinkingSceneIndex::GetChildPrimPaths(const SdfPath &primPath) const
 {
     // This scene index doesn't change the topology.
     return _GetInputSceneIndex()->GetChildPrimPaths(primPath);
+}
+
+HdCollectionExpressionEvaluator
+HdsiLightLinkingSceneIndex::MakeEvaluator(const SdfPathExpression &expr) const
+{
+    return HdCollectionExpressionEvaluator(
+        _GetInputSceneIndex(), expr, _predicateLibrary);
 }
 
 void
@@ -1221,7 +1235,8 @@ HdsiLightLinkingSceneIndex::_PrimsAdded(
         }
     }
 
-    _cache->InvalidatePrimsAndClearDirtyState(&dirtiedEntries, populating);
+    _cache->InvalidatePrimsAndClearDirtyState(
+        &dirtiedEntries, populating, this);
 
     _SendPrimsAdded(entries);
     _SendPrimsDirtied(dirtiedEntries);
@@ -1260,7 +1275,7 @@ HdsiLightLinkingSceneIndex::_ProcessAddedLightOrFilter(
                 continue;
             }
 
-            _cache->ProcessCollection(entry.primPath, colName, expr);
+            _cache->ProcessCollection(entry.primPath, colName, expr, this);
         }
     }
 }
@@ -1306,8 +1321,8 @@ HdsiLightLinkingSceneIndex::_PrimsRemoved(
         _lightAndFilterPrimPaths.erase(begin, end);
     }
 
-    _cache->InvalidatePrimsAndClearDirtyState(&dirtiedEntries,
-                                              /* populating = */ false);
+    _cache->InvalidatePrimsAndClearDirtyState(
+        &dirtiedEntries, /* populating = */ false, this);
 
     _SendPrimsRemoved(entries);
     _SendPrimsDirtied(dirtiedEntries);
@@ -1384,7 +1399,8 @@ HdsiLightLinkingSceneIndex::_PrimsDirtied(
                 const SdfPathExpression expr =
                     exprDs->GetTypedValue(0.0);
 
-                _cache->ProcessCollection(primPath, collectionName, expr);
+                _cache->ProcessCollection(
+                    primPath, collectionName, expr, this);
                 
             } else {
                 // XXX Issue warning? We do always expect a value
@@ -1394,8 +1410,8 @@ HdsiLightLinkingSceneIndex::_PrimsDirtied(
         }
     }
 
-    _cache->InvalidatePrimsAndClearDirtyState(&newEntries,
-                                              /* populating = */ false);
+    _cache->InvalidatePrimsAndClearDirtyState(
+        &newEntries, /* populating = */ false, this);
 
     _SendPrimsDirtied(entries);
     _SendPrimsDirtied(newEntries);

@@ -168,6 +168,9 @@ pxr_library(usdImaging
 
     PRIVATE_HEADERS
         dataSourceImplicits-Impl.h
+    
+    CPPFILES
+        renderPassPruneSceneIndexPlugin.cpp
 
     RESOURCE_FILES
         plugInfo.json
@@ -257,6 +260,15 @@ pxr_build_test(testUsdImagingRerootingSceneIndex
         vt
     CPPFILES
         testenv/testUsdImagingRerootingSceneIndex.cpp
+)
+pxr_build_test(testUsdImagingNiAggregationNonDescendantPaths
+    LIBRARIES
+        usdImaging
+        hd
+        sdf
+        tf
+    CPPFILES
+        testenv/testUsdImagingNiAggregationNonDescendantPaths.cpp
 )
 pxr_build_test(testUsdImagingRootPrim
     LIBRARIES
@@ -372,6 +384,12 @@ pxr_register_test(testUsdImagingPrimvarUtils
 pxr_register_test(testUsdImagingRerootingSceneIndex
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingRerootingSceneIndex"
     EXPECTED_RETURN_CODE 0
+)
+pxr_register_test(testUsdImagingNiAggregationNonDescendantPaths
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingNiAggregationNonDescendantPaths"
+    EXPECTED_RETURN_CODE 0
+    ENV
+        USD_ASSIGN_PROTOTYPES_DETERMINISTICALLY=1
 )
 pxr_register_test(testUsdImagingRootPrim
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingRootPrim"

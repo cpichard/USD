@@ -200,7 +200,6 @@ void wrapSpline()
         .def("__str__", &_WrapStr)
 
         .def("GetValueTypeName", &_WrapGetValueTypeName)
-        .def("SetTimeValued", &This::SetTimeValued)
         .def("IsTimeValued", &This::IsTimeValued)
         .def("SetCurveType", &This::SetCurveType)
         .def("GetCurveType", &This::GetCurveType)

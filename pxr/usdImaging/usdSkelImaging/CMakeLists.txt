@@ -82,6 +82,18 @@ pxr_build_test(testUsdSkelImagingComputations
         testenv/testUsdSkelImagingComputations.cpp
 )
 
+pxr_build_test(testUsdSkelImagingNiAggregationNonDescendantPaths
+    LIBRARIES
+        usdImaging
+        usdSkel
+        usd
+        sdf
+        hd
+        tf
+    CPPFILES
+        testenv/testUsdSkelImagingNiAggregationNonDescendantPaths.cpp
+)
+
 # Register tests only when they are supported.
 if (BUILD_SHARED_LIBS)
     pxr_register_test(testUsdSkelImagingChanges
@@ -99,5 +111,14 @@ if (BUILD_SHARED_LIBS)
         ENV
             TF_FATAL_VERIFY=0
             USDSKELIMAGING_ENABLE_NORMAL_COMPUTATIONS=1
+    )
+
+    pxr_register_test(testUsdSkelImagingNiAggregationNonDescendantPaths
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdSkelImagingNiAggregationNonDescendantPaths"
+        EXPECTED_RETURN_CODE 0
+        TESTENV testenv/testUsdSkelImagingNiAggregationNonDescendantPaths
+        ENV
+            TF_FATAL_VERIFY=0
+            USD_ASSIGN_PROTOTYPES_DETERMINISTICALLY=1
     )
 endif()

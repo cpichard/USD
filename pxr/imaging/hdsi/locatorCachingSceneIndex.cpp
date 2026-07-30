@@ -102,7 +102,11 @@ HdsiLocatorCachingSceneIndex::_GetWithCache(
         }
 
         // Tag cache allocations.
-        HF_MALLOC_TAG_FUNCTION();
+        TfAutoMallocTag mallocTag(
+            "hdsi",
+            "HdsiLocatorCachingSceneIndex",
+            /* We already verified locator is not empty. */
+            locator.GetFirstElement().GetText());
 
         // No cached data source found, so pull from input.
         // This is the potentially expensive or repeated operation

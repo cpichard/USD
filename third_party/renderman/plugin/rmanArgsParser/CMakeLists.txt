@@ -1,6 +1,11 @@
 set(PXR_PREFIX "")
 set(PXR_PACKAGE rmanArgsParser)
 
+set(optionalLibs "")
+if(PXR_VERSION AND PXR_VERSION LESS 2508)
+    list(APPEND optionalLibs ndr)
+endif()
+
 pxr_plugin(rmanArgsParser
     LIBRARIES
         arch
@@ -8,7 +13,9 @@ pxr_plugin(rmanArgsParser
         tf
         vt
         ar
+        sdf
         sdr
+        ${optionalLibs}
 
     PRIVATE_CLASSES
         rmanArgsParser

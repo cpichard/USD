@@ -16,9 +16,17 @@
 #define HDPRMAN_USE_LIGHT_LINKING_SCENE_INDEX
 #endif
 
+#if HDSI_API_VERSION >= 21
+#define HDPRMAN_CONFIGURE_PREDICATE_LIBRARY
+#include "pxr/usdImaging/usdImaging/collectionPredicateLibrary.h"
+#endif
+
 #endif // #if HD_API_VERSION >= 58
 
 #ifdef HDPRMAN_USE_LIGHT_LINKING_SCENE_INDEX
+
+#include "pxr/imaging/hd/overlayContainerDataSource.h"
+#include "pxr/imaging/hd/retainedDataSource.h"
 
 #include "pxr/imaging/hd/sceneIndexPlugin.h"
 #include "pxr/imaging/hd/sceneIndexPluginRegistry.h"
@@ -73,6 +81,16 @@ TF_REGISTRY_FUNCTION(HdSceneIndexPlugin)
 // Scene Index Implementation
 ////////////////////////////////////////////////////////////////////////////////
 
+static HdContainerDataSourceHandle
+_ConfigureInputArgs(
+    const HdContainerDataSourceHandle &pluginInputArgs)
+{
+    // XXX Update args to provide the list of geometry and light types
+    //     supported by hdPrman instead of using the fallback behavior in
+    //     HdsiLightLinkingSceneIndex that uses the hardcoded tokens in hd.
+    return pluginInputArgs;
+}
+
 class HdPrman_LightLinkingSceneIndexPlugin :
     public HdSceneIndexPlugin
 {
@@ -88,12 +106,22 @@ protected:
         if (!TF_VERIFY(_IsEnabled(inputArgs))) {
             return inputScene;
         }
-        
-        // XXX Update inputArgs to provide the list of geometry and light types
-        //     supported by hdPrman instead of using the fallback behavior in
-        //     HdsiLightLinkingSceneIndex that uses the hardcoded tokens in hd.
-        static const HdContainerDataSourceHandle localInputArgs = nullptr;
-        return HdsiLightLinkingSceneIndex::New(inputScene, localInputArgs);
+
+        #ifdef HDPRMAN_CONFIGURE_PREDICATE_LIBRARY
+        // UsdImaging's predicate library supports the evaluation of USD
+        // predicates. The assumption here is that light linking collections
+        // are authored in USD (via UsdLuxLightAPI, LightFilter) and thus can
+        // use only the USD predicate expressions.
+        // So, we don't use the Hydra (core) predicate library returned by
+        // HdGetCollectionPredicateLibrary() here.
+        //
+        return HdsiLightLinkingSceneIndex::New(
+            inputScene, _ConfigureInputArgs(inputArgs),
+            UsdImagingGetCollectionPredicateLibrary());
+#else
+        return HdsiLightLinkingSceneIndex::New(
+            inputScene, _ConfigureInputArgs(inputArgs));
+#endif
     }
 
     bool _IsEnabled(

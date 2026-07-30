@@ -400,6 +400,32 @@ public:
         int *outHitInstanceIndex = NULL,
         HdInstancerContext *outInstancerContext = NULL);
 
+    /// Result of a batch DecodeIntersection call.
+    struct DecodeResult
+    {
+        SdfPath primPath;
+        HdInstancerContext instancerContext;
+    };
+
+    using DecodeResultVector = std::vector<DecodeResult>;
+
+    struct PickId
+    {
+        int primId;
+        int instanceId;
+    };
+
+    using PickIdVector = std::vector<PickId>;
+
+    /// Batch version of DecodeIntersection. Resolves multiple
+    /// (primId, instanceId) pairs in one call, amortizing the cost of
+    /// instancer topology computation across all hits.
+    ///
+    /// Returns a vector of DecodeResults (though some entries may be empty).
+    /// Each entry corresponds to the same-indexed entry in \p pickIds.
+    USDIMAGINGGL_API
+    DecodeResultVector DecodeIntersections(const PickIdVector& pickIds);
+
     /// \deprecated Please use the override of TestIntersection that takes
     ///
     /// PickParams and returns an IntersectionResultVector instead!

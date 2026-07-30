@@ -41,7 +41,7 @@ class HdStSimpleLightingShader : public HdStLightingShader
 {
 public:
     HDST_API
-    HdStSimpleLightingShader();
+    HdStSimpleLightingShader(const Hgi* hgi);
     HDST_API
     ~HdStSimpleLightingShader() override;
 
@@ -135,11 +135,10 @@ public:
     HDST_API
     void SetMaxLights(uint32_t maxLights);
 
+    // Limit set based to half the max samplers allowed by selected Hgi backend.
     HDST_API
-    static constexpr uint32_t GetMaxShadows() {
-        // Could only be higher with a texture atlas/array, since GL limits
-        // the number of bound samplers per shader stage.
-        return 16;
+    uint32_t GetMaxShadows() const {
+        return _maxShadows;
     }
 
 private:
@@ -181,6 +180,7 @@ private:
     HdStPooledRenderBufferUniquePtr _shadowBufferFallback;
 
     uint32_t _maxLights;
+    uint32_t _maxShadows;
 };
 
 

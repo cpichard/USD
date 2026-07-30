@@ -403,6 +403,21 @@ _ToConformWindowPolicy(const TfToken &token)
 }
 #endif
 
+static std::vector<TfToken>
+_ExtractLegacyProductNames(const _LegacyRenderProducts &legacyProducts)
+{
+    std::vector<TfToken> names;
+    for (const HdRenderSettingsMap & product : legacyProducts) {
+        auto it = product.find(HdPrmanRenderProductTokens->productName);
+        if (it != product.end() && it->second.IsHolding<TfToken>()) {
+            names.push_back(it->second.UncheckedGet<TfToken>());
+        } else {
+            names.push_back(TfToken());
+        }
+    }
+    return names;
+}  
+
 } // end anonymous namespace
 
 
@@ -667,12 +682,6 @@ HdPrman_RenderPass::_Execute(
     _renderParam->SetFallbackLightsEnabled(false);
 #endif
 
-    int frame =
-        renderDelegate->GetRenderSetting<int>(
-            HdPrmanRenderSettingsTokens->houdiniFrame, 1);
-    const bool frameChanged = _renderParam->frame != frame;
-    _renderParam->frame = frame;
-
     // HdPrman_WorldOffsetSceneIndexPlugin now handles trace:worldorigin
     // and trace:worldoffset internally, by pulling the relevant information
     // from scene globals.  The below code is for backwards compatbility.
@@ -717,13 +726,25 @@ HdPrman_RenderPass::_Execute(
     //
     if (hasLegacyProducts) {
         // Use RenderProducts from the RenderSettingsMap (Solaris)
-        if (frameChanged) {
+
+        int frame = renderDelegate->GetRenderSetting<int>( HdPrmanRenderSettingsTokens->houdiniFrame, 1);
+        const bool frameChanged = _renderParam->frame != frame;
+        _renderParam->frame = frame;
+
+        std::vector<TfToken> legacyProductNames = _ExtractLegacyProductNames(legacyProducts);
+        const bool legacyProductNamesChanged = _lastLegacyProductNames != legacyProductNames;
+        if (legacyProductNamesChanged) {
+            _lastLegacyProductNames = legacyProductNames;
+        }
+
+        if (frameChanged || legacyProductNamesChanged) {
             riley::Riley * const riley = _renderParam->AcquireRiley();
             if(!riley) {
                 return;
             }
             _renderParam->GetRenderViewContext().DeleteRenderView(riley);
         }
+
         _renderParam->CreateRenderViewFromLegacyProducts(legacyProducts, frame);
     } else if (!passHasAovBindings) {
         // Note: This handles the case that we are rendering with the 

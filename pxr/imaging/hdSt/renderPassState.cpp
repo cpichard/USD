@@ -334,19 +334,26 @@ HdStRenderPassState::Prepare(
             HdShaderTokens->viewport,
             HdTupleType{HdTypeFloatVec4, 1});
 
-        // Avoid shader permutations when using 0-4 clip planes by always
-        // allocating storage for 4 clip planes.
-        static constexpr size_t s_minNumClipPlanes = 4;
-        _clipPlanesBufferSize =
-            std::max<size_t>(clipPlanes.size(), s_minNumClipPlanes);
-        bufferSpecs.emplace_back(
-            HdShaderTokens->clipPlanes,
-            HdTupleType{HdTypeFloatVec4, _clipPlanesBufferSize});
 
-        bufferSpecs.emplace_back(
-            HdShaderTokens->numClipPlanes,
-            HdTupleType{HdTypeUInt32, 1});
+        if (maxClipPlanes > 0) {
+            // We allocate for clip planes based on whether clip planes are
+            // supported, not whether they are enabled, to avoid costly shader
+            // recompilation when toggling clip planes on and off. When clip
+            // planes are supported (maxClipPlanes > 0), we allocate storage for
+            // up to four clip planes, limited by maxClipPlanes.
+            const size_t minNumClipPlanes =
+                std::min<size_t>(maxClipPlanes, 4UL);
+            _clipPlanesBufferSize =
+                std::max<size_t>(clipPlanes.size(), minNumClipPlanes);
 
+            bufferSpecs.emplace_back(
+                HdShaderTokens->numClipPlanes,
+                HdTupleType{HdTypeUInt32, 1});
+
+            bufferSpecs.emplace_back(
+                HdShaderTokens->clipPlanes,
+                HdTupleType{HdTypeFloatVec4, _clipPlanesBufferSize});
+        }
         // allocate interleaved buffer
         _renderPassStateBar =
             hdStResourceRegistry->AllocateUniformBufferArrayRange(
@@ -483,18 +490,20 @@ HdStRenderPassState::Prepare(
             VtValue(
                 _ComputeDataWindow(
                     _framing, _viewport))));
-
-    if (clipPlanes.size() > 0) {
+    if (maxClipPlanes > 0) {
         sources.push_back(
             std::make_shared<HdVtBufferSource>(
-                HdShaderTokens->clipPlanes,
-                VtValue(clipPlanes),
-                clipPlanes.size()));
+                HdShaderTokens->numClipPlanes,
+                VtValue(uint32_t(clipPlanes.size()))));
+
+        if (!clipPlanes.empty()) {
+                sources.push_back(
+                    std::make_shared<HdVtBufferSource>(
+                        HdShaderTokens->clipPlanes,
+                        VtValue(clipPlanes),
+                        clipPlanes.size()));
+        }
     }
-    sources.push_back(
-    std::make_shared<HdVtBufferSource>(
-        HdShaderTokens->numClipPlanes,
-        VtValue(uint32_t(clipPlanes.size()))));
 
     hdStResourceRegistry->AddSources(_renderPassStateBar, std::move(sources));
 

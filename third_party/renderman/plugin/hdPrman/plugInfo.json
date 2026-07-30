@@ -139,6 +139,18 @@
                             "position": "lastBefore"
                         }
                     },
+                    "HdPrman_RenderTerminalTimeSamplingSceneIndexPlugin" : {
+                        "bases": ["HdSceneIndexPlugin"],
+                        "loadWithRenderer": ["RenderMan RIS", "RenderMan XPU", "RenderMan XPU - CPU", "RenderMan XPU - GPU"],
+                        "priority": 0,
+                        "displayName": "Render Terminal Time Sampling",
+
+                        "tags": ["hdPrman:phase0"],
+                        "ordering": {
+                            "after": "hd:sceneAssembly",
+                            "position": "firstAfter"
+                        }
+                    },
                     "HdPrman_MaterialPrimvarTransferSceneIndexPlugin" : {
                         "bases": ["HdSceneIndexPlugin"],
                         "loadWithRenderer": ["RenderMan RIS", "RenderMan XPU", "RenderMan XPU - CPU", "RenderMan XPU - GPU"],

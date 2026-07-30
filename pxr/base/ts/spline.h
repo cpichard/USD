@@ -101,12 +101,6 @@ public:
     template <typename T>
     bool IsHolding() const;
 
-    /// \deprecated
-    /// Deprecated in favor of constructing the TsSpline with a value type
-    /// of GfTimeCode.
-    TS_API
-    void SetTimeValued(bool timeValued);
-
     /// Convenience function that returns true if the value type of the
     /// spline is GfTimeCode.
     TS_API

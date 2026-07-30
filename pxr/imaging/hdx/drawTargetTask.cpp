@@ -271,11 +271,16 @@ HdxDrawTargetTask::_ComputeRenderPassInfos(HdRenderIndex * const renderIndex)
     for (_DrawTargetEntry const &entry : drawTargetEntries) {
         if (HdStDrawTarget * const drawTarget = entry.drawTarget) {
             if (drawTarget->IsEnabled()) {
+
+                HdStResourceRegistrySharedPtr registry =
+                    std::dynamic_pointer_cast<HdStResourceRegistry>(
+                        renderIndex->GetResourceRegistry());
+                const Hgi* hgi = registry ? registry->GetHgi() : nullptr;
                 result.push_back(
                     { std::make_unique<HdSt_RenderPass>(
                             renderIndex, HdRprimCollection()),
                       std::make_shared<HdStRenderPassState>(),
-                      std::make_shared<HdStSimpleLightingShader>(),
+                      std::make_shared<HdStSimpleLightingShader>(hgi),
                       drawTarget,
                       0 });
             }

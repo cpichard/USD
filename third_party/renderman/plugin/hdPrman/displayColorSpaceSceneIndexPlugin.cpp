@@ -121,6 +121,27 @@ _BuildExcludeAOVsList(const HdContainerDataSourceHandle& rsPrimDS)
                     // matching how HdPrman creates AOVs.
                     const SdfPath varPath = pathDs->GetTypedValue(0.0f);
                     uniqueAOVs.insert(varPath.GetName());
+
+                    // Also exclude the sourceName of the AOV, since it
+                    // make be created as an additional Display and
+                    // we need to ensure that PxrColorDisplayTransform
+                    // does not modify it.
+                    //
+                    // See testHdPrman_ColorSpaceExcludeAOVs for a test
+                    // where Ci, a, and "pos" (source: __Pworld) results in
+                    // 6 displays seen by PxrColorTransformDisplayFilter:
+                    //
+                    //   0: "Ci"
+                    //   1: "a"
+                    //   2: "Ci"
+                    //   3: "a"
+                    //   4: "pos"
+                    //   5: "__Pworld"
+                    //
+                    if (auto sourceNameDs = varSchema.GetSourceName()) {
+                        uniqueAOVs.insert(
+                            sourceNameDs->GetTypedValue(0.0f) );
+                    }
                 }
             }
         }

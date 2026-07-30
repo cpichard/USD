@@ -19,7 +19,7 @@ static const char* _defaultButtonText = "Choose Registered Scene Index";
 HduiRegisteredSceneIndexChooser::HduiRegisteredSceneIndexChooser(
     QWidget *parent)
 : QPushButton(_defaultButtonText, parent)
-, _menu(new QMenu)
+, _menu(new QMenu(this))
 {
     // Associate the dropdown menu with this button.
     setMenu(_menu);
@@ -73,9 +73,6 @@ HduiRegisteredSceneIndexChooser::HduiRegisteredSceneIndexChooser(
     }
 }
 
-HduiRegisteredSceneIndexChooser::~HduiRegisteredSceneIndexChooser()
-{
-    delete _menu;
-}
+HduiRegisteredSceneIndexChooser::~HduiRegisteredSceneIndexChooser() = default;
 
 PXR_NAMESPACE_CLOSE_SCOPE

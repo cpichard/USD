@@ -9,6 +9,7 @@
 #include "hdPrman/idMap.h"
 #include "hdPrman/rixStrings.h"
 #include "pxr/imaging/hd/tokens.h"
+#include "pxr/imaging/hf/perfLog.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/staticData.h"
 #include "pxr/base/tf/tf.h"
@@ -102,12 +103,16 @@ PtDspyError DspyImageActiveRegion(
 
 // Transform NDC space (-1, 1) depth to window space (0, 1).
 static float _ConvertAovDepth(const GfMatrix4d &m, const float depth) {
+#ifdef HDPRMAN_USE_LINEAR_DEPTH
+    return depth;
+#else
     if (std::isfinite(depth)) {
         return GfClamp(
             (m.Transform(GfVec3f(0, 0, -depth))[2] * 0.5) + 0.5, 0, 1); 
     } else {
         return 0.f;
     }
+#endif
 }
 
 extern "C" DISPLAYEXPORT
@@ -376,6 +381,8 @@ HdPrmanFramebuffer::Resize(int width, int height,
                            int cropXMin, int cropYMin,
                            int cropWidth, int cropHeight)
 {
+    HF_MALLOC_TAG_FUNCTION();
+
     if (w != width || h != height ||
         cropOrigin[0] != cropXMin || cropOrigin[1] != cropYMin ||
         cropRes[0] != cropWidth || cropRes[1] != cropHeight) {

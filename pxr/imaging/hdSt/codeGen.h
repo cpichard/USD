@@ -9,10 +9,14 @@
 
 #include "pxr/pxr.h"
 #include "pxr/imaging/hdSt/api.h"
+#include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/version.h"
 #include "pxr/imaging/hdSt/resourceBinder.h"
 #include "pxr/imaging/hdSt/glslProgram.h"
 #include "pxr/imaging/hio/glslfxResourceLayout.h"
+#include "pxr/imaging/hgi/enums.h"
+
+#include "pxr/base/tf/token.h"
 
 #include <unordered_map>
 #include <vector>
@@ -54,7 +58,7 @@ public:
     HDST_API
     HdSt_CodeGen(HdStShaderCodeSharedPtrVector const &shaders,
                  std::unique_ptr<HdSt_ResourceBinder::MetaData>&& metaData);
-    
+
     /// Return the hash value of glsl shader to be generated.
     HDST_API
     ID ComputeHash() const;
@@ -82,7 +86,7 @@ public:
     HDST_API
     HdStGLSLProgramSharedPtr CompileComputeProgram(
         HdStResourceRegistry*const registry);
-    
+
     /// Return the generated vertex shader source
     const std::string &GetVertexShaderSource() const { return _vsSource; }
 
@@ -131,7 +135,7 @@ private:
 
    void _PlumbInterstageElements();
 
-    // The packed field name (grouping vector) and name of its component that 
+    // The packed field name (grouping vector) and name of its component that
     // holds the resource.
     struct _PackedResourceMapping {
         TfToken groupName;
@@ -192,6 +196,16 @@ private:
     ElementVector _resPTCS;
     ElementVector _resPTVS;
     ElementVector _resCS;
+
+    struct _Resource
+    {
+        ElementVector* res;
+        std::stringstream* gen;
+        TfToken hdShaderStage;
+        HgiShaderStage hgiShaderStage;
+    };
+
+    std::vector<_Resource> _resources;
 
     ElementVector _resInterstage;
     std::unordered_map<std::string, _PackedResourceMapping>

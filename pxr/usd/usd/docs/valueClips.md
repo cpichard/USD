@@ -3,16 +3,17 @@
 ## Overview {#Usd_ValueClips_Overview}
 
 USD's <a HREF="http://openusd.org/docs/USD-Glossary.html#USDGlossary-CompositionArcs">composition arcs</a> 
-allow timeSampled animation to be assembled from a variety of sources into
+allow time-varying animation to be assembled from a variety of sources into
 a single composition.  However, because stage composition must not (for
 scalability) take time into account when "indexing" layers, the value resolution
 behavior we are able to provide for layers reached through composition arcs 
-stipulates that the first (strongest) layer that contains \em any timeSample for
-an attribute is the source of \em all timeSamples for the attribute.  For
-many uses of USD this is sufficient, and additionally flexible because each
-Reference and SubLayer can specify a constant 
-\ref SdfLayerOffset "time offset and scale" to be applied to the referenced 
-or sublayered timeSamples.  However, sometimes more flexibility is required!
+stipulates that the first (strongest) layer that contains \em any
+time-varying data for an attribute is the source of \em all time-varying
+data for the attribute.  For many uses of USD this is sufficient, and
+additionally flexible because each Reference and SubLayer can specify a
+constant  \ref SdfLayerOffset "time offset and scale" to be applied to the
+referenced  or sublayered timeSamples.  However, sometimes more flexibility
+is required!
 
 The USD Value Clips feature allows users to decompose time-varying data
 across many layers that can then be sequenced and re-sequenced back together
@@ -46,9 +47,9 @@ Before going further, let's establish some terminology:
   resolution semantics.
 
 - **Clip Manifest**: An individual layer that declares the attributes that have
-  time samples in a clip set's value clips. An attribute must be declared in
-  the manifest in order for value clips to be considered when resolving values
-  for that attribute.
+  time-varying data in a clip set's value clips. An attribute must be
+  declared in the manifest in order for value clips to be considered when
+  resolving values for that attribute.
 
 - \anchor Usd_ValueClips_AnchorPoint **Anchor Point**: The strongest layer 
   in which either \em assetPaths or \em templateAssetPath is authored for a
@@ -137,13 +138,13 @@ takes, there are also a set of "universal" metadata common to both.
           values in each clip.
     - \em manifestAssetPath
         - An asset path (\ref SdfAssetPath) representing the path to a layer
-          that contains an index of the attributes with time samples authored
-          in the set of clips. See \ref Usd_ValueClips_ClipManifest for more
-          details.
+          that contains an index of the attributes with time-varying data
+          authored in the set of clips. See \ref Usd_ValueClips_ClipManifest
+          for more details.
     - \em interpolateMissingClipValues
         - A boolean flag indicating whether values for clips that do not have
-          authored time samples for attributes in the manifest should be
-          interpolated from surrounding clips. 
+          authored time-varying data for attributes in the manifest
+          should be interpolated from surrounding clips. 
           See \ref Usd_ValueClips_ClipValueResolution_InterpolatingGaps for
           more details.
 
@@ -158,9 +159,7 @@ takes, there are also a set of "universal" metadata common to both.
     - \em times 
         - A list of pairs of the form (stageTime, clipTime) representing
           the mapping from stage time to clip time, for whichever clip is 
-          active at the given stage time. Note that every unique stageTime
-          in this list will be in the list of time samples obtained by
-          calling \ref UsdAttribute::GetTimeSamples() .
+          active at the given stage time.
           See \ref Usd_ValueClips_TimeMapping for more details.
 
 - Template Clip Metadata
@@ -208,7 +207,7 @@ takes, there are also a set of "universal" metadata common to both.
             - times  = [(100.5,100.5), (101,101), (102,102), (103,103), (103.5,103.5)]
             - active = [(101.5, 0), (102.5, 1), (103.5, 2)]
         - Note that USD generates two additional clip time 'knots' on the ends
-        of the clipTime array. This allows users to query time samples outside
+        of the clipTime array. This allows users to query values outside
         the start/end range based on the absolute value of their offset.
         - Note that templateActiveOffset cannot exceed 
         the absolute value of templateStride. 
@@ -275,7 +274,7 @@ double2[] times = [(0, 5), (10, 15)]
 \endcode
 
 When an attribute value at time 0 is requested, UsdStage will retrieve the
-time sample value authored at time 5 in the active clip, and at time 10
+value authored at time 5 in the active clip, and at time 10
 UsdStage will ask for the value authored at time 15. As mentioned above,
 these entries are the endpoints for a linear segment in the timing curve, so
 times between these entries will be linearly interpolated. For example,
@@ -326,10 +325,10 @@ discontinuity and the right-most entry represents the right side.
 ## Clip Manifest {#Usd_ValueClips_ClipManifest}
 
 The clip manifest is a \ref SdfLayer "layer" that declares the attributes
-that have time samples in the value clips for the associated clip set.
-This serves as an index that allows value resolution to determine whether
-an attribute has time samples in a clip set without having to examine every
-value clip. 
+that have time-varying data in the value clips for the associated clip
+set. This serves as an index that allows value resolution to determine whether
+an attribute has time-varying data in a clip set without having to
+examine every value clip. 
 
 If a clip set's value clips contain data for an attribute, that attribute *must*
 be declared in the manifest. Otherwise, that data will be ignored.
@@ -413,9 +412,9 @@ def "Model"
 </table>
 
 Like value clips, metadata, relationships, and composition arcs in the manifest
-are ignored. Attributes in the manifest may have default values or time samples
-containing value blocks. See \ref Usd_ValueClips_ClipValueResolution for how
-these values may be used.
+are ignored. Attributes in the manifest may have default values or time-varying
+data containing value blocks. See \ref Usd_ValueClips_ClipValueResolution for
+how these values may be used.
 
 ### Generating a Manifest {#Usd_ValueClips_GeneratingManifest}
 
@@ -486,10 +485,11 @@ owning prim or any ancestors, USD will do the following:
 ### Missing Values in Clip Set {#Usd_ValueClips_ClipValueResolution_Gaps}
 
 A clip set has "gaps" if some of the value clips in the set do not contain
-authored time samples for an attribute that has been declared in the manifest.
+authored time-varying data for an attribute that has been declared in the
+manifest.
 
-By default, if a value clip does not contain time samples for an attribute,
-a time sample at the clip's \em active time will be generated using the
+By default, if a value clip does not contain time-varying data for an
+attribute, a value at the clip's \em active time will be generated using the
 default value for the attribute authored in the clip manifest. If no default
 value has been authored, the fallback value for the attribute's data type
 will be a value block.
@@ -595,22 +595,23 @@ The above behavior allows USD to avoid opening an arbitrary number of clips if
 a gap is encountered in the clip set and can be useful in some situations. For
 example, see \ref Usd_ValueClips_AnimatedVisibility. However, in these cases
 USD can also optionally interpolate values based on the surrounding clips.
-This makes value clips behave like time samples split up into different
-files, which is more intuitive but comes at a performance cost.
+This makes value clips behave as if the time-varying data is split up into
+different files, which is more intuitive but comes at a performance cost.
 
 This feature can be enabled for a clip set by setting 
 \em interpolateMissingClipValues to true in a clip set definition. When enabled,
 if a query is made at a time when the clip set has a gap, and the attribute does 
 not have a default value specified in the manifest, USD will search forward and 
 backwards from the active clip at that time to find the nearest clips that
-contain authored time sample values. The final value will be interpolated from
-these time samples.
+contain authored values. The final value will be interpolated from
+these values.
 
 Note that in the pessimal case, this may wind up opening and querying all clips
-in the set. To accelerate this search, users can author time sample blocks in 
-the manifest at the active time for each clip that does not have time samples
+in the set. To accelerate this search, users can author value blocks in the
+manifest at the active time for each clip that does not have time-varying data
 for a given attribute. Value resolution will use this information to determine
-what clips have time samples without actually opening the clips themselves.
+what clips have time-varying data without actually opening the clips
+themselves.
 
 In the example below, the value for /TestModel.a at time 2 will be 2.0, 
 which is interpolated from the time sample in clip1.usd at time 1 and the 
@@ -719,6 +720,177 @@ Layer offsets affect value clips in the following ways:
     to the strongest layer in which they were authored. Note that this layer 
     may be different from the \ref Usd_ValueClips_AnchorPoint "anchor point".
 
+## Attribute Value Sources in Clips {#Usd_ValueClips_ValueSources}
+
+Clips support time samples-based attributes as well as spline-based attributes.
+Although most value resolution semantics apply consistently to clip attributes
+regardless of whether the attribute resolves to time samples or splines,
+their specification and behavior differ from each other in a few key ways.
+
+### Value Source Specification in Clip Manifests {#Usd_ValueClips_Splines_Manifests}
+
+Each attribute in a clipSet is entirely driven by either splines or time
+samples, even if there is a mix of the two in different clips. The selected
+source is governed by the manifest.
+
+#### Manifest Encoding
+
+By default, attributes in clips resolve to time samples. Splines must be
+explicitly denoted in manifests for corresponding attributes to resolve to
+spline. If time samples are also explictly denoted, time samples win.
+
+In the following example manifest, `a1`, `a2`, `a3`, and `a4` resolve to time
+samples. Only `a5`, `a6` resolve to spline.
+
+\code
+
+    #usda 1.0
+
+    over "PrimA" {
+        double a1
+        double a2.timeSamples = {}
+        double a3.timeSamples = {}
+        double a3.spline = {}
+        double a4 = 4
+
+        double a5.spline = {}
+        double a6 = 6
+        double a6.spline = {}
+    }
+
+\endcode
+
+Note that manifest syntax differs from typical usda syntax in that
+`a3.timeSamples = {}` in a clip manifest indicates the attribute should have
+time samples. In regular usda, `a3.timeSamples = {}` would be completely ignored
+and values that are relatively weaker in the composition stack would shine
+through.
+
+#### Skipping Clips
+
+Both time samples and spline annotations provide manifest syntax to indicate
+that value resolution can skip opening certain clips that are treated as
+contributing no values. Specification of these skips is an optional performance
+optimization.
+
+In the following manifest example, both `a7` and `a8`
+indicate that value resolution should skip opening the clips at active times 3
+and 10. 
+
+\code
+
+    #usda 1.0
+
+    over "PrimA" {
+        double a7.timeSamples = { 3: None, 10: None }
+        double a8.spline = { 3:0; post none,
+                             10:0; post none }
+    }
+
+\endcode
+
+If a manifest is generated and all clips are consulted, any non-empty time
+samples authored in a clip will cause the corresponding attribute to resolve
+to time samples. An attribute resolves to spline only when a clip authors
+a spline and no time samples are authored in any clips for that attribute.
+
+### Differences in Clip Value Resolution by Value Source {#Usd_ValueClips_Splines_ValueResolution}
+
+Splines can represent dual-valued knots. These knots can have different values
+when they are evaluated at the pre-time vs regular time of some time `t`. On
+the other hand, time samples can only represent one value for each time. This
+fundamental semantic difference causes further differences in clip value
+resolution behavior between time samples-based and spline-based attributes.
+
+Clip value resolution treats each clip's spline as contributing values for
+its entire active region in the continuous range `[startTime, endTime)`
+computed from the clipSet's `active` metadata. Time samples only conditionally
+contribute their full active clip region as follows:
+
+- If a clip contributes time samples, a sample is interpolated at the clip's
+  active starting time. This means the clip contributes time samples whose
+  behavior is preserved in the range `[startTime, <last sample time>)` where
+  `<last sample time>` is the highest time of an authored sample that is less
+  than the clip end time.
+- However, the last active clip contributes values in its full active range
+  `[startTime, +inf)`.
+- If a jump discontinuity is specified at the end time of a clip (or the
+  active time of the next clip), the clip contributes values in its full
+  active range `[startTime, endTime)`.
+
+In the example below, clip1 contributes values in the time range `(-inf, 5)`.
+clip2 contributes values in the time range `[10, +inf)`. The region
+`[5, 10)` is interpolated between the values at the clip boundaries.
+Thus, `attr` evaluated at time 8 results in a value of 3.0 due to linear
+interpolation between clip1's sample at time 5 and clip2's inserted sample
+at time 10. 
+
+<table>
+<tr>
+<th>clip1.usd</th>
+<th>clip2.usd</th>
+</tr>
+<tr>
+<td>
+\code
+#usda 1.0
+
+def "Model"
+{
+    double attr.timeSamples = {
+        5: 0,
+        15: -10
+    }
+}
+\endcode
+</td>
+<td>
+\code
+#usda 1.0
+
+def "Model"
+{
+    double attr.timeSamples = {
+        6: 1,
+        11: 6
+    }
+}
+\endcode
+</td>
+</tr>
+<tr>
+<th colspan=2>stage.usd</th>
+</tr>
+<tr>
+<td colspan=2>
+\code
+#usda 1.0
+
+def "Model" (
+    clips = {
+        dictionary default = {
+            double2[] active = [(0, 0), (10, 1)]
+            asset[] assetPaths = [@./clip1.usd@, @./clip2.usd@]
+            string primPath = "/Model"
+        }
+    }
+)
+{
+    double attr
+}
+\endcode
+</td>
+</tr>
+
+</table>
+
+When evaluating a clipSet whose times contain a jump discontinuity
+(see \ref Usd_ValueClips_Discontinuities), for an attribute whose value
+source is time samples, we will insert a time sample at a miniscule step
+before the time at which a jump discontinuity occurs. Because USD splines
+have dual-valued knots, no such minor offset is needed for splines and the
+jump discontinuity can be expressed natively on a single knot.
+
 ## Additional Notes {#Usd_ValueClips_AdditionalNotes}
 
 The flexibility and reuse of animated data that clips provides does come with
@@ -752,11 +924,11 @@ memory consumption, we are satisfied with the caching strategy for now.
 
 ### Flattening {#Usd_ValueClips_Flattening}
 
-Flattening a UsdStage with value clips will merge the appropriate time
-samples from the value clips into the time samples on the attribute on
+Flattening a UsdStage with value clips will merge the appropriate value
+sources from the value clips into the value source on the attribute on
 the flattened stage and remove the clip set definitions. Querying for
-time samples and values on the flattened stage should always give the
-same result as on the unflattened stage.
+values on the flattened stage should always give the same result as on
+the unflattened stage.
 
 ### usdview {#Usd_ValueClips_usdview}
 
@@ -770,7 +942,7 @@ on the prim introducing clips.
 ### usdstitchclips {#Usd_ValueClips_usdstitchclips}
 
 The usdstitchclips utility will generate a stage that uses value clips to
-stitch together the time samples in a given set of clip layers. This
+stitch together the value sources in a given set of clip layers. This
 utility will generate the necessary clip set definitions (using either explicit
 or template metadata) and also generate a topology layer defining the
 attributes and a manifest layer.

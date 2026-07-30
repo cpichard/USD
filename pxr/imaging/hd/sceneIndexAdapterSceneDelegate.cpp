@@ -1862,6 +1862,7 @@ HdPrimvarDescriptorFromSchema(TfToken const& name, HdPrimvarSchema primvar)
 
     desc.name = name;
 
+    // interpolation
     HdTokenDataSourceHandle interpolationDataSource =
         primvar.GetInterpolation();
     if (!interpolationDataSource) {
@@ -1869,16 +1870,22 @@ HdPrimvarDescriptorFromSchema(TfToken const& name, HdPrimvarSchema primvar)
         desc.interpolation = HdInterpolationCount;
         return desc;
     }
-
     TfToken interpolationToken =
         interpolationDataSource->GetTypedValue(0.0f);
     desc.interpolation =
         Hd_InterpolationAsEnum(interpolationToken);
 
+    // role
     if (HdTokenDataSourceHandle roleDataSource = primvar.GetRole()) {
         desc.role = roleDataSource->GetTypedValue(0.0f);
     }
 
+    // elementSize
+    if (HdIntDataSourceHandle elementSizeDs = primvar.GetElementSize()) {
+        desc.elementSize = elementSizeDs->GetTypedValue(0.0f);
+    }
+
+    // indexed
     desc.indexed = primvar.IsIndexed();
 
     return desc;

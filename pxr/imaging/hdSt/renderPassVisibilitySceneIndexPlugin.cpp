@@ -81,11 +81,35 @@ _IsGeometryType(const TfToken &primType)
             != extraGeomTypes.end();
 }
 
-// Returns true if the renderVisibility rules apply to this prim type.
+// Returns true if the visibility rules apply to this prim
 bool
-_ShouldApplyPassVisibility(const TfToken &primType)
+_ShouldApplyPassVisibility(HdSceneIndexPrim const& prim)
 {
-    return _IsGeometryType(primType) || HdPrimTypeIsLight(primType);
+    // Apply pass visibility to point instancers, which are explicitly created
+    // in the scene by users, but not to other instancers created internally,
+    // e.g. by UsdImaging native instance aggregation.  The latter case is
+    // already handled elsewhere by evaluating the collection against each
+    // instanceLocation.  The general intuition is that user-defined
+    // collections are only ever applied against user-defined paths.
+    if (prim.primType == HdPrimTypeTokens->instancer) {
+        const HdInstancerTopologySchema topoSchema =
+            HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+        if (!topoSchema) {
+            return false;
+        }
+        // If there are no instanceLocations, this is an explicit
+        // point instancer, and we apply visibility rules to the
+        // instancer as a whole.
+        const HdPathArrayDataSourceHandle instanceLocationsDs =
+            topoSchema.GetInstanceLocations();
+        if (!instanceLocationsDs) {
+            return true;
+        }
+        const VtArray<SdfPath> instanceLocations =
+            instanceLocationsDs->GetTypedValue(0.0f);
+        return instanceLocations.empty();
+    }
+    return _IsGeometryType(prim.primType) || HdPrimTypeIsLight(prim.primType);
 }
 
 bool
@@ -131,7 +155,7 @@ struct _RenderPassVisibilityState {
         HdSceneIndexPrim const& prim) const
     {
         return renderVisEval
-            && _ShouldApplyPassVisibility(prim.primType)
+            && _ShouldApplyPassVisibility(prim)
             && !renderVisEval->Match(primPath)
             && _IsVisible(prim.dataSource);
     }

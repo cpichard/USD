@@ -64,6 +64,7 @@ pxr_library(vdf
         traits.h
         typedVector.h
         vectorAccessor.h
+        vectorIterator.h
         weightedIterator.h
 
     PUBLIC_CLASSES

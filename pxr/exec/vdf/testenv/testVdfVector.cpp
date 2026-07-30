@@ -11,6 +11,7 @@
 #include "pxr/exec/vdf/mask.h"
 #include "pxr/exec/vdf/typedVector.h"
 #include "pxr/exec/vdf/vectorData.h"
+#include "pxr/exec/vdf/vectorIterator.h"
 
 #include "pxr/base/tf/errorMark.h"
 #include "pxr/base/tf/smallVector.h"
@@ -205,6 +206,12 @@ static bool TestSingleElement()
     TF_AXIOM(v.GetReadAccessor<string>()[0] != a);
     ASSERT_EQ(v.GetReadAccessor<string>()[0], b);
 
+    VdfVectorIterator it = v.GetIterator<string>();
+    TF_AXIOM(!it.IsAtEnd());
+    ASSERT_EQ(*it, b);
+    ++it;
+    TF_AXIOM(it.IsAtEnd());
+
     return true;
 }
 
@@ -245,6 +252,14 @@ static bool TestDenseVector()
     for(size_t i=0; i<access.GetNumValues(); i++) {
         ASSERT_EQ(access[i], vec[i]);
     }
+
+    // Test vector iteration
+    VdfVectorIterator it = v.GetIterator<string>();
+    for (size_t i=0; i<vec.size(); ++it, ++i) {
+        TF_AXIOM(!it.IsAtEnd());
+        ASSERT_EQ(*it, vec[i]);
+    }
+    TF_AXIOM(it.IsAtEnd());
 
     return true;
 }
@@ -287,6 +302,13 @@ static bool TestSparseVector()
             ASSERT_EQ(access[i], vec[i]);
         }
     }
+
+    // Test vector iteration
+    VdfVectorIterator it = v.GetIterator<string>();
+    TF_AXIOM(!it.IsAtEnd());
+    ASSERT_EQ(*it, vec[1]);
+    ++it;
+    TF_AXIOM(it.IsAtEnd());
 
     return true;
 }
@@ -338,6 +360,28 @@ static bool TestCompressedVector()
     ASSERT_EQ(array.size(), 2);
     ASSERT_EQ(array[0], "3");
     ASSERT_EQ(array[1], "4");
+
+    // Test vector iteration
+    {
+        VdfVectorIterator it = v.GetIterator<string>();
+        for (const char *s : {"1", "3", "4", "1499"}) {
+            TF_AXIOM(!it.IsAtEnd());
+            ASSERT_EQ(*it, s);
+            ++it;
+        }
+        TF_AXIOM(it.IsAtEnd());
+    }
+
+    // Test AdvanceTo
+    {
+        VdfVectorIterator it = v.GetIterator<string>();
+        TF_AXIOM(!it.AdvanceTo(2));
+        ASSERT_EQ(*it, "3");
+        TF_AXIOM(it.AdvanceTo(1499));
+        ASSERT_EQ(*it, "1499");
+        TF_AXIOM(!it.AdvanceTo(1500));
+        TF_AXIOM(it.IsAtEnd());
+    }
 
     return true;
 }

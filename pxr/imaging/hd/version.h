@@ -163,7 +163,8 @@
 //             HdRendererCreateArgs (or bool) in favor of overloads taking
 //             HdRendererCreateArgsSchema.
 //             Removing HdRenderSettingsTokens->renderCreateArgs.
-#define HD_API_VERSION 103
+// 103 -> 104: Added elementSize to HdPrimvarDescriptor.
+#define HD_API_VERSION 104
 
 // 1  ->  2: SimpleLighting -> FallbackLighting
 // 2  ->  3: Use GetLightCount() instead of NUM_LIGHTS to get light count.

@@ -86,7 +86,7 @@ public:
     void ApplyPendingUpdates();
 
     /// @}
-    
+
 private:
     USDIMAGING_API
     UsdImagingStageSceneIndex(HdContainerDataSourceHandle const &inputArgs);
@@ -171,7 +171,9 @@ private:
     std::map<SdfPath, TfTokenVector> _usdPropertiesToResync;
 
     using _PrimAdapterPair = std::pair<UsdPrim, UsdImagingPrimAdapterSharedPtr>;
-    _PrimAdapterPair _FindResponsibleAncestor(const UsdPrim &prim) const;
+    using _PrimAdapterPairVec = std::vector<_PrimAdapterPair>;
+    _PrimAdapterPairVec _FindResponsibleAncestors(const UsdPrim &prim) const;
+    bool _HasResponsibleAncestor(const UsdPrim &prim) const;
 
     std::unique_ptr<UsdImaging_AdapterManager> const _adapterManager;
 };

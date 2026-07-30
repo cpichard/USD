@@ -1311,6 +1311,25 @@ class TestUsdValueClips(unittest.TestCase):
 
         self.CheckTimeSamples(attr)
 
+    def test_MultipleClipsWithTimesSpanningClips3(self):
+        """Check behavior of multiple clips with a jump discontinuity
+        not on an active time boundary
+        """
+        stage = Usd.Stage.Open('multiclip/root.usda')
+
+        model = stage.GetPrimAtPath('/ModelWithTimesSpanningClips_3')
+        attr = model.GetAttribute('size')
+
+        self.CheckValue(attr, time=0, expected=105)
+        self.CheckValue(attr, time=5, expected=105)
+        self.CheckValue(attr, time=Usd.TimeCode.PreTime(10), expected=910)
+        self.CheckValue(attr, time=10, expected=910)
+        self.CheckValue(attr, time=Usd.TimeCode.PreTime(20), expected=920)
+        self.CheckValue(attr, time=20, expected=900)
+        self.CheckValue(attr, time=30, expected=910)
+
+        self.CheckTimeSamples(attr)
+
     def test_MultipleClipsWithNoTimes(self):
         """Test sequencing multiple clips together with no times metadata
         to remap times."""

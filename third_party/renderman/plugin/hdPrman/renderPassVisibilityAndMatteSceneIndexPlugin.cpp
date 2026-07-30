@@ -12,6 +12,17 @@
 
 #include "pxr/imaging/hd/version.h"
 
+// There was no hdsi/version.h before this HD_API_VERSION.
+#if HD_API_VERSION >= 58 
+#include "pxr/imaging/hdsi/version.h"
+
+#if HDSI_API_VERSION >= 21
+#define HDPRMAN_CONFIGURE_PREDICATE_LIBRARY
+#include "pxr/usdImaging/usdImaging/collectionPredicateLibrary.h"
+#endif
+
+#endif // HD_API_VERSION >= 58
+
 #include "pxr/imaging/hd/collectionExpressionEvaluator.h"
 #include "pxr/imaging/hd/collectionsSchema.h"
 #include "pxr/imaging/hd/instancedBySchema.h"
@@ -88,12 +99,37 @@ _IsGeometryType(const TfToken &primType)
             != extraGeomTypes.end();
 }
 
-// Returns true if the renderVisibility rules apply to this prim type.
+// Returns true if render pass visibility rules apply to this prim.
 bool
-_ShouldApplyPassVisibility(const TfToken &primType)
+_ShouldApplyPassVisibility(HdSceneIndexPrim const& prim)
 {
-    return _IsGeometryType(primType) || HdPrimTypeIsLight(primType) ||
-        primType == HdPrimTypeTokens->lightFilter;
+    // Apply pass visibility to point instancers, which are explicitly created
+    // in the scene by users, but not to other instancers created internally,
+    // e.g. by UsdImaging native instance aggregation.  The latter case is
+    // already handled elsewhere by evaluating the collection against each
+    // instanceLocation.  The general intuition is that user-defined
+    // collections are only ever applied against user-defined paths.
+    if (prim.primType == HdPrimTypeTokens->instancer) {
+        const HdInstancerTopologySchema topoSchema =
+            HdInstancerTopologySchema::GetFromParent(prim.dataSource);
+        if (!topoSchema) {
+            return false;
+        }
+        // If there are no instanceLocations, this is an explicit
+        // point instancer, and we apply visibility rules to the
+        // instancer as a whole.
+        const HdPathArrayDataSourceHandle instanceLocationsDs =
+            topoSchema.GetInstanceLocations();
+        if (!instanceLocationsDs) {
+            return true;
+        }
+        const VtArray<SdfPath> instanceLocations =
+            instanceLocationsDs->GetTypedValue(0.0f);
+        return instanceLocations.empty();
+    }
+
+    return _IsGeometryType(prim.primType) || HdPrimTypeIsLight(prim.primType) ||
+        prim.primType == HdPrimTypeTokens->lightFilter;
 }
 
 // Returns true if the matte rules apply to this prim type.
@@ -224,7 +260,7 @@ struct _RenderPassVisibilityAndMatteState {
         HdSceneIndexPrim const& prim) const
     {
         return renderVisEval
-            && _ShouldApplyPassVisibility(prim.primType)
+            && _ShouldApplyPassVisibility(prim)
             && !renderVisEval->Match(primPath)
             && _IsVisible(prim.dataSource);
     }
@@ -234,7 +270,7 @@ struct _RenderPassVisibilityAndMatteState {
         HdSceneIndexPrim const& prim) const
     {
         return cameraVisEval
-            && _ShouldApplyPassVisibility(prim.primType)
+            && _ShouldApplyPassVisibility(prim)
             && !cameraVisEval->Match(primPath)
             && _IsVisibleToCamera(prim.dataSource);
     }
@@ -354,21 +390,24 @@ struct _RenderPassVisibilityAndMatteState {
             return {};
         }
         TRACE_FUNCTION();
-        const VtArray<int> existingMask =
+        VtArray<int> cameraVisPerInstance =
             _GetInstancerCameraVisPrimvar(prim.dataSource);
-        VtArray<int> mask =
-            (!existingMask.empty() &&
-             existingMask.size() == instanceLocations.size())
-            ? existingMask
-            : VtArray<int>(instanceLocations.size(), 1);
-        bool modified = false;
+        if (cameraVisPerInstance.size() != instanceLocations.size()) {
+            // There was no prior opinion about per-instance camera visibility.
+            // Instances are camera-visible by default.
+            cameraVisPerInstance =
+                VtArray<int>(instanceLocations.size(), 1);
+        }
         for (size_t i = 0; i < instanceLocations.size(); ++i) {
-            if (!cameraVisEval->Match(instanceLocations[i]) && mask[i]) {
-                mask[i] = 0;
-                modified = true;
+            // If the instance was previously made invisible,
+            // leave it so; otherwise let the collection evaluator
+            // determine its visibility.
+            if (cameraVisPerInstance[i]) {
+                cameraVisPerInstance[i] =
+                   bool(cameraVisEval->Match(instanceLocations[i]));
             }
         }
-        return modified ? mask : existingMask;
+        return cameraVisPerInstance;
     }
 };
 
@@ -488,7 +527,7 @@ _RenderPassVisibilityAndMatteDataSource::Get(const TfToken &name)
                         HdPrimvarSchema::BuildInterpolationDataSource(
                             HdPrimvarSchemaTokens->constant))
                     .Build();
-            primvarEditor.Overlay(
+            primvarEditor.Set(
                 HdDataSourceLocator(_tokens->riAttributesVisibilityCamera),
                 invisDs);
         }
@@ -503,7 +542,7 @@ _RenderPassVisibilityAndMatteDataSource::Get(const TfToken &name)
         const VtArray<int> cameraVisPerInstance =
             renderPass.GetCameraVisPerInstance(_prim);
         if (!cameraVisPerInstance.empty()) {
-            primvarEditor.Overlay(
+            primvarEditor.Set(
                 HdDataSourceLocator(_tokens->riAttributesVisibilityCamera),
                 HdPrimvarSchema::Builder()
                     .SetPrimvarValue(
@@ -531,7 +570,7 @@ _RenderPassVisibilityAndMatteDataSource::Get(const TfToken &name)
                         BuildInterpolationDataSource(
                             HdPrimvarSchemaTokens->constant))
                     .Build();
-            primvarEditor.Overlay(
+            primvarEditor.Set(
                 HdDataSourceLocator(_tokens->riAttributesRiMatte),
                 matteDs);
         }
@@ -545,7 +584,7 @@ _RenderPassVisibilityAndMatteDataSource::Get(const TfToken &name)
         const VtArray<int> mattePerInstance =
             renderPass.GetMattePerInstance(_prim);
         if (!mattePerInstance.empty()) {
-            primvarEditor.Overlay(
+            primvarEditor.Set(
                 HdDataSourceLocator(_tokens->riAttributesRiMatte),
                 HdPrimvarSchema::Builder()
                     .SetPrimvarValue(
@@ -776,19 +815,44 @@ _RenderPassVisibilityAndMatteSceneIndex::_UpdateActiveRenderPassState(
             inputSceneIndex->GetPrim(state.renderPassPath);
         if (HdCollectionsSchema collections =
             HdCollectionsSchema::GetFromParent(passPrim.dataSource)) {
+
+            // Only support USD predicates when evaluating expressions on
+            // render pass collections. Assumption here is that render pass
+            // scene index prims are backed by UsdRenderPass prims, which use
+            // UsdCollectionAPI and are thus limited to the set of USD
+            // predicate expressions.
+            //
+
             // Prepare evaluators for render pass collections.
-            HdsiUtilsCompileCollection(collections, _tokens->matte,
-                                       inputSceneIndex,
-                                       &state.matteExpr,
-                                       &state.matteEval);
-            HdsiUtilsCompileCollection(collections, _tokens->renderVisibility,
-                                       inputSceneIndex,
-                                       &state.renderVisExpr,
-                                       &state.renderVisEval);
-            HdsiUtilsCompileCollection(collections, _tokens->cameraVisibility,
-                                       inputSceneIndex,
-                                       &state.cameraVisExpr,
-                                       &state.cameraVisEval);
+            HdsiUtilsCompileCollection(
+                collections,
+                _tokens->matte,
+                inputSceneIndex,
+#ifdef HDPRMAN_CONFIGURE_PREDICATE_LIBRARY
+                UsdImagingGetCollectionPredicateLibrary(),
+#endif
+                &state.matteExpr,
+                &state.matteEval);
+
+            HdsiUtilsCompileCollection(
+                collections,
+                _tokens->renderVisibility,
+                inputSceneIndex,
+#ifdef HDPRMAN_CONFIGURE_PREDICATE_LIBRARY
+                UsdImagingGetCollectionPredicateLibrary(),
+#endif
+                &state.renderVisExpr,
+                &state.renderVisEval);
+
+            HdsiUtilsCompileCollection(
+                collections,
+                _tokens->cameraVisibility,
+                inputSceneIndex,
+#ifdef HDPRMAN_CONFIGURE_PREDICATE_LIBRARY
+                UsdImagingGetCollectionPredicateLibrary(),
+#endif
+                &state.cameraVisExpr,
+                &state.cameraVisEval);
         }
     }
 #endif

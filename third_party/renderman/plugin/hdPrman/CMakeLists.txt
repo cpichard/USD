@@ -36,15 +36,24 @@ elseif(APPLE)
     set( CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} -undefined dynamic_lookup -headerpad_max_install_names" )
 endif()
 
+if(PXR_VERSION AND PXR_VERSION LESS 2508)
+    list(APPEND optionalLibs ndr)
+endif()
+
 set(optionalIncludeDirs "")
 set(optionalPublicClasses "")
 if (${PXR_ENABLE_MATERIALX_SUPPORT})
     list(APPEND optionalLibs
         MaterialXCore
         MaterialXFormat
-        MaterialXGenShader
+        MaterialXGenGlsl
         MaterialXGenOsl
+        MaterialXGenShader
         MaterialXRender
+        MaterialXRenderGlsl
+        MaterialXRenderHw
+        MaterialXRenderOsl
+        usdMtlx
         hdMtlx
     )
     list(APPEND optionalPublicClasses 
@@ -68,23 +77,62 @@ if (${PXR_ENABLE_OPENVDB_SUPPORT})
     list(APPEND optionalLibs hioOpenVDB)
 endif()
 
+# Riley Schemas require hd/containerSchema.h (USD > 23.11)
+# Remove this guard once USD <= 23.11 is no longer supported
+if(PXR_VERSION AND PXR_VERSION GREATER 2311)
+    list(APPEND optionalPublicClasses
+        rileyCameraSchema
+        rileyClippingPlaneSchema
+        rileyCoordinateSystemSchema
+        rileyDisplacementSchema
+        rileyDisplayFilterSchema
+        rileyDisplaySchema
+        rileyEnergyFilterSchema
+        rileyGeometryInstanceSchema
+        rileyGeometryPrototypeSchema
+        rileyGlobalsSchema
+        rileyIntegratorSchema
+        rileyLightInstanceSchema
+        rileyLightShaderSchema
+        rileyMaterialSchema
+        rileyParamSchema
+        rileyParamListSchema
+        rileyPrimvarSchema
+        rileyPrimvarListSchema
+        rileyRenderOutputSchema
+        rileyRenderTargetSchema
+        rileyRenderViewSchema
+        rileySampleFilterSchema
+        rileyShadingNodeSchema
+    )
+endif()
+
 pxr_plugin(${PXR_PACKAGE}
     LIBRARIES
         ar
         arch
+        cameraUtil
         js
         plug
+        pxOsd
+        sdf
+        sdr
         tf
+        trace
         vt
         gf
         hd
         hdGp
         hdsi
+        hf
         hio
         TBB::tbb
         usdRi
+        usdImaging
+        usdLux
         usdVol
         usdVolImaging
+        work
         ${optionalLibs}
 
     INCLUDE_DIRS
@@ -123,29 +171,7 @@ pxr_plugin(${PXR_PACKAGE}
         renderDelegate
         renderSettings
         renderTerminalOutputInvalidatingSceneIndexPlugin
-        rileyCameraSchema
-        rileyClippingPlaneSchema
-        rileyCoordinateSystemSchema
-        rileyDisplacementSchema
-        rileyDisplayFilterSchema
-        rileyEnergyFilterSchema
-        rileyDisplaySchema
-        rileyGeometryInstanceSchema
-        rileyGeometryPrototypeSchema
-        rileyGlobalsSchema
-        rileyIntegratorSchema
-        rileyLightInstanceSchema
-        rileyLightShaderSchema
-        rileyMaterialSchema
-        rileyParamSchema
-        rileyParamListSchema
-        rileyPrimvarSchema
-        rileyPrimvarListSchema
-        rileyRenderOutputSchema
-        rileyRenderTargetSchema
-        rileyRenderViewSchema
-        rileySampleFilterSchema
-        rileyShadingNodeSchema
+        renderTerminalTimeSamplingSceneIndexPlugin
         renderingColorSpaceSceneIndexPlugin
         rixStrings
         sampleFilter
@@ -177,6 +203,7 @@ pxr_plugin(${PXR_PACKAGE}
         renderSettingsFilteringSceneIndexPlugin
         renderViewContext
         resourceRegistry
+        retesselationSceneIndexPlugin
         rileyCameraPrim
         rileyConversionSceneIndex
         rileyCoordinateSystemPrim
@@ -217,8 +244,6 @@ pxr_plugin(${PXR_PACKAGE}
 
     PRIVATE_HEADERS
         prmanArchDefs.h
-        pxr/base/vt/typeHeaders.h # polyfill until USD 22.08
-        pxr/base/vt/visitValue.h  # polyfill until USD 22.11
         rileyIds.h
         virtualStructConditionalGrammar.tab.h
 

@@ -66,6 +66,8 @@ private:
 
     std::chrono::steady_clock::time_point _frameStart;
     float _quickIntegrateTime;
+
+    std::vector<TfToken> _lastLegacyProductNames;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

@@ -306,8 +306,8 @@ TestAttributeQuery(Fixture &fixture)
 
     TF_AXIOM(esfQuery->GetPath() == SdfPath("/Prim1.attr1"));
     TF_AXIOM(esfQuery->GetSpline().has_value() == usdQuery.HasSpline());
-    TF_AXIOM(esfQuery->ValueMightBeTimeVarying() ==
-        usdQuery.ValueMightBeTimeVarying());
+    TF_AXIOM(esfQuery->ValueSourceMightBeTimeVarying() ==
+        usdQuery.ValueSourceMightBeTimeVarying());
     TF_AXIOM(!esfQuery->IsTimeVarying(
         UsdTimeCode::Default(), UsdTimeCode(0.0)));
 }
@@ -333,8 +333,8 @@ TestSplineAttributeQuery(Fixture &fixture)
 
     TF_AXIOM(esfQuery->GetPath() == SdfPath("/Prim1.attr3"));
     TF_AXIOM(esfQuery->GetSpline().has_value() == usdQuery.HasSpline());
-    TF_AXIOM(esfQuery->ValueMightBeTimeVarying() ==
-        usdQuery.ValueMightBeTimeVarying());
+    TF_AXIOM(esfQuery->ValueSourceMightBeTimeVarying() ==
+        usdQuery.ValueSourceMightBeTimeVarying());
     TF_AXIOM(esfQuery->IsTimeVarying(UsdTimeCode(1.0), UsdTimeCode(2.0)));
     TF_AXIOM(!esfQuery->IsTimeVarying(UsdTimeCode(2.0), UsdTimeCode(3.0)));
 }

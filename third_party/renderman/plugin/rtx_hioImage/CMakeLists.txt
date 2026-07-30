@@ -5,7 +5,9 @@ pxr_plugin(${PXR_PACKAGE}
 
     LIBRARIES
         tf
-        glf
+        gf
+        trace
+        hio
         ${PXRCORE_LIBRARY}
         ${PRMAN_LIBRARY}
 

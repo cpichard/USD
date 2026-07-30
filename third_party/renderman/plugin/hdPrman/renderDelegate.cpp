@@ -204,6 +204,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (ri)
     ((outputsRi, "outputs:ri"))
     ((mtlxRenderContext, "mtlx"))
+    ((hvisualizeRenderContext, "hvisualize"))
     (renderCameraPath)
     (DefaultMayaLight)
     (__FnKat_bbox)
@@ -802,11 +803,18 @@ HdPrmanRenderDelegate::GetMaterialBindingPurpose() const
 TfTokenVector
 HdPrmanRenderDelegate::GetMaterialRenderContexts() const
 {
+    TfTokenVector contexts;
+
+    // Houdini's visualize VOP from H22.0
+    contexts.push_back(_tokens->hvisualizeRenderContext);
+
+    contexts.push_back(_tokens->ri);
+
 #ifdef PXR_MATERIALX_SUPPORT_ENABLED
-    return {_tokens->ri, _tokens->mtlxRenderContext};
-#else
-    return {_tokens->ri};
+    contexts.push_back(_tokens->mtlxRenderContext);
 #endif
+
+    return contexts;
 }
 
 TfTokenVector

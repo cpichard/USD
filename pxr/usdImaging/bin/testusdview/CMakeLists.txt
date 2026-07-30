@@ -682,6 +682,32 @@ pxr_register_test(testUsdviewMaterialEdits
     EXPECTED_RETURN_CODE 0
 )
 
+pxr_register_test(testUsdviewModelAPIEdits
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewModelAPIEdits.py sphere.usda"
+    TESTENV testenv/testUsdviewModelAPIEdits
+    IMAGE_DIFF_COMPARE
+        start.png
+        bounds.png
+        cards.png
+        api-removed.png
+    FAIL 0.05
+    FAIL_PERCENT 0.03
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testUsdviewReferencedNodegraphEdits
+    PYTHON
+    COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewReferencedNodegraphEdits.py referenced-nodegraph.usda"
+    TESTENV testenv/testUsdviewReferencedNodegraphEdits
+    IMAGE_DIFF_COMPARE
+        before.png
+        after.png
+    FAIL 0.05
+    FAIL_PERCENT 0.03
+    EXPECTED_RETURN_CODE 0
+)
+
 pxr_register_test(testUsdviewUpAxis_zUp
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/bin/testusdview --testScript testUsdviewUpAxis_zUp.py testZUp.usda"

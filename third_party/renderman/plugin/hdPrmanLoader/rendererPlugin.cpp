@@ -290,6 +290,11 @@ HdPrmanLoaderRendererPlugin::GetSceneIndexInputArgs() const
 
 #endif // HD_API_VERSION >= 90
 
+TfToken HdPrmanLoaderRendererPlugin::_GetRenderVariant()
+{
+    return TfToken();
+}
+
 int HdPrmanLoaderRendererPlugin::_GetCpuConfig(
     HdRenderSettingsMap const& settingsMap)
 {
@@ -385,6 +390,7 @@ _IsSupported(std::string * const reasonWhyNot = nullptr)
 {
     // TODO: Should we disable XPU gpus with gpuEnabled off?
     if (!_hdPrman.valid) {
+#if PXR_VERSION >= 2505
         TF_DEBUG(HD_RENDERER_PLUGIN).Msg(
             "hdPrman renderer plugin unsupported: %s\n",
             _hdPrman.errorMsg.c_str());
@@ -392,6 +398,7 @@ _IsSupported(std::string * const reasonWhyNot = nullptr)
             *reasonWhyNot = "hdPrman renderer plugin unsupported: " +
                 _hdPrman.errorMsg;
         }
+#endif
     }
 
     return _hdPrman.valid;
@@ -405,8 +412,8 @@ HdPrmanLoaderRendererPlugin::IsSupported(
 #elif HD_API_VERSION >= 83
     HdRendererCreateArgs const &rendererCreateArgs,
     std::string * reasonWhyNot
-#elif PXR_VERSION < 2305
-    bool gpuEnabled = true
+#elif PXR_VERSION >= 2305
+    bool gpuEnabled
 #endif
     ) const
 {

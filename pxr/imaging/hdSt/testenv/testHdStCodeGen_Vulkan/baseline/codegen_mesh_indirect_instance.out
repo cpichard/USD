@@ -157,13 +157,13 @@ FORWARD_DECL(float GetSelectedEdgeOpacity());
 // //////// Global Structs ////////
 
 // //////// Global Member Declarations ////////
-layout(std430, binding = 6) readonly buffer ssbo_instanceIndices { int instanceIndices[]; };
-layout(std430, binding = 7) buffer ssbo_culledInstanceIndices { int culledInstanceIndices[]; };
 layout(std430, binding = 0) readonly buffer ssbo_constantPrimvars { ConstantData7 constantPrimvars[]; };
 layout(std430, binding = 1) readonly buffer ssbo_hydra_instanceTranslations_0 { hd_vec3 hydra_instanceTranslations_0[]; };
 layout(std430, binding = 2) readonly buffer ssbo_primitiveParam { int primitiveParam[]; };
 layout(std430, binding = 3) readonly buffer ssbo_edgeIndices { int edgeIndices[]; };
 layout(std430, binding = 4) readonly buffer ssbo_faceVisibility { float faceVisibility[]; };
+layout(std430, binding = 6) readonly buffer ssbo_instanceIndices { int instanceIndices[]; };
+layout(std430, binding = 7) buffer ssbo_culledInstanceIndices { int culledInstanceIndices[]; };
 layout(location = 2) in ivec4 drawingCoord0;
 layout(location = 3) in ivec4 drawingCoord1;
 layout(location = 4) in ivec2 drawingCoord2;
@@ -1161,8 +1161,6 @@ layout (triangle_strip, max_vertices = 3) out;
 // //////// Global Structs ////////
 
 // //////// Global Member Declarations ////////
-layout(std430, binding = 6) readonly buffer ssbo_instanceIndices { int instanceIndices[]; };
-layout(std430, binding = 7) buffer ssbo_culledInstanceIndices { int culledInstanceIndices[]; };
 layout(std430, binding = 0) readonly buffer ssbo_constantPrimvars { ConstantData7 constantPrimvars[]; };
 layout(std430, binding = 1) readonly buffer ssbo_hydra_instanceTranslations_0 { hd_vec3 hydra_instanceTranslations_0[]; };
 layout(std430, binding = 2) readonly buffer ssbo_primitiveParam { int primitiveParam[]; };
@@ -2003,8 +2001,6 @@ vec4 InterpolatePatchCoordTriangle(vec2 uv, ivec3 patchParam)
 // //////// Global Structs ////////
 
 // //////// Global Member Declarations ////////
-layout(std430, binding = 6) readonly buffer ssbo_instanceIndices { int instanceIndices[]; };
-layout(std430, binding = 7) buffer ssbo_culledInstanceIndices { int culledInstanceIndices[]; };
 layout(std430, binding = 0) readonly buffer ssbo_constantPrimvars { ConstantData7 constantPrimvars[]; };
 layout(std430, binding = 1) readonly buffer ssbo_hydra_instanceTranslations_0 { hd_vec3 hydra_instanceTranslations_0[]; };
 layout(std430, binding = 2) readonly buffer ssbo_primitiveParam { int primitiveParam[]; };
@@ -3256,13 +3252,13 @@ FORWARD_DECL(float GetSelectedEdgeOpacity());
 // //////// Global Structs ////////
 
 // //////// Global Member Declarations ////////
-layout(std430, binding = 6) readonly buffer ssbo_instanceIndices { int instanceIndices[]; };
-layout(std430, binding = 7) buffer ssbo_culledInstanceIndices { int culledInstanceIndices[]; };
 layout(std430, binding = 0) readonly buffer ssbo_constantPrimvars { ConstantData7 constantPrimvars[]; };
 layout(std430, binding = 1) readonly buffer ssbo_hydra_instanceTranslations_0 { hd_vec3 hydra_instanceTranslations_0[]; };
 layout(std430, binding = 2) readonly buffer ssbo_primitiveParam { int primitiveParam[]; };
 layout(std430, binding = 3) readonly buffer ssbo_edgeIndices { ivec2 edgeIndices[]; };
 layout(std430, binding = 4) readonly buffer ssbo_faceVisibility { float faceVisibility[]; };
+layout(std430, binding = 6) readonly buffer ssbo_instanceIndices { int instanceIndices[]; };
+layout(std430, binding = 7) buffer ssbo_culledInstanceIndices { int culledInstanceIndices[]; };
 layout(location = 2) in ivec4 drawingCoord0;
 layout(location = 3) in ivec4 drawingCoord1;
 layout(location = 4) in ivec2 drawingCoord2;
@@ -4260,8 +4256,6 @@ layout (triangle_strip, max_vertices = 6) out;
 // //////// Global Structs ////////
 
 // //////// Global Member Declarations ////////
-layout(std430, binding = 6) readonly buffer ssbo_instanceIndices { int instanceIndices[]; };
-layout(std430, binding = 7) buffer ssbo_culledInstanceIndices { int culledInstanceIndices[]; };
 layout(std430, binding = 0) readonly buffer ssbo_constantPrimvars { ConstantData7 constantPrimvars[]; };
 layout(std430, binding = 1) readonly buffer ssbo_hydra_instanceTranslations_0 { hd_vec3 hydra_instanceTranslations_0[]; };
 layout(std430, binding = 2) readonly buffer ssbo_primitiveParam { int primitiveParam[]; };
@@ -5131,8 +5125,6 @@ vec4 InterpolatePatchCoordTriangle(vec2 uv, ivec3 patchParam)
 // //////// Global Structs ////////
 
 // //////// Global Member Declarations ////////
-layout(std430, binding = 6) readonly buffer ssbo_instanceIndices { int instanceIndices[]; };
-layout(std430, binding = 7) buffer ssbo_culledInstanceIndices { int culledInstanceIndices[]; };
 layout(std430, binding = 0) readonly buffer ssbo_constantPrimvars { ConstantData7 constantPrimvars[]; };
 layout(std430, binding = 1) readonly buffer ssbo_hydra_instanceTranslations_0 { hd_vec3 hydra_instanceTranslations_0[]; };
 layout(std430, binding = 2) readonly buffer ssbo_primitiveParam { int primitiveParam[]; };

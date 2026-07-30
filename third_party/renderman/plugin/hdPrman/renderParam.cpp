@@ -604,7 +604,7 @@ _IsPrototypeAttribute(TfToken const& primvarName)
 template <typename T>
 static void
 _Convert(HdSceneDelegate *sceneDelegate, SdfPath const& id,
-         HdInterpolation hdInterp, T& params, int expectedSize,
+         HdInterpolation hdInterp, T& params, int elementCount,
          const GfVec2d &shutterInterval,
          float time = 0.f)
 {
@@ -613,10 +613,7 @@ _Convert(HdSceneDelegate *sceneDelegate, SdfPath const& id,
         std::is_same<RtPrimVarList, T>>::value,
         "params must be RtParamList or RtPrimVarList");
 
-    // XXX:TODO: To support array-valued types, we need more
-    // shaping information.  Currently we assume arrays are
-    // simply N scalar values, according to the detail.
-
+    // Label used in diagnostic messages.
     std::string label;
     if constexpr (std::is_same<RtPrimVarList, T>()) {
         label = "primvar";
@@ -624,6 +621,7 @@ _Convert(HdSceneDelegate *sceneDelegate, SdfPath const& id,
         label = "attribute";
     }
 
+    // Convert HdInterpolation to RtDetailType.
     const RtDetailType detail = _RixDetailForHdInterpolation(hdInterp);
 
     TF_DEBUG(HDPRMAN_PRIMVARS)
@@ -656,6 +654,15 @@ _Convert(HdSceneDelegate *sceneDelegate, SdfPath const& id,
                     continue;
                 }
 
+                // elementSize specifies the number of values per element.
+                const size_t expectedArraySize =
+#if HD_API_VERSION >= 104
+                    elementCount * compPrimvar.elementSize;
+#else
+                    elementCount * 1 /* no elementSize available */;
+#endif
+
+
                 RtUString name = _GetPrmanPrimvarName(compPrimvar.name, detail);
 
                 TF_DEBUG(HDPRMAN_PRIMVARS)
@@ -668,11 +675,20 @@ _Convert(HdSceneDelegate *sceneDelegate, SdfPath const& id,
                          TfStringify(val).c_str());
 
                 if (val.IsArrayValued() &&
-                    val.GetArraySize() != static_cast<size_t>(expectedSize)) {
+                    val.GetArraySize() != expectedArraySize) {
+#if HD_API_VERSION >= 104
+                    const int elementSize = compPrimvar.elementSize;
+#else
+                    const int elementSize = 1;
+#endif
                     TF_WARN("<%s> primvar '%s' size (%zu) did not match "
-                            "expected (%d)", id.GetText(),
-                            compPrimvar.name.GetText(), val.GetArraySize(),
-                            expectedSize);
+                            "expected size "
+                            "(%d elements, %d values per element)",
+                            id.GetText(),
+                            compPrimvar.name.GetText(),
+                            val.GetArraySize(),
+                            elementCount,
+                            elementSize);
                     continue;
                 }
 
@@ -702,6 +718,14 @@ _Convert(HdSceneDelegate *sceneDelegate, SdfPath const& id,
         if (primvar.name == HdTokens->points) {
             continue;
         }
+
+        // elementSize specifies the number of values per element.
+        const size_t expectedArraySize =
+#if HD_API_VERSION >= 104
+            elementCount * primvar.elementSize;
+#else
+            elementCount * 1 /* no elementSize available */;
+#endif
 
         // Constant Hydra primvars become either Riley primvars or attributes,
         // depending on prefix and the name.
@@ -859,10 +883,13 @@ _Convert(HdSceneDelegate *sceneDelegate, SdfPath const& id,
         // matches the expected topology size.
         if (hdInterp != HdInterpolationConstant &&
             val.IsArrayValued() &&
-            val.GetArraySize() != static_cast<size_t>(expectedSize)) {
-            TF_WARN("<%s> %s '%s' size (%zu) did not match "
-                    "expected (%d)", id.GetText(), label.c_str(),
-                    primvar.name.GetText(), val.GetArraySize(), expectedSize);
+            val.GetArraySize() != expectedArraySize) {
+            TF_WARN("<%s> %s '%s' array size (%zu) did not match "
+                    "expected size (%d elements, %d values per element)",
+                    id.GetText(), label.c_str(), primvar.name.GetText(),
+                    val.GetArraySize(),
+                    elementCount,
+                    primvar.elementSize);
             continue;
         }
         if constexpr(std::is_same<RtPrimVarList, T>()) {
@@ -897,9 +924,8 @@ HdPrman_ConvertPrimvars(HdSceneDelegate *sceneDelegate, SdfPath const& id,
         HdInterpolationVarying,
         HdInterpolationFaceVarying,
     };
-    // The expected size of each interpolation mode. -1 means any size is
-    // acceptable.
-    const int primvarSizes[] = {
+    // The expected element count for each interpolation mode.
+    const int elementCount[] = {
         1,
         numUniform,
         numVertex,
@@ -909,9 +935,7 @@ HdPrman_ConvertPrimvars(HdSceneDelegate *sceneDelegate, SdfPath const& id,
     const int modeCount = 5;
     for (size_t i = 0; i < modeCount; ++i) {
         _Convert(sceneDelegate, id, hdInterpValues[i], primvars,
-                 primvarSizes[i],
-                 shutterInterval,
-                 time);
+                 elementCount[i], shutterInterval, time);
     }
 }
 
@@ -966,7 +990,8 @@ HdPrman_RenderParam::ConvertAttributes(HdSceneDelegate *sceneDelegate,
         HdInterpolationConstant,
     };
     for (HdInterpolation hdInterp: hdInterpValues) {
-        _Convert(sceneDelegate, id, hdInterp, attrs, 1, GetShutterInterval());
+        _Convert(sceneDelegate, id, hdInterp, attrs,
+                 /* elementCount = */ 1, GetShutterInterval());
     }
 
     // Hydra id -> Riley Rix::k_identifier_name, if it has not already
@@ -1048,10 +1073,14 @@ HdPrman_RenderParam::ConvertAttributes(HdSceneDelegate *sceneDelegate,
         // Integer primvars do not exist in prman, which is why we do this on
         // the attributes instead. Furthermore, all custom attributes like this
         // must be in the "user:" namespace to be accessible from the shader.
-        attrs.SetInteger(
-            RtUString("user:hydra:doubleSided"),
-            sceneDelegate->GetDoubleSided(id) ? 1 : 0
-        );
+        //
+        // Only set this when it varies from the default, in order to minimize
+        // attribute cost.  See UsdPreviewSurfaceParameters.osl for
+        // more details on its use.
+        if (sceneDelegate->GetDoubleSided(id)) {
+            attrs.SetInteger(
+                RtUString("user:hydra:doubleSided"), 1);
+        }
     }
 
     return attrs;

@@ -175,7 +175,6 @@ pxr_library(hdSt
         pipelineDrawBatch
         pointsShaderKey
         quadrangulate
-        renderPassPruneSceneIndexPlugin
         renderPassVisibilitySceneIndexPlugin
         renderPassShaderKey
         resourceBinder

@@ -1974,6 +1974,7 @@ HdPrmanInstancer::_ResizeProtoMap(
     const size_t newSize)
 {
     HD_TRACE_FUNCTION();
+    HF_MALLOC_TAG_FUNCTION();
     _ProtoInstMap& protoInstMap = _protoMap.get(prototypePrimPath).map;
     for (riley::GeometryPrototypeId protoId : rileyPrototypeIds) {
         _InstanceIdVec& instIdVec = protoInstMap[protoId];
