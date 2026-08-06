@@ -105,7 +105,11 @@ public:
     {
         std::string s;
         for (const auto& part : parts) {
-            s += part.content;
+            if (part.isVariable) {
+                s += "${" + part.content + "}";
+            } else {
+                s += part.content;
+            }
         }
 
         return ASTNodes::_NodeCreator::MakeNode<ASTNodes::LiteralNode>(

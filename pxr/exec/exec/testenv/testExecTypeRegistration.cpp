@@ -15,9 +15,13 @@
 #include "pxr/base/gf/vec3d.h"
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/errorMark.h"
+#include "pxr/base/tf/refBase.h"
+#include "pxr/base/tf/refPtr.h"
 #include "pxr/base/tf/stringUtils.h"
 #include "pxr/base/tf/type.h"
 #include "pxr/base/vt/types.h"
+
+#include <memory>
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
@@ -62,6 +66,17 @@ TestBasicRegistration()
 
     reg.RegisterType(TestExecTypeRegistrationValue{});
     reg.CheckForRegistration<TestExecTypeRegistrationValue>();
+
+    // Test registration of allowed pointer types.
+
+    struct RefPointable : TfRefBase {};
+    using ConstRefPtr = TfRefPtr<const RefPointable>;
+
+    struct S {};
+    using ConstSharedPtr = std::shared_ptr<const S>;
+
+    reg.RegisterType(ConstRefPtr{});
+    reg.RegisterType(ConstSharedPtr{});
 }
 
 // This tests conversion of VtValue to VdfVector with a variety of types.

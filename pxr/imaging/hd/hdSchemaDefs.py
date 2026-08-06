@@ -1694,5 +1694,17 @@
         ],
     ),
 
+    #--------------------------------------------------------------------------
+    # particleField
+    dict(
+        SCHEMA_NAME = 'ParticleField',
+        SCHEMA_TOKEN = 'particleField',
+        DOC = '''Schema for representing configuration information about
+                 particleField prims.''',
+        ADD_DEFAULT_LOCATOR = True,
+        MEMBERS = [
+            ('kernelType', T_TOKEN, {}),
+        ],
+    ),
     
 ]

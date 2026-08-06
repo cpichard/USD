@@ -464,6 +464,15 @@ struct _VtValueToRtParamList
         }
         return (*this)(us);
     }
+    bool operator()(const VtArray<SdfPath> &v) {
+        // Convert to RtUString.
+        std::vector<RtUString> us;
+        us.reserve(v.size());
+        for (SdfPath const& path: v) {
+            us.push_back(RtUString(path.GetText()));
+        }
+        return (*this)(us);
+    }
 
     bool operator()(const VtValue &val) {
         // Dispatch for types that are not part of VT_VALUE_TYPES
@@ -472,6 +481,10 @@ struct _VtValueToRtParamList
             return (*this)(val.UncheckedGet<SdfAssetPath>());
         } else if (val.IsHolding<VtArray<SdfAssetPath>>()) {
             return (*this)(val.UncheckedGet<VtArray<SdfAssetPath>>());
+        } else if (val.IsHolding<SdfPath>()) {
+            return (*this)(val.UncheckedGet<SdfPath>());
+        } else if (val.IsHolding<VtArray<SdfPath>>()) {
+            return (*this)(val.UncheckedGet<VtArray<SdfPath>>());
         } else if (val.IsHolding<std::vector<RtUString>>()) {
             return (*this)(val.UncheckedGet<std::vector<RtUString>>());
         } else {

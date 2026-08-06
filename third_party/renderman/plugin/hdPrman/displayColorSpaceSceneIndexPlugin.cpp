@@ -47,12 +47,18 @@ TF_DEFINE_PRIVATE_TOKENS(
     // Color Transform Display Filter Tokens
     (PxrColorTransformDisplayFilter)
     ((colorTransformFilterName, "__ColorTransform_DisplayFilter_"))
+
     // List of AOVs to be excluded by the display filter. 
     // Non-color AOVS (ex: normals, depth, etc.) should not be transformed.
     ((excludeAOVs, "ri:excludeAOVs"))
     ((colorTransform, "ri:transform"))
+
     // Display Filter Dependency
     (displayFilter_depOn_renderingColorSpace)
+
+    // Namespaced setting on HdRenderVar used to exclude an AOV here.
+    ((hdPrmanExcludeFromDisplayColorTransform,
+      "hdPrman:excludeFromDisplayColorTransform"))
 );
 
 TF_MAKE_STATIC_DATA(
@@ -71,14 +77,31 @@ TF_MAKE_STATIC_DATA(
     _disableTransformCallbacks->clear();
 }
 
-// Helper function to determine if a dataType represents a color (as opposed to 
-// vector/point/normal/float/int data). Used in _BuildExcludeAOVsList()
+// Helper function to determine if a HdRenderVar should be excluded
+// from PxrColorDisplayTransform.
 static bool
-_IsColorType(const TfToken& dataType)
+_ShouldExcludeVar(const HdRenderVarSchema &varSchema)
 {
     // Check if dataType contains "color".
-    const std::string& typeStr = dataType.GetString();
-    return (typeStr.find("color") != std::string::npos);
+    if (const HdTokenDataSourceHandle dataTypeDs = varSchema.GetDataType()) {
+        const TfToken dataType = dataTypeDs->GetTypedValue(0.0f);
+        const std::string& typeStr = dataType.GetString();
+        if (typeStr.find("color") == std::string::npos) {
+            // Not a color, so exclude.
+            return true;
+        }
+    }
+    // Check if hdPrmanExcludeFromDisplayColorTransform is set.
+    if (auto nsDS = varSchema.GetNamespacedSettings()) {
+        if (auto excludeDS = HdBoolDataSource::Cast(
+            nsDS->Get(_tokens->hdPrmanExcludeFromDisplayColorTransform))) {
+            if (excludeDS->GetTypedValue(0.0f)) {
+                // Explicitly excluded.
+                return true;
+            }
+        }
+    }
+    return false;
 }
 
 // Build a list of AOV names to exclude from color transformation based on the
@@ -93,63 +116,58 @@ _BuildExcludeAOVsList(const HdContainerDataSourceHandle& rsPrimDS)
         return {};
     }
 
-    VtStringArray excludeAOVs;
+    // Use a set to collect and sort AOV names to exclude.
+    std::set<std::string> excludeAOVs;
     
     const HdRenderSettingsSchema rsSchema(renderSettingsDS);
-    const HdRenderProductVectorSchema productsSchema = rsSchema.GetRenderProducts();
-
-    // Use a set to collect unique source names.
-    std::set<std::string> uniqueAOVs;
-
+    const HdRenderProductVectorSchema productsSchema =
+        rsSchema.GetRenderProducts();
     const size_t numProducts = productsSchema.GetNumElements();
-    for (size_t i = 0; i < numProducts; ++i) {
-        const HdRenderProductSchema productSchema = productsSchema.GetElement(i);
-        const HdRenderVarVectorSchema varsSchema = productSchema.GetRenderVars();
 
+    for (size_t i = 0; i < numProducts; ++i) {
+        const HdRenderProductSchema productSchema =
+            productsSchema.GetElement(i);
+        const HdRenderVarVectorSchema varsSchema =
+            productSchema.GetRenderVars();
         const size_t numVars = varsSchema.GetNumElements();
+
         for (size_t j = 0; j < numVars; ++j) {
             const HdRenderVarSchema varSchema = varsSchema.GetElement(j);
+            if (_ShouldExcludeVar(varSchema)) {
+                // Use the leaf name of the render var path as the AOV name,
+                // matching how HdPrman creates AOVs.
+                const HdPathDataSourceHandle pathDs = varSchema.GetPath();
+                if (!pathDs) {
+                    continue;
+                }
+                const SdfPath varPath = pathDs->GetTypedValue(0.0f);
+                excludeAOVs.insert(varPath.GetName());
 
-            // Check dataType and exclude if NOT a color.
-            const HdPathDataSourceHandle pathDs = varSchema.GetPath();
-            const HdTokenDataSourceHandle dataTypeDs = varSchema.GetDataType();
-
-            if (pathDs && dataTypeDs) {
-                const TfToken dataType = dataTypeDs->GetTypedValue(0.0f);
-                if (!_IsColorType(dataType)) {
-                    // Use the leaf name of the render var path as the AOV name,
-                    // matching how HdPrman creates AOVs.
-                    const SdfPath varPath = pathDs->GetTypedValue(0.0f);
-                    uniqueAOVs.insert(varPath.GetName());
-
-                    // Also exclude the sourceName of the AOV, since it
-                    // make be created as an additional Display and
-                    // we need to ensure that PxrColorDisplayTransform
-                    // does not modify it.
-                    //
-                    // See testHdPrman_ColorSpaceExcludeAOVs for a test
-                    // where Ci, a, and "pos" (source: __Pworld) results in
-                    // 6 displays seen by PxrColorTransformDisplayFilter:
-                    //
-                    //   0: "Ci"
-                    //   1: "a"
-                    //   2: "Ci"
-                    //   3: "a"
-                    //   4: "pos"
-                    //   5: "__Pworld"
-                    //
-                    if (auto sourceNameDs = varSchema.GetSourceName()) {
-                        uniqueAOVs.insert(
-                            sourceNameDs->GetTypedValue(0.0f) );
-                    }
+                // Also exclude the sourceName of the AOV, since it
+                // make be created as an additional Display and
+                // we need to ensure that PxrColorDisplayTransform
+                // does not modify it.
+                //
+                // See testHdPrman_ColorSpaceExcludeAOVs for a test
+                // where Ci, a, and "pos" (source: __Pworld) results in
+                // 6 displays seen by PxrColorTransformDisplayFilter:
+                //
+                //   0: "Ci"
+                //   1: "a"
+                //   2: "Ci"
+                //   3: "a"
+                //   4: "pos"
+                //   5: "__Pworld"
+                //
+                if (auto sourceNameDs = varSchema.GetSourceName()) {
+                    excludeAOVs.insert(
+                        sourceNameDs->GetTypedValue(0.0f) );
                 }
             }
         }
     }
 
-    excludeAOVs.assign(uniqueAOVs.begin(), uniqueAOVs.end());
-
-    return excludeAOVs;
+    return VtStringArray(excludeAOVs.begin(), excludeAOVs.end());
 }
 
 

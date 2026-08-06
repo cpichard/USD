@@ -10,6 +10,7 @@ pxr_library(usdviewq
         tf
         usd
         usdGeom
+        usdUI
         hd
 
     PUBLIC_CLASSES

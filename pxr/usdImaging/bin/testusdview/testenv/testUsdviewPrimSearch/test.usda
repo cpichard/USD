@@ -9,7 +9,18 @@ def "foo" {
 }
 
 def "g" (
-    displayName = "testDisplayName"
+    uiHints = {
+       string displayName = "testDisplayName"
+    }
+)
+{
+
+}
+
+# We will support the old encodings in the UsdUI reading API's
+# for an extended deprecation period
+def "oldEncoding" (
+    displayName = "testBackCompat"
 )
 {
 

@@ -311,6 +311,8 @@ protected:
     HdResourceRegistrySharedPtr _resourceRegistry;
     HdRenderPassSharedPtr _renderPass;
     HdRenderSettingDescriptorList _settingDescriptors;
+
+    bool _isHoudiniViewport;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE

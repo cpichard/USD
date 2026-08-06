@@ -201,6 +201,69 @@ TestMultipleContextObjects()
     }
 }
 
+static void
+TestContains()
+{
+    TestIntContextObject intCtx(42);
+    TestStringContextObject stringCtx("test string");
+
+    // An empty context contains another empty context.
+    TF_AXIOM(ArResolverContext().Contains(ArResolverContext()));
+
+    // An empty context does not contain any context object.
+    TF_AXIOM(!ArResolverContext().Contains(stringCtx));
+    TF_AXIOM(!ArResolverContext().Contains(ArResolverContext(stringCtx)));
+    TF_AXIOM(!ArResolverContext().Contains(
+            ArResolverContext(intCtx, stringCtx)));
+
+    // A non-empty context contains an empty context.
+    TF_AXIOM(ArResolverContext(stringCtx).Contains(ArResolverContext()));
+    TF_AXIOM(ArResolverContext(intCtx, stringCtx).Contains(ArResolverContext()));
+
+    // Context contains the exact object it was constructed with.
+    TF_AXIOM(ArResolverContext(stringCtx).Contains(stringCtx));
+    TF_AXIOM(ArResolverContext(stringCtx).Contains(
+            ArResolverContext(stringCtx)));
+
+    // Context does not contain a different value of the same type.
+    TF_AXIOM(!ArResolverContext(stringCtx).Contains(
+            TestStringContextObject("other string")));
+    TF_AXIOM(!ArResolverContext(stringCtx).Contains(
+            ArResolverContext(TestStringContextObject("other string"))));
+
+    // Context does not contain an object of a type it doesn't hold.
+    TF_AXIOM(!ArResolverContext(stringCtx).Contains(intCtx));
+    TF_AXIOM(!ArResolverContext(stringCtx).Contains(ArResolverContext(intCtx)));
+
+    ArResolverContext multiCtx(intCtx, stringCtx);
+
+    // Multi-object context contains each of its individual objects.
+    TF_AXIOM(multiCtx.Contains(intCtx));
+    TF_AXIOM(multiCtx.Contains(ArResolverContext(intCtx)));
+
+    TF_AXIOM(multiCtx.Contains(stringCtx));
+    TF_AXIOM(multiCtx.Contains(ArResolverContext(stringCtx)));
+
+    // Multi-object context contains the full multi-object context.
+    TF_AXIOM(multiCtx.Contains(ArResolverContext(intCtx, stringCtx)));
+    TF_AXIOM(multiCtx.Contains(ArResolverContext(stringCtx, intCtx)));
+
+    // Single-object context does not contain the multi-object context.
+    TF_AXIOM(!ArResolverContext(intCtx).Contains(multiCtx));
+    TF_AXIOM(!ArResolverContext(stringCtx).Contains(multiCtx));
+
+    // Multi-object context does not contain an object with a different value.
+    TF_AXIOM(!multiCtx.Contains(TestStringContextObject("other string")));
+    TF_AXIOM(!multiCtx.Contains(TestIntContextObject(0)));
+
+    // Multi-object context does not contain an ArResolverContext with a
+    // mismatched value for one of the held types.
+    TF_AXIOM(!multiCtx.Contains(
+            ArResolverContext(TestStringContextObject("other str"))));
+    TF_AXIOM(!multiCtx.Contains(
+            ArResolverContext(intCtx, TestStringContextObject("other str"))));
+}
+
 int main(int argc, char** argv)
 {
     printf("TestDefault ...\n");
@@ -211,6 +274,9 @@ int main(int argc, char** argv)
 
     printf("TestMultipleContextObjects ...\n");
     TestMultipleContextObjects();
+
+    printf("TestContains ...\n");
+    TestContains();
 
     printf("All tests passed!\n");
     return 0;

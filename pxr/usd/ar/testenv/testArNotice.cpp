@@ -52,38 +52,59 @@ PXR_NAMESPACE_CLOSE_SCOPE
 static void
 TestResolverChangedNotice()
 {
-    ArNotice::ResolverChanged affectsAllNotice;
-    TF_AXIOM(affectsAllNotice.AffectsContext(
-            ArResolverContext()));
-    TF_AXIOM(affectsAllNotice.AffectsContext(
-            ArResolverContext(IntContext(0), StringContext("s"))));
+    {
+        ArNotice::ResolverChanged affectsAllNotice;
+        TF_AXIOM(affectsAllNotice.AffectsContext(
+                ArResolverContext()));
+        TF_AXIOM(affectsAllNotice.AffectsContext(
+                ArResolverContext(IntContext(0), StringContext("s"))));
+    }
 
-    ArNotice::ResolverChanged affectsContext(IntContext(0));
-    TF_AXIOM(!affectsContext.AffectsContext(
-            ArResolverContext()));
-    TF_AXIOM(!affectsContext.AffectsContext(
-            ArResolverContext(IntContext(1))));
-    TF_AXIOM(affectsContext.AffectsContext(
-            ArResolverContext(IntContext(0))));
-    TF_AXIOM(affectsContext.AffectsContext(
-            ArResolverContext(IntContext(0), StringContext("s"))));
+    {
+        ArNotice::ResolverChanged affectsContext(IntContext(0));
+        TF_AXIOM(!affectsContext.AffectsContext(
+                ArResolverContext()));
+        TF_AXIOM(!affectsContext.AffectsContext(
+                ArResolverContext(IntContext(1))));
+        TF_AXIOM(affectsContext.AffectsContext(
+                ArResolverContext(IntContext(0))));
+        TF_AXIOM(affectsContext.AffectsContext(
+                ArResolverContext(IntContext(0), StringContext("s"))));
+    }
 
-    ArNotice::ResolverChanged affectsFn(
-        [](const ArResolverContext& ctx) {
-            const StringContext* stringCtx = ctx.Get<StringContext>();
-            return stringCtx && 
-                stringCtx->data.find("needle") != std::string::npos;
-        });
-    TF_AXIOM(!affectsFn.AffectsContext(
-            ArResolverContext()));
-    TF_AXIOM(!affectsFn.AffectsContext(
-            ArResolverContext(IntContext(0))));
-    TF_AXIOM(!affectsFn.AffectsContext(
-            ArResolverContext(IntContext(0), StringContext("s"))));
-    TF_AXIOM(affectsFn.AffectsContext(
-            ArResolverContext(StringContext("test-needle"))));
-    TF_AXIOM(affectsFn.AffectsContext(
-            ArResolverContext(IntContext(0), StringContext("test-needle"))));
+    {
+        ArResolverContext ctx(IntContext(0));
+        ArNotice::ResolverChanged affectsContext(ctx);
+        TF_AXIOM(!affectsContext.AffectsContext(
+                ArResolverContext()));
+        TF_AXIOM(!affectsContext.AffectsContext(
+                ArResolverContext(IntContext(1))));
+        TF_AXIOM(affectsContext.AffectsContext(
+                ArResolverContext(IntContext(0))));
+        TF_AXIOM(affectsContext.AffectsContext(
+                ArResolverContext(IntContext(0), StringContext("s"))));
+    }
+
+    {
+        ArNotice::ResolverChanged affectsFn(
+            [](const ArResolverContext& ctx) {
+                const StringContext* stringCtx = ctx.Get<StringContext>();
+                return stringCtx && 
+                    stringCtx->data.find("needle") != std::string::npos;
+            });
+        TF_AXIOM(!affectsFn.AffectsContext(
+                ArResolverContext()));
+        TF_AXIOM(!affectsFn.AffectsContext(
+                ArResolverContext(IntContext(0))));
+        TF_AXIOM(!affectsFn.AffectsContext(
+                ArResolverContext(IntContext(0), StringContext("s"))));
+        TF_AXIOM(affectsFn.AffectsContext(
+                ArResolverContext(StringContext("test-needle"))));
+        TF_AXIOM(affectsFn.AffectsContext(
+                ArResolverContext(
+                    IntContext(0), 
+                    StringContext("test-needle"))));
+    }
 }
 
 int main(int argc, char** argv)

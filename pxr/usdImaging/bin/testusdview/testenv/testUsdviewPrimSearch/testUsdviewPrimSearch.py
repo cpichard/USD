@@ -10,7 +10,8 @@ def _assertSelectedPrim(appController, primName):
     selected = appController._ui.primView.selectedItems()
     assert len(selected) == 1
     # 0 indicates the first column where we store prim names
-    assert primName == selected[0].text(0)
+    assert primName == selected[0].text(0),\
+        f"Expected {primName} but got {selected[0].text(0)}"
 
 def _search(appController, searchTerm, expectedItems):
     # Repainting isn't necessary at all here, its left in as
@@ -39,21 +40,21 @@ def _testSearchBasic(appController):
     # with the prim display name option on, search 
     # is only searching the display name value
     # so a search that is targeting the prim name
-    # won't produce the prim name as a result
+    # won't produce the prim name as a result, so
+    # we'll find neither prims "g" nor "oldEncoding"
+    # (unless we were dropping backwards compatibility)
     _search(appController, 'g', [])
 
-    # On an invalid search, the results will be
-    # equivalent to what was previously there (which in
-    # this case is nothing...)
+    # On an invalid search, the result will be the last
+    # "found" prim (which in this case is nothing...)
     _search(appController, 'xxx', [])
 
-    # Do a regex based search - again, this is
-    # looking at prim names here not display names
-    # since they aren't authored
-    _search(appController, 'f.*', ['f', 'foo'])
+    # Do a regex based search that matches both
+    # an unadorned prim AND one with a displayName
+    _search(appController, '.*o.*', ['testBackCompat', 'foo'])
 
     # search based on display name
-    _search(appController, 'test', ['testDisplayName'])
+    _search(appController, 'test', ['testDisplayName', 'testBackCompat'])
 
 def _testSearchNoPrimDisplayName(appController):
     """
@@ -72,16 +73,18 @@ def _testSearchNoPrimDisplayName(appController):
     # the block of _search calls only look at prim names
     # not display names
     _search(appController, 'f', ['f', 'foo'])
-    _search(appController, 'g', ['g'])
+    _search(appController, 'g', ['g', 'oldEncoding'])
 
-    # On an invalid search, the old term will remain
-    _search(appController, 'xxx', ['g'])
+    # On an invalid search, the result will be the last
+    # "found" prim
+    _search(appController, 'xxx', ['oldEncoding'])
 
-    # Do a regex based search
-    _search(appController, 'f.*', ['f', 'foo'])
+    # Do a regex based search. `foo` will come up first because `oldEncoding`
+    # is selected at time of search.
+    _search(appController, '.*o.*', ['foo', 'oldEncoding'])
 
     appController._dataModel.viewSettings.showPrimDisplayNames = True
-    _search(appController, 'test', ['testDisplayName'])
+    _search(appController, 'test', ['testDisplayName', 'testBackCompat'])
 
 def testUsdviewInputFunction(appController):
     _testSearchBasic(appController)

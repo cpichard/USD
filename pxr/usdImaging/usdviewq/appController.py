@@ -22,7 +22,7 @@ from functools import cmp_to_key
 
 # Usd Library Components
 from pxr import Usd, UsdGeom, UsdShade, UsdUtils, UsdImagingGL, Glf, Sdf, Tf, Ar
-from pxr import UsdAppUtils
+from pxr import UsdAppUtils, UsdUI
 from pxr.UsdAppUtils.complexityArgs import RefinementComplexities
 from pxr.UsdUtils.constantsGroup import ConstantsGroup
 
@@ -2265,20 +2265,13 @@ class AppController(QtCore.QObject):
             matchLambda = lambda x: pattern in x.casefold()
 
         if useDisplayName:
-            # typically we would check prim.HasAuthoredDisplayName()
-            # rather than getting the display name and checking
-            # against the empty string, but HasAuthoredDisplayName
-            # does about the same amount of work of GetDisplayName
-            # so we'd be paying twice the price for each prim
-            # search, which on large scenes would be a big performance
-            # hit, so we do it this way instead
-            displayName = self._normalize_unicode(prim.GetDisplayName())
+            uiHints = UsdUI.ObjectHints(prim)
+            displayName = uiHints.GetDisplayName()
             if displayName:
-                return matchLambda(displayName)
-            else:
-                return matchLambda(self._normalize_unicode(prim.GetName()))
-        else:
-            return matchLambda(self._normalize_unicode(prim.GetName()))
+                return matchLambda(self._normalize_unicode(displayName))
+
+        # no displayName found (or not consulted), so use prim's true name
+        return matchLambda(self._normalize_unicode(prim.GetName()))
 
 
     def _findPrims(self, pattern, useRegex=True):

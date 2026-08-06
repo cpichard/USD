@@ -14,6 +14,9 @@
 
 #include "pxr/usd/sdf/path.h"
 #include "pxr/usd/sdr/registry.h"
+#if PXR_VERSION <= 2411
+#include "pxr/usd/sdr/shaderProperty.h"
+#endif
 
 #include <cmath>
 

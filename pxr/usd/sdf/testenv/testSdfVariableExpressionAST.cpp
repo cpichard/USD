@@ -37,16 +37,29 @@ _TestCasts(NodePtr node)
     _TestCast<AST::FunctionNode, ExpectedNodeType>(node);
 }
 
-static void
-_TestLiteral()
+static void _TestLiteralNode(
+    const std::string& exprStr, 
+    const std::string& expectedStr = "")
 {
-    SdfVariableExpressionAST ast("`1`");
+    SdfVariableExpressionAST ast(exprStr);
     _TestCasts<AST::LiteralNode>(ast.GetRoot());
     _TestCasts<AST::LiteralNode>(std::as_const(ast).GetRoot());
 
     AST::LiteralNode* literalNode = ast.GetRoot()->As<AST::LiteralNode>();
     SdfVariableExpression expr = literalNode->GetExpressionBuilder();
-    TF_AXIOM(expr.GetString() == "`1`");
+    TF_AXIOM(
+        expr.GetString() == (expectedStr.empty() ? exprStr : expectedStr));
+}
+
+static void
+_TestLiteral()
+{
+    _TestLiteralNode("`1`");
+    _TestLiteralNode("`True`");
+    _TestLiteralNode("`False`");
+    _TestLiteralNode("`\"DoubleQuote\"`");
+    _TestLiteralNode("`'SingleQuote'`", "`\"SingleQuote\"`");
+    _TestLiteralNode("`\"shot_${SHOT_ID}.usda\"`");
 }
 
 static void

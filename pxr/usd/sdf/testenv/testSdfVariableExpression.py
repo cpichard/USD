@@ -206,6 +206,12 @@ class TestSdfVariableExpression(unittest.TestCase):
             expected="string_substitution_works",
             expectedUsedVars=["A", "B"])
 
+        self.assertEvaluates(
+            '''`'string_${A}_${B}'`''',
+            {},
+            expected="string_${A}_${B}",
+            expectedUsedVars=[])
+
         # 'None' is considered an empty string for substitution purposes.
         self.assertEvaluates(
             '''`'none_sub_${A}'`''',

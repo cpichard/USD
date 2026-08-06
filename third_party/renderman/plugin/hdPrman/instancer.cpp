@@ -183,16 +183,28 @@ struct _GetValueAtIndex {
     template <class T>
     VtValue operator()(const VtArray<T>& array) const
     {
+        return _AtIndex(array);
+    }
+
+    VtValue operator()(const VtValue& val) const
+    {
+        if (val.IsHolding<VtArray<SdfPath>>()) {
+            return _AtIndex(val.UncheckedGet<VtArray<SdfPath>>());
+        } else if (val.IsHolding<VtArray<SdfAssetPath>>()) {
+            return _AtIndex(val.UncheckedGet<VtArray<SdfAssetPath>>());
+        }
+        return VtValue();
+    }
+private:
+    template <class T>
+    VtValue _AtIndex(const VtArray<T>& array) const
+    {
         if (array.size() > _index) {
             return VtValue(array[_index]);
         }
         return VtValue();
     }
-    VtValue operator()(const VtValue&) const
-    {
-        return VtValue();
-    }
-private:
+
     size_t _index;
 };
 

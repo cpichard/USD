@@ -75,7 +75,8 @@ class TestSdfVariableExpressionAST(unittest.TestCase):
             self.assertEqualExpression(
                 ast.GetExpression(), _makeExpr(expectedValue))
 
-        testValues = [0, 1, 2**31-1, 2**31, "foo", True, False, None]
+        testValues = [
+            0, 1, 2**31-1, 2**31, "foo", "foo_${BAR}", True, False, None]
         for value in testValues:
             expr = _makeExpr(value)
             print()

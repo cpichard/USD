@@ -145,7 +145,6 @@ drawCalls = 0
 ----- executed -----
 drawIndirect, 72
 drawIndirectCull, 72
-drawIndirectResult, 4
 nonUniformSize, 16
 numberOfTextureHandles, 0
 numberOfTextureObjects, 0
@@ -154,11 +153,10 @@ singleBufferSize, 0
 textureMemory, 0
 topology, 0
 garbageCollected = 0
-drawCalls = 1
+drawCalls = 0
 ----- clear all -----
 drawIndirect, 72
 drawIndirectCull, 72
-drawIndirectResult, 4
 nonUniformSize, 16
 numberOfTextureHandles, 0
 numberOfTextureObjects, 0
@@ -167,6 +165,6 @@ singleBufferSize, 0
 textureMemory, 0
 topology, 0
 garbageCollected = 1
-drawCalls = 1
+drawCalls = 0
 
 OK

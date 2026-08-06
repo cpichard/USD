@@ -214,7 +214,7 @@ TestComputedRequestExpiration()
     TF_AXIOM(accumulator.GetInterval().IsFullInterval());
 }
 
-// Checks that a request is not expired when unrelated scene objects become
+// Tests that a request is not expired when unrelated scene objects become
 // invalid.
 //
 static void
@@ -241,7 +241,7 @@ TestUnrelatedSceneObject()
     TF_AXIOM(accumulator.GetInterval().IsEmpty());
 }
 
-// Check that unexpired indices continue to receive invalidation even after
+// Tests that unexpired indices continue to receive invalidation even after
 // another index has been expired.
 //
 static void
@@ -274,6 +274,52 @@ TestInvalidateUnexpiredIndex()
     TF_AXIOM(accumulator.GetIndices().count(0));
 }
 
+// Tests the behavior of a request that contains no value keys. Empty requests
+// are always valid, and they remain valid across any scene change because they
+// have no value keys that can expire the request.
+//
+// When a scene change leaves a request with 0 valid value keys, the request is
+// discarded. An empty request remains valid after being discarded, as opposed
+// to a non-empty request, which remains invalid after all value keys have
+// expired.
+//
+static void
+TestEmptyRequest()
+{
+    const UsdStageRefPtr stage = CreateTestStage();
+    ExecUsdSystem system(stage);
+    
+    const ExecUsdRequest request = system.BuildRequest({});
+    
+    // Empty request is valid after construction.
+    TF_AXIOM(request.IsValid());
+
+    // Empty request remains valid for all scene changes.
+    stage->RemovePrim(SdfPath("/A"));
+    stage->RemovePrim(SdfPath("/B"));
+    stage->RemovePrim(SdfPath("/C"));
+    TF_AXIOM(request.IsValid());
+}
+
+// Tests that expiring the provider of the last value key in the request
+// causes the request to become invalid.
+//
+static void
+TestExpireLastValueKey()
+{
+    const UsdStageRefPtr stage = CreateTestStage();
+    ExecUsdSystem system(stage);
+
+    const ExecUsdRequest request = system.BuildRequest({
+        ExecUsdValueKey{stage->GetAttributeAtPath(SdfPath("/A.x"))}
+    });
+
+    TF_AXIOM(request.IsValid());
+
+    stage->RemovePrim(SdfPath("/A"));
+    TF_AXIOM(!request.IsValid());
+}
+
 int
 main(int argc, char* argv[])
 {
@@ -283,6 +329,8 @@ main(int argc, char* argv[])
     TestComputedRequestExpiration();
     TestUnrelatedSceneObject();
     TestInvalidateUnexpiredIndex();
+    TestEmptyRequest();
+    TestExpireLastValueKey();
 
     return 0;
 }

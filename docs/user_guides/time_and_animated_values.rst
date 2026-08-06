@@ -1859,9 +1859,9 @@ pre-extrapolation value is 5, and the post-extrapolation value is 3.
        custom float attr
        float attr.spline = {
            bezier,
-           15: 5; pre (2, 0.5); post curve (2, 0.9),
+           15: 5; pre (2, 0.5); post curve (2, 0.8),
            20: 10; pre (2, 0); post curve (2, 0),
-           25: 3; pre (2, 0.5); post curve (2, 0.9),
+           25: 3; pre (2, -1.2); post curve (2, 0.9),
        }
    }
 

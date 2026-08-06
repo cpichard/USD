@@ -297,7 +297,7 @@ StringNode::Evaluate(EvalContext* ctx) const
                 // No value for variable. Leave the substitution
                 // string in place in case downstream clients want to
                 // handle it.
-                result += part.content;
+                result += "${" + part.content + "}";
             }
             else if (!varResult.value.IsEmpty()) {
                 if (varResult.value.IsHolding<std::string>()) {

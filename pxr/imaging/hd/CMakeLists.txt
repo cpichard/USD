@@ -140,6 +140,7 @@ pxr_library(hd
         nurbsPatchSchema
         nurbsPatchTrimCurveSchema
         overlayContainerDataSource
+        particleFieldSchema
         perfLog
         planeSchema
         pluginRenderDelegateUniqueHandle

@@ -128,7 +128,6 @@ pxr_library(ts
 
     DOXYGEN_FILES
         doxygen/overview.md
-        doxygen/status.md
         doxygen/regression.md
         doxygen/tsTest.dox
         doxygen/images/boldS.png
