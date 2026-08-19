@@ -69,7 +69,6 @@ public:
     SDF_API
     explicit SdfVariableExpression(const std::string& expr);
 
-    /// \overload
     SDF_API
     explicit SdfVariableExpression(std::string&& expr);
 
@@ -356,6 +355,16 @@ public:
     /// \p name, i.e. `${name}`.
     SDF_API static Builder MakeVariable(const std::string& name);
 
+    /// Create a variable reference expression for the variable named
+    /// \p name and \p fallbackValue, i.e. `${name:val}`.
+    SDF_API static Builder MakeVariable(const std::string& name,
+                                        const Builder& fallbackValue);
+
+    /// Create a variable reference expression whose fallback is the
+    /// expression \p fallbackValue. This is useful when the fallback is an
+    /// already-built expression, e.g. the result of MakeList.
+    SDF_API static Builder MakeVariable(const std::string& name,
+                                        const SdfVariableExpression& fallbackValue);
     /// @}
 
 private:
