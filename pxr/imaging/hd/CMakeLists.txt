@@ -171,6 +171,7 @@ pxr_library(hd
         renderPassSchema
         renderPassState
         renderProductSchema
+        renderSettingDescriptorSchema
         renderSettings
         renderSettingsSchema
         renderVarSchema

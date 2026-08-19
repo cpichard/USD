@@ -40,6 +40,7 @@
 #include "pxr/imaging/hd/rendererCreateArgsSchema.h"
 #include "pxr/imaging/hd/rendererPlugin.h"
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
+#include "pxr/imaging/hd/renderSettingDescriptorSchema.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
 #include "pxr/imaging/hd/sceneGlobalsSchema.h"
 #include "pxr/imaging/hd/sceneIndexCreateArgsSchema.h"
@@ -447,6 +448,8 @@ UsdImagingGLEngine::_DestroyHydraObjects()
 
         _taskControllerSceneIndex = TfNullPtr;
     }
+
+    _sceneIndexCreateArgs = nullptr;
 
     _isPopulated = false;
 }
@@ -1566,6 +1569,10 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(
     HdContainerDataSourceHandle const sceneIndexCreateArgs =
         _GetSceneIndexCreateArgs(plugin);
 
+    // Retain the create-args so that GetRendererSettingsList() can source the
+    // renderer's advertised render settings from them.
+    _sceneIndexCreateArgs = sceneIndexCreateArgs;
+
     // Create the merging scene index, all subsequent scene indices
     // and the renderer.
     _CreateSceneIndexChainAndRenderer(
@@ -1942,9 +1949,69 @@ UsdImagingGLEngine::GetAovRenderBuffer(TfToken const& name) const
     return renderControl->GetRenderBuffer(path);
 }
 
+// Determine the kind of UI widget to create based on the type of the
+// setting's default value. Returns false (and warns) if the type is not
+// supported, in which case the setting should be skipped.
+static bool
+_ComputeRendererSettingType(UsdImagingGLRendererSetting * const r)
+{
+    if (r->defValue.IsHolding<bool>()) {
+        r->type = UsdImagingGLRendererSetting::TYPE_FLAG;
+    } else if (r->defValue.IsHolding<int>() ||
+               r->defValue.IsHolding<unsigned int>()) {
+        r->type = UsdImagingGLRendererSetting::TYPE_INT;
+    } else if (r->defValue.IsHolding<float>()) {
+        r->type = UsdImagingGLRendererSetting::TYPE_FLOAT;
+    } else if (r->defValue.IsHolding<std::string>()) {
+        r->type = UsdImagingGLRendererSetting::TYPE_STRING;
+    } else {
+        TF_WARN("Setting '%s' with type '%s' doesn't have a UI"
+                " implementation...",
+                r->name.c_str(),
+                r->defValue.GetTypeName().c_str());
+        return false;
+    }
+    return true;
+}
+
 UsdImagingGLRendererSettingsList
 UsdImagingGLEngine::GetRendererSettingsList() const
 {
+    // Prefer the render settings advertised by the renderer plugin through the
+    // scene-index create-args data source. This is the Hydra 2.0 path and does
+    // not require a live render delegate / render control.
+    if (const HdRenderSettingDescriptorContainerSchema container =
+            HdSceneIndexCreateArgsSchema(_sceneIndexCreateArgs)
+                .GetRenderSettingDescriptors()) {
+
+        UsdImagingGLRendererSettingsList ret;
+
+        // The container maps each setting's key (the entry name) to a
+        // descriptor.
+        for (const TfToken &name : container.GetNames()) {
+            const HdRenderSettingDescriptorSchema descriptor =
+                container.Get(name);
+
+            UsdImagingGLRendererSetting r;
+            r.key = name;
+            if (const HdStringDataSourceHandle nameDs =
+                    descriptor.GetName()) {
+                r.name = nameDs->GetTypedValue(0.0f);
+            }
+            if (const HdSampledDataSourceHandle defValueDs =
+                    descriptor.GetDefaultValue()) {
+                r.defValue = defValueDs->GetValue(0.0f);
+            }
+
+            if (_ComputeRendererSettingType(&r)) {
+                ret.push_back(r);
+            }
+        }
+
+        return ret;
+    }
+
+    // Fall back to the legacy render control interface.
     HdLegacyRenderControlInterface * const renderControl =
         _GetLegacyRenderControl();
     if (!renderControl) {
@@ -1960,25 +2027,9 @@ UsdImagingGLEngine::GetRendererSettingsList() const
         r.name = desc.name;
         r.defValue = desc.defaultValue;
 
-        // Use the type of the default value to tell us what kind of
-        // widget to create...
-        if (r.defValue.IsHolding<bool>()) {
-            r.type = UsdImagingGLRendererSetting::TYPE_FLAG;
-        } else if (r.defValue.IsHolding<int>() ||
-                   r.defValue.IsHolding<unsigned int>()) {
-            r.type = UsdImagingGLRendererSetting::TYPE_INT;
-        } else if (r.defValue.IsHolding<float>()) {
-            r.type = UsdImagingGLRendererSetting::TYPE_FLOAT;
-        } else if (r.defValue.IsHolding<std::string>()) {
-            r.type = UsdImagingGLRendererSetting::TYPE_STRING;
-        } else {
-            TF_WARN("Setting '%s' with type '%s' doesn't have a UI"
-                    " implementation...",
-                    r.name.c_str(),
-                    r.defValue.GetTypeName().c_str());
-            continue;
+        if (_ComputeRendererSettingType(&r)) {
+            ret.push_back(r);
         }
-        ret.push_back(r);
     }
 
     return ret;

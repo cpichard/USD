@@ -1090,6 +1090,22 @@
     ),
 
     #--------------------------------------------------------------------------
+    # renderSettingDescriptor
+    dict(
+        SCHEMA_NAME = 'RenderSettingDescriptor',
+        SCHEMA_TOKEN = 'renderSettingDescriptor',
+        DOC = '''Describes render setting advertised by a renderer through
+                 HdRendererPlugin::GetSceneIndexCreateArgs, see
+                 HdSceneIndexCreateArgsSchema::GetRenderSettings.''',
+        MEMBERS = [
+            ('name', T_STRING,
+             dict(DOC = '''Human-readable name of the render setting, suitable
+                           for display in a UI.''')),
+            ('defaultValue', T_SAMPLED, {})
+        ],
+    ),
+
+    #--------------------------------------------------------------------------
     # renderProduct
     dict(
         SCHEMA_NAME = 'RenderProduct',
@@ -1670,6 +1686,7 @@
         render contexts such as glslflx which is understood by Storm but not Prman,
         for example.
         ''',
+        SCHEMA_INCLUDES = ['{{LIBRARY_PATH}}/schemaTypeDefs'],
         MEMBERS = [
             ('motionBlurSupport', T_BOOL,
              dict(DOC = '''Does consumer (most likely HdRenderer) of scene indices need
@@ -1687,6 +1704,8 @@
                            false: the UsdImagingDelegate is querying an emulation
                            render delegate for information to resolve, for example,
                            the material render contexts correctly.''')),
+            ('renderSettingDescriptors', 'HdRenderSettingDescriptorContainerSchema',
+             dict(DOC = '''Render settings advertised by rendererer.''')),
         ],
     ),
 

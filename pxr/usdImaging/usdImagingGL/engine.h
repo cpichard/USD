@@ -905,6 +905,11 @@ private:
     HdCachingSceneIndexRefPtr _cachingSceneIndex;
     HdSceneIndexBaseRefPtr _terminalSceneIndex;
 
+    // Create-args container data source returned by the renderer plugin
+    // (see HdRendererPlugin::GetSceneIndexCreateArgs). Retained so that
+    // GetRendererSettingsList() can source the render settings from it.
+    HdContainerDataSourceHandle _sceneIndexCreateArgs;
+
     /* Hydra 1.0 */
     std::unique_ptr<UsdImagingDelegate> _sceneDelegate;
 
