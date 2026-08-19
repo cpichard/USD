@@ -541,6 +541,11 @@ void HdPrman_RenderSettings::Finalize(HdRenderParam *renderParam)
         //         HdsiRenderSettingsFilteringSceneIndex::GetFallbackPrimPath());
         // }
 
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+        // Tear down the light path listener when the driving prim is finalized.
+        param->SetLightPathListenerOptions(false, {}, 0, 0);
+#endif
+
         // For now, just reset to an empty path.
         param->SetDrivingRenderSettingsPrimPath(SdfPath::EmptyPath());
 
@@ -686,6 +691,33 @@ void HdPrman_RenderSettings::_Sync(
             param->SetRenderSettingsPrimOptions(_settingsOptions);
             param->SetRileyOptions();
         }
+
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+        // Activate or deactivate the light path listener.
+        // Re-evaluate on DirtyActive so that switching the driving prim
+        // tears down a listener that the new prim doesn't request.
+        if (*dirtyBits & (HdRenderSettings::DirtyNamespacedSettings |
+                          HdRenderSettings::DirtyActive)) {
+            static const TfToken lightPathEnable(
+                "ri:statistics:lightPath:enable");
+            static const TfToken lightPathFilename(
+                "ri:statistics:lightPath:outputFilename");
+            static const TfToken lightPathSampleRate(
+                "ri:statistics:lightPath:sampleRate");
+            static const TfToken lightPathMaxPerPixel(
+                "ri:statistics:lightPath:maxPerPixel");
+            param->SetLightPathListenerOptions(
+                VtDictionaryGet<bool>(namespacedSettings, lightPathEnable,
+                    VtDefault = false),
+                VtDictionaryGet<std::string>(namespacedSettings,
+                    lightPathFilename,
+                    VtDefault = std::string("./lightPaths.json")),
+                VtDictionaryGet<int>(namespacedSettings, lightPathSampleRate,
+                    VtDefault = 1),
+                VtDictionaryGet<int>(namespacedSettings, lightPathMaxPerPixel,
+                    VtDefault = 0));
+        }
+#endif
 
         // ... and connections.
         if (*dirtyBits & HdRenderSettings::DirtyNamespacedSettings ||

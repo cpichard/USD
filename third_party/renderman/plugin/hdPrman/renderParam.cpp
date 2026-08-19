@@ -90,6 +90,7 @@
 #include <RixInterfaces.h>
 #include <RixRiCtl.h>
 #include <RixShadingUtils.h>
+#include <stats/Listener.h>
 #include <stats/Logger.h>
 #include <stats/Roz.h>
 #include <stats/Session.h>
@@ -2764,6 +2765,15 @@ HdPrman_RenderParam::_DestroyRiley()
 #if _PRMANAPI_VERSION_MAJOR_ >= 26
     if (_statsSession)
     {
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+        // Tear down light path listener before removing the session
+        if (_lightPathListener) {
+            _statsSession->DetachListener(_lightPathListener.get());
+            _lightPathListener.reset();
+        }
+        _lightPathFactory.reset();
+#endif
+
         // We own the session, it's our responsibility to tell Roz to remove
         // its reference and free the memory
         stats::RemoveSession(*_statsSession);
@@ -2811,6 +2821,64 @@ HdPrman_RenderParam::_DestroyStatsSession(void)
         _statsSession = nullptr;
     }
 }
+
+#if _PRMANAPI_VERSION_MAJOR_ >= 27
+void
+HdPrman_RenderParam::_LightPathFactoryDeleter::operator()(
+    stats::ListenerFactory* f) const
+{
+    if (f) stats::ReleasePluginListenerFactory(f);
+}
+
+void
+HdPrman_RenderParam::SetLightPathListenerOptions(
+    bool enable,
+    const std::string& outputFilename,
+    int sampleRate,
+    int maxPerPixel)
+{
+    if (!_statsSession) return;
+
+    // Disable: tear down existing listener
+    if (!enable) {
+        if (_lightPathListener) {
+            _statsSession->DetachListener(_lightPathListener.get());
+            _lightPathListener.reset();
+        }
+        _lightPathFactory.reset();
+        return;
+    }
+
+    stats::ListenerConfig cfg;
+    cfg.type    = "lightPath";
+    cfg.name    = "light-path-recorder";
+    cfg.enabled = true;
+    cfg.options["outputFilename"] = outputFilename;
+    cfg.options["sampleRate"]     = std::to_string(sampleRate);
+    cfg.options["maxPerPixel"]    = std::to_string(maxPerPixel);
+
+    // Update existing listener in place if already running
+    if (_lightPathListener) {
+        _lightPathListener->UpdateConfigCallback(cfg);
+        return;
+    }
+
+    // First-time creation
+    _lightPathFactory.reset(stats::GetPluginListenerFactory("lightPath"));
+    if (!_lightPathFactory) {
+        TF_WARN("HdPrman: could not load lightPath listener plugin");
+        return;
+    }
+
+    _lightPathListener.reset(_lightPathFactory->MakeListener(cfg));
+    if (_lightPathListener) {
+        _statsSession->AttachListener(_lightPathListener.get());
+    } else {
+        TF_WARN("HdPrman: could not create lightPath listener");
+        _lightPathFactory.reset();
+    }
+}
+#endif // _PRMANAPI_VERSION_MAJOR_ >= 27
 
 static
 RtParamList
