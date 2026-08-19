@@ -11,6 +11,7 @@
 #include "pxr/imaging/hd/version.h"
 #include "pxr/usd/sdf/types.h"
 #include "pxr/base/gf/matrix4d.h"
+#include "pxr/base/tf/mallocTag.h"
 
 #include "hdPrman/gprimbase.h"
 #include "hdPrman/idMap.h"
@@ -163,7 +164,6 @@ HdPrman_Gprim<BASE>::Sync(HdSceneDelegate* sceneDelegate,
                           TfToken const    &reprToken)
 {
     HD_TRACE_FUNCTION();
-    HF_MALLOC_TAG_FUNCTION();
     TF_UNUSED(reprToken);
 
     // Check if there are any relevant dirtyBits.
@@ -278,6 +278,8 @@ HdPrman_Gprim<BASE>::Sync(HdSceneDelegate* sceneDelegate,
     std::vector<riley::MaterialId> subsetMaterialIds;
     std::vector<SdfPath> subsetPaths;
     {
+        TfAutoMallocTag mallocTag("hdPrman", "Geometry Prototypes");
+
         RtUString primType;
         RtPrimVarList primvars;
         HdGeomSubsets geomSubsets;
@@ -411,6 +413,7 @@ HdPrman_Gprim<BASE>::Sync(HdSceneDelegate* sceneDelegate,
     //
     // Create or modify Riley geometry instances.
     //
+    TfAutoMallocTag mallocTag("hdPrman", "Geometry Instances");
 
     // Resolve attributes.
     RtParamList attrs = param->ConvertAttributes(sceneDelegate, id, true);
