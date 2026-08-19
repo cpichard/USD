@@ -1006,8 +1006,8 @@ HdsiBackPlateSceneIndex::_DirtyBackPlateChildren(
     for (const TfToken & name : names){
         const SdfPath meshPath = _BuildBackPlatePrimPath(cameraPrimPath, name,
             _backPlatePrimsTokens->mesh);
-        const SdfPath materialPath = _BuildBackPlatePrimPath(cameraPrimPath, name,
-            _backPlatePrimsTokens->material);
+        const SdfPath materialPath = _BuildBackPlatePrimPath(
+            cameraPrimPath, name, _backPlatePrimsTokens->material);
         dirtiedBackPlatePrims->push_back({
             meshPath,
             HdDataSourceLocatorSet({
@@ -1120,10 +1120,11 @@ HdsiBackPlateSceneIndex::_PrimsDirtied(
                 entry.primPath,
                 isObserved ? &addedBackPlatePrims : nullptr);
         }
-        if (entry.dirtyLocators.Intersects(
+        if ((!_cameraToBackPlates.empty()) && 
+            (entry.dirtyLocators.Intersects(
                 HdCameraSchema::GetDefaultLocator()) ||
             entry.dirtyLocators.Intersects(
-                HdXformSchema::GetDefaultLocator())) {
+                HdXformSchema::GetDefaultLocator()))) {
             _DirtyBackPlateChildren(
                 entry.primPath,
                 isObserved ? &dirtiedBackPlatePrims : nullptr);
