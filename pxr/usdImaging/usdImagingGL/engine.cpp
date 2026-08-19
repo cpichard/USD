@@ -18,8 +18,6 @@
 #include "pxr/usdImaging/usdImaging/sceneIndexCreateArgsSchema.h"
 #include "pxr/usdImaging/usdImaging/stageSceneIndexInterface.h"
 
-#include "pxr/usdImaging/usdExecImaging/stageSceneIndexFactory.h"
-
 #include "pxr/usd/usdGeom/tokens.h"
 #include "pxr/usd/usdGeom/camera.h"
 #include "pxr/usd/usdRender/tokens.h"
