@@ -49,12 +49,17 @@ ARCH_API std::thread::id ArchGetMainThreadId();
 /// work scheduled onto it.
 ///
 /// \note Names are truncated to a platform-specific byte limit imposed by the
-/// OS: 15 bytes on Linux and 63 bytes on MacOS, neither counting the null
-/// terminator. Both of those platforms reject an over-long name outright rather
-/// than shortening it, so we truncate first, at a UTF-8 character boundary so
-/// the result remains valid UTF-8. ArchGetThisThreadName() may therefore return
-/// a shorter name than the one passed here. No truncation is applied on
-/// Windows.
+/// underlying API: 15 bytes on Linux, 63 bytes on MacOS, and 31 bytes on WASM,
+/// none counting the null terminator. Linux and MacOS reject an over-long name
+/// outright; Emscripten cuts one on a byte boundary, which can split a
+/// multi-byte character. In all three cases we truncate first, at a UTF-8
+/// character boundary so the result remains valid UTF-8, which means
+/// ArchGetThisThreadName() may return a shorter name than the one passed here.
+/// No truncation is applied on Windows.
+///
+/// \note On WASM the name is recorded only in builds that enable Emscripten's
+/// thread profiler (--threadprofiler). Without it, the underlying call is a
+/// documented no-op, so this returns false in that case.
 ARCH_API bool ArchSetThisThreadName(char const *name);
 
 /// Return the name of the calling thread as a UTF-8 string, as previously set
@@ -65,6 +70,11 @@ ARCH_API bool ArchSetThisThreadName(char const *name);
 /// \note A thread that was never explicitly named does not necessarily have an
 /// empty name. On Linux a thread's name defaults to the executable's basename,
 /// and a newly created thread inherits its creator's name.
+///
+/// \note Conversely, some platforms provide no way to read a name back, so this
+/// can return an empty string even immediately after ArchSetThisThreadName()
+/// succeeded. WASM is an example: Emscripten offers a set but no corresponding
+/// get.
 ARCH_API std::string ArchGetThisThreadName();
 
 /// Specifies a reduced-priority level for ArchSetThisThreadPriority().
@@ -85,10 +95,13 @@ enum ArchThreadPriority {
 /// Lower the priority of the calling thread to \p priority.
 ///
 /// Return true if the priority was successfully changed, false if the thread is
-/// already at or below the requested level (or if the request failed). This is
-/// a one-way operation -- there is no facility to raise priority back to the
-/// inherited default, and calling this function will never raise priority above
-/// the current level.
+/// already at or below the requested level, if the request failed, or if the
+/// platform has no thread priority facility. This is a one-way operation --
+/// there is no facility to raise priority back to the inherited default, and
+/// calling this function will never raise priority above the current level.
+///
+/// \note WASM has no thread priority facility, so this always returns false
+/// there. Threads are Web Workers, which expose no priority control.
 ///
 /// \note Only call this on threads that your code created or explicitly
 /// owns. See ArchSetThisThreadName() for the same rationale.

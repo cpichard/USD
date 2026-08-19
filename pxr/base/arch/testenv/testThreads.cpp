@@ -21,6 +21,26 @@
 
 PXR_NAMESPACE_USING_DIRECTIVE
 
+// Platforms where a thread name can be set and read back, priority can be
+// lowered, and std::thread is available for the per-thread scoping checks. WASM
+// has none of the three, so it takes the other path below.
+//
+// Where a facility is absent we assert the documented failure behavior rather
+// than skipping, so that an incomplete implementation cannot pass by accident.
+#if defined(ARCH_OS_LINUX) || defined(ARCH_OS_DARWIN) || \
+    defined(ARCH_OS_WINDOWS)
+#define TEST_HAS_FULL_THREAD_API
+#endif
+
+// WASM can set a name via emscripten_set_thread_name(), but only when built
+// with --threadprofiler, and it offers no way to read one back.
+#if defined(ARCH_OS_WASM_VM) && \
+    defined(PTHREADS_PROFILING) && PTHREADS_PROFILING
+#define TEST_HAS_THREAD_NAME_SET_ONLY
+#endif
+
+#if defined(TEST_HAS_FULL_THREAD_API)
+
 static void TestNaming()
 {
     // Short name within all platform limits.
@@ -190,10 +210,40 @@ static void TestPriority()
     ARCH_AXIOM(!ArchSetThisThreadPriority(ArchThreadPriorityLow));
 }
 
+#else // !TEST_HAS_FULL_THREAD_API
+
+// On a platform that implements none (or only part of the API, currently WASM)
+// assert the documented contract for the missing parts. This is deliberately
+// not a skip: reporting failure correctly is behavior worth verifying, and a
+// platform that later grows a real implementation should fail here and be moved
+// to the full path above rather than passing silently.
+static void TestIncompletelyImplementedApi()
+{
+#if defined(TEST_HAS_THREAD_NAME_SET_ONLY)
+    ARCH_AXIOM(ArchSetThisThreadName("test"));
+#else
+    ARCH_AXIOM(!ArchSetThisThreadName("test"));
+#endif
+
+    // No get API, so a name must not come back.
+    ARCH_AXIOM(ArchGetThisThreadName().empty());
+
+    // A null name is rejected on every platform, before any platform code runs.
+    ARCH_AXIOM(!ArchSetThisThreadName(nullptr));
+
+    // No thread priority facility, so both levels must report failure rather
+    // than silently doing nothing and claiming success.
+    ARCH_AXIOM(!ArchSetThisThreadPriority(ArchThreadPriorityLow));
+    ARCH_AXIOM(!ArchSetThisThreadPriority(ArchThreadPriorityLowest));
+}
+
+#endif // TEST_HAS_FULL_THREAD_API
+
 int main()
 {
     ARCH_AXIOM(ArchIsMainThread());
 
+#if defined(TEST_HAS_FULL_THREAD_API)
     // Naming changes are reversible, so they are safe to run on the main
     // thread.
     TestNaming();
@@ -207,6 +257,9 @@ int main()
         TestPriorityIsPerThread();
         std::thread(TestPriority).join();
     }
+#else
+    TestIncompletelyImplementedApi();
+#endif
 
     return 0;
 }

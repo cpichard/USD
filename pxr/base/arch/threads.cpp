@@ -27,6 +27,20 @@
 #  include <Windows.h>
 #endif
 
+#if defined(ARCH_OS_WASM_VM)
+#  include <emscripten/threading.h>
+#  include <pthread.h>
+#endif
+
+// emscripten_set_thread_name() records a name only when the program is built
+// with --threadprofiler, which defines PTHREADS_PROFILING; it is documented as
+// a no-op otherwise.  Gate naming on that so we never report success for a call
+// that nothing records.
+#if defined(ARCH_OS_WASM_VM) && \
+    defined(PTHREADS_PROFILING) && PTHREADS_PROFILING
+#define ARCH_WASM_THREAD_NAMING
+#endif
+
 PXR_NAMESPACE_OPEN_SCOPE
 
 // Static initializer to get the main thread id.  We want this to run as early
@@ -37,18 +51,30 @@ namespace {
 
 const std::thread::id _mainThreadId = std::this_thread::get_id();
 
-#if defined(ARCH_OS_LINUX)
+#if defined(ARCH_OS_LINUX) || defined(ARCH_OS_DARWIN) || \
+    defined(ARCH_WASM_THREAD_NAMING)
+
+// Every naming API except Windows imposes a byte limit on the name.  Linux and
+// MacOS reject an over-long name outright; Emscripten cuts one on a byte
+// boundary, which can split a multi-byte character.  In all three cases we
+// truncate first, on a character boundary, so the result stays valid UTF-8.
+#  if defined(ARCH_OS_LINUX)
 // The kernel enforces TASK_COMM_LEN (16), including the null terminator.
 constexpr size_t _maxThreadNameLen = 15;
-#elif defined(ARCH_OS_DARWIN)
+#  elif defined(ARCH_OS_DARWIN)
 // The kernel enforces MAXTHREADNAMESIZE (64), including the null terminator.
 constexpr size_t _maxThreadNameLen = 63;
-#endif
+#  else
+// emscripten_set_thread_name() documents a 32-byte limit but not whether that
+// counts the null terminator.  Use 31, which is within the limit on either
+// reading: handing it 32 bytes only for it to keep 31 could split the very
+// multi-byte character we took care to preserve.  Losing a byte off an advisory
+// label costs nothing by comparison.
+constexpr size_t _maxThreadNameLen = 31;
+#  endif
 
-#if defined(ARCH_OS_LINUX) || defined(ARCH_OS_DARWIN)
 // Truncate 'name' to at most maxBytes bytes, respecting UTF-8 character
-// boundaries.  Both Linux and MacOS reject an over-long name outright rather
-// than shortening it, so we truncate before handing the name to the OS.
+// boundaries.
 //
 // Writes the result into buf (which must be at least maxBytes+1 bytes) and
 // returns buf.  If the name fits, returns name directly without copying.
@@ -158,7 +184,16 @@ ArchSetThisThreadName(char const *name)
     }
     return SUCCEEDED(SetThreadDescription(GetCurrentThread(), wname.c_str()));
 
+#elif defined(ARCH_WASM_THREAD_NAMING)
+    // Returns void, and the surrounding #if guarantees the thread profiler is
+    // present to record the name, so there is nothing to report but success.
+    char buf[_maxThreadNameLen + 1];
+    emscripten_set_thread_name(
+        pthread_self(), _TruncateUtf8(name, buf, _maxThreadNameLen));
+    return true;
+
 #else
+    // No thread naming facility.
     return false;
 #endif
 }
@@ -186,6 +221,10 @@ ArchGetThisThreadName()
     return result;
 
 #else
+    // No way to read a thread name back.  WASM is deliberately not handled:
+    // Emscripten offers emscripten_set_thread_name() but no corresponding get,
+    // so a name set there cannot be retrieved even when ArchSetThisThreadName()
+    // succeeded.
     return {};
 #endif
 }
@@ -255,6 +294,9 @@ ArchSetThisThreadPriority(ArchThreadPriority priority)
     return SetThreadPriority(GetCurrentThread(), target) != 0;
 
 #else
+    // No thread priority facility.  On WASM in particular, threads are Web
+    // Workers, which expose no priority control at all.
+    (void)priority;
     return false;
 #endif
 }
