@@ -66,6 +66,14 @@ UsdImaging_DataSourceRelocatingSceneIndex::GetPrim(
         return prim;
     }
 
+    // Fast reject: if this prim carries no opinion at the source locator there
+    // is nothing to relocate (_RelocateDataSource would early-out anyway), so
+    // skip the more expensive native-instance probe. The vast majority of prims
+    // (e.g. everything in a non-instanced scene) hit this path.
+    if (!HdContainerDataSource::Get(prim.dataSource, _srcLocator)) {
+        return prim;
+    }
+
     if (_forNativeInstance == _IsNativeInstance(prim)) {
         _RelocateDataSource(prim, _srcLocator, _dstLocator);
     }
@@ -77,6 +85,22 @@ UsdImaging_DataSourceRelocatingSceneIndex::_PrimsDirtied(
     const HdSceneIndexBase& sender,
     const HdSceneIndexObserver::DirtiedPrimEntries& entries) 
 {
+    // Fast path: if no entry dirties the source locator, there is nothing to
+    // remap, so forward the batch unchanged and avoid copying it. Transform /
+    // visibility invalidations (the common case, e.g. from an interactive
+    // activate) never touch the source locator, so they hit this path.
+    bool anyMatch = false;
+    for (const HdSceneIndexObserver::DirtiedPrimEntry& entry : entries) {
+        if (entry.dirtyLocators.Contains(_srcLocator)) {
+            anyMatch = true;
+            break;
+        }
+    }
+    if (!anyMatch) {
+        _SendPrimsDirtied(entries);
+        return;
+    }
+
     HdSceneIndexObserver::DirtiedPrimEntries newDirtiedEntries;
     for (const HdSceneIndexObserver::DirtiedPrimEntry& entry : entries) {
         if (entry.dirtyLocators.Contains(_srcLocator)) {
