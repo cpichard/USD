@@ -402,12 +402,12 @@ pxr_build_test(testTfSIGSEGV
         testenv/SIGSEGV.cpp
 )
 
-pxr_build_test_shared_lib(TestTfDl
+pxr_build_test_plugin(TestTfDl
     CPPFILES
         testenv/TestTfDl.cpp
 )
 
-pxr_build_test_shared_lib(TestTfRegistryFunctionPlugin
+pxr_build_test_plugin(TestTfRegistryFunctionPlugin
     LIBRARIES
         tf
     CPPFILES

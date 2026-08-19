@@ -544,7 +544,11 @@ function (pxr_create_test_module MODULE_NAME)
     endif()
 endfunction() # pxr_create_test_module
 
-function(pxr_build_test_shared_lib LIBRARY_NAME)
+# Builds a test-only shared library that does not provide public headers, and
+# therefore symbols must be loaded from the library by a plugin mechanism
+# (e.g. TfType). These plugins can provide a plugInfo.json file to register
+# their contents.
+function(pxr_build_test_plugin LIBRARY_NAME)
     if (NOT PXR_BUILD_TESTS)
         return()
     endif()
@@ -626,8 +630,11 @@ function(pxr_build_test_shared_lib LIBRARY_NAME)
         ARCHIVE DESTINATION "tests/lib"
         RUNTIME DESTINATION "tests/lib"
     )
-endfunction() # pxr_build_test_shared_lib
+endfunction() # pxr_build_test_plugin
 
+# Builds a test-only library that can be be directly linked to unit-test
+# executables. Those executables can consume public headers from the test-only
+# library.
 function(pxr_build_test_library LIBRARY_NAME)
     set(multiValueArgs
         LIBRARIES

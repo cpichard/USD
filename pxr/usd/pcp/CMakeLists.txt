@@ -119,7 +119,7 @@ pxr_test_scripts(
     testenv/testPcpNegativeOffsetScale.py
 )
 
-pxr_build_test_shared_lib(TestPcpDynamicFileFormatPlugin
+pxr_build_test_plugin(TestPcpDynamicFileFormatPlugin
     INSTALL_PREFIX PcpPlugins
     LIBRARIES
         tf
@@ -130,7 +130,7 @@ pxr_build_test_shared_lib(TestPcpDynamicFileFormatPlugin
         testenv/TestPcpDynamicFileFormatPlugin.cpp
 )
 
-pxr_build_test_shared_lib(TestPcpAssetPathDynamicFileFormatPlugin
+pxr_build_test_plugin(TestPcpAssetPathDynamicFileFormatPlugin
     INSTALL_PREFIX PcpPlugins
     LIBRARIES
         tf
@@ -141,7 +141,7 @@ pxr_build_test_shared_lib(TestPcpAssetPathDynamicFileFormatPlugin
         testenv/TestPcpAssetPathDynamicFileFormatPlugin.cpp
 )
 
-pxr_build_test_shared_lib(TestPcpStreamingLayerReload
+pxr_build_test_plugin(TestPcpStreamingLayerReload
     INSTALL_PREFIX PcpPlugins
     LIBRARIES
         tf

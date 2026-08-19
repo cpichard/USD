@@ -72,7 +72,7 @@ pxr_library(arch
         overview.dox
 )
 
-pxr_build_test_shared_lib(testArchAbiPlugin
+pxr_build_test_plugin(testArchAbiPlugin
     CPPFILES
         testenv/testArchAbiPlugin.cpp
 )
