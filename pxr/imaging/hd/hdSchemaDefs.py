@@ -1086,6 +1086,25 @@
                       times and is expected to span the union of the shutter
                       intervals of cameras used in generating the render
                       artifacts.''')),
+            ('useForLegacyRenderDelegateSettings', T_BOOL,
+             dict(DOC = '''
+                A temporary field to transition to in-band render settings.
+
+                This field will not exist in a pure Hydra 2.0 world since
+                render settings are always communicated in-band through the
+                scene index. It mitigates the risk for HdRenderDelegate's
+                implementing both in-band render settings and the legacy
+                HdRenderDelegate::SetRenderSettings and those implementations
+                interact in complicated ways. That is, applications can use,
+                for example, an env var to switch between the new mechanism
+                and direct calls to HdRenderDelegate::SetRenderSettings to
+                revert to the old behavior while we address fall-out.
+
+                This field changes the emulation layer
+                HdRenderDelegateAdapterRenderer, to
+                set the legacy render settings on the legacy render delegate
+                using HdRenderDelegate::SetRenderSetting with the values
+                provided by this schema.''')),
         ],
     ),
 

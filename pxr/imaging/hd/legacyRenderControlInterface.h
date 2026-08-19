@@ -63,8 +63,13 @@ public:
     /// @}
 
     /// \name Render settings
+    ///
+    /// Deprecated: In hydra 2.0, render settings are
+    /// communicated in-band through the active render settings prim
+    /// in the scene index feeding the renderer.
+    ///
     /// @{
-    
+
     virtual HdRenderSettingDescriptorList
         GetRenderSettingDescriptors() const = 0;
     virtual VtValue GetRenderSetting(
