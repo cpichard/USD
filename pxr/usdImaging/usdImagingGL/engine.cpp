@@ -16,9 +16,9 @@
 #include "pxr/usdImaging/usdImaging/sceneIndex.h"
 #include "pxr/usdImaging/usdImaging/sceneIndices.h"
 #include "pxr/usdImaging/usdImaging/sceneIndexCreateArgsSchema.h"
+#include "pxr/usdImaging/usdImaging/stageSceneIndexInterface.h"
 
 #include "pxr/usdImaging/usdExecImaging/stageSceneIndexFactory.h"
-#include "pxr/usdImaging/usdExecImaging/stageSceneIndexInterface.h"
 
 #include "pxr/usd/usdGeom/tokens.h"
 #include "pxr/usd/usdGeom/camera.h"

@@ -12,18 +12,19 @@
 #include "pxr/pxr.h"
 
 #include "pxr/usdImaging/usdExecImaging/api.h"
-#include "pxr/usdImaging/usdExecImaging/stageSceneIndexInterface.h"
+
+#include "pxr/usdImaging/usdImaging/stageSceneIndexInterface.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-/// Constructs a concrete instance of UsdExecImagingStageSceneIndexInterface.
+/// Constructs a concrete instance of UsdImagingStageSceneIndexInterface.
 ///
 /// Construction of the scene index is hidden behind a factory function, because
 /// usdExecImaging can be built with exec disabled. When pxr is built with
 /// PXR_BUILD_EXEC=OFF, this method returns a null pointer.
 ///
 USDEXECIMAGING_API
-UsdExecImagingStageSceneIndexInterfaceRefPtr UsdExecImagingCreateStageSceneIndex();
+UsdImagingStageSceneIndexInterfaceRefPtr UsdExecImagingCreateStageSceneIndex();
 
 PXR_NAMESPACE_CLOSE_SCOPE
 

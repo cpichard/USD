@@ -41,6 +41,7 @@ pxr_library(usdExecImaging
         trace
         usd
         usdGeom
+        usdImaging
         vt
 
     PUBLIC_CLASSES
@@ -48,7 +49,6 @@ pxr_library(usdExecImaging
         primAdapterInterface
         requestAccessorInterface
         requestBuilderInterface
-        stageSceneIndexInterface
 
     PUBLIC_HEADERS
         api.h

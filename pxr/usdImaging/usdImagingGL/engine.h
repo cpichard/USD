@@ -66,7 +66,7 @@ TF_DECLARE_REF_PTRS(HdsiSceneGlobalsSceneIndex);
 TF_DECLARE_REF_PTRS(HdSceneIndexBase);
 TF_DECLARE_REF_PTRS(HdMergingSceneIndex);
 TF_DECLARE_REF_PTRS(HdxTaskControllerSceneIndex);
-TF_DECLARE_REF_PTRS(UsdExecImagingStageSceneIndexInterface);
+TF_DECLARE_REF_PTRS(UsdImagingStageSceneIndexInterface);
 
 using UsdStageWeakPtr = TfWeakPtr<class UsdStage>;
 
@@ -888,7 +888,7 @@ private:
 
     // Note that we'll only ever use one of _sceneIndex/_sceneDelegate
     // at a time.
-    UsdExecImagingStageSceneIndexInterfaceRefPtr _execStageSceneIndex;
+    UsdImagingStageSceneIndexInterfaceRefPtr _execStageSceneIndex;
     HdNoticeBatchingSceneIndexRefPtr _noticeBatchingStageSceneIndex;
     UsdImagingRootOverridesSceneIndexRefPtr _rootOverridesSceneIndex;
     UsdImagingLegacyRenderSettingsSceneIndexRefPtr _legacyRenderSettingsSceneIndex;
