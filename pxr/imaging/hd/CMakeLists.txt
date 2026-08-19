@@ -148,6 +148,7 @@ pxr_library(hd
         points
         prefixingSceneIndex
         primGather
+        primIdSchema
         primOriginSchema
         primTypeIndex
         primvarSchema

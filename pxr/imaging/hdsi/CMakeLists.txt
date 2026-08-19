@@ -40,6 +40,8 @@ pxr_library(hdsi
         particleFieldConversionSceneIndex
         prefixPathPruningSceneIndex
         pinnedCurveExpandingSceneIndex
+        primIdSceneIndex
+        primIdSceneIndexPlugin
         primManagingSceneIndexObserver
         primTypeAndPathPruningSceneIndex
         primTypeNoticeBatchingSceneIndex
@@ -98,6 +100,15 @@ pxr_build_test(testHdsiPrefixPathPruningSceneIndex
    CPPFILES
        testenv/testHdsiPrefixPathPruningSceneIndex.cpp
 )
+pxr_build_test(testHdsiPrimIdSceneIndex
+   LIBRARIES
+       hd
+       hdsi
+       tf
+
+   CPPFILES
+       testenv/testHdsiPrimIdSceneIndex.cpp
+)
 
 pxr_register_test(testHdsiComputeSceneIndexDiff
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdsiComputeSceneIndexDiff"
@@ -110,4 +121,7 @@ pxr_register_test(testHdsiSwitchingSceneIndex
 )
 pxr_register_test(testHdsiPrefixPathPruningSceneIndex
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdsiPrefixPathPruningSceneIndex"
+)
+pxr_register_test(testHdsiPrimIdSceneIndex
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdsiPrimIdSceneIndex"
 )

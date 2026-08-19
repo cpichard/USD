@@ -129,6 +129,8 @@ public:
 
     virtual VtDictionary GetRenderStats() = 0;
 
+    /// Clients should use HdSceneGlobalsSchema's primIdToPath instead.
+    ///
     virtual SdfPath GetRprimPathFromPrimId(int primIdx) = 0;
 
     /// @}

@@ -1522,6 +1522,21 @@
     ),
 
     #--------------------------------------------------------------------------
+    # primId
+    dict(
+        SCHEMA_NAME = 'PrimId',
+        SCHEMA_TOKEN = 'primId',
+        DOC = '''Unique id assigned to all imageable prims. Inverse map is in
+                 SceneGlobals.
+                 For example, these can be assigned by the HdsiPrimIdSceneIndex
+                 and used for an Id buffer for picking.''',
+        ADD_DEFAULT_LOCATOR = True,
+        MEMBERS = [
+            ('primId', 'HdPrimIdDataSource', {}),
+        ],
+    ),
+
+    #--------------------------------------------------------------------------
     # selection
     dict(
         SCHEMA_NAME = 'Selection',
@@ -1576,6 +1591,8 @@
             ('timeCodesPerSecond', T_DOUBLE, {}),
             ('currentFrame', T_DOUBLE, {}),
             ('sceneStateId', T_INT, {}),
+            ('primIdToPath', 'HdPathVectorSchema',
+             dict(DOC = '''Maps id's from PrimId schema to prim paths.''')),
         ],
     ),
 

@@ -872,6 +872,8 @@ private:
 
     HdLegacyRenderControlInterface * _GetLegacyRenderControl() const;
 
+    SdfPath _GetSceneIndexPrimPathFromPrimId(int primId) const;
+
     HdSceneIndexBaseRefPtr
     _AppendOverridesSceneIndices(
         const HdSceneIndexBaseRefPtr &inputScene);

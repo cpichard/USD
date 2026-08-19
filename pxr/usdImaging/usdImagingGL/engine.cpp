@@ -41,6 +41,7 @@
 #include "pxr/imaging/hd/rendererPlugin.h"
 #include "pxr/imaging/hd/rendererPluginRegistry.h"
 #include "pxr/imaging/hd/retainedDataSource.h"
+#include "pxr/imaging/hd/sceneGlobalsSchema.h"
 #include "pxr/imaging/hd/sceneIndexCreateArgsSchema.h"
 #include "pxr/imaging/hd/sceneIndexPluginRegistry.h"
 #include "pxr/imaging/hd/systemMessages.h"
@@ -1320,13 +1321,7 @@ UsdImagingGLEngine::DecodeIntersection(
     int * const outHitInstanceIndex,
     HdInstancerContext *const outInstancerContext)
 {
-    HdLegacyRenderControlInterface * const renderControl =
-        _GetLegacyRenderControl();
-    if (!renderControl) {
-        return false;
-    }
-
-    const SdfPath sceneIndexPath = renderControl->GetRprimPathFromPrimId(primIdx);
+    const SdfPath sceneIndexPath = _GetSceneIndexPrimPathFromPrimId(primIdx);
     if (sceneIndexPath.IsEmpty()) {
         return false;
     }
@@ -1378,29 +1373,11 @@ UsdImagingGLEngine::DecodeIntersection(
     return true;
 }
 
-// Convert a PickId to an HdxPickHit
-static HdxPickHit
-_PickHitFromPickId(
-    const UsdImagingGLEngine::PickId& pickId,
-    HdLegacyRenderControlInterface * const renderControl)
-{
-    HdxPickHit hit;
-    hit.objectId = renderControl->GetRprimPathFromPrimId(pickId.primId);
-    hit.instanceIndex = pickId.instanceId;
-    return hit;
-}
-
 UsdImagingGLEngine::DecodeResultVector
 UsdImagingGLEngine::DecodeIntersections(const PickIdVector& pickIds)
 {
     DecodeResultVector results;
     results.resize(pickIds.size());
-
-    HdLegacyRenderControlInterface * const renderControl =
-        _GetLegacyRenderControl();
-    if (!renderControl) {
-        return results;
-    }
 
     if (_sceneDelegate) {
         // Legacy scene delegate path: resolve each rprimPath individually
@@ -1408,7 +1385,7 @@ UsdImagingGLEngine::DecodeIntersections(const PickIdVector& pickIds)
             const auto [primIdx, instanceIdx] = pickIds[i];
 
             const SdfPath sceneIndexPath =
-                renderControl->GetRprimPathFromPrimId(primIdx);
+                _GetSceneIndexPrimPathFromPrimId(primIdx);
             if (sceneIndexPath.IsEmpty()) {
                 continue;
             }
@@ -1424,7 +1401,10 @@ UsdImagingGLEngine::DecodeIntersections(const PickIdVector& pickIds)
         hits.resize(pickIds.size());
 
         for (size_t i = 0; i < pickIds.size(); ++i) {
-            hits[i] = _PickHitFromPickId(pickIds[i], renderControl);
+            const PickId& pickId = pickIds[i];
+            HdxPickHit& hit = hits[i];
+            hit.objectId = _GetSceneIndexPrimPathFromPrimId(pickId.primId);
+            hit.instanceIndex = pickId.instanceId;
         }
 
         const std::vector<HdxPrimOriginInfo> infos =
@@ -2665,6 +2645,31 @@ UsdImagingGLEngine::_GetLegacyRenderControl() const
     }
 
     return renderControl;
+}
+
+SdfPath
+UsdImagingGLEngine::_GetSceneIndexPrimPathFromPrimId(const int primId) const
+{
+    HdSceneIndexBaseRefPtr const si = _GetTerminalSceneIndex();
+    if (!si) {
+        return {};
+    }
+
+    // Prefer prim id from terminal scene index.
+    if (HdPathDataSourceHandle const ds =
+            HdSceneGlobalsSchema::GetFromSceneIndex(si)
+                .GetPrimIdToPath()
+                .GetElement(primId)) {
+        return ds->GetTypedValue(0.0f);
+    }
+
+    // Fall back to the render index's own prim id table.
+    if (HdLegacyRenderControlInterface * const renderControl =
+            _GetLegacyRenderControl()) {
+        return renderControl->GetRprimPathFromPrimId(primId);
+    }
+
+    return {};
 }
 
 bool
