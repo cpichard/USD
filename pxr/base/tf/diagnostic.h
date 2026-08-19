@@ -290,11 +290,11 @@ PXR_NAMESPACE_OPEN_SCOPE
 /// "Debugging info about function YourClass::SomeMethod."
 ///
 /// \hideinitializer
-#define TF_FUNC_NAME()                                                     \
-    ([](char const *f, char const *pf) -> TfEternalString {                \
-        static TfEternalString const n =                                   \
-            TfEternalString::LeakCopy(ArchGetPrettierFunctionName(f, pf)); \
-        return n;                                                          \
+#define TF_FUNC_NAME()                                                         \
+    ([](char const *f, char const *pf) -> TfEternalString {                    \
+        static TfEternalString const n =                                       \
+            TfEternalString::Immortalize(ArchGetPrettierFunctionName(f, pf));  \
+        return n;                                                              \
     }(__ARCH_FUNCTION__, __ARCH_PRETTY_FUNCTION__))
 
 

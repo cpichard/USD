@@ -21,68 +21,72 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 /// \class TfEternalString
 ///
-/// An immutable string whose character data is guaranteed to remain valid at a
-/// fixed address for the remainder of the process.
+/// An immutable, interned string whose character data is guaranteed to remain
+/// valid at a fixed address for the remainder of the process.
 ///
 /// The point of this type is not to be a better string; it is to make a promise
 /// to the functions you pass it to, in a form the compiler can check.  A callee
 /// that receives a \c TfEternalString may:
 ///
 ///   \li retain \c c_str() / \c data() indefinitely without copying, and
-///   \li use that address as a durable memoization key -- if the same address
-///       is presented twice, it denotes the same characters, forever.
+///   \li use that address as a durable content identity.
 ///
-/// A callee may not assume the address is a content *identity*.  There is no
-/// interning here.  The implication runs one way only:
+/// The characters live in the \c TfToken table, which deduplicates by content,
+/// so the implication runs both ways and holds for the life of the process:
 ///
-///   \li same address   ==>  same content
-///   \li same content  =/=>  same address
+///   \li same address  <==>  same content
 ///
-/// Two distinct \c TfEternalString objects with equal content are expected.
-/// For example, \c TF_FUNC_NAME() which returns a \c TfEternalString can
-/// produce them, because \c ArchGetPrettierFunctionName() truncates to collapse
-/// overloads and template instantiations:
+/// That is, two equal addresses denote the same characters, and two differing
+/// addresses denote different characters.  Equality and hashing are therefore
+/// defined on the address, and are constant time regardless of length.
+///
+/// Interning also means there is only ever one copy of a given string.  Two
+/// call sites that produce the same content share it, rather than each holding
+/// their own copy.  \c TF_FUNC_NAME(), which returns a \c TfEternalString, does
+/// this whenever \c ArchGetPrettierFunctionName() truncates two names to the
+/// same text:
 ///
 /// \code
 ///   Outer::Member<int, float>()   -->  "Outer::Member"
 ///   Outer::Member<char, bool>()   -->  "Outer::Member"
 /// \endcode
 ///
-/// Two call sites, two addresses, one string.  Accordingly, equality and
-/// hashing on this type are defined by *content*, not by address.  Address
-/// comparison is a legitimate fast path but never a uniqueness guarantee.
+/// Two call sites, one string, one address.  Content that an ordinary \c TfToken
+/// elsewhere in the process already names is shared as well.
 ///
 /// \section TfEternalString_cost Cost
 ///
-/// Creating one leaks.  \c LeakCopy() allocates storage that is never freed,
-/// deliberately, to satisfy the immortality guarantee.  This makes the type
-/// suitable for a *bounded* set of strings fixed by the program source code --
-/// one per call site, as \c TF_FUNC_NAME() does -- and actively not suitable
-/// for anything dynamic or derived from data.  Never call \c LeakCopy() in a
-/// loop, per prim, per frame, or on user input.  If you cannot name a static
-/// bound on how many distinct strings your code creates, this is the wrong
-/// type.
+/// Creating one permanently retains an entry in the \c TfToken table.  Nothing
+/// reclaims it, deliberately, to satisfy the immortality guarantee.  Creating
+/// one also costs a hash, a \c strcmp, and a lock on one of the token table's
+/// sets, which is paid even when the content is already interned and no
+/// allocation results.
+///
+/// This makes the type suitable for a *bounded* set of strings fixed by the
+/// program source code -- one per call site, as \c TF_FUNC_NAME() does -- and
+/// actively not suitable for anything dynamic or derived from data.  Never call
+/// \c Immortalize() in a loop, per prim, per frame, or on user input.  Repeating
+/// the same content costs no additional space, since it dedups; the hazard is
+/// unbounded *distinct* content.  If you cannot name a static bound on how many
+/// distinct strings your code creates, this is the wrong type.
 ///
 /// \section TfEternalString_vs_token Relationship to TfToken
 ///
-/// \c TfToken is the closest existing thing, and this type deliberately agrees
-/// with it about what a name *is*: both derive string identity from a
-/// NUL-terminated c-string, which is why \c LeakCopy() trims.
+/// This type is implemented on the \c TfToken table: \c Immortalize() creates
+/// an immortal token and keeps the address of its characters.  That is where
+/// the content identity and the sharing described above come from.
 ///
-/// The reason \c TfEternalString exists anyway is *not* that an immortal
-/// \c TfToken is less durable.  It isn't.  Immortalizing clears the low bit of a
-/// rep's reference count, and reps are reclaimed only when that count is exactly
-/// 1, so an immortal rep's characters remain valid for the life of the process
-/// even with no live \c TfToken referring to them.  The reasons are these:
+/// Given that, the reason a separate type exists is *not* that an immortal \c
+/// TfToken is less durable.  It is the same storage and exactly as durable.
+/// The reasons are these:
 ///
-///   \li That durability is undocumented, and \c TfToken::GetText() states the
-///       opposite -- that its pointer is invalid once the token is destroyed.  A
-///       callee retaining immortal text would be relying on an implementation
-///       detail rather than on a contract.
-///   \li The promise would live in a runtime bit rather than in the type.  A
-///       callee handed a \c TfToken must consult \c IsImmortal() and carry a
-///       fallback, and cannot know statically that retaining the pointer is
-///       safe.  Handed a \c TfEternalString, it knows.
+///   \li The promise would live in a runtime property rather than in the type.
+///       The durability is real and documented (see \c TfToken's immortal
+///       constructors) but it is a property of how a particular token was made,
+///       not of the type.  A callee handed a \c TfToken must consult \c
+///       IsImmortal() and handle the case when it is not.  Handed a \c
+///       TfEternalString, it knows statically that retaining the pointer is
+///       safe.
 ///   \li \c TfToken is not a drop-in for a string-like result.  It has no
 ///       \c c_str(), \c length(), or \c empty(), and no \c operator+ at all --
 ///       and its implicit \c std::string const & conversion does not rescue
@@ -92,11 +96,8 @@ PXR_NAMESPACE_OPEN_SCOPE
 ///   \li \c tf/diagnostic.h, which defines \c TF_FUNC_NAME(), is deliberately
 ///       light and does not include \c tf/token.h.  Making it do so would pull
 ///       the token table's dependencies into nearly every translation unit.
-///
-/// None of that rules out using the token table as the *storage* for this type's
-/// characters, which would additionally make equal content share a single
-/// address.  Keeping the NUL semantics aligned is what leaves that available as
-/// a change with no observable effect on this interface.
+///       Only \c tf/eternalString.cpp includes \c tf/token.h, so depending on
+///       the token table for storage costs this header nothing.
 ///
 class TfEternalString
 {
@@ -104,21 +105,21 @@ public:
     /// Construct the empty eternal string.
     TF_API TfEternalString();
 
-    /// Copy \p content into heap storage that is never freed, and return a
-    /// \c TfEternalString referring to it.
+    /// Return the \c TfEternalString naming \p content, interning its
+    /// characters if they are not interned already.
     ///
     /// This is spelled as a named factory, not a converting constructor, so
     /// that callers make an explicit acknowledgement of intent at the call
     /// site.  There is deliberately no implicit conversion from \c char const *
-    /// or \c std::string for the same reason.
+    /// or \c std::string for the same reason.  See \ref TfEternalString_cost.
     ///
     /// Embedded NULs are not supported.  \p content is trimmed at the first
-    /// NUL, so \c LeakCopy("a\\0b") and \c LeakCopy("a") name the same string.
-    /// This matches \c TfToken, which derives string identity from a
+    /// NUL, so \c Immortalize("a\\0b") and \c Immortalize("a") name the same
+    /// string.  This matches \c TfToken, which derives string identity from a
     /// NUL-terminated c-string and therefore cannot tell such a name from its
     /// prefix either.  Consequently \c size() is always \c strlen(c_str()), and
     /// this type is for names, not for arbitrary binary content.
-    TF_API static TfEternalString LeakCopy(std::string_view content);
+    TF_API static TfEternalString Immortalize(std::string_view content);
 
     /// \name std::string-compatible accessors
     /// @{
@@ -148,7 +149,7 @@ public:
     ///
     /// Note the \c std::string conversion yields a reference, not a value.
     /// That is what makes the durable-address promise survive being passed
-    /// through an ordinary \c std::string const & parameter: no temporary is
+    /// through an ordinary `std::string const &` parameter: no temporary is
     /// materialized, so a callee that retains \c c_str() is safe.
     ///
     /// Providing both is a deliberate trade with one known cost.  A callee
@@ -186,10 +187,11 @@ public:
         return _Cat(a.data(), a.size(), b.data(), b.size());
     }
 
-    /// Compare by content, with an address fast path -- see the class
-    /// documentation on why address equality alone is not sufficient.
+    /// Compare by address, which interning makes a content identity in both
+    /// directions -- see the class documentation.  Constant time regardless of
+    /// length.
     friend bool operator==(TfEternalString a, TfEternalString b) {
-        return a._str == b._str || a.GetStringView() == b.GetStringView();
+        return a._str == b._str;
     }
     friend bool operator==(TfEternalString a, std::string_view b) {
         return a.GetStringView() == b;
@@ -207,10 +209,15 @@ public:
         return !(a == b);
     }
 
-    /// Hash by content -- see the class documentation on why not by address.
+    /// Hash by address, which interning makes a content identity -- see the
+    /// class documentation.  Constant time regardless of length.
+    ///
+    /// As with \c TfToken, which hashes its rep pointer for the same reason,
+    /// this means hash values vary between runs and do not agree with the hash
+    /// of an equal \c std::string.  Do not persist them.
     template <class HashState>
     friend void TfHashAppend(HashState &h, TfEternalString s) {
-        h.Append(s.GetString());
+        h.Append(s._str);
     }
 
     TF_API friend std::ostream &operator<<(std::ostream &o, TfEternalString s);

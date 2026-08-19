@@ -7,40 +7,40 @@
 #include "pxr/pxr.h"
 #include "pxr/base/tf/eternalString.h"
 
+#include "pxr/base/tf/token.h"
+
 #include <ostream>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
-// The one and only place this type leaks.  Storage allocated here is
-// intentionally never reclaimed; see the class doc for rationale.
+// Return the canonical, immortal address of the characters naming \p content.
 //
-// Content is trimmed at the first embedded NUL.  That is deliberate rather than
-// incidental: TfToken establishes string identity from a NUL-terminated
-// c-string, so a name with an embedded NUL is indistinguishable there from its
-// prefix.  Trimming here makes TfEternalString agree with TfToken about what a
-// given argument names, which keeps the door open to interning through the token
-// table later without changing observable behavior.  It also means
-// size() == strlen(c_str()) always holds.
+// Storage comes from the TfToken table, which deduplicates by content, so this
+// address is a content identity in both directions: equal content always yields
+// the same address, and distinct content never does.  Equal content shares a
+// single copy of the characters, whether it came from another TfEternalString
+// or from an ordinary TfToken.
+//
 static std::string const *
-_Leak(std::string_view content)
+_Intern(std::string_view content)
 {
-    // find() returns npos when there is no NUL, and substr() treats an npos
-    // count as "to the end", so this is a no-op for well-formed content.
-    return new std::string(content.substr(0, content.find('\0')));
+    // Taking the address of a temporary's referent is safe here precisely
+    // because the characters are immortal: whether they belong to an immortal
+    // rep or to the canonical empty string, they remain valid at a fixed
+    // address for the remainder of the process, outliving every TfToken that
+    // refers to them.  See TfToken's immortal constructors and GetString().
+    return &TfToken(std::string(content), TfToken::Immortal).GetString();
 }
 
 TfEternalString::TfEternalString()
-    : _str([]() {
-          static std::string const *empty = _Leak(std::string_view());
-          return empty;
-      }())
+    : _str(&TfToken().GetString())
 {
 }
 
 TfEternalString
-TfEternalString::LeakCopy(std::string_view content)
+TfEternalString::Immortalize(std::string_view content)
 {
-    return TfEternalString(_Leak(content));
+    return TfEternalString(_Intern(content));
 }
 
 std::string
