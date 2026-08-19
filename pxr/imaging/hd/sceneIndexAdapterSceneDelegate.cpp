@@ -359,6 +359,10 @@ HdSceneIndexAdapterSceneDelegate::PrimsAdded(
         _PrimAdded(entry.primPath, entry.primType);
     }
     if (!entries.empty()) {
+        // Clear, rather than only flagging: these are raw pointers to
+        // delegates we do not own, and an entry left here can outlive the
+        // delegate it points at.
+        _sceneDelegates.clear();
         _sceneDelegatesBuilt = false;
         _didAddOrRemovePrimsSinceLastSync = true;
     }
@@ -427,6 +431,10 @@ HdSceneIndexAdapterSceneDelegate::PrimsRemoved(
     }
 
     if (!entries.empty()) {
+        // Clear, rather than only flagging: these are raw pointers to
+        // delegates we do not own, and an entry left here can outlive the
+        // delegate it points at.
+        _sceneDelegates.clear();
         _sceneDelegatesBuilt = false;
         _didAddOrRemovePrimsSinceLastSync = true;
     }
@@ -3012,9 +3020,13 @@ HdSceneIndexAdapterSceneDelegate::Sync(HdSyncRequestVector* request)
 void
 HdSceneIndexAdapterSceneDelegate::PostSyncCleanup()
 {
-    for (auto sd : _sceneDelegates) {
-        if (TF_VERIFY(sd != nullptr)) {
-            sd->PostSyncCleanup();
+    // Only valid while _sceneDelegatesBuilt: these are raw pointers to
+    // delegates we do not own, and unlike Sync() we must not rebuild here.
+    if (_sceneDelegatesBuilt) {
+        for (auto sd : _sceneDelegates) {
+            if (TF_VERIFY(sd != nullptr)) {
+                sd->PostSyncCleanup();
+            }
         }
     }
 
