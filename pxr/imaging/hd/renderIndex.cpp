@@ -96,7 +96,9 @@ _GetPrimIdFromSceneIndex(
     HdPrimIdDataSourceHandle const ds =
         HdPrimIdSchema::GetFromParent(prim.dataSource).GetPrimId();
     if (!ds) {
-        TF_WARN("No prim id for <%s> from terminal scene index", rprimId.GetText());
+        TF_WARN(
+            "No prim id for prim <%s> of type '%s' from terminal scene index.",
+            rprimId.GetText(), prim.primType.GetText());
         return -1;
     }
     return static_cast<int32_t>(ds->GetTypedValue(0.0f));
