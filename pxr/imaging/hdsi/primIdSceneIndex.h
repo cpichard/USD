@@ -15,7 +15,7 @@ PXR_NAMESPACE_OPEN_SCOPE
 
 namespace HdsiPrimIdSceneIndex_Impl
 {
-struct _PrimIdInfo;
+class _PrimIdInfo;
 using _PrimIdInfoSharedPtr = std::shared_ptr<_PrimIdInfo>;
 }
 
@@ -29,8 +29,10 @@ TF_DECLARE_REF_PTRS(HdsiPrimIdSceneIndex);
 /// It populates the HdPrimId schema and the primIdToPath map of the
 /// HdSceneGlobalsSchema.
 ///
-/// Note that the id's might not be consecutive and might be reallocated
-/// to ensure they are smaller than 2^24.
+/// Note that the id's might not be consecutive. When a prim is removed, its
+/// id is freed and later reused for a new prim. The prim id of a prim does
+/// not change unless the prim is removed and re-added or re-added with a
+/// different prim type.
 ///
 /// It replaces the prim id's that were assigned in the HdRenderIndex.
 ///
@@ -72,9 +74,6 @@ protected:
             const HdSceneIndexObserver::DirtiedPrimEntries &entries) override;
 
 private:
-    // Reassign prim ids if there is a prim id greater or equal to 2^24.
-    void _CompactPrimIdsIfNecessary();
-
     // State for this scene index.
     HdsiPrimIdSceneIndex_Impl::_PrimIdInfoSharedPtr const _primIdInfo;
 

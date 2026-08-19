@@ -26,16 +26,13 @@
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <variant>
 #include <vector>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
 namespace HdsiPrimIdSceneIndex_Impl
 {
-
-// The largest id we ever hand out to clients (unless there are
-// 2^24 prims or more).
-static constexpr uint32_t maxId = (1 << 24) - 1;
 
 //
 // Compact version of std::optional<uint32_t>.
@@ -61,20 +58,162 @@ private:
 };
 
 // Scene index state.
-struct _PrimIdInfo
+//
+// Mapping between imageable prim paths and their prim ids.
+//
+class _PrimIdInfo
 {
+public:
+    // Assign an id to the given path if it does not have one yet.
+    // Returns true if a new id was assigned.
+    bool AssignIdToPath(const SdfPath &path)
+    {
+        _OptionalPrimId &id = _pathToId[path];
+        if (id) {
+            // Already has a prim Id.
+            return false;
+        }
+        // Assign the new prim Id.
+        id = _AllocateId(path);
+        return true;
+    }
+
+    // Free the id of the given path but not the descendants.
+    // Returns true if the prim had an Id (and it was freed).
+    bool RemoveAssignedIdForPath(const SdfPath &path)
+    {
+        const auto it = _pathToId.find(path);
+        if (it == _pathToId.end() || !it->second) {
+            return false;
+        }
+        _FreeId(*it->second);
+        if (it.HasChild()) {
+            // We cannot delete it from the SdfPathTable because it
+            // has (imageable) descendants.
+            it->second = {};
+        } else {
+            // Safe to delete since it has no descendants.
+            _pathToId.erase(it);
+        }
+        return true;
+    }
+
+    // Free the ids of the given path and all its descendants.
+    // Returns true if any id was freed.
+    bool RemoveSubtree(const SdfPath &path)
+    {
+        bool freed = false;
+        const auto [begin, end] = _pathToId.FindSubtreeRange(path);
+        for (auto it = begin; it != end; ++it) {
+            if (it->second) {
+                _FreeId(*it->second);
+                freed = true;
+            }
+        }
+        // _pathToId is an SdfPathTable, so all descendants get removed
+        // automatically.
+        _pathToId.erase(path);
+        return freed;
+    }
+
+    void Clear()
+    {
+        TfReset(_pathToId);
+        TfReset(_idToPathOrNextFreeId);
+        _firstFreeId = {};
+    }
+
+    // The id assigned to path or the empty optional.
+    _OptionalPrimId GetId(const SdfPath &path) const
+    {
+        const auto it = _pathToId.find(path);
+        if (it == _pathToId.end()) {
+            return {};
+        }
+        return it->second;
+    }
+
+    // The total number of assigned and free ids. It is an upper bound
+    // of any prim id.
+    size_t GetNumIds() const
+    {
+        return _idToPathOrNextFreeId.size();
+    }
+
+    // The path for id, or an empty path if id is out of range or free.
+    SdfPath GetPathFromId(const size_t id) const
+    {
+        if (id >= _idToPathOrNextFreeId.size()) {
+            return {};
+        }
+        const SdfPath * const path =
+            std::get_if<SdfPath>(&_idToPathOrNextFreeId[id]);
+        if (!path) {
+            // A free id.
+            return {};
+        }
+        return *path;
+    }
+
+private:
+    // Allocate an id for the given path.
+    uint32_t _AllocateId(const SdfPath &path)
+    {
+        if (_firstFreeId) {
+            // Re-use a free Id if possible.
+            const uint32_t id = *_firstFreeId;
+            // The slot holds the next free id in the list.
+            try {
+                _firstFreeId =
+                    std::get<_OptionalPrimId>(_idToPathOrNextFreeId[id]);
+                _idToPathOrNextFreeId[id] = path;
+            }
+            catch(const std::bad_variant_access&)
+            {
+                TF_VERIFY(
+                    false,
+                    "Expected _OptionalPrimId for slot pointed to by "
+                    "_firstFreeId.");
+            }
+            return id;
+        }
+        // Use a new Id.
+        const uint32_t id = static_cast<uint32_t>(_idToPathOrNextFreeId.size());
+        _idToPathOrNextFreeId.emplace_back(path);
+        return id;
+    }
+
+    // Free the given id.
+    void _FreeId(const uint32_t id)
+    {
+        // Push it onto the linked list.
+        _idToPathOrNextFreeId[id] = _firstFreeId;
+        _firstFreeId = id;
+    }
+
     // Prim path to optional prim Id.
     //
     // We do not add an entry for non-imageable prims.
     // However, the SdfPathTable adds ancestors of imageable prims
-    // if necessary (which will be empty _OptionalPrimId's.
+    // if necessary (which will be empty _OptionalPrimId's).
     //
-    SdfPathTable<_OptionalPrimId> pathToId;
+    SdfPathTable<_OptionalPrimId> _pathToId;
 
     // Inverse of the above path table.
     //
-    // Can contain empty paths since prim ids might not be consecutive.
-    std::vector<SdfPath> idToPath;
+    // If the element at index i is an SdfPath, then i is the Id assigned to
+    // the prim at that path. All other elements form a linked list of
+    // unassigned Ids. The tail of the linked list is indicated by
+    // an empty _OptionalPrimId.
+    //
+    // That is, if the element at index i is holding an _OptionalPrimId,
+    // then i itself is an unassigned Id. If the _OptionalPrimId is non-empty,
+    // then it contains the next unassigned Id.
+    std::vector<std::variant<SdfPath, _OptionalPrimId>> _idToPathOrNextFreeId;
+
+    // Head of the linked list of free ids (not necessarily the smallest
+    // free Id).
+    _OptionalPrimId _firstFreeId;
 };
 
 // Prim-level container data source for an imagable prim overlaying the
@@ -122,13 +261,13 @@ private:
     {
         TRACE_FUNCTION();
 
-        const auto it = _primIdInfo->pathToId.find(_primPath);
-        if (it == _primIdInfo->pathToId.end() || !it->second) {
+        const _OptionalPrimId id = _primIdInfo->GetId(_primPath);
+        if (!id) {
             return nullptr;
         }
         return HdPrimIdSchema::Builder()
             .SetPrimId(
-                HdRetainedTypedSampledDataSource<uint32_t>::New(*it->second))
+                HdRetainedTypedSampledDataSource<uint32_t>::New(*id))
             .Build();
     }
 
@@ -145,15 +284,12 @@ public:
 
     size_t GetNumElements() override
     {
-        return _primIdInfo->idToPath.size();
+        return _primIdInfo->GetNumIds();
     }
 
     HdDataSourceBaseHandle GetElement(const size_t element) override
     {
-        if (element >= _primIdInfo->idToPath.size()) {
-            return nullptr;
-        }
-        const SdfPath &path = _primIdInfo->idToPath[element];
+        const SdfPath path = _primIdInfo->GetPathFromId(element);
         if (path.IsEmpty()) {
             return nullptr;
         }
@@ -189,58 +325,13 @@ HdsiPrimIdSceneIndex::HdsiPrimIdSceneIndex(
     const HdSceneIndexBaseRefPtr &input = _GetInputSceneIndex();
 
     for (const SdfPath &primPath : HdSceneIndexPrimView(input)) {
-        
         if (HdPrimTypeIsGprim(input->GetPrim(primPath).primType)) {
-            _primIdInfo->pathToId[primPath] =
-                static_cast<uint32_t>(_primIdInfo->idToPath.size());
-            _primIdInfo->idToPath.push_back(primPath);
+            _primIdInfo->AssignIdToPath(primPath);
         }
     }
 }
 
 HdsiPrimIdSceneIndex::~HdsiPrimIdSceneIndex() = default;
-
-void
-HdsiPrimIdSceneIndex::_CompactPrimIdsIfNecessary()
-{
-    TRACE_FUNCTION();
-
-    if (_primIdInfo->idToPath.size() <= maxId) {
-        // No re-assignment unless we reach the maxId.
-        return;
-    }
-
-    // Re-assign consectuive primId's (starting with 0) to all
-    // imagable prims.
-
-    _primIdInfo->idToPath.clear();
-
-    const bool isObserved = _IsObserved();
-
-    HdSceneIndexObserver::DirtiedPrimEntries dirtied;
-    for (auto &[primPath, primId] : _primIdInfo->pathToId) {
-        if (!primId) {
-            continue;
-        }
-        primId =
-            static_cast<uint32_t>(_primIdInfo->idToPath.size());
-        _primIdInfo->idToPath.push_back(primPath);
-        if (isObserved) {
-            dirtied.emplace_back(
-                primPath, HdPrimIdSchema::GetDefaultLocator());
-        }
-    }
-
-    if (!isObserved) {
-        return;
-    }
-
-    dirtied.emplace_back(
-        SdfPath::AbsoluteRootPath(),
-        HdSceneGlobalsSchema::GetPrimIdToPathLocator());
-
-    _SendPrimsDirtied(dirtied);
-}
 
 HdSceneIndexPrim
 HdsiPrimIdSceneIndex::GetPrim(const SdfPath &primPath) const
@@ -287,41 +378,18 @@ HdsiPrimIdSceneIndex::_PrimsAdded(
 
         for (const HdSceneIndexObserver::AddedPrimEntry &entry : entries) {
             if (HdPrimTypeIsGprim(entry.primType)) {
-                _OptionalPrimId &existingId =
-                    _primIdInfo->pathToId[entry.primPath];
-                if (existingId) {
-                    continue;
+                // Assign a new primId unless the prim already has one.
+                if (_primIdInfo->AssignIdToPath(entry.primPath)) {
+                    primIdsChanged = true;
                 }
-                // Prim didn't have an existing primId, need to assign a new
-                // one.
-                existingId =
-                    static_cast<uint32_t>(_primIdInfo->idToPath.size());
-                _primIdInfo->idToPath.push_back(entry.primPath);
-                primIdsChanged = true;
             } else {
-                auto it = _primIdInfo->pathToId.find(entry.primPath);
-                if (it == _primIdInfo->pathToId.end()) {
-                    continue;
-                }
-                if (!it->second) {
-                    continue;
-                }
-                // Prim had an existing primId. We need to delete it.
-                _primIdInfo->idToPath[*it->second] = {};
-                primIdsChanged = true;
-                if (it.HasChild()) {
-                    // It has imagable descendants, so we cannot
-                    // delete it from the SdfPathTable.
-                    it->second = {};
-                } else {
-                    // No children, so safe to delete.
-                    _primIdInfo->pathToId.erase(it);
+                // Free the primId if the prim had one.
+                if (_primIdInfo->RemoveAssignedIdForPath(entry.primPath)) {
+                    primIdsChanged = true;
                 }
             }
         }
     }
-
-    _CompactPrimIdsIfNecessary();
 
     if (!_IsObserved()) {
         return;
@@ -349,25 +417,15 @@ HdsiPrimIdSceneIndex::_PrimsRemoved(
         const SdfPath &primPath = entry.primPath;
 
         if (primPath.IsAbsoluteRootPath()) {
-            TfReset(_primIdInfo->pathToId);
-            TfReset(_primIdInfo->idToPath);
+            _primIdInfo->Clear();
             primIdsChanged = true;
             break;
         }
 
-        // Update idToPath for all descendants of prim path.
-        const auto [begin, end] =
-            _primIdInfo->pathToId.FindSubtreeRange(primPath);
-        for (auto it = begin; it != end; ++it) {
-            if (it->second) {
-                _primIdInfo->idToPath[*it->second] = {};
-                primIdsChanged = true;
-            }
+        // Free the ids of prim path and all its descendants.
+        if (_primIdInfo->RemoveSubtree(primPath)) {
+            primIdsChanged = true;
         }
-
-        // pathToId is SdfPathTable, so all descendants get
-        // removed automatically.
-        _primIdInfo->pathToId.erase(primPath);
     }
 
     if (!_IsObserved()) {
