@@ -54,10 +54,17 @@ void
 UsdExecImaging_StageSceneIndex::SetTime(UsdTimeCode time)
 {
     if (_request) {
+        _time = time;
         _request->SetTime(time);
         _request->Refresh();
         _SendPrimsDirtied(_request->TakeDirtiedPrimEntries());
     }
+}
+
+UsdTimeCode
+UsdExecImaging_StageSceneIndex::GetTime() const
+{
+    return _time;
 }
 
 void

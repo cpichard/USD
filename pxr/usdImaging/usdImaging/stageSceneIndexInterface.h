@@ -42,6 +42,9 @@ public:
     ///
     virtual void SetTime(UsdTimeCode time) = 0;
 
+    /// Return the current time.
+    virtual UsdTimeCode GetTime() const = 0;
+
     /// Apply queued stage edits to imaging scene.
     ///
     /// If the USD stage is edited while the scene index is pulling from it,

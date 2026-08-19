@@ -13,9 +13,10 @@
 
 #include "pxr/usdImaging/usdExecImaging/request.h"
 
+#include "pxr/base/tf/declarePtrs.h"
+#include "pxr/usd/usd/timeCode.h"
 #include "pxr/usdImaging/usdImaging/stageSceneIndexInterface.h"
 
-#include "pxr/base/tf/declarePtrs.h"
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -72,7 +73,12 @@ public:
     /// The updated values are recomputed on the next call to GetPrim or
     /// ApplyPendingUpdates.
     ///
+    /// PrimsDirtied is only called if the time is different from the last call.
+    ///
     void SetTime(UsdTimeCode time) override;
+
+    /// Returns the current time.
+    UsdTimeCode GetTime() const override;
 
     /// Calls PrimsDirtied for computed values that have changed due to scene
     /// changes.
@@ -89,6 +95,7 @@ private:
 
 private:
     UsdExecImaging_RequestSharedPtr _request;
+    UsdTimeCode _time;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
