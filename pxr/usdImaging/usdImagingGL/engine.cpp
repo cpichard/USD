@@ -411,6 +411,9 @@ UsdImagingGLEngine::_DestroyHydraObjects()
         TRACE_SCOPE("Destroy UsdImaging delegate");
 
         _sceneDelegate = nullptr;
+
+        // Reset flag.
+        _setActiveRenderSettingsPrimPathCalled = false;
     }
 
     // We are not removing _usdImagingFinalSceneIndex from _mergingSceneIndex
@@ -553,9 +556,9 @@ UsdImagingGLEngine::PrepareBatch(
                 stage->GetPrimAtPath(_rootPath),
                 _excludedPrimPaths);
             _sceneDelegate->SetInvisedPrimPaths(_invisedPrimPaths);
-            // This is only necessary when using the legacy scene delegate.
-            // The stage scene index provides this functionality.
-            _SetActiveRenderSettingsPrimFromStageMetadata(stage);
+            if (!_setActiveRenderSettingsPrimPathCalled) {
+                _SetActiveRenderSettingsPrimFromStageMetadata(stage);
+            }
         }
         _isPopulated = true;
     }
@@ -582,32 +585,32 @@ void
 UsdImagingGLEngine::_SetActiveRenderSettingsPrimFromStageMetadata(
     UsdStageWeakPtr stage)
 {
+    if (UseUsdImagingSceneIndex()) {
+        TF_CODING_ERROR(
+            "The canonical source of the active render settings prim path of "
+            "the UsdStage is the UsdImagingSceneIndex.");
+    }
+    
     if (!TF_VERIFY(stage)) {
         return;
     }
 
-    HdSceneIndexBaseRefPtr const terminalSceneIndex =
-        _GetTerminalSceneIndex();
-    if (!TF_VERIFY(terminalSceneIndex)) {
+    if (!stage->HasAuthoredMetadata(UsdRenderTokens->renderSettingsPrimPath)) {
         return;
     }
 
-    // If we already have an opinion, skip the stage metadata.
-    if (!HdUtils::HasActiveRenderSettingsPrim(terminalSceneIndex)) {
-        std::string pathStr;
-        if (stage->HasAuthoredMetadata(
-                UsdRenderTokens->renderSettingsPrimPath)) {
-            stage->GetMetadata(
-                UsdRenderTokens->renderSettingsPrimPath, &pathStr);
-        }
-        // Add the delegateId prefix since the scene globals scene index is
-        // inserted into the merging scene index.
-        if (!pathStr.empty()) {
-            SetActiveRenderSettingsPrimPath(
-                SdfPath(pathStr).ReplacePrefix(
-                    SdfPath::AbsoluteRootPath(), _sceneDelegateId));
-        }
+    std::string pathStr;
+    stage->GetMetadata(UsdRenderTokens->renderSettingsPrimPath, &pathStr);
+
+    if (pathStr.empty()) {
+        return;
     }
+
+    // Add the delegateId prefix since the scene globals scene index is
+    // inserted into the merging scene index.
+    SetActiveRenderSettingsPrimPath(
+        SdfPath(pathStr).ReplacePrefix(
+            SdfPath::AbsoluteRootPath(), _sceneDelegateId));
 }
 
 void
@@ -2146,6 +2149,10 @@ UsdImagingGLEngine::SetActiveRenderSettingsPrimPath(SdfPath const &path)
     auto &sgsi = _appSceneIndices->sceneGlobalsSceneIndex;
     if (ARCH_UNLIKELY(!sgsi)) {
         return;
+    }
+
+    if (!UseUsdImagingSceneIndex()) {
+        _setActiveRenderSettingsPrimPathCalled = true;
     }
 
     sgsi->SetActiveRenderSettingsPrimPath(path);

@@ -916,6 +916,21 @@ private:
 
     bool _allowAsynchronousSceneProcessing = false;
     bool _enableUsdDrawModes = true;
+
+    /* Hydra 1.0 */
+    // A flag indicating whether the active render pass prim path
+    // on the scene globals scene index was set.
+    //
+    // Explanation: The active render passs prim path can be set by a
+    // client of UsdImagingGLEngine through SetActiveRenderSettingsPrimPath
+    // and or by reading the stage metadata when using the UsdImagingDelegate.
+    //
+    // Thus, we could get into a situation where a user explicitly sets it
+    // through the UsdImagingGLEngine API first and then we wrongfully change
+    // it later by reading the stage metadata.
+    //
+    // This flag is here to prevent this.
+    bool _setActiveRenderSettingsPrimPathCalled = false;
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
