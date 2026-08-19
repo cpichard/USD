@@ -258,6 +258,7 @@ pxr_library(tf
         pyErrorInternal
 
     PRIVATE_HEADERS
+        buffer.h
         scopeDescriptionPrivate.h
         pxrDoubleConversion/ieee.h
         pxrDoubleConversion/utils.h
@@ -444,6 +445,7 @@ pxr_build_test(testTf
         testenv/atomicOfstreamWrapper.cpp
         testenv/bits.cpp
         testenv/bitUtils.cpp
+        testenv/buffer.cpp
         testenv/compressedBits.cpp
         testenv/debug.cpp
         testenv/denseHashMap.cpp
@@ -564,6 +566,9 @@ pxr_register_test(TfBits
 )
 pxr_register_test(TfBitUtils
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfBitUtils"
+)
+pxr_register_test(Tf_Buffer
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf Tf_Buffer"
 )
 pxr_register_test(TfCompressedBits
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfCompressedBits"
