@@ -135,6 +135,7 @@ pxr_library(tf
         error
         errorMark
         errorTransport
+        eternalString
         exception
         expiryNotifier
         fastCompression
@@ -454,6 +455,7 @@ pxr_build_test(testTf
         testenv/enum.cpp
         testenv/error.cpp
         testenv/envSetting.cpp
+        testenv/eternalString.cpp
         testenv/exception.cpp
         testenv/fastCompression.cpp
         testenv/fileUtils.cpp
@@ -634,6 +636,9 @@ pxr_register_test(TfErrorAndDiagnosticTransportLogText
 )
 pxr_register_test(TfErrorThreadTransport
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfErrorThreadTransport"
+)
+pxr_register_test(TfEternalString
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testTf TfEternalString"
 )
 pxr_register_test(TfFileUtils_Python
     PYTHON
