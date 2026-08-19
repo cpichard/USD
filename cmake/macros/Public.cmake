@@ -1060,6 +1060,19 @@ function(pxr_register_test TEST_NAME)
     # TF_FATAL_VERIFY where desired.
     set(testWrapperCmd ${testWrapperCmd} --env-var=TF_FATAL_VERIFY=1)
 
+    # If building on Windows, the tests need to add directories containing DLLs
+    # to the PATH. This includes directories for core libraries, plugins, and
+    # test-only libraries. On non-Windows platforms, this is handled by the
+    # RPATH embedded in the test executable. Note this is a best-effort to add
+    # the appropriate DLL paths, but the user may still be responsible for
+    # modifying the PATH to find 3rd party DLLs from outside the tree.
+    if (WIN32)
+        set(testWrapperCmd ${testWrapperCmd}
+            "--pre-path=${CMAKE_INSTALL_PREFIX}/lib"
+            "--pre-path=${CMAKE_INSTALL_PREFIX}/plugin/usd"
+            "--pre-path=${CMAKE_INSTALL_PREFIX}/tests/lib")
+    endif()
+
     # Allow env vars to be set via a global variable to make it easier
     # to affect a set of tests (e.g., all tests in a library). Set
     # this first to allow tests to override these env vars.
