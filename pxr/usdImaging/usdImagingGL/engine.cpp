@@ -635,17 +635,12 @@ UsdImagingGLEngine::_UpdateDomeLightCameraVisibility()
     // as we move towards Hydra 2.0 render delegates and render settings are
     // communicated in-band through scene indices.
 
+    const VtValue v = 
+        GetRendererSetting(HdRenderSettingsTokens->domeLightCameraVisibility);
+
     // The absence of a setting in the map is the same as camera visibility
     // being on.
-    HdLegacyRenderControlInterface * const renderControl =
-        _GetLegacyRenderControl();
-    if (!renderControl) {
-        return;
-    }
-    const VtValue v = renderControl->GetRenderSetting(
-        HdRenderSettingsTokens->domeLightCameraVisibility);
-    bool domeLightCamVisSetting = v.GetWithDefault<bool>(true);
-
+    const bool domeLightCamVisSetting = v.GetWithDefault<bool>(true);
     if (_domeLightCameraVisibility == domeLightCamVisSetting) {
         return;
     }
