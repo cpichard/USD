@@ -16,6 +16,18 @@
 #extension GL_NV_shader_buffer_load : require
 #extension GL_NV_gpu_shader5 : require
 #extension GL_ARB_bindless_texture : require
+#if defined(GL_EXT_control_flow_attributes)
+	#extension GL_EXT_control_flow_attributes: require
+	#define HGI_COMPILER_ATTR_UNROLL [[unroll]]
+	#define HGI_COMPILER_ATTR_DONT_UNROLL [[dont_unroll]]
+	#define HGI_COMPILER_ATTR_FLATTEN [[flatten]]
+	#define HGI_COMPILER_ATTR_DONT_FLATTEN [[dont_flatten]]
+#else
+	#define HGI_COMPILER_ATTR_UNROLL
+	#define HGI_COMPILER_ATTR_DONT_UNROLL
+	#define HGI_COMPILER_ATTR_FLATTEN
+	#define HGI_COMPILER_ATTR_DONT_FLATTEN
+#endif
 #extension GL_ARB_shader_draw_parameters : require
 int HgiGetBaseVertex() {
   return gl_BaseVertexARB;
@@ -965,6 +977,18 @@ float ApplyPointSizeBias(float pointSize)
 #extension GL_NV_shader_buffer_load : require
 #extension GL_NV_gpu_shader5 : require
 #extension GL_ARB_bindless_texture : require
+#if defined(GL_EXT_control_flow_attributes)
+	#extension GL_EXT_control_flow_attributes: require
+	#define HGI_COMPILER_ATTR_UNROLL [[unroll]]
+	#define HGI_COMPILER_ATTR_DONT_UNROLL [[dont_unroll]]
+	#define HGI_COMPILER_ATTR_FLATTEN [[flatten]]
+	#define HGI_COMPILER_ATTR_DONT_FLATTEN [[dont_flatten]]
+#else
+	#define HGI_COMPILER_ATTR_UNROLL
+	#define HGI_COMPILER_ATTR_DONT_UNROLL
+	#define HGI_COMPILER_ATTR_FLATTEN
+	#define HGI_COMPILER_ATTR_DONT_FLATTEN
+#endif
 #define REF(space,type) inout type
 #define FORWARD_DECL(func_decl) func_decl;
 #define ATOMIC_LOAD(a) (a)
@@ -1548,6 +1572,18 @@ void determineLODSettings(CurveData vertexData)
 #extension GL_NV_shader_buffer_load : require
 #extension GL_NV_gpu_shader5 : require
 #extension GL_ARB_bindless_texture : require
+#if defined(GL_EXT_control_flow_attributes)
+	#extension GL_EXT_control_flow_attributes: require
+	#define HGI_COMPILER_ATTR_UNROLL [[unroll]]
+	#define HGI_COMPILER_ATTR_DONT_UNROLL [[dont_unroll]]
+	#define HGI_COMPILER_ATTR_FLATTEN [[flatten]]
+	#define HGI_COMPILER_ATTR_DONT_FLATTEN [[dont_flatten]]
+#else
+	#define HGI_COMPILER_ATTR_UNROLL
+	#define HGI_COMPILER_ATTR_DONT_UNROLL
+	#define HGI_COMPILER_ATTR_FLATTEN
+	#define HGI_COMPILER_ATTR_DONT_FLATTEN
+#endif
 #define REF(space,type) inout type
 #define FORWARD_DECL(func_decl) func_decl;
 #define ATOMIC_LOAD(a) (a)
@@ -2344,6 +2380,18 @@ vec4 InterpolatePrimvar(vec4 inPv0, vec4 inPv1, vec4 inPv2, vec4 inPv3,
 #extension GL_NV_shader_buffer_load : require
 #extension GL_NV_gpu_shader5 : require
 #extension GL_ARB_bindless_texture : require
+#if defined(GL_EXT_control_flow_attributes)
+	#extension GL_EXT_control_flow_attributes: require
+	#define HGI_COMPILER_ATTR_UNROLL [[unroll]]
+	#define HGI_COMPILER_ATTR_DONT_UNROLL [[dont_unroll]]
+	#define HGI_COMPILER_ATTR_FLATTEN [[flatten]]
+	#define HGI_COMPILER_ATTR_DONT_FLATTEN [[dont_flatten]]
+#else
+	#define HGI_COMPILER_ATTR_UNROLL
+	#define HGI_COMPILER_ATTR_DONT_UNROLL
+	#define HGI_COMPILER_ATTR_FLATTEN
+	#define HGI_COMPILER_ATTR_DONT_FLATTEN
+#endif
 #extension GL_NV_fragment_shader_barycentric: require
 #define REF(space,type) inout type
 #define FORWARD_DECL(func_decl) func_decl;
