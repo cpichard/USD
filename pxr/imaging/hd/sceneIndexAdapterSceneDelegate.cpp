@@ -33,6 +33,7 @@
 #include "pxr/imaging/hd/sceneIndexObserver.h"
 #include "pxr/imaging/hd/sceneIndexPrimView.h"
 #include "pxr/imaging/hd/schemaTypeDefs.h"
+#include "pxr/imaging/hd/systemMessages.h"
 #include "pxr/imaging/hd/tokens.h"
 #include "pxr/imaging/hd/topology.h"
 #include "pxr/imaging/hd/types.h"
@@ -150,6 +151,7 @@ HdSceneIndexAdapterSceneDelegate::HdSceneIndexAdapterSceneDelegate(
     SdfPath const &delegateID)
 : HdSceneDelegate(parentIndex, delegateID)
 , _inputSceneIndex(inputSceneIndex)
+, _didAddOrRemovePrimsSinceLastSync(false)
 , _sceneDelegatesBuilt(false)
 , _cachedLocatorSet()
 , _cachedDirtyBits(0)
@@ -358,6 +360,7 @@ HdSceneIndexAdapterSceneDelegate::PrimsAdded(
     }
     if (!entries.empty()) {
         _sceneDelegatesBuilt = false;
+        _didAddOrRemovePrimsSinceLastSync = true;
     }
 }
 
@@ -425,6 +428,7 @@ HdSceneIndexAdapterSceneDelegate::PrimsRemoved(
 
     if (!entries.empty()) {
         _sceneDelegatesBuilt = false;
+        _didAddOrRemovePrimsSinceLastSync = true;
     }
 }
 
@@ -3008,14 +3012,28 @@ HdSceneIndexAdapterSceneDelegate::Sync(HdSyncRequestVector* request)
 void
 HdSceneIndexAdapterSceneDelegate::PostSyncCleanup()
 {
-    if (!_sceneDelegatesBuilt) {
-        return;
-    }
-
     for (auto sd : _sceneDelegates) {
         if (TF_VERIFY(sd != nullptr)) {
             sd->PostSyncCleanup();
         }
+    }
+
+    // Cache eviction strategy:
+    //
+    // If prims were added or removed since the last sync, send a
+    // "dropCaches" system message.  This allows scene indexes to
+    // reclaim storage associated with internal caches supporting
+    // efficient scene population.  If no prims were addded or removed,
+    // leave caches in place in case they are supporting interactive
+    // edit loops (PrimsDirtied).
+    //
+    // This caching strategy may continue to evolve in the future.
+    if (_didAddOrRemovePrimsSinceLastSync) {
+        if (_inputSceneIndex) {
+            _inputSceneIndex->SystemMessage(
+                HdSystemMessageTokens->dropCaches, nullptr);
+        }
+        _didAddOrRemovePrimsSinceLastSync = false;
     }
 }
 
