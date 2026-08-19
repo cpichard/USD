@@ -17,21 +17,13 @@ struct _EvalSplineFunctor
 {
     template <typename T>
     void operator()(const TsSpline& spline, UsdTimeCode localTime,
-                    const SdfLayerOffset& layerToStageOffset, T* result,
-                    bool* successOut)
+                    T* result, bool* successOut)
     {
         S val;
         auto evalFunc = !localTime.IsPreTime() ?
                             &TsSpline::Eval<S> : &TsSpline::EvalPreValue<S>;
         if (!(spline.*evalFunc)(localTime.GetValue(), &val)) {
             return;
-        }
-        if (spline.IsTimeValued()) {
-            if constexpr (std::is_same_v<S, double> ||
-                          std::is_same_v<S, GfTimeCode>)
-            {
-                val = layerToStageOffset * val;
-            }
         }
         *successOut = Usd_SetValue(result, val);
     }
@@ -88,14 +80,13 @@ bool
 Usd_QuerySpline(
     const TsSpline& spline,
     UsdTimeCode timeCode,
-    const SdfLayerOffset& layerToStageOffset,
     T* result)
 {
     bool success = false;
     // Use the spline's value type to dispatch to the appropriate evaluator.
     TsDispatchToValueTypeTemplate<_EvalSplineFunctor>(
         spline.GetValueType(), spline, timeCode,
-        layerToStageOffset, result, &success);
+        result, &success);
 
     return success;
 }
@@ -103,7 +94,6 @@ Usd_QuerySpline(
 #define _INSTANTIATE_QUERY_SPLINE(unused, elem)                 \
     template bool Usd_QuerySpline(                              \
         const TsSpline&, UsdTimeCode,                           \
-        const SdfLayerOffset&,                                  \
         TS_SPLINE_VALUE_CPP_TYPE(elem)*);
 
 TF_PP_SEQ_FOR_EACH(_INSTANTIATE_QUERY_SPLINE, ~, TS_SPLINE_SUPPORTED_VALUE_TYPES)
@@ -111,11 +101,9 @@ TF_PP_SEQ_FOR_EACH(_INSTANTIATE_QUERY_SPLINE, ~, TS_SPLINE_SUPPORTED_VALUE_TYPES
 
 template bool Usd_QuerySpline(
     const TsSpline&, UsdTimeCode,
-    const SdfLayerOffset&,
     SdfAbstractDataValue*);
 template bool Usd_QuerySpline(
     const TsSpline&, UsdTimeCode,
-    const SdfLayerOffset&,
     VtValue*);
 
 PXR_NAMESPACE_CLOSE_SCOPE

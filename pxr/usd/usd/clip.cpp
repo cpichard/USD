@@ -1014,7 +1014,7 @@ _MakeHeldSpline(
     // the result of the value query (not pre-value).
     VtValue knotValue;
     const bool hasValue = Usd_QuerySpline(clipSpline, clipQueryTime,
-                                          SdfLayerOffset(), &knotValue);
+                                          &knotValue);
 
     if (sectionStart == Usd_ClipTimesEarliest) {
         spline.SetPreExtrapolation(hasValue ? TsExtrapHeld
@@ -1121,8 +1121,7 @@ Usd_Clip::QuerySpline(
 
     // Note that we don't need to apply a layer offset, since it's baked
     // into clip times upon clipset construction.
-    bool ok = Usd_QuerySpline(spline, clipTime, SdfLayerOffset(),
-                              value);
+    bool ok = Usd_QuerySpline(spline, clipTime, value);
     if (!ok) {
         return false;
     }

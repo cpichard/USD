@@ -600,6 +600,14 @@ class TestUsdValueClips(unittest.TestCase):
         attr2 = model2.GetAttribute('size')
         model3 = stage.GetPrimAtPath('/Model_3')
         attr3 = model3.GetAttribute('size')
+        model4 = stage.GetPrimAtPath('/Model_4')
+        attr4 = model4.GetAttribute('size')
+        model5 = stage.GetPrimAtPath('/Model_5')
+        attr5 = model5.GetAttribute('size')
+        model6 = stage.GetPrimAtPath('/Model_6')
+        attr6 = model6.GetAttribute('size')
+        model7 = stage.GetPrimAtPath('/Model_7')
+        attr7 = model7.GetAttribute('size')
 
         # Default value should be unaffected by layer offsets.
         self.CheckValue(attr1, expected=1.0)
@@ -661,6 +669,55 @@ class TestUsdValueClips(unittest.TestCase):
                 Sdf.LayerOffset(20)), 
              (Sdf.Find('layerOffsets/ref.usda', '/Model.size'), 
                 Sdf.LayerOffset(20))])
+
+        # Test that layer offsets are taken into account when clip times is
+        # absent. This should result in the same time samples as attr1
+        self.CheckValue(attr4, time=0, expected=-5)
+        self.CheckValue(attr4, time=9, expected=-5)
+        self.CheckValue(attr4, time=10, expected=-5)
+        self.CheckValue(attr4, time=15, expected=-5)
+        self.CheckValue(attr4, time=20, expected=-10)
+        self.CheckValue(attr4, time=25, expected=-15)
+        self.CheckValue(attr4, time=30, expected=-20)
+        self.CheckValue(attr4, time=50, expected=-20)
+        self.assertEqual(attr1.GetTimeSamples(), attr4.GetTimeSamples())
+        self.CheckTimeSamples(attr4)
+
+        # Test that layer offsets combined with stretch/shrink regions in clip
+        # times are taken into account. This example is sped up 2x by clip
+        # times with a layer offset of 10.
+        self.CheckValue(attr5, time=0, expected=-5)
+        self.CheckValue(attr5, time=2.5, expected=-5)
+        self.CheckValue(attr5, time=5, expected=-5)
+        self.CheckValue(attr5, time=10, expected=-10)
+        self.CheckValue(attr5, time=11, expected=-10)
+        self.CheckTimeSamples(attr5)
+
+        # Test that the layer offset for a clipSet is the offset from the
+        # stage to the layer where the strongest authored 'active' metadata
+        # is defined.
+        self.CheckValue(attr6, time=0, expected=-5)
+        self.CheckValue(attr6, time=20, expected=-5)
+        self.CheckValue(attr6, time=25, expected=-5)
+        self.CheckValue(attr6, time=30, expected=-10)
+        self.CheckValue(attr6, time=35, expected=-15)
+        self.CheckValue(attr6, time=40, expected=-20)
+        self.CheckValue(attr6, time=45, expected=-20)
+        self.CheckTimeSamples(attr6)
+
+        # Test that clip times are offset independently of the layer offset
+        # for a clipSet. The base offset is 20 and the clip times offset is
+        # 10, so evaluation proceeds as if clip times is scaled by
+        # 10 - 20 = -10. Note that evaluation itself proceeds by first
+        # applying the base offset (20) to the queried time.
+        self.CheckValue(attr7, time=0, expected=-5)
+        self.CheckValue(attr7, time=10, expected=-5)
+        self.CheckValue(attr7, time=15, expected=-5)
+        self.CheckValue(attr7, time=20, expected=-10)
+        self.CheckValue(attr7, time=25, expected=-15)
+        self.CheckValue(attr7, time=30, expected=-20)
+        self.CheckValue(attr7, time=50, expected=-20)
+        self.CheckTimeSamples(attr7)
 
     def test_ClipsWithSplineWithLayerOffsets(self):
         """Tests behavior of splines in clips with layer offsets involvement"""
