@@ -409,6 +409,7 @@ Exec_RequestImpl::_Compile(
     // avoid repopulating _leafOutputs.
 
     TRACE_FUNCTION();
+    TfAutoMallocTag tag("Exec", __ARCH_PRETTY_FUNCTION__);
 
     // Compile the value keys.
     WorkWithScopedDispatcher([this, valueKeys] (WorkDispatcher &d) {
@@ -618,6 +619,7 @@ Exec_RequestImpl::_BuildLeafNodeToIndexMap(
     }
 
     TRACE_FUNCTION();
+    TfAutoMallocTag tag("Exec", __ARCH_PRETTY_FUNCTION__);
 
     // Invalid leaf nodes will need to be converted into indices for client
     // notification. Here, we build a data structure for efficient lookup.
