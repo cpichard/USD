@@ -319,15 +319,9 @@ _CollectMetadata(
     SdrShaderNodeMetadata metadataObject = legacyMetadata;
 
     if (!shaderRepresentation.departments.empty()) {
-        metadataObject.SetDepartments(SdrTokenVec(
-            shaderRepresentation.departments.begin(),
-            shaderRepresentation.departments.end()));
-    }
-
-    if (!shaderRepresentation.pages.empty()) {
-        metadataObject.SetPages(SdrTokenVec(
-            shaderRepresentation.pages.begin(),
-            shaderRepresentation.pages.end()));
+        metadataObject.SetItem(TfToken(departmentsStr),
+            SdrTokenVec(shaderRepresentation.departments.begin(),
+                        shaderRepresentation.departments.end()));
     }
 
     if (!shaderRepresentation.openPages.empty()) {
