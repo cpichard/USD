@@ -66,14 +66,6 @@ UsdImaging_DataSourceRelocatingSceneIndex::GetPrim(
         return prim;
     }
 
-    // Fast reject: if this prim carries no opinion at the source locator there
-    // is nothing to relocate (_RelocateDataSource would early-out anyway), so
-    // skip the more expensive native-instance probe. The vast majority of prims
-    // (e.g. everything in a non-instanced scene) hit this path.
-    if (!HdContainerDataSource::Get(prim.dataSource, _srcLocator)) {
-        return prim;
-    }
-
     if (_forNativeInstance == _IsNativeInstance(prim)) {
         _RelocateDataSource(prim, _srcLocator, _dstLocator);
     }
