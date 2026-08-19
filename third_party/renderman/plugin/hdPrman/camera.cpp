@@ -510,5 +510,26 @@ HdPrmanCamera::SetRileyCameraParams(RtParamList& camParams,
     }
 }
 
+static void
+_ConvertCameraExposureForPxrPathTracer(
+    HdPrmanRenderDelegate* /* renderDelegate */,
+    const HdPrmanCamera* camera,
+    std::string const& integratorName,
+    RtParamList& integratorParams)
+{
+    if (integratorName == "PxrPathTracer") {
+        float emissionMultiplier = 1.0f;
+        integratorParams.GetFloat(RtUString("emissionMultiplier"), emissionMultiplier);
+        emissionMultiplier *= pow(2.0f, camera->GetExposure());
+        integratorParams.SetFloat(RtUString("emissionMultiplier"), emissionMultiplier);
+    }
+}
+
+TF_REGISTRY_FUNCTION(HdPrman_RenderParam)
+{
+    HdPrman_RenderParam::RegisterIntegratorCallbackForCamera(
+        _ConvertCameraExposureForPxrPathTracer);
+}
+
 PXR_NAMESPACE_CLOSE_SCOPE
 
