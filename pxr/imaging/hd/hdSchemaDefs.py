@@ -1282,9 +1282,9 @@
             ('depthMinOffset', T_FLOAT, {}),
             ('depthNormalizingFactor', T_FLOAT, {}),
             ('depthCameraSpaceOffset', T_FLOAT, {}),
-            ('lumaGain', T_VEC3F, {}),
-            ('lumaGamma', T_VEC3F, {}),
-            ('lumaLift', T_VEC3F, {}),
+            ('lumaSlope', T_VEC3F, {}),
+            ('lumaOffset', T_VEC3F, {}),
+            ('lumaPower', T_VEC3F, {}),
             ('plateVisibility', T_TOKEN, {}),
         ],
         STATIC_TOKEN_DATASOURCE_BUILDERS = [ # optional for shared token ds's

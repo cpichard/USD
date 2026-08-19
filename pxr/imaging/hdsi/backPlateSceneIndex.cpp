@@ -53,9 +53,9 @@ TF_DEFINE_PRIVATE_TOKENS(_materialNodeNamesTokens,
 TF_DEFINE_PRIVATE_TOKENS(_materialNodeParamsTokens,
     (rgb)
     (a)
-    (gain)
-    (gamma)
-    (lift)
+    (slope)
+    (power)
+    (offset)
     (opacity)
     (file) 
     (st)
@@ -365,9 +365,9 @@ public:
         HdBackPlateSchema backPlate = _GetBackPlateSchema(_instanceName, 
                                                           _primDataSource);
         GfVec3f result(0.0);
-        // if _type is lift we leave the default as (0, 0, 0).
-        if (_type == _materialNodeParamsTokens->gain || 
-            _type == _materialNodeParamsTokens->gamma) {
+        // if _type is offset we leave the default as (0, 0, 0).
+        if (_type == _materialNodeParamsTokens->slope || 
+            _type == _materialNodeParamsTokens->power) {
             result = GfVec3f(1.0);
         }
 
@@ -402,14 +402,14 @@ private:
 
     HdVec3fDataSourceHandle 
     _GetLumaSource(HdBackPlateSchema const &backPlate) const {
-        if (_type == _materialNodeParamsTokens->lift) {
-            return backPlate.GetLumaLift();
+        if (_type == _materialNodeParamsTokens->offset) {
+            return backPlate.GetLumaOffset();
         }
-        if (_type == _materialNodeParamsTokens->gain) {
-            return backPlate.GetLumaGain();
+        if (_type == _materialNodeParamsTokens->slope) {
+            return backPlate.GetLumaSlope();
         }
-        if (_type == _materialNodeParamsTokens->gamma) {
-            return backPlate.GetLumaGamma();
+        if (_type == _materialNodeParamsTokens->power) {
+            return backPlate.GetLumaPower();
         }
         return nullptr;
     }
@@ -553,28 +553,28 @@ _BuildMaterialNetworkDataSource(
     };
 
     static const TfToken usdUnlitSurfaceParamNames[] = {
-        _materialNodeParamsTokens->lift,
-        _materialNodeParamsTokens->gain,
-        _materialNodeParamsTokens->gamma,
+        _materialNodeParamsTokens->offset,
+        _materialNodeParamsTokens->slope,
+        _materialNodeParamsTokens->power,
         _materialNodeParamsTokens->opacity
     };
     const HdDataSourceBaseHandle usdUnlitSurfaceParams[] = {
         HdMaterialNodeParameterSchema::Builder()
             .SetValue(_ColorGradingDataSource::New(
                 appliedInstanceName, 
-                _materialNodeParamsTokens->lift, 
+                _materialNodeParamsTokens->offset, 
                 primDataSource))
             .Build(),
         HdMaterialNodeParameterSchema::Builder()
             .SetValue(_ColorGradingDataSource::New(
                 appliedInstanceName, 
-                _materialNodeParamsTokens->gain, 
+                _materialNodeParamsTokens->slope, 
                 primDataSource))
             .Build(),
         HdMaterialNodeParameterSchema::Builder()
             .SetValue(_ColorGradingDataSource::New(
                 appliedInstanceName, 
-                _materialNodeParamsTokens->gamma, 
+                _materialNodeParamsTokens->power, 
                 primDataSource))
             .Build(),
         HdMaterialNodeParameterSchema::Builder()

@@ -89,27 +89,27 @@ UsdImagingBackPlateAPIAdapter::GetImagingSubprimData(
             .SetDepthCameraSpaceOffset(
                 UsdImagingDataSourceAttribute<float>::New(
                     backPlate.GetDepthCameraSpaceOffsetAttr(), stageGlobals))
-            .SetLumaGain(
+            .SetLumaSlope(
                UsdImagingDataSourceAttribute<GfVec3f>::New(
-                    backPlate.GetLumaGainAttr(), 
+                    backPlate.GetLumaSlopeAttr(), 
                     stageGlobals,
                     prim.GetPath(),
                     plateLocator.Append(
-                        HdBackPlateSchemaTokens->lumaGain)))
-            .SetLumaGamma(
+                        HdBackPlateSchemaTokens->lumaSlope)))
+            .SetLumaPower(
                 UsdImagingDataSourceAttribute<GfVec3f>::New(
-                    backPlate.GetLumaGammaAttr(), 
+                    backPlate.GetLumaPowerAttr(), 
                     stageGlobals,
                     prim.GetPath(),
                     plateLocator.Append(
-                        HdBackPlateSchemaTokens->lumaGamma))) 
-            .SetLumaLift(
+                        HdBackPlateSchemaTokens->lumaPower))) 
+            .SetLumaOffset(
                 UsdImagingDataSourceAttribute<GfVec3f>::New(
-                    backPlate.GetLumaLiftAttr(), 
+                    backPlate.GetLumaOffsetAttr(), 
                     stageGlobals,
                     prim.GetPath(),
                     plateLocator.Append(
-                        HdBackPlateSchemaTokens->lumaLift))) 
+                        HdBackPlateSchemaTokens->lumaOffset))) 
             .SetPlateVisibility(
                 HdBackPlateSchema::BuildPlateVisibilityDataSource(plateVisibility))
             .Build();
