@@ -61,6 +61,8 @@
 #include "pxr/imaging/hgi/hgi.h"
 #include "pxr/imaging/hgi/tokens.h"
 
+#include "pxr/base/plug/registry.h"
+
 #include "pxr/base/tf/diagnostic.h"
 #include "pxr/base/tf/envSetting.h"
 #include "pxr/base/tf/getenv.h"
@@ -1664,32 +1666,7 @@ UsdImagingGLEngine::_AppendOverridesSceneIndices(
     HdSceneIndexBaseRefPtr sceneIndex = inputScene;
 
     if (TfGetEnvSetting(USDIMAGINGGL_ENGINE_ENABLE_EXEC_SCENE_INDEX)) {
-        _execStageSceneIndex = UsdExecImagingCreateStageSceneIndex();
-        if (TF_VERIFY(_execStageSceneIndex)) {
-            // Insert a merging scene index that merges the input scene with the
-            // _execStageSceneIndex. The _execStageSceneIndex is added first so
-            // that its data sources overshadow the corresponding data sources
-            // from the input scene.
-            const HdMergingSceneIndexRefPtr mergingSceneIndex =
-                HdMergingSceneIndex::New();
-            mergingSceneIndex->AddInputScene(
-                _execStageSceneIndex,
-                SdfPath::AbsoluteRootPath());
-            mergingSceneIndex->AddInputScene(
-                inputScene,
-                SdfPath::AbsoluteRootPath());
-
-            // Insert a notice batching scene index that batches all notices
-            // originating from the UsdImagingStageSceneIndex and the
-            // UsdExecImagingStageSceneIndex. This ensures the exec scene index
-            // is able to refresh its exec request before notices are flushed
-            // to downstream scene indices.
-            _noticeBatchingStageSceneIndex = HdNoticeBatchingSceneIndex::New(
-                mergingSceneIndex);
-            _noticeBatchingStageSceneIndex->SetBatchingEnabled(true);
-
-            sceneIndex = _noticeBatchingStageSceneIndex;
-        }
+        sceneIndex = _CreateExecSceneIndices(sceneIndex);
     }
 
     const HdContainerDataSourceHandle prefixPathPruningInputArgs =
@@ -1721,6 +1698,58 @@ UsdImagingGLEngine::_AppendOverridesSceneIndices(
         UsdImagingLegacyRenderSettingsSceneIndex::New(sceneIndex);
 
     return sceneIndex;
+}
+
+HdSceneIndexBaseRefPtr
+UsdImagingGLEngine::_CreateExecSceneIndices(
+    const HdSceneIndexBaseRefPtr &inputScene)
+{
+    // Try to manufacture an instance of UsdExecImaging_StageSceneIndex from a
+    // registered factory object. If this cannot be done, emit an error and do
+    // not modify the input scene.
+
+    const TfType execStageSceneIndexType =
+        PlugRegistry::FindDerivedTypeByName<UsdImagingStageSceneIndexInterface>(
+            "UsdExecImaging_StageSceneIndex");
+    if (!TF_VERIFY(!execStageSceneIndexType.IsUnknown())) {
+        return inputScene;
+    }
+
+    const auto *const execSceneIndexFactory =
+        execStageSceneIndexType.GetFactory<
+            UsdImagingStageSceneIndexInterfaceFactoryBase>();
+    if (!TF_VERIFY(execSceneIndexFactory)) {
+        return inputScene;
+    }
+
+    _execStageSceneIndex = execSceneIndexFactory->New();
+    if (!TF_VERIFY(_execStageSceneIndex)) {
+        return inputScene;
+    }
+
+    // Insert a merging scene index that merges the input scene with the
+    // _execStageSceneIndex. The _execStageSceneIndex is added first so that its
+    // data sources overshadow the corresponding data sources from the input
+    // scene.
+    const HdMergingSceneIndexRefPtr mergingSceneIndex =
+        HdMergingSceneIndex::New();
+    mergingSceneIndex->AddInputScene(
+        _execStageSceneIndex,
+        SdfPath::AbsoluteRootPath());
+    mergingSceneIndex->AddInputScene(
+        inputScene,
+        SdfPath::AbsoluteRootPath());
+
+    // Insert a notice batching scene index that batches all notices
+    // originating from the UsdImagingStageSceneIndex and the
+    // UsdExecImagingStageSceneIndex. This ensures the exec scene index
+    // is able to refresh its exec request before notices are flushed
+    // to downstream scene indices.
+    _noticeBatchingStageSceneIndex = HdNoticeBatchingSceneIndex::New(
+        mergingSceneIndex);
+    _noticeBatchingStageSceneIndex->SetBatchingEnabled(true);
+
+    return _noticeBatchingStageSceneIndex;
 }
 
 HdSceneIndexBaseRefPtr

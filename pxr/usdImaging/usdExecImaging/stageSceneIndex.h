@@ -39,6 +39,8 @@ class UsdExecImaging_StageSceneIndex
     : public UsdImagingStageSceneIndexInterface
 {
 public:
+    UsdExecImaging_StageSceneIndex();
+
     static UsdExecImaging_StageSceneIndexRefPtr New();
 
     ~UsdExecImaging_StageSceneIndex() override;
@@ -89,9 +91,6 @@ public:
     /// PrimsDirtied.
     ///
     void ApplyPendingUpdates() override;
-
-private:
-    UsdExecImaging_StageSceneIndex();
 
 private:
     UsdExecImaging_RequestSharedPtr _request;

@@ -881,6 +881,9 @@ private:
 
     UsdImagingGLEngine_Impl::_AppSceneIndicesSharedPtr _appSceneIndices;
 
+    HdSceneIndexBaseRefPtr
+    _CreateExecSceneIndices(const HdSceneIndexBaseRefPtr &inputScene);
+
     bool _CreateSceneIndicesAndRenderer(
         HdRendererPluginHandle const &plugin,
         const HdRendererCreateArgsSchema &rendererCreateArgs);

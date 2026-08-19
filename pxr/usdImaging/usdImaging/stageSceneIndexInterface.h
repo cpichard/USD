@@ -14,8 +14,11 @@
 #include "pxr/usdImaging/usdImaging/api.h"
 
 #include "pxr/base/tf/declarePtrs.h"
+#include "pxr/base/tf/type.h"
 #include "pxr/imaging/hd/sceneIndex.h"
 #include "pxr/usd/usd/timeCode.h"
+
+#include <type_traits>
 
 PXR_NAMESPACE_OPEN_SCOPE
 
@@ -53,6 +56,31 @@ public:
     /// into PrimsDirtied.
     ///
     virtual void ApplyPendingUpdates() = 0;
+};
+
+/// A factory interface that constructs instances of
+/// UsdImagingStageSceneIndexInterface.
+///
+/// Instances can be constructed without arguments.
+///
+class UsdImagingStageSceneIndexInterfaceFactoryBase : public TfType::FactoryBase
+{
+public:
+    virtual UsdImagingStageSceneIndexInterfaceRefPtr New() const = 0;
+};
+
+/// A trivial implementation of UsdImagingStageSceneIndexInterfaceFactoryBase
+/// that manufactures instances of \tparam T.
+///
+template <class T>
+class UsdImagingStageSceneIndexInterfaceFactory
+    : public UsdImagingStageSceneIndexInterfaceFactoryBase
+{
+    static_assert(std::is_base_of_v<UsdImagingStageSceneIndexInterface, T>);
+public:
+    UsdImagingStageSceneIndexInterfaceRefPtr New() const final {
+        return TfCreateRefPtr(new T);
+    }
 };
 
 PXR_NAMESPACE_CLOSE_SCOPE
