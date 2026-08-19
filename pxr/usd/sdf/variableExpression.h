@@ -32,7 +32,7 @@ namespace Sdf_VariableExpressionImpl {
 /// Class responsible for parsing and evaluating variable expressions.
 ///
 /// Variable expressions are written in a custom language and 
-/// represented in scene description as a string surrounded by backticks (`).
+/// represented in scene description as a string surrounded by backticks.
 /// These expressions may refer to "expression variables", which are key-value
 /// pairs provided by clients. For example, when evaluating an expression like:
 ///
@@ -81,7 +81,7 @@ public:
     ~SdfVariableExpression();
 
     /// Returns true if \p s is a variable expression, false otherwise.
-    /// A variable expression is a string surrounded by backticks (`).
+    /// A variable expression is a string surrounded by backticks.
     ///
     /// A return value of true does not guarantee that \p s is a valid
     /// expression. This function is meant to be used as an initial check
