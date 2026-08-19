@@ -1660,7 +1660,8 @@ UsdImagingGLEngine::_ComputeControllerPath(
 
 HdSceneIndexBaseRefPtr
 UsdImagingGLEngine::_AppendOverridesSceneIndices(
-    HdSceneIndexBaseRefPtr const &inputScene)
+    HdSceneIndexBaseRefPtr const &inputScene,
+    HdContainerDataSourceHandle const &)
 {
     HdSceneIndexBaseRefPtr sceneIndex = inputScene;
 
@@ -1730,13 +1731,15 @@ UsdImagingGLEngine::_CreateUsdImagingSceneIndices(
 {
     HdSceneIndexBaseRefPtr sceneIndex;
 
+    UsdImagingSceneIndex::SceneIndexAppendCallbacks callbacks;
+    callbacks.overridesSceneIndexCallback =
+        std::bind(
+            &UsdImagingGLEngine::_AppendOverridesSceneIndices,
+            this, std::placeholders::_1, std::placeholders::_2);
+
     sceneIndex =
         _usdImagingSceneIndex =
-            UsdImagingSceneIndex::New(
-                sceneIndexCreateArgs,
-                std::bind(
-                    &UsdImagingGLEngine::_AppendOverridesSceneIndices,
-                    this, std::placeholders::_1));
+            UsdImagingSceneIndex::New(sceneIndexCreateArgs, callbacks);
 
     sceneIndex =
         _displayStyleSceneIndex =

@@ -876,7 +876,8 @@ private:
 
     HdSceneIndexBaseRefPtr
     _AppendOverridesSceneIndices(
-        const HdSceneIndexBaseRefPtr &inputScene);
+        HdSceneIndexBaseRefPtr const &inputScene,
+        HdContainerDataSourceHandle const &sceneIndexCreateArgs);
 
     UsdImagingGLEngine_Impl::_AppSceneIndicesSharedPtr _appSceneIndices;
 
