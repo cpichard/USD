@@ -344,7 +344,7 @@ HdsiPrimIdSceneIndex::GetPrim(const SdfPath &primPath) const
         // Serve the primIdToPath field of the HdSceneGlobalsSchema
         // for the root prim.
         prim.dataSource =
-            HdOverlayContainerDataSource::OverlayedContainerDataSources(
+            HdCreateOverlayContainerDataSource(
                 _rootPrimOverlayDataSource, prim.dataSource);
         return prim;
     }

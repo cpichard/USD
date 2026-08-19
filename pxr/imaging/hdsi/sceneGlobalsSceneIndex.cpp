@@ -243,7 +243,7 @@ HdsiSceneGlobalsSceneIndex::GetPrim(const SdfPath &primPath) const
     // Overlay a data source at the scene globals locator for the default prim.
     if (primPath == HdSceneGlobalsSchema::GetDefaultPrimPath()) {
         prim.dataSource =
-            HdOverlayContainerDataSource::OverlayedContainerDataSources(
+            HdCreateOverlayContainerDataSource(
                 HdRetainedContainerDataSource::New(
                     HdSceneGlobalsSchemaTokens->sceneGlobals,
                     _sceneGlobalsSchemaDataSource),

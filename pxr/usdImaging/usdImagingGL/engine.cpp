@@ -1592,7 +1592,7 @@ UsdImagingGLEngine::_CreateSceneIndicesAndRenderer(
 
         HdRenderIndexAdapterSceneIndexRefPtr const adapter =
             HdRenderIndexAdapterSceneIndex::New(
-                HdOverlayContainerDataSource::OverlayedContainerDataSources(
+                HdCreateOverlayContainerDataSource(
                     sceneIndexCreateArgs,
                     _GetSceneIndexCreateArgsFromLegacyRenderControl()));
 
@@ -1767,7 +1767,7 @@ UsdImagingGLEngine::_GetSceneIndexCreateArgs(
                         _displayUnloadedPrimsWithBounds))
                 .Build());
 
-    return HdOverlayContainerDataSource::OverlayedContainerDataSources(
+    return HdCreateOverlayContainerDataSource(
         rendererPluginArgs,
         usdImagingArgs);
 }
