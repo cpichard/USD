@@ -37,6 +37,19 @@ public:
         const HdContainerDataSourceHandle &src2);
 
     HD_API
+    static
+    HdContainerDataSourceHandle
+    OverlayedContainerDataSources(
+        const std::initializer_list<HdContainerDataSourceHandle> &sources);
+
+    HD_API
+    static
+    HdContainerDataSourceHandle
+    OverlayedContainerDataSources(
+        size_t count,
+        HdContainerDataSourceHandle *containers);
+    
+    HD_API
     TfTokenVector GetNames() override;
     HD_API
     HdDataSourceBaseHandle Get(const TfToken &name) override;
@@ -44,12 +57,17 @@ public:
 private:
     HD_API
     HdOverlayContainerDataSource(
-        std::initializer_list<HdContainerDataSourceHandle> sources);
+        const std::initializer_list<HdContainerDataSourceHandle> &sources);
 
     HD_API
     HdOverlayContainerDataSource(
         size_t count,
-        HdContainerDataSourceHandle *containers);
+        HdContainerDataSourceHandle *sources);
+
+    using _ContainerVector = TfSmallVector<HdContainerDataSourceHandle, 8>;
+    HD_API
+    HdOverlayContainerDataSource(
+        _ContainerVector &&containers);
 
     HD_API
     HdOverlayContainerDataSource(
@@ -62,7 +80,6 @@ private:
         const HdContainerDataSourceHandle &src2,
         const HdContainerDataSourceHandle &src3);
 
-    using _ContainerVector = TfSmallVector<HdContainerDataSourceHandle, 8>;
     _ContainerVector _containers;
 };
 

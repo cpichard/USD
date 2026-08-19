@@ -11,7 +11,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 HdOverlayContainerDataSource::HdOverlayContainerDataSource(
-    std::initializer_list<HdContainerDataSourceHandle> sources)
+    const std::initializer_list<HdContainerDataSourceHandle> &sources)
     : _containers(sources.begin(), sources.end())
 {
 }
@@ -24,6 +24,12 @@ HdOverlayContainerDataSource::HdOverlayContainerDataSource(
     for (size_t i = 0; i < count; ++i) {
         _containers.push_back(containers[i]);
     }
+}
+
+HdOverlayContainerDataSource::HdOverlayContainerDataSource(
+    _ContainerVector &&containers)
+ : _containers(std::move(containers))
+{
 }
 
 HdOverlayContainerDataSource::HdOverlayContainerDataSource(
@@ -55,6 +61,48 @@ HdOverlayContainerDataSource::OverlayedContainerDataSources(
     return HdOverlayContainerDataSource::New(src1, src2);
 }
 
+HdContainerDataSourceHandle
+HdOverlayContainerDataSource::OverlayedContainerDataSources(
+    const std::initializer_list<HdContainerDataSourceHandle> &sources)
+{
+    _ContainerVector containers;
+    containers.reserve(sources.size());
+    for (HdContainerDataSourceHandle const &source : sources) {
+        if (source) {
+            containers.push_back(source);
+        }
+    }
+    switch (containers.size()) {
+    case 0:
+        return nullptr;
+    case 1:
+        return containers[0];
+    default:
+        return HdOverlayContainerDataSource::New(std::move(containers));
+    }
+}
+
+HdContainerDataSourceHandle
+HdOverlayContainerDataSource::OverlayedContainerDataSources(
+    const size_t count,
+    HdContainerDataSourceHandle * const sources)
+{
+    _ContainerVector containers;
+    containers.reserve(count);
+    for (size_t i = 0; i < count; ++i) {
+        if (sources[i]) {
+            containers.push_back(sources[i]);
+        }
+    }
+    switch (containers.size()) {
+    case 0:
+        return nullptr;
+    case 1:
+        return containers[0];
+    default:
+        return HdOverlayContainerDataSource::New(std::move(containers));
+    }
+}
 
 TfTokenVector
 HdOverlayContainerDataSource::GetNames()
