@@ -404,6 +404,7 @@ Usd_ClipSet::Usd_ClipSet(
             clipDef.indexOfLayerWhereAssetPathsFound])
     , clipPrimPath(SdfPath(*clipDef.clipPrimPath))
     , interpolateMissingClipValues(false)
+    , toStageOffset(clipDef.toStageOffset)
 {
     // NOTE: Assumes definition has already been validated
 

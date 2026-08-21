@@ -143,7 +143,7 @@ TF_DEFINE_PRIVATE_TOKENS(
     (vector2)
     ((string_type, "string"))
 
-    // Hydra SourceTypes
+    // Hydra shading systems
     (OSL)       // Adapter Node
     (RmanCpp)   // PxrSurface Node
 
@@ -633,13 +633,13 @@ _UpdateNetwork(
                     : netInterface->GetNodeType(upstreamNodeName);
 
             SdrShaderNodeConstPtr sdrMtlxNode =
-                sdrRegistry.GetShaderNodeByIdentifierAndType(
+                sdrRegistry.GetShaderNodeByIdentifierAndSystem(
                     nodeType, _tokens->mtlx);
             
             // Custom nodes do not use the nodeDefString as the identifier
             // make sure to look to the type indicated in the HdNetwork
             if (!sdrMtlxNode) {
-                sdrMtlxNode = sdrRegistry.GetShaderNodeByIdentifierAndType(
+                sdrMtlxNode = sdrRegistry.GetShaderNodeByIdentifierAndSystem(
                     netInterface->GetNodeType(upstreamNodeName), _tokens->mtlx);
             }
 
@@ -686,7 +686,7 @@ _UpdateNetwork(
                                 SdfAssetPath(compiledShaderPath),
                                 SdrTokenMap(),  // metadata
                                 _tokens->mtlx,  // subId
-                                _tokens->OSL);  // sourceType
+                                _tokens->OSL);  // shading system
 
             if (!sdrNode) {
                 continue;
@@ -924,7 +924,7 @@ _NetworkHasMtlxNodes(HdMaterialNetworkInterface *netInterface)
     for (TfToken const &nodeName : nodeNames) {
         const TfToken nodeType = netInterface->GetNodeType(nodeName);
         const SdrShaderNodeConstPtr sdrNode =
-            sdrRegistry.GetShaderNodeByIdentifierAndType(
+            sdrRegistry.GetShaderNodeByIdentifierAndSystem(
                 nodeType, _tokens->mtlx);
         if (sdrNode) {
             return true;
@@ -1110,7 +1110,7 @@ _UpdateTextureNodes(
                     // Get the sdr node for the mxTexture node
                     SdrRegistry &sdrRegistry = SdrRegistry::GetInstance();
                     const SdrShaderNodeConstPtr sdrTextureNode =
-                        sdrRegistry.GetShaderNodeByIdentifierAndType(
+                        sdrRegistry.GetShaderNodeByIdentifierAndSystem(
                             nodeType, _tokens->mtlx);
 
                     // If the node does not already contain a texcoord primvar node
@@ -1298,7 +1298,7 @@ _UpdatePrimvarNodes(
         // Get the sdr node for the texcoord node
         SdrRegistry &sdrRegistry = SdrRegistry::GetInstance();
         const SdrShaderNodeConstPtr sdrTexcoordNode =
-            sdrRegistry.GetShaderNodeByIdentifierAndType(
+            sdrRegistry.GetShaderNodeByIdentifierAndSystem(
                 nodeType, _tokens->mtlx);
         // Get the primvarname from the sdrTexcoordNode metadata
         auto metadata = sdrTexcoordNode->GetMetadata();

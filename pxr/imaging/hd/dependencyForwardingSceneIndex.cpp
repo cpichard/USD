@@ -50,7 +50,7 @@ HdDependencyForwardingSceneIndex::GetPrim(const SdfPath &primPath) const
                 HdDependenciesSchema::GetSchemaToken(),
                 HdBlockDataSource::New());
         prim.dataSource =
-            HdOverlayContainerDataSource::OverlayedContainerDataSources(
+            HdCreateOverlayContainerDataSource(
                 blockDeps, prim.dataSource);
     }
 

@@ -139,7 +139,7 @@ protected:
 
 private:
     // Ensures the _leafNodeToIndex map is up-to-date.
-    void _BuildLeafNodeToIndexMap();
+    void _BuildLeafNodeToIndexMap(TfSpan<const ExecValueKey> valueKeys);
 
     // Turns invalid leaf nodes into a set of requested - and not previously
     // invalidated - indices.
@@ -148,6 +148,12 @@ private:
         bool isNewlyInvalidInterval,
         TfSpan<const VdfNode *const> leafNodes,
         ExecRequestIndexSet *invalidIndices);
+
+    // Resets the schedule if any there are any topological network edits to 
+    // leaf nodes that are referenced in this request. 
+    //
+    void _InvalidateScheduleForLeafNodes(
+        TfSpan<const VdfNode *const> disconnectedLeafNodes);
 
 private:
     // The system that issued this request.

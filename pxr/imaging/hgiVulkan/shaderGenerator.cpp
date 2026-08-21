@@ -190,6 +190,20 @@ HgiVulkanShaderGenerator::_WriteExtensions(std::ostream &ss)
     const bool builtinBarycentricsEnabled = _hgi->GetCapabilities()->
         IsSet(HgiDeviceCapabilitiesBitsBuiltinBarycentrics);
 
+    // Control flow attributes
+    ss <<   "#if defined(GL_EXT_control_flow_attributes)\n"
+                "\t#extension GL_EXT_control_flow_attributes: require\n"
+                "\t#define HGI_COMPILER_ATTR_UNROLL [[unroll]]\n"
+                "\t#define HGI_COMPILER_ATTR_DONT_UNROLL [[dont_unroll]]\n"
+                "\t#define HGI_COMPILER_ATTR_FLATTEN [[flatten]]\n"
+                "\t#define HGI_COMPILER_ATTR_DONT_FLATTEN [[dont_flatten]]\n"
+            "#else\n"
+                "\t#define HGI_COMPILER_ATTR_UNROLL\n"
+                "\t#define HGI_COMPILER_ATTR_DONT_UNROLL\n"
+                "\t#define HGI_COMPILER_ATTR_FLATTEN\n"
+                "\t#define HGI_COMPILER_ATTR_DONT_FLATTEN\n"
+            "#endif\n";
+
     if (_GetShaderStage() & HgiShaderStageVertex) {
         if (glslVersion < 460 && shaderDrawParametersEnabled) {
             ss << "#extension GL_ARB_shader_draw_parameters : require\n";

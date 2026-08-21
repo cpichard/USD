@@ -63,8 +63,13 @@ public:
     /// @}
 
     /// \name Render settings
+    ///
+    /// Deprecated: In hydra 2.0, render settings are
+    /// communicated in-band through the active render settings prim
+    /// in the scene index feeding the renderer.
+    ///
     /// @{
-    
+
     virtual HdRenderSettingDescriptorList
         GetRenderSettingDescriptors() const = 0;
     virtual VtValue GetRenderSetting(
@@ -129,6 +134,8 @@ public:
 
     virtual VtDictionary GetRenderStats() = 0;
 
+    /// Clients should use HdSceneGlobalsSchema's primIdToPath instead.
+    ///
     virtual SdfPath GetRprimPathFromPrimId(int primIdx) = 0;
 
     /// @}

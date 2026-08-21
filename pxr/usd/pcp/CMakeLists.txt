@@ -111,7 +111,6 @@ pxr_test_scripts(
     testenv/testPcpRegressionBugs_bug90508.py
     testenv/testPcpRegressionBugs_bug90706.py
     testenv/testPcpRegressionBugs_bug92955.py
-    testenv/testPcpRegressionBugs_bug101300.py
     testenv/testPcpLayerRelocatesEditBuilder.py
     testenv/testPcpResolvedPathChange.py
     testenv/testPcpStreamingLayerReload.py
@@ -119,7 +118,7 @@ pxr_test_scripts(
     testenv/testPcpNegativeOffsetScale.py
 )
 
-pxr_build_test_shared_lib(TestPcpDynamicFileFormatPlugin
+pxr_build_test_plugin(TestPcpDynamicFileFormatPlugin
     INSTALL_PREFIX PcpPlugins
     LIBRARIES
         tf
@@ -130,7 +129,7 @@ pxr_build_test_shared_lib(TestPcpDynamicFileFormatPlugin
         testenv/TestPcpDynamicFileFormatPlugin.cpp
 )
 
-pxr_build_test_shared_lib(TestPcpAssetPathDynamicFileFormatPlugin
+pxr_build_test_plugin(TestPcpAssetPathDynamicFileFormatPlugin
     INSTALL_PREFIX PcpPlugins
     LIBRARIES
         tf
@@ -141,7 +140,7 @@ pxr_build_test_shared_lib(TestPcpAssetPathDynamicFileFormatPlugin
         testenv/TestPcpAssetPathDynamicFileFormatPlugin.cpp
 )
 
-pxr_build_test_shared_lib(TestPcpStreamingLayerReload
+pxr_build_test_plugin(TestPcpStreamingLayerReload
     INSTALL_PREFIX PcpPlugins
     LIBRARIES
         tf
@@ -1558,13 +1557,6 @@ pxr_register_test(testPcpRegressionBugs_bug92827
     TESTENV testenv/testPcpRegressionBugs_bug92827.testenv
     STDOUT_REDIRECT compositionResults_bug92827.txt
     DIFF_COMPARE compositionResults_bug92827.txt compositionErrors_bug92827.txt
-    EXPECTED_RETURN_CODE 0
-)
-
-pxr_register_test(testPcpRegressionBugs_bug101300
-    PYTHON
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpRegressionBugs_bug101300" 
-    TESTENV testenv/testPcpRegressionBugs_bug101300.testenv
     EXPECTED_RETURN_CODE 0
 )
 

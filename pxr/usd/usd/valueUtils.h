@@ -395,7 +395,6 @@ bool
 Usd_QuerySpline(
     const TsSpline& spline,
     UsdTimeCode timeCode,
-    const SdfLayerOffset& layerToStageOffset,
     T* result);
 
 PXR_NAMESPACE_CLOSE_SCOPE

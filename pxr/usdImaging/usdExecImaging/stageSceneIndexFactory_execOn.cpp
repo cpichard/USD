@@ -11,7 +11,7 @@
 PXR_NAMESPACE_OPEN_SCOPE
 
 // This implementation is used when building with PXR_BUILD_EXEC=ON.
-UsdExecImagingStageSceneIndexInterfaceRefPtr
+UsdImagingStageSceneIndexInterfaceRefPtr
 UsdExecImagingCreateStageSceneIndex()
 {
     return UsdExecImaging_StageSceneIndex::New();
