@@ -7,16 +7,16 @@
 def Camera "main_cam"
 {
     float4[] clippingPlanes = []
-    float2 clippingRange = (1, 2000000)
+    float2 clippingRange = (53.038, 60.4)
     float focalLength = 68.5216
-    float focusDistance = 91.025475
+    float focusDistance = 61.13806
     float fStop = 0
-    float horizontalAperture = 27.570835
+    float horizontalAperture = 17.515018
     float horizontalApertureOffset = 0
     token projection = "perspective"
     float verticalAperture = 20.955
     float verticalApertureOffset = 0
-    matrix4d xformOp:transform = ( (0.9999904807207345, 0.004363309284746571, -9.688492862972733e-19, 0), (0, 2.220446049250313e-16, 1, 0), (0.004363309284746571, -0.9999904807207345, 2.2204249122042763e-16, 0), (14.468019210471157, -89.02460856019046, 3.000000000000021, 1) )
+    matrix4d xformOp:transform = ( (-0.0784590957278346, -0.9969173337331287, 2.2136011551168816e-16, 0), (0.21152359920390632, -0.016647268291031504, 0.9772311064626789, 0), (-0.9742186290958491, 0.07667266893017309, 0.21217767215644623, 0), (-45.37666363305091, 8.589507999017151, 17.55299805543655, 1) )
     uniform token[] xformOpOrder = ["xformOp:transform"]
 }
 
@@ -73,5 +73,13 @@ def Xform "world"
 
             double radius = 1.0
         }
+    }
+}
+
+def Xform "lights" 
+{
+    def DomeLight "DomeLight"
+    {
+        asset inputs:texture:file = "./StinsonBeach.hdr"
     }
 }

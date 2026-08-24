@@ -9,14 +9,14 @@ def Camera "main_cam"
     float4[] clippingPlanes = []
     float2 clippingRange = (1, 2000000)
     float focalLength = 68.5216
-    float focusDistance = 91.025475
+    float focusDistance = 13.150047
     float fStop = 0
-    float horizontalAperture = 27.570835
+    float horizontalAperture = 30.887257
     float horizontalApertureOffset = 0
     token projection = "perspective"
     float verticalAperture = 20.955
     float verticalApertureOffset = 0
-    matrix4d xformOp:transform = ( (0.9999904807207345, 0.004363309284746571, -9.688492862972733e-19, 0), (0, 2.220446049250313e-16, 1, 0), (0.004363309284746571, -0.9999904807207345, 2.2204249122042763e-16, 0), (14.468019210471157, -89.02460856019046, 3.000000000000021, 1) )
+    matrix4d xformOp:transform = ( (0.9999904807207345, 0.004363309284757127, -9.688492862996172e-19, 0), (0, 2.220446049250313e-16, 1, 0), (0.004363309284757127, -0.9999904807207345, 2.2204249122042763e-16, 0), (14.12822463505606, -11.14992248106352, 2.999999999999994, 1) )
     uniform token[] xformOpOrder = ["xformOp:transform"]
 }
 

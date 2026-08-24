@@ -384,9 +384,14 @@ HgiGLShaderGenerator::_WriteInOuts(
     const static std::set<std::string> takenOutParams {
         "gl_Position",
         "gl_FragColor",
-        "gl_FragDepth",
         "gl_PointSize",
         "hd_SampleMask",
+    };
+
+    // Some params are built-in, but we may want to declare them in the shader 
+    // anyway, such as to specify any custom attributes
+    const static std::set<std::string> takenOutParamsToDeclare {
+        "gl_FragDepth"
     };
 
     const static std::unordered_map<std::string, std::string> takenInParams {
@@ -410,6 +415,12 @@ HgiGLShaderGenerator::_WriteInOuts(
         { HgiShaderKeywordTokens->hdSampleMaskIn, "gl_SampleMaskIn[0]"}
     };
 
+    const static std::unordered_map<std::string, std::string> attrIndexM {
+        { HgiShaderKeywordTokens->hdDepthAny, "depth_any"},
+        { HgiShaderKeywordTokens->hdDepthGreater, "depth_greater"},
+        { HgiShaderKeywordTokens->hdDepthLess, "depth_less"}
+    };
+
     const bool in_qualifier = qualifier == "in";
     const bool out_qualifier = qualifier == "out";
     for(const HgiShaderFunctionParamDesc &param : parameters) {
@@ -417,6 +428,29 @@ HgiGLShaderGenerator::_WriteInOuts(
         const std::string &paramName = param.nameInShader;
         if (out_qualifier &&
                 takenOutParams.find(paramName) != takenOutParams.end()) {
+            continue;
+        }
+        if (out_qualifier && takenOutParamsToDeclare.find(paramName) !=
+                             takenOutParamsToDeclare.end()) {
+            HgiShaderSectionAttributeVector attrs{};
+            const std::string &role = param.role;
+            auto const& attr = attrIndexM.find(role);
+            if (attr != attrIndexM.end()) {
+                if (paramName != attr->second) {
+                    attrs.push_back({attr->second, ""});
+                }
+            }
+
+            CreateShaderSection<HgiGLMemberShaderSection>(
+                paramName,
+                param.type,
+                param.interpolation,
+                param.sampling,
+                param.storage,
+                attrs,
+                qualifier,
+                std::string(),
+                param.arraySize);
             continue;
         }
         if (in_qualifier) {

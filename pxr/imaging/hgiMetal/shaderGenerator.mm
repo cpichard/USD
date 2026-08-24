@@ -194,6 +194,9 @@ _GetBuiltinOutputKeyword(HgiShaderFunctionParamDesc const &param,
     // Map from descriptor to Metal
     const static std::unordered_map<std::string, std::string> roleIndexM {
        {HgiShaderKeywordTokens->hdSampleMask, "sample_mask"},
+       {HgiShaderKeywordTokens->hdDepthAny, "depth(any)"},
+       {HgiShaderKeywordTokens->hdDepthGreater, "depth(greater)"},
+       {HgiShaderKeywordTokens->hdDepthLess, "depth(less)"}
     };
 
     //check if has a role

@@ -60,6 +60,7 @@ struct hgi_dmat3 { double m00, m01, m02,
 // //////// Codegen Defines //////// 
 #define HD_SHADER_API 3
 #define MAT4 mat4
+#define HD_MINUS_ONE_TO_ONE_DEPTH_RANGE
 // Alias hgi vec and matrix types to hd.
 #define hd_ivec3 hgi_ivec3
 #define hd_vec3 hgi_vec3
@@ -1017,6 +1018,7 @@ struct hgi_dmat3 { double m00, m01, m02,
 // //////// Codegen Defines //////// 
 #define HD_SHADER_API 3
 #define MAT4 mat4
+#define HD_MINUS_ONE_TO_ONE_DEPTH_RANGE
 // Alias hgi vec and matrix types to hd.
 #define hd_ivec3 hgi_ivec3
 #define hd_vec3 hgi_vec3
@@ -1612,6 +1614,7 @@ struct hgi_dmat3 { double m00, m01, m02,
 // //////// Codegen Defines //////// 
 #define HD_SHADER_API 3
 #define MAT4 mat4
+#define HD_MINUS_ONE_TO_ONE_DEPTH_RANGE
 // Alias hgi vec and matrix types to hd.
 #define hd_ivec3 hgi_ivec3
 #define hd_vec3 hgi_vec3
@@ -2434,6 +2437,7 @@ vec3 hd_BaryCoordNoPersp = gl_BaryCoordNoPerspNV;
 // //////// Codegen Defines //////// 
 #define HD_SHADER_API 3
 #define MAT4 mat4
+#define HD_MINUS_ONE_TO_ONE_DEPTH_RANGE
 // Alias hgi vec and matrix types to hd.
 #define hd_ivec3 hgi_ivec3
 #define hd_vec3 hgi_vec3
@@ -2585,7 +2589,6 @@ float HdGetScalar_widths() { return HdGet_widths(0); }
 
 // //////// Codegen FS Source //////// 
 #define HD_SHADER_SUPPORTS_DOUBLE_PRECISION
-#define HD_MINUS_ONE_TO_ONE_DEPTH_RANGE
 vec3 GetBarycentricCoord() {
   return hd_BaryCoordNoPersp;
 }
