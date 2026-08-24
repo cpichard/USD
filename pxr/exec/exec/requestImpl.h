@@ -24,6 +24,7 @@
 
 PXR_NAMESPACE_OPEN_SCOPE
 
+class EfLeafNode;
 class EfTime;
 struct Exec_AttributeValueInvalidationResult;
 class Exec_CacheView;
@@ -139,7 +140,9 @@ protected:
 
 private:
     // Ensures the _leafNodeToIndex map is up-to-date.
-    void _BuildLeafNodeToIndexMap(TfSpan<const ExecValueKey> valueKeys);
+    void _BuildLeafNodeToIndexMap(
+        TfSpan<const ExecValueKey> valueKeys,
+        const std::vector<const EfLeafNode*> &leafNodes);
 
     // Turns invalid leaf nodes into a set of requested - and not previously
     // invalidated - indices.

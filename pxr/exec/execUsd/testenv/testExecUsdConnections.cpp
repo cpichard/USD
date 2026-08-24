@@ -105,6 +105,22 @@ EXEC_REGISTER_COMPUTATIONS_FOR_SCHEMA(
         });
 }
 
+// Verifies we got the expected single invalid index and resets invalidIndices
+// in preparation for more testing.
+//
+// \p indexSet should be the ExecRequestIndexSet that we get from a request
+// invalidation callback.
+// 
+// \p i is the single index we expect to find in the set.
+//
+#define VERIFY_SINGLE_INVALID_INDEX(indexSet, i)                               \
+    ASSERT_EQ(indexSet.size(), 1);                                             \
+    ASSERT_EQ(indexSet.count(i), 1);                                           \
+    indexSet.clear();
+
+// Test that we get the expected results and the expected invalidation when
+// attribute connections are edited.
+//
 static void
 TestAttributeConnections()
 {
@@ -132,8 +148,14 @@ TestAttributeConnections()
     UsdAttribute attr = usdStage->GetAttributeAtPath(SdfPath("/Prim.attr"));
     TF_AXIOM(attr.IsValid());
 
-    ExecUsdRequest request = execSystem.BuildRequest({
-        {attr, ExecBuiltinComputations->computeValue}});
+    ExecRequestIndexSet invalidIndices;
+
+    ExecUsdRequest request = execSystem.BuildRequest(
+        {{attr, ExecBuiltinComputations->computeValue}},
+        [&invalidIndices](const ExecRequestIndexSet &indices,
+                          const class EfTimeInterval &) {
+            invalidIndices = indices;
+        });
     TF_AXIOM(request.IsValid());
 
     execSystem.PrepareRequest(request);
@@ -153,6 +175,7 @@ TestAttributeConnections()
     // attribute is ignored, and the computed result is the resolved value of 
     // the owning attribute 'attr'. 
     attr.AddConnection(SdfPath("/Prim.attr3"));
+    VERIFY_SINGLE_INVALID_INDEX(invalidIndices, 0);
     {
         ExecUsdCacheView view = execSystem.Compute(request);
         VtValue v = view.Get(0);
@@ -166,6 +189,7 @@ TestAttributeConnections()
     // valid connection owned by 'attr' provides its computed value.
     attr.RemoveConnection(SdfPath("/Prim.attr2"));
     TF_AXIOM(request.IsValid());
+    VERIFY_SINGLE_INVALID_INDEX(invalidIndices, 0);
     {
         ExecUsdCacheView view = execSystem.Compute(request);
         VtValue v = view.Get(0);
@@ -178,8 +202,10 @@ TestAttributeConnections()
     // Remove the existing connection and connect an attribute that produces an 
     // empty output. 
     attr.RemoveConnection(SdfPath("/Prim.attr3"));
+    VERIFY_SINGLE_INVALID_INDEX(invalidIndices, 0);
 
-    UsdAttribute emptyAttr = usdStage->GetAttributeAtPath(SdfPath("/Prim.emptyAttr"));
+    UsdAttribute emptyAttr =
+        usdStage->GetAttributeAtPath(SdfPath("/Prim.emptyAttr"));
     TF_AXIOM(emptyAttr.IsValid());
     
     attr.AddConnection(SdfPath("/Prim.emptyAttr"));
@@ -193,6 +219,7 @@ TestAttributeConnections()
     // registered for 'emptyAttr'.   
     attr.RemoveConnection(SdfPath("/Prim.emptyAttr"));
     TF_AXIOM(emptyAttr.IsValid());
+    VERIFY_SINGLE_INVALID_INDEX(invalidIndices, 0);
     emptyAttr.AddConnection(SdfPath("/Prim.attr"));
 
     ExecUsdRequest emptyAttrRequest = execSystem.BuildRequest({
@@ -208,7 +235,8 @@ TestAttributeConnections()
 
     // Connect scalar-typed attribute 'attr' to an array-typed attribute 
     // 'array' that contains a single element. 
-    UsdAttribute arrayAttr = usdStage->GetAttributeAtPath(SdfPath("/Prim.array"));
+    UsdAttribute arrayAttr =
+        usdStage->GetAttributeAtPath(SdfPath("/Prim.array"));
     TF_AXIOM(arrayAttr.IsValid());
 
     attr.AddConnection(SdfPath("/Prim.array"));
@@ -262,7 +290,8 @@ TestConnectionsComputationNotFound()
 
     ExecUsdSystem execSystem(usdStage);
 
-    const UsdAttribute attr = usdStage->GetAttributeAtPath(SdfPath("/Prim.attr"));
+    const UsdAttribute attr =
+        usdStage->GetAttributeAtPath(SdfPath("/Prim.attr"));
     TF_AXIOM(attr.IsValid());
 
     const ExecUsdRequest request = execSystem.BuildRequest({

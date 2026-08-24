@@ -411,11 +411,16 @@ Exec_RequestImpl::_Compile(
     TRACE_FUNCTION();
     TfAutoMallocTag tag("Exec", __ARCH_PRETTY_FUNCTION__);
 
-    // Compile the value keys.
-    WorkWithScopedDispatcher([this, valueKeys] (WorkDispatcher &d) {
+    std::vector<const EfLeafNode*> leafNodes;
 
-        d.Run([valueKeys, system = _system, &leafOutputs = _leafOutputs] {
-            leafOutputs = system->_Compile(valueKeys);
+    // Compile the value keys.
+    WorkWithScopedDispatcher([this, valueKeys, &leafNodes] (WorkDispatcher &d) {
+
+        d.Run([valueKeys, system = _system,
+               &leafOutputs = _leafOutputs, &leafNodes] {
+            auto leafOutputsAndNodes = system->_Compile(valueKeys);
+            leafOutputs = std::move(leafOutputsAndNodes.first);
+            leafNodes = std::move(leafOutputsAndNodes.second);
         });
 
         {
@@ -467,7 +472,7 @@ Exec_RequestImpl::_Compile(
     // We must greedily build the leaf node to index map. When requests are
     // informed of network edits, some leaf nodes may have already been
     // disconnected from their source output.
-    _BuildLeafNodeToIndexMap(valueKeys);
+    _BuildLeafNodeToIndexMap(valueKeys, leafNodes);
 }
 
 void
@@ -611,7 +616,8 @@ Exec_RequestImpl::_Discard()
 
 void
 Exec_RequestImpl::_BuildLeafNodeToIndexMap(
-    TfSpan<const ExecValueKey> valueKeys)
+    TfSpan<const ExecValueKey> valueKeys,
+    const std::vector<const EfLeafNode*> &leafNodes)
 {
     const Exec_Program *const program = _system->_program.get();
     if (!program) {
@@ -626,7 +632,7 @@ Exec_RequestImpl::_BuildLeafNodeToIndexMap(
     _leafNodeToIndex.clear();
     _leafNodeToIndex.reserve(valueKeys.size());
     for (size_t i = 0; i < valueKeys.size(); ++i) {
-        const EfLeafNode *leafNode = program->GetCompiledLeafNode(valueKeys[i]);
+        const EfLeafNode *const leafNode = leafNodes[i];
         if (!leafNode) {
             continue;
         }
