@@ -45,6 +45,7 @@
 #include "pxr/imaging/hd/sceneIndexPluginRegistry.h"
 #include "pxr/imaging/hd/systemMessages.h"
 #include "pxr/imaging/hd/utils.h"
+#include "pxr/imaging/hdsi/applicationRenderSettingsSceneIndex.h"
 #include "pxr/imaging/hdsi/domeLightCameraVisibilitySceneIndex.h"
 #include "pxr/imaging/hdsi/legacyDisplayStyleOverrideSceneIndex.h"
 #include "pxr/imaging/hdsi/prefixPathPruningSceneIndex.h"
@@ -90,6 +91,12 @@ TF_DEFINE_ENV_SETTING(
     "Use caching scene index.");
 
 TF_DEFINE_ENV_SETTING(
+    USDIMAGINGGL_ENGINE_ENABLE_RENDER_SETTINGS_SCENE_INDEX, false,
+    "Communicate render settings in-band through the application render "
+    "settings scene index rather than through the "
+    "HdLegacyRenderControlInterface.");
+
+TF_DEFINE_ENV_SETTING(
     USDIMAGINGGL_ENGINE_ENABLE_EXEC_SCENE_INDEX, false,
     "Inserts an initial scene index which provides values computed by exec. "
     "The exec scene index is added by a merging scene index in the overrides "
@@ -115,6 +122,8 @@ struct _AppSceneIndices
         domeLightCameraVisibilitySceneIndex;
     HdsiSceneMaterialPruningSceneIndexRefPtr
         sceneMaterialPruningSceneIndex;
+    HdsiApplicationRenderSettingsSceneIndexRefPtr
+        applicationRenderSettingsSceneIndex;
 
     _AppSceneIndicesSharedPtr
     static New(const TfToken &renderInstanceId)
@@ -148,7 +157,8 @@ private:
     }
 
     HdSceneIndexBaseRefPtr _Append(
-        const HdSceneIndexBaseRefPtr &inputScene)
+        const HdSceneIndexBaseRefPtr &inputScene,
+        const HdContainerDataSourceHandle &createArgs)
     {
         HdSceneIndexBaseRefPtr sceneIndex = inputScene;
 
@@ -163,6 +173,16 @@ private:
         sceneIndex =
             sceneMaterialPruningSceneIndex =
                 HdsiSceneMaterialPruningSceneIndex::New(sceneIndex);
+
+        static const bool enableRenderSettingsSceneIndex =
+            TfGetEnvSetting(
+                USDIMAGINGGL_ENGINE_ENABLE_RENDER_SETTINGS_SCENE_INDEX);
+        if (enableRenderSettingsSceneIndex) {
+            sceneIndex =
+                applicationRenderSettingsSceneIndex =
+                    HdsiApplicationRenderSettingsSceneIndex::New(
+                        sceneIndex, createArgs);
+        }
 
         return sceneIndex;
     }
@@ -179,7 +199,7 @@ private:
                             renderInstanceId.c_str());
             return inputScene;
         }
-        return instance->_Append(inputScene);
+        return instance->_Append(inputScene, createArgs);
     }
 
     static void _Register()
@@ -1854,7 +1874,8 @@ UsdImagingGLEngine::_CreateSceneIndexChainAndRenderer(
         sceneIndex =
             HdSceneIndexPluginRegistry::GetInstance()
                 .AppendSceneIndicesForRenderer(
-                    rendererDisplayName, sceneIndex, renderInstanceId);
+                    rendererDisplayName, sceneIndex, renderInstanceId,
+                    /* appName = */ std::string(), sceneIndexCreateArgs);
     }
 
     if (_IsEnabledTerminalCachingSceneIndex()) {
@@ -2001,35 +2022,55 @@ _ComputeRendererSettingType(UsdImagingGLRendererSetting * const r)
     }
     return true;
 }
-
+    
 UsdImagingGLRendererSettingsList
 UsdImagingGLEngine::GetRendererSettingsList() const
 {
-    // Prefer the render settings advertised by the renderer plugin through the
-    // scene-index create-args data source. This is the Hydra 2.0 path and does
-    // not require a live render delegate / render control.
-    if (const HdRenderSettingDescriptorContainerSchema container =
-            HdSceneIndexCreateArgsSchema(_sceneIndexCreateArgs)
-                .GetRenderSettingDescriptors()) {
+    UsdImagingGLRendererSettingsList ret;
 
-        UsdImagingGLRendererSettingsList ret;
+    // Use the application render setting scene index to get the
+    // render settings advertised by the renderer plugin.
+    const HdsiApplicationRenderSettingsSceneIndexRefPtr si =
+        _GetApplicationRenderSettingsSceneIndex();
+    if (si) {
+        const HdRenderSettingDescriptorContainerSchema descriptors =
+            si->GetRenderSettingDescriptorsFromRenderer();
+        if (descriptors.IsDefined()) {
+            // The container maps each setting's key (the entry name) to a
+            // descriptor.
+            for (const TfToken &name : descriptors.GetNames()) {
+                const HdRenderSettingDescriptorSchema descriptor =
+                    descriptors.Get(name);
 
-        // The container maps each setting's key (the entry name) to a
-        // descriptor.
-        for (const TfToken &name : container.GetNames()) {
-            const HdRenderSettingDescriptorSchema descriptor =
-                container.Get(name);
-
-            UsdImagingGLRendererSetting r;
-            r.key = name;
-            if (const HdStringDataSourceHandle nameDs =
+                UsdImagingGLRendererSetting r;
+                r.key = name;
+                if (const HdStringDataSourceHandle nameDs =
                     descriptor.GetName()) {
-                r.name = nameDs->GetTypedValue(0.0f);
-            }
-            if (const HdSampledDataSourceHandle defValueDs =
+                    r.name = nameDs->GetTypedValue(0.0f);
+                }
+                if (const HdSampledDataSourceHandle defValueDs =
                     descriptor.GetDefaultValue()) {
-                r.defValue = defValueDs->GetValue(0.0f);
+                    r.defValue = defValueDs->GetValue(0.0f);
+                }
+
+                if (_ComputeRendererSettingType(&r)) {
+                    ret.push_back(r);
+                }
             }
+            return ret;
+        }
+    }
+
+    // Fallbck to getting the render setting through the
+    // HdLegacyRenderControlInterface (really a Hydra 1.0 backdoor).
+    if (HdLegacyRenderControlInterface * const renderControl =
+            _GetLegacyRenderControl()) {
+        for (const HdRenderSettingDescriptor& desc :
+                 renderControl->GetRenderSettingDescriptors()) {
+            UsdImagingGLRendererSetting r;
+            r.key = desc.key;
+            r.name = desc.name;
+            r.defValue = desc.defaultValue;
 
             if (_ComputeRendererSettingType(&r)) {
                 ret.push_back(r);
@@ -2039,39 +2080,44 @@ UsdImagingGLEngine::GetRendererSettingsList() const
         return ret;
     }
 
-    // Fall back to the legacy render control interface.
-    HdLegacyRenderControlInterface * const renderControl =
-        _GetLegacyRenderControl();
-    if (!renderControl) {
-        return {};
-    }
-
-    UsdImagingGLRendererSettingsList ret;
-
-    for (const HdRenderSettingDescriptor& desc :
-             renderControl->GetRenderSettingDescriptors()) {
-        UsdImagingGLRendererSetting r;
-        r.key = desc.key;
-        r.name = desc.name;
-        r.defValue = desc.defaultValue;
-
-        if (_ComputeRendererSettingType(&r)) {
-            ret.push_back(r);
-        }
-    }
-
     return ret;
+    
 }
 
 VtValue
 UsdImagingGLEngine::GetRendererSetting(TfToken const& id) const
 {
-    HdLegacyRenderControlInterface * const renderControl =
-        _GetLegacyRenderControl();
-    if (!renderControl) {
-        return {};
+    // Use the application render setting scene index to see the current
+    // value the application sets it to.
+    if (const HdsiApplicationRenderSettingsSceneIndexRefPtr si =
+            _GetApplicationRenderSettingsSceneIndex()) {
+        const VtValue setting =
+            si->GetRenderSetting(
+                HdsiApplicationRenderSettingsSceneIndex::
+                RenderSettingsSource::Resolved,
+                id);
+        if (setting.IsEmpty()) {
+            if (HdLegacyRenderControlInterface * const renderControl =
+                _GetLegacyRenderControl()) {
+                for (const HdRenderSettingDescriptor& desc :
+                         renderControl->GetRenderSettingDescriptors()) {
+                    if (desc.key == id) {
+                        return desc.defaultValue;
+                    }
+                }
+            }
+        }
+        return setting;
     }
-    return renderControl->GetRenderSetting(id);
+
+    // Fallbck to getting the render setting through the
+    // HdLegacyRenderControlInterface (really a Hydra 1.0 backdoor).
+    if (HdLegacyRenderControlInterface * const renderControl =
+            _GetLegacyRenderControl()) {
+        return renderControl->GetRenderSetting(id);
+    }
+
+    return {};
 }
 
 void
@@ -2082,12 +2128,21 @@ UsdImagingGLEngine::SetRendererSetting(TfToken const& id, VtValue const& value)
     }
 
     TF_PY_ALLOW_THREADS_IN_SCOPE();
-    HdLegacyRenderControlInterface * const renderControl =
-        _GetLegacyRenderControl();
-    if (!renderControl) {
+
+    // Prefer the application render settings scene index (Hydra 2.0 path);
+    // fall back to the legacy render control interface if the renderer did not
+    // advertise render setting descriptors.
+    if (const HdsiApplicationRenderSettingsSceneIndexRefPtr si =
+            _GetApplicationRenderSettingsSceneIndex()) {
+        si->SetApplicationOverrideRenderSetting(id, value);
         return;
     }
-    renderControl->SetRenderSetting(id, value);
+
+    if (HdLegacyRenderControlInterface * const renderControl =
+            _GetLegacyRenderControl()) {
+        renderControl->SetRenderSetting(id, value);
+        return;
+    }
 }
 
 SdfPath
@@ -2111,15 +2166,27 @@ UsdImagingGLEngine::GetActiveRenderPassPrimPath() const
 SdfPath
 UsdImagingGLEngine::GetActiveRenderSettingsPrimPath() const
 {
-    HdSceneIndexBaseRefPtr const terminalSceneIndex =
-        _GetTerminalSceneIndex();
-    if (ARCH_UNLIKELY(!terminalSceneIndex)) {
+    if (!_appSceneIndices) {
+        return {};
+    }
+
+    // After the HdsiApplicationRenderSettingsSceneIndex,
+    // the active render settings prim path is always the same.
+    //
+    // Thus, pick it up just after the scene globals scene index.
+    // That way it corresponds to either the path coming from the
+    // UsdImagingSceneIndex or the one explicitly set by
+    // UsdImagingGLEngine::SetActiveRenderSettingsPrimPath.
+
+    HdSceneIndexBaseRefPtr const sceneIndex =
+        _appSceneIndices->sceneGlobalsSceneIndex;
+    if (!TF_VERIFY(sceneIndex)) {
         return {};
     }
 
     SdfPath activeRenderSettingsPath;
     if (!HdUtils::HasActiveRenderSettingsPrim(
-            terminalSceneIndex, &activeRenderSettingsPath)) {
+            sceneIndex, &activeRenderSettingsPath)) {
         return {};
     }
     return activeRenderSettingsPath;
@@ -2728,6 +2795,15 @@ UsdImagingGLEngine::_GetLegacyRenderControl() const
     }
 
     return renderControl;
+}
+
+HdsiApplicationRenderSettingsSceneIndexRefPtr
+UsdImagingGLEngine::_GetApplicationRenderSettingsSceneIndex() const
+{
+    if (!_appSceneIndices) {
+        return nullptr;
+    }
+    return _appSceneIndices->applicationRenderSettingsSceneIndex;
 }
 
 SdfPath
