@@ -49,6 +49,11 @@ public:
     virtual void SetTaskContextData(
         const TfToken &name, const VtValue &data) = 0;
 
+    virtual void RemoveTaskContextData(
+        const TfToken &name) = 0;
+
+    virtual void ClearTaskContextData() = 0;
+
     /// @}
 
     /// \name AOVs
