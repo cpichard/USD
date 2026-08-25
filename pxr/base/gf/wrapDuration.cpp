@@ -5,7 +5,7 @@
 // https://openusd.org/license.
 //
 #include "pxr/pxr.h"
-#include "pxr/base/gf/timeCode.h"
+#include "pxr/base/gf/duration.h"
 #include "pxr/base/tf/hash.h"
 #include "pxr/base/tf/pyResultConversions.h"
 #include "pxr/base/tf/stringUtils.h"
@@ -23,43 +23,43 @@ using namespace pxr_boost::python;
 
 namespace {
 
-static std::string _Str(GfTimeCode const &self)
+static std::string _Str(GfDuration const &self)
 {
     return TfStringify(self);
 }
 
 static std::string
-_Repr(GfTimeCode const &self)
+_Repr(GfDuration const &self)
 {
     std::ostringstream repr;
-    repr << TF_PY_REPR_PREFIX << "TimeCode(" << self << ")";
+    repr << TF_PY_REPR_PREFIX << "Duration(" << self << ")";
     return repr.str();
 }
 
-static bool _HasNonZeroTimeCode(GfTimeCode const &self)
+static bool _HasNonZeroDuration(GfDuration const &self)
 {
-    return self != GfTimeCode(0.0);
+    return self != GfDuration(0.0);
 }
 
-static double _Float(GfTimeCode const &self)
+static double _Float(GfDuration const &self)
 {
     return double(self);
 }
 
 } // anonymous namespace
 
-void wrapTimeCode()
+void wrapDuration()
 {
-    typedef GfTimeCode This;
+    typedef GfDuration This;
 
-    auto selfCls = class_<This>("TimeCode", init<>())
+    auto selfCls = class_<This>("Duration", init<>())
         .def(init<double>())
 
         .def("GetValue", &This::GetValue)
 
         .def("__repr__", _Repr)
         .def("__str__", _Str)
-        .def("__bool__", _HasNonZeroTimeCode)
+        .def("__bool__", _HasNonZeroDuration)
         .def("__hash__", &This::GetHash)
         .def("__float__", _Float)
 
@@ -76,24 +76,15 @@ void wrapTimeCode()
         .def( self >= self )
         .def( double() >= self )
 
-        .def( double() * self )
         .def( self * double() )
-
+        .def( double() * self )
         .def( self / double() )
         .def( self / self )
-
         .def( self + self )
-        .def( self + GfDuration() )
         .def( self + double() )
-        .def( GfDuration() + self )
         .def( double() + self )
-
         .def( self - self )
-        .def( self - GfDuration() )
-        .def( GfDuration() - self )
         .def( double() - self )
-        .def( self - double() )
-
         .def( -self )
         ;
 

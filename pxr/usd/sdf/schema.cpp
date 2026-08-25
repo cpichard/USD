@@ -443,6 +443,7 @@ _AddStandardTypesToRegistry(Sdf_ValueTypeRegistry* r)
     r->AddType(T("float",  float()));
     r->AddType(T("double", double()));
     r->AddType(T("timecode", GfTimeCode()));
+    r->AddType(T("duration", GfDuration()));
     // TfType reports "string" as the typename for "std::string", but we want
     // the fully-qualified name for documentation purposes.
     r->AddType(T("string", std::string()).CPPTypeName("std::string"));
@@ -1936,6 +1937,7 @@ Sdf_InitializeValueTypeNames()
     n->Float           = r.FindType("float");
     n->Double          = r.FindType("double");
     n->TimeCode        = r.FindType("timecode");
+    n->Duration        = r.FindType("duration");
     n->String          = r.FindType("string");
     n->Token           = r.FindType("token");
     n->Asset           = r.FindType("asset");
@@ -1993,6 +1995,7 @@ Sdf_InitializeValueTypeNames()
     n->FloatArray      = r.FindType("float[]");
     n->DoubleArray     = r.FindType("double[]");
     n->TimeCodeArray   = r.FindType("timecode[]");
+    n->DurationArray   = r.FindType("duration[]");
     n->StringArray     = r.FindType("string[]");
     n->TokenArray      = r.FindType("token[]");
     n->AssetArray      = r.FindType("asset[]");
