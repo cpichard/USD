@@ -51,6 +51,7 @@ public:
     {
     public:
         inline const SdfPath &operator*() const;
+        inline const SdfPath *operator->() const;
 
         HD_API
         const_iterator& operator++();
@@ -106,6 +107,12 @@ HdSceneIndexPrimView::const_iterator::operator*() const
 {
     const _StackFrame &frame = _stack.back();
     return frame.paths[frame.index];
+}
+
+const SdfPath *
+HdSceneIndexPrimView::const_iterator::operator->() const
+{
+    return &(**this);
 }
 
 void
