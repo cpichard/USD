@@ -31,9 +31,9 @@ TF_DECLARE_REF_PTRS(UsdExecImaging_StageSceneIndex);
 /// also sends PrimsDirtied notifications for prims when their computed values
 /// are invalidated.
 ///
-/// The implementation is private to usdExecImaging, so that it can be omitted
-/// when building with PXR_BUILD_EXEC=OFF. To obtain a concrete instance of the
-/// interface, clients must call UsdExecImagingCreateStageSceneIndex.
+/// UsdExecImaging_StageSceneIndex registers a factory with TfType, so that it
+/// can be manufactured from usdImagingGL without linking directly to
+/// usdExecImaging.
 ///
 class UsdExecImaging_StageSceneIndex
     : public UsdImagingStageSceneIndexInterface

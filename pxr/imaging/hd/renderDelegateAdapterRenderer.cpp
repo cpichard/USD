@@ -97,6 +97,14 @@ public:
         return _engine->SetTaskContextData(name, data);
     }
 
+    void RemoveTaskContextData(const TfToken &name) override {
+        _engine->RemoveTaskContextData(name);
+    }
+
+    void ClearTaskContextData() override {
+        _engine->ClearTaskContextData();
+    }
+
     HdAovDescriptor
     GetDefaultAovDescriptor(const TfToken &name) const override {
         return _renderDelegate->GetDefaultAovDescriptor(name);

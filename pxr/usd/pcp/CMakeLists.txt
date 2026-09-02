@@ -191,6 +191,16 @@ pxr_build_test(testPcpPathTranslation_HardToReach
         testenv/testPcpPathTranslation_HardToReach.cpp
 )
 
+pxr_build_test(testPcpSubLayersAndOffsetsMismatch
+    LIBRARIES
+        tf 
+        pcp 
+        sdf
+
+    CPPFILES
+        testenv/testPcpSubLayersAndOffsetsMismatch.cpp
+)
+
 # Enable self-consistency checks for all tests in this library.
 set(PXR_TEST_ENV_VARS PCP_ENABLE_CONSISTENCY_CHECKS=1)
 
@@ -1495,6 +1505,11 @@ pxr_register_test(testPcpLayerMuting
     PYTHON
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpLayerMuting"
     TESTENV testenv/testPcpLayerMuting.testenv
+    EXPECTED_RETURN_CODE 0
+)
+
+pxr_register_test(testPcpSubLayersAndOffsetsMismatch
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testPcpSubLayersAndOffsetsMismatch"
     EXPECTED_RETURN_CODE 0
 )
 

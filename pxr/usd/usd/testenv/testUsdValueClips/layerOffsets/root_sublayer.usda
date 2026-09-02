@@ -37,6 +37,12 @@ def "Model_3" (
 }
 
 def "Model_4" (
+    references = @./ref2.usda@</Model> (offset = 10; scale = 2)
+)
+{
+}
+
+def "Model_5" (
     references = @./ref.usda@</Model>
 
     clips = {
@@ -50,7 +56,7 @@ def "Model_4" (
 {
 }
 
-def "Model_5" (
+def "Model_6" (
     references = @./ref.usda@</Model>
 
     clips = {
@@ -65,7 +71,7 @@ def "Model_5" (
 {
 }
 
-def "Model_6" (
+def "Model_7" (
     references = @./ref.usda@</Model>
 
     clips = {
@@ -78,7 +84,7 @@ def "Model_6" (
 {
 }
 
-def "Model_7" (
+def "Model_8" (
     references = @./ref.usda@</Model>
 
     clips = {

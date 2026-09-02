@@ -19,6 +19,7 @@ pxr_library(hdsi
         TBB::tbb
 
     PUBLIC_CLASSES
+        applicationRenderSettingsSceneIndex
         backPlateSceneIndex
         computeSceneIndexDiff
         coordSysPrimSceneIndex

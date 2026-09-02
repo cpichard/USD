@@ -64,6 +64,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 );
 
 // Version history
+// 1.4: Support for GfDuration values.
 // 1.3: Support for loopBoundaryTime-delimited spline extrapolation loops.
 // 1.2: Support for VtArrayEdit values.
 // 1.1: Support for splines with tangent algorithms None, Custom, or AutoEase.
@@ -72,7 +73,7 @@ TF_DEFINE_PRIVATE_TOKENS(
 
 // Current version of usda that can be read/written
 constexpr uint8_t USDA_MAJOR = 1;
-constexpr uint8_t USDA_MINOR = 3;
+constexpr uint8_t USDA_MINOR = 4;
 constexpr uint8_t USDA_PATCH = 0;
 
 // Caveat developer!

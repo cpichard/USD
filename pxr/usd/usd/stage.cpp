@@ -687,6 +687,13 @@ _TransformTimeCode(GfTimeCode const &timeCode, Xf const &xf)
     return xf.GetLayerOffset() * timeCode;
 }
 
+template <class Xf>
+GfDuration
+_TransformDuration(GfDuration const &duration, Xf const &xf)
+{
+    return xf.GetLayerOffset() * duration;
+}
+
 } // anon
 
 TF_REGISTRY_FUNCTION(VtValue)
@@ -697,6 +704,8 @@ TF_REGISTRY_FUNCTION(VtValue)
     VtRegisterTransform(_TransformSpline<_StageValueToFieldXf>);
     VtRegisterTransform(_TransformTimeCode<_FieldValueToStageXf>);
     VtRegisterTransform(_TransformTimeCode<_StageValueToFieldXf>);
+    VtRegisterTransform(_TransformDuration<_FieldValueToStageXf>);
+    VtRegisterTransform(_TransformDuration<_StageValueToFieldXf>);
     VtRegisterTransform(_PathExprToStage);
     VtRegisterTransform(_PathExprToField);
     VtRegisterTransform(_AssetPathToStage);

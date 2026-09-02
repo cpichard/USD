@@ -63,6 +63,7 @@ TF_DECLARE_REF_PTRS(HdCachingSceneIndex);
 TF_DECLARE_REF_PTRS(HdsiLegacyDisplayStyleOverrideSceneIndex);
 TF_DECLARE_REF_PTRS(HdsiPrimTypeAndPathPruningSceneIndex);
 TF_DECLARE_REF_PTRS(HdsiSceneGlobalsSceneIndex);
+TF_DECLARE_REF_PTRS(HdsiApplicationRenderSettingsSceneIndex);
 TF_DECLARE_REF_PTRS(HdSceneIndexBase);
 TF_DECLARE_REF_PTRS(HdMergingSceneIndex);
 TF_DECLARE_REF_PTRS(HdxTaskControllerSceneIndex);
@@ -871,6 +872,12 @@ private:
     HdSceneIndexBaseRefPtr _GetTerminalSceneIndex() const;
 
     HdLegacyRenderControlInterface * _GetLegacyRenderControl() const;
+
+    // The application-managed render settings scene index, if the renderer
+    // advertised render setting descriptors (the Hydra 2.0 path). Null
+    // otherwise (in which case callers fall back to the legacy render control).
+    HdsiApplicationRenderSettingsSceneIndexRefPtr
+    _GetApplicationRenderSettingsSceneIndex() const;
 
     SdfPath _GetSceneIndexPrimPathFromPrimId(int primId) const;
 
