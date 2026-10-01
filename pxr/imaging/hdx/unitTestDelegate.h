@@ -150,7 +150,12 @@ public:
                  bool guide=false, SdfPath const &instancerId=SdfPath(),
                  TfToken const &scheme=PxOsdOpenSubdivTokens->catmullClark);
 
+    /// Remove a prim
+    void Remove(SdfPath const &id);
+
     void SetRefineLevel(SdfPath const &id, int level);
+
+    void SetDisplayInOverlay(SdfPath const &id, bool displayInOverlay);
 
     void SetReprName(SdfPath const &id, TfToken const &reprName);
 
@@ -249,6 +254,7 @@ private:
     std::map<SdfPath, _Instancer> _instancers;
     std::map<SdfPath, VtValue> _materials;
     std::map<SdfPath, int> _refineLevels;
+    std::map<SdfPath, bool> _displayInOverlay;
     std::map<SdfPath, _DrawTarget> _drawTargets;
     std::map<SdfPath, GfMatrix4d> _cameraTransforms;
     int _refineLevel;
