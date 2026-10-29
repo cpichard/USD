@@ -1,6 +1,12 @@
 # Change Log
 
-## [26.11] - 2026-10-19
+## [26.11.1] - 2026-10-21
+
+- Fixed a GPU memory issue.
+
+- Updated GitHub's CI configuration to avoid a PySide6 bug.
+
+## [26.11.0] - 2026-10-20
 
 ### Security
 
@@ -28,8 +34,8 @@
   Alembic, Qt, and OpenEXR versions were upgraded, and obsolete patches for past 
   dependency versions were dropped.
 
-- **Important**: PySide2 support is deprecated and will be removed in a future 
-  release.
+- **Important**: PySide2 support is deprecated and unsupported due to VFX 2025 
+  toolchain requirements and will be removed in a future release.
 
 - Dropped support for python39 and python310.
 
@@ -40,6 +46,8 @@
   - Replaced deprecated codecs.open call from build_usd.py.
   - Updated to download and install the Polygonal Mesh Coding (PMC) codec 
     library and plugin when building with PMC support.
+  - Fixed default TBB help string.
+    (PR: [#4282](https://github.com/PixarAnimationStudios/OpenUSD/pull/4282))  
 
 - Build changes made in support of the AOUSD Build Interest Group's work on 
   cmake modernization. 
@@ -80,7 +88,8 @@
   `pxr_build_test_plugin`.
 
 - Configured OpenColorIO to be built when building OpenImageIO. 
-  (Issue: [#4219](https://github.com/PixarAnimationStudios/OpenUSD/issues/4219))
+  (Issue: [#4219](https://github.com/PixarAnimationStudios/OpenUSD/issues/4219),
+   PR: [#4295](https://github.com/PixarAnimationStudios/OpenUSD/pull/4295))
 
 ### USD
 
@@ -509,9 +518,9 @@
   requires calls to GarbageCollect, framebuffers are cleared on HgiGLTexture 
   deletion.
 
-- Added `GetDetailedResourceAllocation` to HdResourceRegistry, which can be 
-  implemented to return more detailed information than `GetResourceAllocation`. 
-  If unimplemented, returns the same information as `GetResourceAllocation`.
+- Added `GetDetailedResourceAllocation` to HdResourceRegistry, which derived 
+  classes can override to return detailed resource allocation information, 
+  otherwise returns the same information as `GetResourceAllocation`.
 
 - Fixed possible OOB shader access for basis curves when patch vertex count was 
   less than 4.
@@ -706,6 +715,11 @@
 
 - Updated USDZ specification doc to clarify that nesting usdz is allowed. 
   (Issue: [#4200](https://github.com/PixarAnimationStudios/OpenUSD/issues/4200))
+
+- Various doc fixes.
+  (PR: [#4280](https://github.com/PixarAnimationStudios/OpenUSD/pull/4280),
+   [#4281](https://github.com/PixarAnimationStudios/OpenUSD/pull/4281),
+   [#4289](https://github.com/PixarAnimationStudios/OpenUSD/pull/4289))
 
 <details open>
   <summary><b>Previous Releases</b></summary>

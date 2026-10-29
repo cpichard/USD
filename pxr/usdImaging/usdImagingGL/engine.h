@@ -48,10 +48,11 @@ TF_DECLARE_WEAK_AND_REF_PTRS(GlfSimpleLightingContext);
 TF_DECLARE_REF_PTRS(UsdImagingSceneIndex);
 TF_DECLARE_REF_PTRS(UsdImagingRootOverridesSceneIndex);
 TF_DECLARE_REF_PTRS(HdCachingSceneIndex);
+TF_DECLARE_REF_PTRS(HdsiApplicationRenderSettingsSceneIndex);
 TF_DECLARE_REF_PTRS(HdsiLegacyDisplayStyleOverrideSceneIndex);
 TF_DECLARE_REF_PTRS(HdsiPrimTypeAndPathPruningSceneIndex);
+TF_DECLARE_REF_PTRS(HdsiPurposeFilteringSceneIndex);
 TF_DECLARE_REF_PTRS(HdsiSceneGlobalsSceneIndex);
-TF_DECLARE_REF_PTRS(HdsiApplicationRenderSettingsSceneIndex);
 TF_DECLARE_REF_PTRS(HdSceneIndexBase);
 TF_DECLARE_REF_PTRS(HdMergingSceneIndex);
 TF_DECLARE_REF_PTRS(HdxTaskControllerSceneIndex);
@@ -789,6 +790,12 @@ protected:
         HdContainerDataSourceHandle const &sceneIndexCreateArgs,
         HdRendererPluginHandle const &plugin,
         const HdRendererCreateArgsSchema &rendererCreateArgs);
+    
+    // Get the terminal scene index of the scene index graph that feeds
+    // the renderer.
+    USDIMAGINGGL_API
+    HdSceneIndexBaseRefPtr
+    _GetTerminalSceneIndex() const;
 
     Hgi *
     _GetOrCreateHgi();
@@ -827,8 +834,6 @@ protected:
     bool _isPopulated;
 
 private:
-    HdSceneIndexBaseRefPtr _GetTerminalSceneIndex() const;
-
     HdLegacyRenderControlInterface * _GetLegacyRenderControl() const;
 
     // The application-managed render settings scene index, if the renderer
@@ -836,6 +841,9 @@ private:
     // otherwise (in which case callers fall back to the legacy render control).
     HdsiApplicationRenderSettingsSceneIndexRefPtr
     _GetApplicationRenderSettingsSceneIndex() const;
+
+    HdsiPurposeFilteringSceneIndexRefPtr
+    _GetPurposeFilteringSceneIndex() const;
 
     SdfPath _GetSceneIndexPrimPathFromPrimId(int primId) const;
 

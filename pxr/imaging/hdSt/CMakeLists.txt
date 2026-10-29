@@ -192,6 +192,7 @@ pxr_library(hdSt
 
     RESOURCE_FILES
         plugInfo.json
+        shaders/backPlateSurface.glslfx
         shaders/basisCurves.glslfx
         shaders/capsule.glslfx
         shaders/compute.glslfx
@@ -208,6 +209,7 @@ pxr_library(hdSt
         shaders/implicitSurface.glslfx
         shaders/implicitSurfaceFaceCull.glslfx
         shaders/implicitSurfaceNormal.glslfx
+        shaders/implicitSurfaceWire.glslfx
         shaders/instancing.glslfx
         shaders/invalidMaterialNetwork.glslfx
         shaders/mesh.glslfx
@@ -2749,7 +2751,6 @@ pxr_register_test(testHdStInstancingUnbalancedNoBindless
         TF_DEBUG=HD_SAFE_MODE
 )
 if (${PXR_ENABLE_MATERIALX_SUPPORT} AND NOT APPLE)
-if (NOT WIN32)
 pxr_register_test(testHdStMaterialXShaderGen_UsdPSdefault
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdStMaterialXShaderGen --filename usd_preview_surface_default.mtlx"
     EXPECTED_RETURN_CODE 0
@@ -2757,7 +2758,6 @@ pxr_register_test(testHdStMaterialXShaderGen_UsdPSdefault
     DIFF_COMPARE shadergen_UsdPSdefault.out
     TESTENV testenv/testHdStMaterialXShaderGen
 )
-endif()
 pxr_register_test(testHdStMaterialXShaderGen_SSmarble
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdStMaterialXShaderGen --filename standard_surface_marble_solid.mtlx"
     EXPECTED_RETURN_CODE 0
@@ -2779,7 +2779,6 @@ pxr_register_test(testHdStMaterialXShaderGen_SSdefault
     DIFF_COMPARE shadergen_SSdefault.out
     TESTENV testenv/testHdStMaterialXShaderGen
 )
-if (NOT WIN32)
 pxr_register_test(testHdStMaterialXShaderGen_UsdPStextured
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdStMaterialXShaderGen --filename usd_preview_surface_brass_tiled.mtlx --textureName image_color_file --textureName image_roughness_file"
     EXPECTED_RETURN_CODE 0
@@ -2787,7 +2786,6 @@ pxr_register_test(testHdStMaterialXShaderGen_UsdPStextured
     DIFF_COMPARE shadergen_UsdPStextured.out
     TESTENV testenv/testHdStMaterialXShaderGen
 )
-endif()
 pxr_register_test(testHdStMaterialXShaderGen_SStextured
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdStMaterialXShaderGen --filename standard_surface_brass_tiled.mtlx --textureName image_color_file --textureName image_roughness_file --primvarMap uv:vector2"
     EXPECTED_RETURN_CODE 0
@@ -2795,7 +2793,6 @@ pxr_register_test(testHdStMaterialXShaderGen_SStextured
     DIFF_COMPARE shadergen_SStextured.out
     TESTENV testenv/testHdStMaterialXShaderGen
 )
-if (NOT WIN32)
 pxr_register_test(testHdStMaterialXShaderGen_UsdPSglass
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdStMaterialXShaderGen --filename usd_preview_surface_glass.mtlx"
     EXPECTED_RETURN_CODE 0
@@ -2803,7 +2800,6 @@ pxr_register_test(testHdStMaterialXShaderGen_UsdPSglass
     DIFF_COMPARE shadergen_UsdPSglass.out
     TESTENV testenv/testHdStMaterialXShaderGen
 )
-endif()
 pxr_register_test(testHdStMaterialXShaderGen_SStextured_bindless
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdStMaterialXShaderGen --filename standard_surface_brass_tiled.mtlx --textureName image_color_file --textureName image_roughness_file --primvarMap uv:vector2 --bindless"
     EXPECTED_RETURN_CODE 0
@@ -2811,7 +2807,6 @@ pxr_register_test(testHdStMaterialXShaderGen_SStextured_bindless
     DIFF_COMPARE shadergen_SStextured_bindless.out
     TESTENV testenv/testHdStMaterialXShaderGen
 )
-if (NOT WIN32)
 pxr_register_test(testHdStMaterialXShaderGen_texcoord
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testHdStMaterialXShaderGen --filename texcoord.mtlx --primvarMap st:vector2"
     EXPECTED_RETURN_CODE 0
@@ -2819,7 +2814,6 @@ pxr_register_test(testHdStMaterialXShaderGen_texcoord
     DIFF_COMPARE shadergen_texcoord.out
     TESTENV testenv/testHdStMaterialXShaderGen
 )
-endif()
 endif()
 if (NOT APPLE)
 pxr_register_test(testHdStMeshTopology
