@@ -249,6 +249,17 @@ pxr_build_test(testUsdImagingMaterialBinding
     CPPFILES
         testenv/testUsdImagingMaterialBinding.cpp
 )
+pxr_build_test(testUsdImagingMaterialAdapter
+    LIBRARIES
+        usdImaging
+        usdShade
+        usd
+        hd
+        garch
+        tf
+    CPPFILES
+        testenv/testUsdImagingMaterialAdapter.cpp
+)
 pxr_build_test(testUsdImagingNestedInstancingCategories
     LIBRARIES
         usdImaging
@@ -268,8 +279,9 @@ pxr_build_test(testUsdImagingPrimvarUtils
 pxr_build_test(testUsdImagingRerootingSceneIndex
     LIBRARIES
         usdImaging
+        usd
+        sdf
         hd
-        vt
     CPPFILES
         testenv/testUsdImagingRerootingSceneIndex.cpp
 )
@@ -402,6 +414,11 @@ if (BUILD_SHARED_LIBS)
         EXPECTED_RETURN_CODE 0
         ENV
             USD_ASSIGN_PROTOTYPES_DETERMINISTICALLY=1
+    )
+    pxr_register_test(testUsdImagingMaterialAdapter
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingMaterialAdapter -stage model.usda"
+        TESTENV testenv/testUsdImagingMaterialAdapter
+        EXPECTED_RETURN_CODE 0
     )
     pxr_register_test(testUsdImagingColorSpace
         COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingColorSpace"

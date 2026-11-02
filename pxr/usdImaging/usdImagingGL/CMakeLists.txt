@@ -822,6 +822,28 @@ pxr_register_test(testUsdImagingGLNativeImplicits_piCapsulesWireOnSurf
         HDST_ENABLE_NATIVE_IMPLICITS=1
 )
 
+pxr_register_test(testUsdImagingGLNativeImplicits_points
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading points -stage intersectingImplicits.usda -camera /main_cam -write testUsdImagingGLNativeImplicits_points.png"
+    IMAGE_DIFF_COMPARE
+        testUsdImagingGLNativeImplicits_points.png
+    FAIL_PERCENT 0.02
+    FAIL 0.05
+    TESTENV testenv/testUsdImagingGLNativeImplicits
+    ENV
+        HDST_ENABLE_NATIVE_IMPLICITS=1
+)
+
+pxr_register_test(testUsdImagingGLNativeImplicits_pointsClipped
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading points -stage intersectingImplicitsClipped.usda -camera /main_cam -write testUsdImagingGLNativeImplicits_pointsClipped.png"
+    IMAGE_DIFF_COMPARE
+        testUsdImagingGLNativeImplicits_pointsClipped.png
+    FAIL_PERCENT 0.01
+    FAIL 0.05
+    TESTENV testenv/testUsdImagingGLNativeImplicits
+    ENV
+        HDST_ENABLE_NATIVE_IMPLICITS=1
+)
+
 pxr_register_test(testUsdImagingGLNativeImplicits_piSpheres
     COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -stage piSpheres.usda -camera /main_cam -write testUsdImagingGLNativeImplicits_piSpheres.png"
     IMAGE_DIFF_COMPARE
@@ -2775,7 +2797,7 @@ pxr_register_test(testUsdImagingGLPreviewSurface_TextureOpacity
 
 
 pxr_register_test(testUsdImagingGLPreviewSurface_TextureScaleAndBias
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -frameAll -stage testPreviewSurfaceTextureScaleAndBias.usda -write testPreviewSurfaceTextureScaleAndBias.png"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -camera /Scene/Camera -stage testPreviewSurfaceTextureScaleAndBias.usda -write testPreviewSurfaceTextureScaleAndBias.png"
     IMAGE_DIFF_COMPARE
         testPreviewSurfaceTextureScaleAndBias.png
     FAIL 0.04
@@ -2790,7 +2812,7 @@ pxr_register_test(testUsdImagingGLPreviewSurface_TextureScaleAndBias
 
 
 pxr_register_test(testUsdImagingGLPreviewSurface_Transform2d
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -frameAll -stage testPreviewSurfaceTransform2d.usda -write testPreviewSurfaceTransform2d.png"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -camera /Scene/Camera -stage testPreviewSurfaceTransform2d.usda -write testPreviewSurfaceTransform2d.png"
     IMAGE_DIFF_COMPARE
         testPreviewSurfaceTransform2d.png
     FAIL 0.1
@@ -2820,7 +2842,7 @@ pxr_register_test(testUsdImagingGLPreviewSurface_SourceColorSpace
 
 
 pxr_register_test(testUsdImagingGLPreviewSurface_NormalMap
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -frameAll -stage testPreviewSurfaceNormalMap.usda -write testPreviewSurfaceNormalMap.png"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -camera /Scene/Camera -stage testPreviewSurfaceNormalMap.usda -write testPreviewSurfaceNormalMap.png"
     IMAGE_DIFF_COMPARE
         testPreviewSurfaceNormalMap.png
     FAIL 0.05
@@ -3112,7 +3134,7 @@ pxr_register_test(testUsdImagingGLPreviewSurfaceNonBindless_TextureOpacity
 
 
 pxr_register_test(testUsdImagingGLPreviewSurfaceNonBindless_TextureScaleAndBias
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -frameAll -stage testPreviewSurfaceTextureScaleAndBias.usda -write testPreviewSurfaceTextureScaleAndBias.png"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -camera /Scene/Camera -stage testPreviewSurfaceTextureScaleAndBias.usda -write testPreviewSurfaceTextureScaleAndBias.png"
     IMAGE_DIFF_COMPARE
         testPreviewSurfaceTextureScaleAndBias.png
     FAIL 0.04
@@ -3127,7 +3149,7 @@ pxr_register_test(testUsdImagingGLPreviewSurfaceNonBindless_TextureScaleAndBias
 
 
 pxr_register_test(testUsdImagingGLPreviewSurfaceNonBindless_Transform2d
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -frameAll -stage testPreviewSurfaceTransform2d.usda -write testPreviewSurfaceTransform2d.png"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -camera /Scene/Camera -stage testPreviewSurfaceTransform2d.usda -write testPreviewSurfaceTransform2d.png"
     IMAGE_DIFF_COMPARE
         testPreviewSurfaceTransform2d.png
     FAIL 0.1
@@ -3157,7 +3179,7 @@ pxr_register_test(testUsdImagingGLPreviewSurfaceNonBindless_SourceColorSpace
 
 
 pxr_register_test(testUsdImagingGLPreviewSurfaceNonBindless_NormalMap
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -frameAll -stage testPreviewSurfaceNormalMap.usda -write testPreviewSurfaceNormalMap.png"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -camera /Scene/Camera -stage testPreviewSurfaceNormalMap.usda -write testPreviewSurfaceNormalMap.png"
     IMAGE_DIFF_COMPARE
         testPreviewSurfaceNormalMap.png
     FAIL 0.05
@@ -3348,7 +3370,7 @@ pxr_register_test(testUsdImagingGLPremultiplyAlpha
 )
 
 pxr_register_test(testUsdImagingGLPremultiplyAlpha_udims
-    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -frameAll -stage testPremultiplyAlphaUdims.usda -write testPremultiplyAlphaUdims.png"
+    COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -offscreen -lighting -shading smooth -camera /Scene/Camera -stage testPremultiplyAlphaUdims.usda -write testPremultiplyAlphaUdims.png"
     IMAGE_DIFF_COMPARE
         testPremultiplyAlphaUdims.png
     FAIL 0.01
@@ -5059,7 +5081,7 @@ if (MaterialX_FOUND AND ${PXR_ENABLE_MATERIALX_SUPPORT})
     )
 
     pxr_register_test(testUsdImagingGLMaterialXBasic_mxDirectLights
-        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -lighting -sceneLights -shading smooth -complexity 1.3 -offscreen -frameAll -stage mxDirectLights.usda -write mxDirectLights.png"
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -lighting -sceneLights -shading smooth -complexity 1.3 -offscreen -camera /Camera -stage mxDirectLights.usda -write mxDirectLights.png"
         IMAGE_DIFF_COMPARE
             mxDirectLights.png
         FAIL 0.1
@@ -5071,7 +5093,7 @@ if (MaterialX_FOUND AND ${PXR_ENABLE_MATERIALX_SUPPORT})
     )
 
     pxr_register_test(testUsdImagingGLMaterialXBasic_mxDirectLightsCameraLight
-        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -lighting -camlight -shading smooth -complexity 1.3 -offscreen -frameAll -stage mxDirectLights.usda -write mxDirectLightsCameraLight.png"
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -lighting -camlight -shading smooth -complexity 1.3 -offscreen -camera /Camera -stage mxDirectLights.usda -write mxDirectLightsCameraLight.png"
         IMAGE_DIFF_COMPARE
             mxDirectLightsCameraLight.png
         FAIL 0.1
@@ -5083,7 +5105,7 @@ if (MaterialX_FOUND AND ${PXR_ENABLE_MATERIALX_SUPPORT})
     )
 
     pxr_register_test(testUsdImagingGLMaterialXBasic_mxLights
-        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -lighting -sceneLights -shading smooth -complexity 1.3 -offscreen -frameAll -stage mxLights.usda -write mxLights.png"
+        COMMAND "${CMAKE_INSTALL_PREFIX}/tests/testUsdImagingGLBasicDrawing -lighting -sceneLights -shading smooth -complexity 1.3 -offscreen -camera /Camera -stage mxLights.usda -write mxLights.png"
         IMAGE_DIFF_COMPARE
             mxLights.png
         FAIL 0.1
