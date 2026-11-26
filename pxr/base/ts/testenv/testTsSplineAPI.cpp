@@ -67,6 +67,12 @@ void TestKnotIO()
     VERIFY_GET(knot, GetPreTanSlope, T, 2.3);
     TF_AXIOM(knot.SetCustomDataByKey("blah", VtValue(7)));
     TF_AXIOM(knot.GetCustomData()["blah"] == VtValue(7));
+    TF_AXIOM(knot.GetCustomDataByKey("blah") == VtValue(7));
+
+    TF_AXIOM(knot.SetCustomDataByKey("blank", VtValue()));
+    TF_AXIOM(knot.GetCustomData()["blah"] == VtValue(7));
+    TF_AXIOM(knot.GetCustomData()["blank"] == VtValue());
+             
 
     // Clear pre-value.
     TF_AXIOM(knot.ClearPreValue());
@@ -89,6 +95,7 @@ void TestKnotIO()
     TF_AXIOM(knotM.GetTime() == 1);
     VERIFY_GET(knotM, GetValue, T, 14);
     TF_AXIOM(knotM.GetCustomData()["blah"] == VtValue(7));
+    TF_AXIOM(knotM.GetCustomDataByKey("blah") == VtValue(7));
     TF_AXIOM(knot.GetTime() == 0);
     VERIFY_GET(knot, GetValue, T, 0);
     TF_AXIOM(knot.GetCustomData().empty());
@@ -102,6 +109,7 @@ void TestKnotIO()
     TF_AXIOM(knotM.GetTime() == 0);
     VERIFY_GET(knotM, GetValue, T, 0);
     TF_AXIOM(knotM.GetCustomData().empty());
+    TF_AXIOM(knotM.GetCustomDataByKey("random") == VtValue());
 }
 
 template <typename T>
@@ -296,6 +304,43 @@ void TestSplineIO()
     TF_AXIOM(splineAR.Eval(4, &vtValue) &&
              vtValue.IsHolding<T>() &&
              vtValue.Get<T>() == 3);
+
+    // Verify changing knots
+    spline = splineAR;
+
+    // Add then remove a knot.
+    splineAR.SetKnot(knotAR2);
+    TF_AXIOM(splineAR != spline);
+    splineAR.RemoveKnot(2);
+    TF_AXIOM(splineAR == spline);
+
+    // Add then change customData
+    knotAR2.SetCustomDataByKey("foo", VtValue(1));
+    splineAR.SetKnot(knotAR2);
+    spline2 = splineAR;
+    knotAR2.SetCustomDataByKey("foo", VtValue(3));
+    splineAR.SetKnot(knotAR2);
+    TF_AXIOM(splineAR != spline2);
+
+    // Verify round trip into and out of a spline.
+    TsKnot genericKnot;
+    TF_AXIOM(splineAR.GetKnot(2, &genericKnot));
+    TF_AXIOM(genericKnot == knotAR2);
+    TF_AXIOM(genericKnot.GetCustomData()["foo"] == VtValue(3));
+
+    // restore it.
+    knotAR2.SetCustomDataByKey("foo", VtValue(1));
+    splineAR.SetKnot(knotAR2);
+    TF_AXIOM(splineAR == spline2);
+
+    // clear it and verify that empty customData round trips as well.
+    knotAR2.SetCustomData(VtDictionary());
+    splineAR.SetKnot(knotAR2);
+    TF_AXIOM(splineAR != spline2);
+
+    TF_AXIOM(splineAR.GetKnot(2, &genericKnot));
+    TF_AXIOM(genericKnot == knotAR2);
+    TF_AXIOM(genericKnot.GetCustomData().empty());
 }
 
 int main()
